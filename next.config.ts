@@ -9,9 +9,12 @@ const withPWA = withPWAInit({
   reloadOnOnline: true,
 });
 
-const nextConfig: NextConfig = {
+const baseConfig: NextConfig = {
   reactStrictMode: true,
-  // @ducanh2912/next-pwa usa Webpack; en Next 16 el build por defecto es Turbopack.
 };
 
-export default withPWA(nextConfig);
+// En desarrollo no envolvemos con PWA: el plugin añade Webpack y choca con Turbopack (`next dev`).
+// En `next build` NODE_ENV es `production` y sí aplicamos PWA (el build sigue usando `next build --webpack`).
+const isDev = process.env.NODE_ENV === "development";
+
+export default isDev ? baseConfig : withPWA(baseConfig);
