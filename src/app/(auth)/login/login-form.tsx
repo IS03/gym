@@ -25,6 +25,31 @@ export function LoginForm({ authError }: LoginFormProps) {
   );
   const [pending, setPending] = useState(false);
 
+  async function handleGoogle() {
+    setError(null);
+    setMessage(null);
+    setPending(true);
+
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message);
+        setPending(false);
+      }
+      // Si no hay error, Supabase redirige al proveedor; no seguimos ejecutando UI.
+    } catch {
+      setError("Configurá Supabase en .env.local (URL y anon key).");
+      setPending(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -57,10 +82,24 @@ export function LoginForm({ authError }: LoginFormProps) {
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl">Appgym</CardTitle>
         <CardDescription>
-          Ingresá tu correo y te enviamos un enlace mágico (sin contraseña).
+          Ingresá con Google o por correo con enlace mágico (sin contraseña).
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full"
+          onClick={handleGoogle}
+          disabled={pending}
+        >
+          {pending ? "Redirigiendo…" : "Continuar con Google"}
+        </Button>
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">o</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Correo</Label>
