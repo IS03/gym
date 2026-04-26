@@ -4,7 +4,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import {
-  confirmMealAction,
   createMealAction,
   softDeleteMealAction,
   updateMealAction,
@@ -207,12 +206,19 @@ export default async function TodayPage() {
                   </details>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <form action={confirmMealAction}>
-                      <input type="hidden" name="id" value={meal.id} />
-                      <Button className="h-11 w-full" type="submit" variant="outline">
-                        Confirmar
+                    {meal.status !== "confirmed" ? (
+                      <form action={updateMealAction}>
+                        <input type="hidden" name="id" value={meal.id} />
+                        <input type="hidden" name="status" value="confirmed" />
+                        <Button className="h-11 w-full" type="submit" variant="outline">
+                          Confirmar
+                        </Button>
+                      </form>
+                    ) : (
+                      <Button className="h-11 w-full" type="button" variant="outline" disabled>
+                        Confirmada
                       </Button>
-                    </form>
+                    )}
                     <form action={softDeleteMealAction}>
                       <input type="hidden" name="id" value={meal.id} />
                       <Button className="h-11 w-full" type="submit" variant="destructive">

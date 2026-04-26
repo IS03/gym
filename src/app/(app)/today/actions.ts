@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createMeal, softDeleteMeal, updateMeal } from "@/lib/phase1/day-log";
+import {
+  createMeal,
+  softDeleteMeal,
+  updateMeal,
+} from "@/lib/phase1/day-log";
 
 function parseNumber(value: FormDataEntryValue | null): number | null {
   if (value === null) return null;
@@ -29,6 +33,7 @@ export async function createMealAction(formData: FormData) {
   });
 
   revalidatePath("/today");
+  revalidatePath("/history");
 }
 
 export async function updateMealAction(formData: FormData) {
@@ -52,17 +57,20 @@ export async function updateMealAction(formData: FormData) {
   });
 
   revalidatePath("/today");
+  revalidatePath("/history");
 }
 
 export async function confirmMealAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await updateMeal({ id, status: "confirmed" });
   revalidatePath("/today");
+  revalidatePath("/history");
 }
 
 export async function softDeleteMealAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await softDeleteMeal(id);
   revalidatePath("/today");
+  revalidatePath("/history");
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/providers/theme-context";
 import { Button } from "@/components/ui/button";
 
 export function ThemeSettings() {
