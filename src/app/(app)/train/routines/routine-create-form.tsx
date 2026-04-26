@@ -10,6 +10,17 @@ type State = { error: string | null };
 
 const initialState: State = { error: null };
 
+const ROUTINE_COLORS = [
+  { value: "", label: "Sin color" },
+  { value: "#ef4444", label: "Rojo" },
+  { value: "#f97316", label: "Naranja" },
+  { value: "#eab308", label: "Amarillo" },
+  { value: "#22c55e", label: "Verde" },
+  { value: "#06b6d4", label: "Cian" },
+  { value: "#3b82f6", label: "Azul" },
+  { value: "#a855f7", label: "Violeta" },
+] as const;
+
 export function RoutineCreateForm() {
   const [state, formAction, pending] = useActionState(
     async (_prev: State, formData: FormData): Promise<State> => {
@@ -28,6 +39,21 @@ export function RoutineCreateForm() {
       <div className="space-y-1">
         <Label htmlFor="nombre">Nombre</Label>
         <Input id="nombre" name="nombre" placeholder="Ej: Pecho" required />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="color">Color</Label>
+        <select
+          id="color"
+          name="color"
+          className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+          defaultValue=""
+        >
+          {ROUTINE_COLORS.map((c) => (
+            <option key={c.value || "none"} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
       </div>
       {state.error ? (
         <p className="text-sm text-destructive">{state.error}</p>

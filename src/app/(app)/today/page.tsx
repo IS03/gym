@@ -93,6 +93,9 @@ export default async function TodayPage() {
               <Input
                 id="final_protein_g"
                 name="final_protein_g"
+                type="number"
+                min={0}
+                step="0.1"
                 inputMode="numeric"
                 placeholder="Ej: 30"
               />
@@ -173,6 +176,9 @@ export default async function TodayPage() {
                           <Input
                             id={`p-${meal.id}`}
                             name="final_protein_g"
+                            type="number"
+                            min={0}
+                            step="0.1"
                             inputMode="numeric"
                             defaultValue={
                               meal.final_protein_g === null ? "" : String(meal.final_protein_g)

@@ -36,8 +36,15 @@ export default async function RoutinesPage() {
                 href={`/train/routines/${r.id}`}
                 className="block rounded-md border bg-background px-4 py-3"
               >
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">{r.nombre}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block size-3 shrink-0 rounded-full border"
+                      style={{ backgroundColor: r.color ?? "transparent" }}
+                      aria-hidden
+                    />
+                    <span className="text-sm font-medium">{r.nombre}</span>
+                  </div>
                 </div>
               </Link>
             ))}

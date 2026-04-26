@@ -9,6 +9,7 @@ import {
   createExercise,
   createExerciseFromSession,
   createRoutine,
+  finishSession,
   removeSessionExercise,
   removeRoutineExercise,
   replaceRoutineExercises,
@@ -26,6 +27,15 @@ function str(formData: FormData, key: string) {
 function num(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function numOptional(formData: FormData, key: string): number | null | undefined {
+  const v = formData.get(key);
+  if (v === null) return undefined; // key ausente: no tocar en DB
+  const raw = String(v).trim();
+  if (!raw) return null; // key presente pero vacío: borrar valor
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
@@ -76,14 +86,16 @@ export async function archiveExerciseAction(formData: FormData) {
 
 export async function createRoutineAction(formData: FormData) {
   const nombre = str(formData, "nombre");
-  await createRoutine({ nombre });
+  const color = str(formData, "color") || null;
+  await createRoutine({ nombre, color });
   revalidatePath("/train/routines");
 }
 
 export async function updateRoutineAction(formData: FormData) {
   const id = str(formData, "id");
   const nombre = str(formData, "nombre");
-  await updateRoutine({ id, nombre });
+  const color = str(formData, "color") || null;
+  await updateRoutine({ id, nombre, color });
   revalidatePath("/train/routines");
   revalidatePath(`/train/routines/${id}`);
 }
@@ -171,6 +183,13 @@ export async function removeSessionExerciseAction(formData: FormData) {
   revalidatePath(`/train/session/${sessionId}`);
 }
 
+export async function finishSessionAction(formData: FormData) {
+  const sessionId = str(formData, "session_id");
+  await finishSession(sessionId);
+  revalidatePath(`/train/session/${sessionId}`);
+  revalidatePath("/train");
+}
+
 export async function updateSessionExerciseAction(formData: FormData) {
   const sessionId = str(formData, "session_id");
   const id = str(formData, "id");
@@ -181,9 +200,9 @@ export async function updateSessionExerciseAction(formData: FormData) {
 
   await updateSessionExercise({
     id,
-    series_reales: num(formData, "series_reales"),
-    reps_reales: num(formData, "reps_reales"),
-    peso_real: num(formData, "peso_real"),
+    series_reales: numOptional(formData, "series_reales"),
+    reps_reales: numOptional(formData, "reps_reales"),
+    peso_real: numOptional(formData, "peso_real"),
     is_completed,
   });
 

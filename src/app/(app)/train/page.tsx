@@ -48,6 +48,12 @@ export default function TrainPage() {
           >
             Historial por ejercicio
           </Link>
+          <Link
+            href="/train/calendar"
+            className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
+          >
+            Calendario
+          </Link>
         </CardContent>
       </Card>
     </div>

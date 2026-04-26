@@ -25,6 +25,7 @@ export type Routine = {
   id: string;
   user_id: string;
   nombre: string;
+  color: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ export type WorkoutSession = {
   id: string;
   day_log_id: string;
   routine_id: string | null;
+  ended_at: string | null;
   created_at: string;
   updated_at: string;
 };

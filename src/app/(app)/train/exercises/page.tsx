@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listExercises } from "@/lib/phase2/training";
+import { ExerciseFilterForm } from "./exercise-filter-form";
 import {
   createExerciseAction,
   archiveExerciseAction,
@@ -22,8 +23,18 @@ const MUSCLE_GROUPS = [
   { value: "cardio", label: "Cardio" },
 ] as const;
 
-export default async function ExercisesPage() {
-  const exercises = await listExercises({ includeArchived: false });
+export default async function ExercisesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const group = typeof sp.group === "string" ? sp.group : "";
+
+  const exercises = await listExercises({
+    includeArchived: false,
+    muscleGroup: (group === "none" ? "none" : (group as any)) || undefined,
+  });
 
   return (
     <div className="space-y-6">
@@ -97,6 +108,22 @@ export default async function ExercisesPage() {
               Crear
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ExerciseFilterForm
+            group={group}
+            options={[
+              { value: "", label: "(Todos)" },
+              { value: "none", label: "(Sin grupo)" },
+              ...MUSCLE_GROUPS,
+            ]}
+          />
         </CardContent>
       </Card>
 
