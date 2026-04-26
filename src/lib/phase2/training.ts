@@ -24,6 +24,15 @@ function assertNonEmpty(value: string, label: string) {
   if (!value.trim()) throw new Error(`${label} es obligatorio.`);
 }
 
+function asPostgrestError(err: unknown): { code?: string; message?: string } {
+  if (typeof err !== "object" || err === null) return {};
+  const anyErr = err as any;
+  return {
+    code: typeof anyErr.code === "string" ? anyErr.code : undefined,
+    message: typeof anyErr.message === "string" ? anyErr.message : undefined,
+  };
+}
+
 export async function listExercises(params?: {
   includeArchived?: boolean;
 }): Promise<Exercise[]> {
@@ -70,7 +79,13 @@ export async function createExercise(input: {
     .select("*")
     .single();
 
-  if (error) throw new Error(`Crear exercise: ${error.message}`);
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe un ejercicio con ese nombre.");
+    }
+    throw new Error(`Crear exercise: ${error.message}`);
+  }
   return data as Exercise;
 }
 
@@ -106,7 +121,13 @@ export async function updateExercise(input: {
     .select("*")
     .single();
 
-  if (error) throw new Error(`Editar exercise: ${error.message}`);
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe un ejercicio con ese nombre.");
+    }
+    throw new Error(`Editar exercise: ${error.message}`);
+  }
   return data as Exercise;
 }
 
@@ -150,7 +171,13 @@ export async function createRoutine(input: {
     .select("*")
     .single();
 
-  if (error) throw new Error(`Crear rutina: ${error.message}`);
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe una rutina con ese nombre.");
+    }
+    throw new Error(`Crear rutina: ${error.message}`);
+  }
   return data as Routine;
 }
 
@@ -177,7 +204,13 @@ export async function updateRoutine(input: {
     .select("*")
     .single();
 
-  if (error) throw new Error(`Editar rutina: ${error.message}`);
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe una rutina con ese nombre.");
+    }
+    throw new Error(`Editar rutina: ${error.message}`);
+  }
   return data as Routine;
 }
 
@@ -248,6 +281,66 @@ export async function replaceRoutineExercises(input: {
     })),
   );
   if (insErr) throw new Error(`Insert routine_exercises: ${insErr.message}`);
+}
+
+export async function addExerciseToRoutine(input: {
+  routineId: string;
+  exerciseId: string;
+}): Promise<RoutineExercise> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  // Validar ownership de rutina y exercise (defensivo; triggers/RLS también protegen)
+  const { data: routine, error: routineErr } = await supabase
+    .from("routines")
+    .select("id, user_id")
+    .eq("id", input.routineId)
+    .maybeSingle();
+  if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
+  if (!routine) throw new Error("Rutina no encontrada.");
+  if (routine.user_id !== userId) throw new Error("Forbidden.");
+
+  const { data: exercise, error: exErr } = await supabase
+    .from("exercises")
+    .select("id, user_id")
+    .eq("id", input.exerciseId)
+    .maybeSingle();
+  if (exErr) throw new Error(`Leer exercise: ${exErr.message}`);
+  if (!exercise) throw new Error("Ejercicio no encontrado.");
+  if (exercise.user_id !== userId) throw new Error("Forbidden.");
+
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .insert({
+      routine_id: input.routineId,
+      exercise_id: input.exerciseId,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ese ejercicio ya está en la rutina.");
+    }
+    throw new Error(`Agregar ejercicio a rutina: ${error.message}`);
+  }
+
+  return data as RoutineExercise;
+}
+
+export async function removeRoutineExercise(input: {
+  routineExerciseId: string;
+}): Promise<void> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const { error } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("id", input.routineExerciseId);
+
+  if (error) throw new Error(`Quitar ejercicio de rutina: ${error.message}`);
 }
 
 export async function startFreeSession(input: {

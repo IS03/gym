@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { listRoutines } from "@/lib/phase2/training";
-import { createRoutineAction } from "../actions";
+import { RoutineCreateForm } from "./routine-create-form";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +20,7 @@ export default async function RoutinesPage() {
           <CardTitle className="text-base">Nueva rutina</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createRoutineAction} className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="nombre">Nombre</Label>
-              <Input id="nombre" name="nombre" placeholder="Ej: Pecho" required />
-            </div>
-            <Button className="h-11 w-full" type="submit">
-              Crear
-            </Button>
-          </form>
+          <RoutineCreateForm />
         </CardContent>
       </Card>
 

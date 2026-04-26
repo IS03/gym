@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import type { MuscleGroup } from "@/lib/phase2/types";
 import {
   addExistingExerciseToSession,
+  addExerciseToRoutine,
   archiveExercise,
   createExercise,
   createExerciseFromSession,
   createRoutine,
   removeSessionExercise,
+  removeRoutineExercise,
   replaceRoutineExercises,
   startFreeSession,
   startSessionFromRoutine,
@@ -100,6 +102,20 @@ export async function replaceRoutineExercisesAction(formData: FormData) {
     })),
   });
 
+  revalidatePath(`/train/routines/${routineId}`);
+}
+
+export async function addExerciseToRoutineAction(formData: FormData) {
+  const routineId = str(formData, "routine_id");
+  const exerciseId = str(formData, "exercise_id");
+  await addExerciseToRoutine({ routineId, exerciseId });
+  revalidatePath(`/train/routines/${routineId}`);
+}
+
+export async function removeRoutineExerciseAction(formData: FormData) {
+  const routineId = str(formData, "routine_id");
+  const routineExerciseId = str(formData, "routine_exercise_id");
+  await removeRoutineExercise({ routineExerciseId });
   revalidatePath(`/train/routines/${routineId}`);
 }
 
