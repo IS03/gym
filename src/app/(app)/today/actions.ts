@@ -15,21 +15,27 @@ function parseNumber(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseRequiredCalories(value: FormDataEntryValue | null): number {
+  const n = parseNumber(value);
+  if (n === null || n <= 0) {
+    throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
+  }
+  return Math.trunc(n);
+}
+
 export async function createMealAction(formData: FormData) {
   const date = String(formData.get("date") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const calories = parseNumber(formData.get("final_calories"));
+  const calories = parseRequiredCalories(formData.get("final_calories"));
   const protein = parseNumber(formData.get("final_protein_g"));
-  const intent = String(formData.get("intent") ?? "draft");
 
   await createMeal({
     date,
     title: title || undefined,
     description: description || undefined,
-    final_calories: calories ?? undefined,
+    final_calories: calories,
     final_protein_g: protein ?? undefined,
-    status: intent === "confirmed" ? "confirmed" : "draft",
   });
 
   revalidatePath("/today");
@@ -40,9 +46,8 @@ export async function updateMealAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const calories = parseNumber(formData.get("final_calories"));
+  const calories = parseRequiredCalories(formData.get("final_calories"));
   const protein = parseNumber(formData.get("final_protein_g"));
-  const status = String(formData.get("status") ?? "").trim();
 
   await updateMeal({
     id,
@@ -50,19 +55,8 @@ export async function updateMealAction(formData: FormData) {
     description: description ? description : null,
     final_calories: calories,
     final_protein_g: protein,
-    status:
-      status === "confirmed" || status === "needs_review" || status === "draft"
-        ? status
-        : undefined,
   });
 
-  revalidatePath("/today");
-  revalidatePath("/history");
-}
-
-export async function confirmMealAction(formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  await updateMeal({ id, status: "confirmed" });
   revalidatePath("/today");
   revalidatePath("/history");
 }

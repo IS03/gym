@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { DayLog, MealEntry, MealEntryStatus } from "./types";
+import type { DayLog, MealEntry } from "./types";
 
 export type IsoDate = `${number}-${number}-${number}`; // YYYY-MM-DD
 
@@ -63,16 +63,16 @@ export type CreateMealInput = {
   description?: string;
   final_calories?: number;
   final_protein_g?: number;
-  status?: MealEntryStatus;
 };
 
 export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
   assertIsoDate(input.date);
+  if (typeof input.final_calories !== "number" || input.final_calories <= 0) {
+    throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
+  }
   const dayLog = await getOrCreateDayLog(input.date);
   const supabase = await createClient();
   const userId = await getAuthedUserId();
-
-  const status: MealEntryStatus = input.status ?? "draft";
 
   const { data, error } = await supabase
     .from("meal_entries")
@@ -82,12 +82,10 @@ export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
       consumed_at: input.consumed_at ?? new Date().toISOString(),
       title: input.title ?? null,
       description: input.description ?? null,
-      final_calories:
-        typeof input.final_calories === "number" ? input.final_calories : null,
+      final_calories: Math.trunc(input.final_calories),
       final_protein_g:
         typeof input.final_protein_g === "number" ? input.final_protein_g : null,
       source_type: "manual",
-      status,
     })
     .select("*")
     .single();
@@ -102,7 +100,6 @@ export type UpdateMealInput = {
   description?: string | null;
   final_calories?: number | null;
   final_protein_g?: number | null;
-  status?: MealEntryStatus;
 };
 
 export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
@@ -112,10 +109,14 @@ export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
   if (input.description !== undefined) patch.description = input.description;
-  if (input.final_calories !== undefined) patch.final_calories = input.final_calories;
+  if (input.final_calories !== undefined) {
+    if (input.final_calories === null || input.final_calories <= 0) {
+      throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
+    }
+    patch.final_calories = Math.trunc(input.final_calories);
+  }
   if (input.final_protein_g !== undefined)
     patch.final_protein_g = input.final_protein_g;
-  if (input.status !== undefined) patch.status = input.status;
 
   const { data, error } = await supabase
     .from("meal_entries")

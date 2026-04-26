@@ -1,5 +1,3 @@
-export type MealEntryStatus = "draft" | "needs_review" | "confirmed";
-
 export type DayLog = {
   id: string;
   user_id: string;
@@ -29,7 +27,6 @@ export type MealEntry = {
   final_calories: number | null;
   final_protein_g: number | null;
   source_type: "manual" | "label" | "ai" | null;
-  status: MealEntryStatus;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

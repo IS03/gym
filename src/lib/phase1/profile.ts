@@ -1,13 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
 export type Sex = "male" | "female" | "other";
-export type ActivityLevel =
-  | "sedentary"
-  | "light"
-  | "moderate"
-  | "active"
-  | "very_active";
-export type GoalType = "lose" | "maintain" | "gain";
 
 export type Profile = {
   user_id: string;
@@ -16,8 +9,6 @@ export type Profile = {
   sex: Sex | null;
   height_cm: number | null;
   current_weight_kg: number | null;
-  activity_level: ActivityLevel | null;
-  goal_type: GoalType | null;
   bmr_kcal_current: number | null;
   maintenance_kcal_current: number | null;
   target_kcal_current: number | null;
@@ -42,40 +33,25 @@ export function calculateBmrKcal(params: {
   weight_kg: number;
 }): number {
   const age = calcAge(params.birth_date);
-  // Mifflin-St Jeor
-  const base = 10 * params.weight_kg + 6.25 * params.height_cm - 5 * age;
-  const sexAdj = params.sex === "male" ? 5 : params.sex === "female" ? -161 : -78;
-  return Math.round(base + sexAdj);
-}
-
-export function activityMultiplier(level: ActivityLevel): number {
-  switch (level) {
-    case "sedentary":
-      return 1.2;
-    case "light":
-      return 1.375;
-    case "moderate":
-      return 1.55;
-    case "active":
-      return 1.725;
-    case "very_active":
-      return 1.9;
+  // Harris–Benedict (según lo pedido):
+  // Hombres: TMB = 88.362 + 13.397*peso + 4.799*altura - 5.677*edad
+  // Mujeres: TMB = 447.593 + 9.247*peso + 3.098*altura - 4.330*edad
+  if (params.sex === "female") {
+    return Math.round(
+      447.593 +
+        9.247 * params.weight_kg +
+        3.098 * params.height_cm -
+        4.33 * age,
+    );
   }
-}
 
-export function goalDeltaKcal(goal: GoalType): number {
-  // Simple y explícito para Fase 1 (ajustable luego):
-  // - lose: -300 kcal
-  // - maintain: 0
-  // - gain: +300 kcal
-  switch (goal) {
-    case "lose":
-      return -300;
-    case "maintain":
-      return 0;
-    case "gain":
-      return 300;
-  }
+  // Para "male" y "other" usamos la fórmula de hombres (regla simple por ahora).
+  return Math.round(
+    88.362 +
+      13.397 * params.weight_kg +
+      4.799 * params.height_cm -
+      5.677 * age,
+  );
 }
 
 export async function getAuthedUser() {
@@ -109,8 +85,6 @@ export async function upsertMyProfile(input: {
   sex: Sex | null;
   height_cm: number | null;
   current_weight_kg: number | null;
-  activity_level: ActivityLevel | null;
-  goal_type: GoalType | null;
 }): Promise<Profile> {
   const supabase = await createClient();
   const user = await getAuthedUser();
@@ -131,15 +105,10 @@ export async function upsertMyProfile(input: {
       height_cm: input.height_cm,
       weight_kg: input.current_weight_kg,
     });
-
-    if (input.activity_level) {
-      maintenance = Math.round(bmr * activityMultiplier(input.activity_level));
-      if (input.goal_type) {
-        target = maintenance + goalDeltaKcal(input.goal_type);
-      } else {
-        target = maintenance;
-      }
-    }
+    // En esta etapa: "mantenimiento" = TMB (Harris–Benedict) sin multiplicadores.
+    // Más adelante, si volvemos a agregar actividad/objetivo, se deriva acá.
+    maintenance = bmr;
+    target = bmr;
   }
 
   const { data, error } = await supabase
@@ -152,8 +121,6 @@ export async function upsertMyProfile(input: {
         sex: input.sex,
         height_cm: input.height_cm,
         current_weight_kg: input.current_weight_kg,
-        activity_level: input.activity_level,
-        goal_type: input.goal_type,
         bmr_kcal_current: bmr,
         maintenance_kcal_current: maintenance,
         target_kcal_current: target,

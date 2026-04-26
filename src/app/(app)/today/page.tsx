@@ -80,6 +80,10 @@ export default async function TodayPage() {
               <Input
                 id="final_calories"
                 name="final_calories"
+                type="number"
+                min={1}
+                step={1}
+                required
                 inputMode="numeric"
                 placeholder="Ej: 420"
               />
@@ -102,16 +106,8 @@ export default async function TodayPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Button className="h-11" type="submit" name="intent" value="draft">
-                Guardar borrador
-              </Button>
-              <Button
-                className="h-11"
-                type="submit"
-                name="intent"
-                value="confirmed"
-              >
-                Guardar y confirmar
+              <Button className="h-11 w-full" type="submit">
+                Agregar comida
               </Button>
             </div>
           </form>
@@ -127,12 +123,11 @@ export default async function TodayPage() {
             {meals.map((meal) => (
               <Card key={meal.id}>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    {meal.title || "Sin título"}
-                  </CardTitle>
+                  {meal.title ? (
+                    <CardTitle className="text-base">{meal.title}</CardTitle>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
-                    {meal.status} · {formatKcal(meal.final_calories)} ·{" "}
-                    {formatProtein(meal.final_protein_g)}
+                    {formatKcal(meal.final_calories)} · {formatProtein(meal.final_protein_g)}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -140,7 +135,10 @@ export default async function TodayPage() {
                     <p className="text-sm text-muted-foreground">{meal.description}</p>
                   ) : null}
 
-                  <details className="rounded-md border bg-background p-3">
+                  <details
+                    key={`${meal.id}-${meal.updated_at}`}
+                    className="rounded-md border bg-background p-3"
+                  >
                     <summary className="cursor-pointer text-sm font-medium">
                       Editar
                     </summary>
@@ -160,6 +158,10 @@ export default async function TodayPage() {
                           <Input
                             id={`k-${meal.id}`}
                             name="final_calories"
+                            type="number"
+                            min={1}
+                            step={1}
+                            required
                             inputMode="numeric"
                             defaultValue={
                               meal.final_calories === null ? "" : String(meal.final_calories)
@@ -187,17 +189,9 @@ export default async function TodayPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label htmlFor={`s-${meal.id}`}>Status</Label>
-                        <select
-                          id={`s-${meal.id}`}
-                          name="status"
-                          defaultValue={meal.status}
-                          className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-                        >
-                          <option value="draft">draft</option>
-                          <option value="needs_review">needs_review</option>
-                          <option value="confirmed">confirmed</option>
-                        </select>
+                        <div className="rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
+                          Confirmada (todas las comidas cuentan en el día)
+                        </div>
                       </div>
                       <Button className="h-11 w-full" type="submit">
                         Guardar cambios
@@ -205,27 +199,12 @@ export default async function TodayPage() {
                     </form>
                   </details>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    {meal.status !== "confirmed" ? (
-                      <form action={updateMealAction}>
-                        <input type="hidden" name="id" value={meal.id} />
-                        <input type="hidden" name="status" value="confirmed" />
-                        <Button className="h-11 w-full" type="submit" variant="outline">
-                          Confirmar
-                        </Button>
-                      </form>
-                    ) : (
-                      <Button className="h-11 w-full" type="button" variant="outline" disabled>
-                        Confirmada
-                      </Button>
-                    )}
-                    <form action={softDeleteMealAction}>
-                      <input type="hidden" name="id" value={meal.id} />
-                      <Button className="h-11 w-full" type="submit" variant="destructive">
-                        Borrar
-                      </Button>
-                    </form>
-                  </div>
+                  <form action={softDeleteMealAction}>
+                    <input type="hidden" name="id" value={meal.id} />
+                    <Button className="h-11 w-full" type="submit" variant="destructive">
+                      Borrar
+                    </Button>
+                  </form>
                 </CardContent>
               </Card>
             ))}
