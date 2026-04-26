@@ -11,6 +11,11 @@ function formatKcal(n: number | null | undefined) {
   return `${n} kcal`;
 }
 
+function formatProtein(n: number | null | undefined) {
+  if (typeof n !== "number") return "—";
+  return `${n.toFixed(0)} g`;
+}
+
 export default async function HistoryPage({
   searchParams,
 }: {
@@ -122,9 +127,13 @@ export default async function HistoryPage({
             {meals.map((m) => (
               <div key={m.id} className="rounded-md border bg-background px-4 py-3">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">{m.title || "Sin título"}</span>
+                  {m.title ? (
+                    <span className="text-sm font-medium">{m.title}</span>
+                  ) : (
+                    <span className="text-sm font-medium" />
+                  )}
                   <span className="text-xs text-muted-foreground">
-                    {m.status} · {formatKcal(m.final_calories)}
+                    {formatKcal(m.final_calories)} · {formatProtein(m.final_protein_g)}
                   </span>
                 </div>
                 {m.description ? (
