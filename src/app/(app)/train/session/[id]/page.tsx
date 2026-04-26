@@ -4,22 +4,25 @@ import { buttonVariants, Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listExercises, getSession, listSetsForSessionExercise } from "@/lib/phase2/training";
+import { listExercises, getSession } from "@/lib/phase2/training";
 import {
   addExistingExerciseToSessionAction,
   createExerciseFromSessionAction,
   removeSessionExerciseAction,
-  upsertWorkoutSetAction,
+  updateSessionExerciseAction,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-const EXERCISE_TYPES = [
-  { value: "strength", label: "Fuerza" },
-  { value: "abs", label: "Abdomen" },
+const MUSCLE_GROUPS = [
+  { value: "pecho", label: "Pecho" },
+  { value: "espalda", label: "Espalda" },
+  { value: "piernas", label: "Piernas" },
+  { value: "hombros", label: "Hombros" },
+  { value: "bíceps", label: "Bíceps" },
+  { value: "tríceps", label: "Tríceps" },
+  { value: "abdomen", label: "Abdomen" },
   { value: "cardio", label: "Cardio" },
-  { value: "mobility", label: "Movilidad" },
-  { value: "other", label: "Otro" },
 ] as const;
 
 export default async function SessionPage({
@@ -32,19 +35,16 @@ export default async function SessionPage({
     getSession(id),
     listExercises({ includeArchived: false }),
   ]);
-
-  const setsBySessionExerciseId = new Map(
-    await Promise.all(
-      exercises.map(async (se) => [se.id, await listSetsForSessionExercise(se.id)] as const),
-    ),
-  );
+  const completed = exercises.filter((e) => e.is_completed).length;
+  const total = exercises.length;
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Sesión</h1>
+        <p className="text-sm text-muted-foreground">{session.created_at}</p>
         <p className="text-sm text-muted-foreground">
-          {session.title ?? "Sin título"}
+          Progreso: {completed}/{total}
         </p>
       </div>
 
@@ -62,7 +62,7 @@ export default async function SessionPage({
             >
               {allExercises.map((ex) => (
                 <option key={ex.id} value={ex.id}>
-                  {ex.name}
+                  {ex.nombre}
                 </option>
               ))}
             </select>
@@ -81,28 +81,53 @@ export default async function SessionPage({
           <form action={createExerciseFromSessionAction} className="space-y-3">
             <input type="hidden" name="session_id" value={id} />
             <div className="space-y-1">
-              <Label htmlFor="name">Nombre</Label>
-              <Input id="name" name="name" placeholder="Ej: Cinta" required />
+              <Label htmlFor="nombre">Nombre</Label>
+              <Input id="nombre" name="nombre" placeholder="Ej: Press banca" required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="category">Categoría</Label>
-              <Input id="category" name="category" placeholder="Opcional" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="exercise_type">Tipo</Label>
+              <Label htmlFor="grupo_muscular">Grupo muscular</Label>
               <select
-                id="exercise_type"
-                name="exercise_type"
+                id="grupo_muscular"
+                name="grupo_muscular"
                 className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-                defaultValue="strength"
-                required
+                defaultValue=""
               >
-                {EXERCISE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                <option value="">(Sin grupo)</option>
+                {MUSCLE_GROUPS.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-1">
+              <Label>Recomendados</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Input
+                  name="series_sugeridas"
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder="Series"
+                />
+                <Input
+                  name="reps_sugeridas"
+                  type="number"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  placeholder="Reps"
+                />
+                <Input
+                  name="peso_sugerido"
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  inputMode="decimal"
+                  placeholder="Peso"
+                />
+              </div>
             </div>
             <Button className="h-11 w-full" type="submit">
               Crear y agregar
@@ -118,16 +143,80 @@ export default async function SessionPage({
         ) : (
           <div className="space-y-3">
             {exercises.map((se) => {
-              const sets = setsBySessionExerciseId.get(se.id) ?? [];
               return (
                 <Card key={se.id}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{se.exercise_name_snapshot}</CardTitle>
+                    <CardTitle className="text-base">{se.nombre_snapshot}</CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      {se.exercise_type_snapshot} · {se.source_type}
+                      {se.grupo_muscular_snapshot ?? "Sin grupo"}
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    <form action={updateSessionExerciseAction} className="space-y-3">
+                      <input type="hidden" name="session_id" value={id} />
+                      <input type="hidden" name="id" value={se.id} />
+
+                      <label className="flex items-center gap-3 rounded-md border bg-background px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="is_completed"
+                          defaultChecked={se.is_completed}
+                          className="size-5"
+                        />
+                        <span className="font-medium">Hecho</span>
+                        {se.completed_at ? (
+                          <span className="ml-auto text-xs text-muted-foreground">
+                            {new Date(se.completed_at).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        ) : null}
+                      </label>
+
+                      <div className="space-y-1">
+                        <Label>Real</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input
+                            name="series_reales"
+                            type="number"
+                            min={0}
+                            step={1}
+                            inputMode="numeric"
+                            defaultValue={
+                              se.series_reales === null ? "" : String(se.series_reales)
+                            }
+                            placeholder="Series"
+                          />
+                          <Input
+                            name="reps_reales"
+                            type="number"
+                            min={0}
+                            step={1}
+                            inputMode="numeric"
+                            defaultValue={
+                              se.reps_reales === null ? "" : String(se.reps_reales)
+                            }
+                            placeholder="Reps"
+                          />
+                          <Input
+                            name="peso_real"
+                            type="number"
+                            min={0}
+                            step="0.5"
+                            inputMode="decimal"
+                            defaultValue={
+                              se.peso_real === null ? "" : String(se.peso_real)
+                            }
+                            placeholder="Peso"
+                          />
+                        </div>
+                      </div>
+                      <Button className="h-11 w-full" type="submit" variant="outline">
+                        Guardar
+                      </Button>
+                    </form>
+
                     <form action={removeSessionExerciseAction}>
                       <input type="hidden" name="session_id" value={id} />
                       <input type="hidden" name="id" value={se.id} />
@@ -135,93 +224,6 @@ export default async function SessionPage({
                         Quitar de la sesión
                       </Button>
                     </form>
-
-                    <details className="rounded-md border bg-background p-3">
-                      <summary className="cursor-pointer text-sm font-medium">
-                        Sets ({sets.length})
-                      </summary>
-                      <div className="mt-3 space-y-3">
-                        {sets.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            Sin sets todavía.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {sets.map((st) => (
-                              <div
-                                key={st.id}
-                                className="rounded-md border bg-background px-3 py-2 text-sm"
-                              >
-                                Set {st.set_number}:{" "}
-                                {st.reps !== null ? `${st.reps} reps` : "—"}{" "}
-                                {st.weight_kg !== null ? `· ${st.weight_kg} kg` : ""}
-                                {st.duration_seconds !== null
-                                  ? ` · ${st.duration_seconds}s`
-                                  : ""}
-                                {st.distance_meters !== null
-                                  ? ` · ${st.distance_meters}m`
-                                  : ""}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <form action={upsertWorkoutSetAction} className="space-y-2">
-                          <input type="hidden" name="session_id" value={id} />
-                          <input
-                            type="hidden"
-                            name="workout_session_exercise_id"
-                            value={se.id}
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <Label htmlFor={`set-${se.id}`}>Set #</Label>
-                              <Input
-                                id={`set-${se.id}`}
-                                name="set_number"
-                                type="number"
-                                min={1}
-                                step={1}
-                                required
-                                inputMode="numeric"
-                                placeholder="1"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`reps-${se.id}`}>Reps</Label>
-                              <Input id={`reps-${se.id}`} name="reps" inputMode="numeric" />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`kg-${se.id}`}>Kg</Label>
-                              <Input id={`kg-${se.id}`} name="weight_kg" inputMode="numeric" />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`rest-${se.id}`}>Descanso (s)</Label>
-                              <Input id={`rest-${se.id}`} name="rest_seconds" inputMode="numeric" />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`dur-${se.id}`}>Duración (s)</Label>
-                              <Input
-                                id={`dur-${se.id}`}
-                                name="duration_seconds"
-                                inputMode="numeric"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label htmlFor={`dist-${se.id}`}>Distancia (m)</Label>
-                              <Input
-                                id={`dist-${se.id}`}
-                                name="distance_meters"
-                                inputMode="numeric"
-                              />
-                            </div>
-                          </div>
-                          <Button className="h-11 w-full" type="submit" variant="outline">
-                            Guardar set
-                          </Button>
-                        </form>
-                      </div>
-                    </details>
                   </CardContent>
                 </Card>
               );

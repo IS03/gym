@@ -49,10 +49,6 @@ export default async function NewSessionPage({
               <Label htmlFor="date">Fecha</Label>
               <Input id="date" name="date" type="date" defaultValue={date} />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="title">Título</Label>
-              <Input id="title" name="title" placeholder="Opcional" />
-            </div>
             <Button className="h-11 w-full" type="submit">
               Iniciar
             </Button>
@@ -86,15 +82,11 @@ export default async function NewSessionPage({
                 ) : (
                   routines.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name}
+                      {r.nombre}
                     </option>
                   ))
                 )}
               </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="title2">Título</Label>
-              <Input id="title2" name="title" placeholder="Opcional" />
             </div>
             <Button className="h-11 w-full" type="submit" disabled={routines.length === 0}>
               Iniciar desde rutina

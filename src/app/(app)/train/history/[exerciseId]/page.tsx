@@ -22,7 +22,7 @@ export default async function ExerciseHistoryPage({
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {exercise?.name ?? "Ejercicio"}
+          {exercise?.nombre ?? "Ejercicio"}
         </h1>
         <p className="text-sm text-muted-foreground">Últimas sesiones.</p>
       </div>
@@ -36,28 +36,16 @@ export default async function ExerciseHistoryPage({
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{it.day_log_date}</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  {it.session.title ?? "Sesión"} · {it.sets.length} sets
+                  {it.sessionExercise.series_reales ?? "—"}x{it.sessionExercise.reps_reales ?? "—"}
+                  {it.sessionExercise.peso_real !== null && it.sessionExercise.peso_real !== undefined
+                    ? ` · ${it.sessionExercise.peso_real} kg`
+                    : ""}
                 </p>
               </CardHeader>
               <CardContent className="space-y-2">
-                {it.sets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin sets cargados.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {it.sets.map((st) => (
-                      <div
-                        key={st.id}
-                        className="rounded-md border bg-background px-3 py-2 text-sm"
-                      >
-                        Set {st.set_number}:{" "}
-                        {st.reps !== null ? `${st.reps} reps` : "—"}{" "}
-                        {st.weight_kg !== null ? `· ${st.weight_kg} kg` : ""}
-                        {st.duration_seconds !== null ? ` · ${st.duration_seconds}s` : ""}
-                        {st.distance_meters !== null ? ` · ${st.distance_meters}m` : ""}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
+                  {it.sessionExercise.is_completed ? "Hecho" : "No marcado como hecho"}
+                </div>
 
                 <Link
                   href={`/train/session/${it.session.id}`}

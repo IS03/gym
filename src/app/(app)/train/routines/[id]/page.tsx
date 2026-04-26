@@ -45,10 +45,10 @@ export default async function RoutineDetailPage({
                 >
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-medium">
-                      {re.exercise.name}
+                      {re.exercise.nombre}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      #{re.exercise_order}
+                      {re.exercise.grupo_muscular ?? "Sin grupo"}
                     </span>
                   </div>
                 </div>
@@ -57,8 +57,7 @@ export default async function RoutineDetailPage({
           )}
 
           <div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
-            UI de edición completa de rutina (orden, defaults, etc.) la hago en el
-            próximo paso: por ahora lo dejamos como pantalla de lectura.
+            Orden estable: por fecha de agregado (routine_exercises.created_at asc).
           </div>
         </CardContent>
       </Card>

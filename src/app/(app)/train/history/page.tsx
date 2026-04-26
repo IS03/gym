@@ -30,8 +30,10 @@ export default async function TrainHistoryPage() {
                   className="block rounded-md border bg-background px-4 py-3"
                 >
                   <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-medium">{ex.name}</span>
-                    <span className="text-xs text-muted-foreground">{ex.exercise_type}</span>
+                    <span className="text-sm font-medium">{ex.nombre}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {ex.grupo_muscular ?? "Sin grupo"}
+                    </span>
                   </div>
                 </Link>
               ))}

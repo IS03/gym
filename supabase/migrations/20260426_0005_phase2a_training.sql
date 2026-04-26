@@ -29,8 +29,28 @@ create table if not exists public.exercises (
 );
 
 -- Evita duplicados obvios por usuario (case-insensitive) sin bloquear "variantes" a futuro.
-create unique index if not exists uniq_exercises_user_name_ci
-on public.exercises(user_id, lower(name));
+do $$
+begin
+  -- Si la columna es `name` (estado original de 0005)
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'exercises'
+      and column_name = 'name'
+  ) then
+    execute 'create unique index if not exists uniq_exercises_user_name_ci on public.exercises(user_id, lower(name))';
+  -- Si ya fue renombrada a `nombre` (por estado intermedio)
+  elsif exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'exercises'
+      and column_name = 'nombre'
+  ) then
+    execute 'create unique index if not exists uniq_exercises_user_name_ci on public.exercises(user_id, lower(nombre))';
+  end if;
+end $$;
 
 create index if not exists idx_exercises_user_active on public.exercises(user_id, is_active);
 
@@ -45,8 +65,26 @@ create table if not exists public.routines (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists uniq_routines_user_name_ci
-on public.routines(user_id, lower(name));
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'routines'
+      and column_name = 'name'
+  ) then
+    execute 'create unique index if not exists uniq_routines_user_name_ci on public.routines(user_id, lower(name))';
+  elsif exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'routines'
+      and column_name = 'nombre'
+  ) then
+    execute 'create unique index if not exists uniq_routines_user_name_ci on public.routines(user_id, lower(nombre))';
+  end if;
+end $$;
 
 create index if not exists idx_routines_user_active on public.routines(user_id, is_active);
 

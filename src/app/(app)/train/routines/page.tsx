@@ -8,13 +8,6 @@ import { createRoutineAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-const ROUTINE_TYPES = [
-  { value: "strength", label: "Fuerza" },
-  { value: "abs", label: "Abdomen" },
-  { value: "cardio", label: "Cardio" },
-  { value: "mixed", label: "Mixta" },
-] as const;
-
 export default async function RoutinesPage() {
   const routines = await listRoutines({ includeArchived: false });
 
@@ -32,28 +25,8 @@ export default async function RoutinesPage() {
         <CardContent>
           <form action={createRoutineAction} className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="name">Nombre</Label>
-              <Input id="name" name="name" placeholder="Ej: Pecho" required />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="routine_type">Tipo</Label>
-              <select
-                id="routine_type"
-                name="routine_type"
-                className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-                defaultValue="strength"
-                required
-              >
-                {ROUTINE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="notes">Notas</Label>
-              <Input id="notes" name="notes" placeholder="Opcional" />
+              <Label htmlFor="nombre">Nombre</Label>
+              <Input id="nombre" name="nombre" placeholder="Ej: Pecho" required />
             </div>
             <Button className="h-11 w-full" type="submit">
               Crear
@@ -75,8 +48,7 @@ export default async function RoutinesPage() {
                 className="block rounded-md border bg-background px-4 py-3"
               >
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">{r.name}</span>
-                  <span className="text-xs text-muted-foreground">{r.routine_type}</span>
+                  <span className="text-sm font-medium">{r.nombre}</span>
                 </div>
               </Link>
             ))}
