@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createRoutineAction } from "../actions";
+import {
+  type CreateRoutineState,
+  createRoutineAction,
+} from "../actions";
 
-type State = { error: string | null };
-
-const initialState: State = { error: null };
+const initialState: CreateRoutineState = { error: null };
 
 const ROUTINE_COLORS = [
   { value: "", label: "Sin color" },
@@ -22,20 +24,28 @@ const ROUTINE_COLORS = [
 ] as const;
 
 export function RoutineCreateForm() {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: State, formData: FormData): Promise<State> => {
-      try {
-        await createRoutineAction(formData);
-        return { error: null };
-      } catch (e) {
-        return { error: e instanceof Error ? e.message : "Error inesperado." };
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await createRoutineAction(initialState, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
-    },
-    initialState,
-  );
+      if (result.id) {
+        router.push(`/train/routines/${result.id}`);
+      }
+    });
+  }
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor="nombre">Nombre</Label>
         <Input id="nombre" name="nombre" placeholder="Ej: Pecho" required />
@@ -55,8 +65,8 @@ export function RoutineCreateForm() {
           ))}
         </select>
       </div>
-      {state.error ? (
-        <p className="text-sm text-destructive">{state.error}</p>
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
       ) : null}
       <Button className="h-11 w-full" type="submit" disabled={pending}>
         {pending ? "Creando..." : "Crear"}
@@ -64,4 +74,3 @@ export function RoutineCreateForm() {
     </form>
   );
 }
-

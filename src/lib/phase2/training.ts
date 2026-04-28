@@ -385,6 +385,11 @@ export async function updateRoutine(input: {
   return data as Routine;
 }
 
+/** En la app, "eliminar" rutina = archivar (no hay DELETE en DB para `authenticated`). */
+export async function archiveRoutine(id: string): Promise<void> {
+  await updateRoutine({ id, is_active: false });
+}
+
 export async function listRoutineExercises(routineId: string): Promise<
   (RoutineExercise & {
     exercise: Pick<Exercise, "id" | "nombre" | "grupo_muscular">;

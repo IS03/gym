@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listRoutines } from "@/lib/phase2/training";
 import { RoutineCreateForm } from "./routine-create-form";
+import { RoutineDeleteButton } from "./routine-delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,14 @@ export default async function RoutinesPage() {
         ) : (
           <div className="space-y-2">
             {routines.map((r) => (
-              <Link
+              <div
                 key={r.id}
-                href={`/train/routines/${r.id}`}
-                className="block rounded-md border bg-background px-4 py-3"
+                className="flex min-h-[52px] items-stretch gap-0 rounded-md border bg-background"
               >
-                <div className="flex items-center justify-between gap-3">
+                <Link
+                  href={`/train/routines/${r.id}`}
+                  className="flex min-w-0 flex-1 items-center px-4 py-3"
+                >
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-block size-3 shrink-0 rounded-full border"
@@ -45,8 +48,14 @@ export default async function RoutinesPage() {
                     />
                     <span className="text-sm font-medium">{r.nombre}</span>
                   </div>
+                </Link>
+                <div className="flex shrink-0 border-l p-0">
+                  <RoutineDeleteButton
+                    routineId={r.id}
+                    routineName={r.nombre}
+                  />
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

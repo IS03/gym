@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
 } from "react";
+import { THEME_STORAGE_KEY } from "@/lib/app-theme";
 
 export type ThemeId = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
@@ -19,8 +21,6 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-
-const STORAGE_KEY = "appgym-theme";
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") return "light";
@@ -38,7 +38,7 @@ function applyThemeToDom(resolved: ResolvedTheme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
     if (typeof window === "undefined") return "system";
-    const saved = (localStorage.getItem(STORAGE_KEY) as ThemeId | null) ?? null;
+    const saved = (localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null) ?? null;
     return saved === "light" || saved === "dark" || saved === "system"
       ? saved
       : "system";
@@ -46,7 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
     if (typeof window === "undefined") return "light";
-    const saved = (localStorage.getItem(STORAGE_KEY) as ThemeId | null) ?? null;
+    const saved = (localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null) ?? null;
     const initialTheme: ThemeId =
       saved === "light" || saved === "dark" || saved === "system"
         ? saved
@@ -54,7 +54,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return initialTheme === "system" ? getSystemTheme() : initialTheme;
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyThemeToDom(resolvedTheme);
   }, [resolvedTheme]);
 
@@ -75,7 +75,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = useCallback((next: ThemeId) => {
     setThemeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    localStorage.setItem(THEME_STORAGE_KEY, next);
     const resolved = next === "system" ? getSystemTheme() : next;
     setResolvedTheme(resolved);
   }, []);

@@ -8,6 +8,7 @@ import {
   archiveExercise,
   createExercise,
   createExerciseFromSession,
+  archiveRoutine,
   createRoutine,
   finishSession,
   removeSessionExercise,
@@ -84,10 +85,28 @@ export async function archiveExerciseAction(formData: FormData) {
   revalidatePath("/train/exercises");
 }
 
-export async function createRoutineAction(formData: FormData) {
-  const nombre = str(formData, "nombre");
-  const color = str(formData, "color") || null;
-  await createRoutine({ nombre, color });
+export type CreateRoutineState = { error: string | null; id?: string };
+
+export async function createRoutineAction(
+  _prev: CreateRoutineState,
+  formData: FormData,
+): Promise<CreateRoutineState> {
+  try {
+    const nombre = str(formData, "nombre");
+    const color = str(formData, "color") || null;
+    const routine = await createRoutine({ nombre, color });
+    revalidatePath("/train/routines");
+    revalidatePath(`/train/routines/${routine.id}`);
+    return { error: null, id: routine.id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Error inesperado." };
+  }
+}
+
+export async function deleteRoutineAction(formData: FormData) {
+  const id = str(formData, "id");
+  if (!id) throw new Error("Falta id de rutina.");
+  await archiveRoutine(id);
   revalidatePath("/train/routines");
 }
 
