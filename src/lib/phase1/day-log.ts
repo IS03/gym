@@ -65,6 +65,85 @@ export type CreateMealInput = {
   final_protein_g?: number;
 };
 
+/** Alineado con public.normalize_name() (trim, espacios colapsados, mayúsculas). */
+function normalizeMealText(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const s = value.trim().replace(/\s+/g, " ").toUpperCase();
+  return s === "" ? null : s;
+}
+
+function proteinMatches(
+  a: number | null | undefined,
+  b: number | null | undefined,
+): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(Number(a) - Number(b)) < 0.0001;
+}
+
+/** Título o descripción nuevos coinciden con el registro (ya normalizado en BD). */
+function newMealTextMatchesExisting(
+  newTitle: string,
+  newDescription: string,
+  existing: { title: string | null; description: string | null },
+): boolean {
+  const nt = normalizeMealText(newTitle);
+  const nd = normalizeMealText(newDescription);
+  const et = existing.title;
+  const ed = existing.description;
+  const titleMatch = nt != null && et != null && nt === et;
+  const descMatch = nd != null && ed != null && nd === ed;
+  return titleMatch || descMatch;
+}
+
+export const DUPLICATE_MEAL_LOOKBACK_MS = 60_000;
+
+/**
+ * Busca otra comida no borrada en el mismo día, misma carga numérica, texto
+ * coincidente (título o descripción) y creada hace poco. Para evitar dobles
+ * accidentales, no reemplaza una validación estricta en el servidor.
+ */
+export async function findRecentPossibleDuplicateMeal(input: {
+  date: string;
+  title?: string;
+  description?: string;
+  final_calories: number;
+  final_protein_g?: number | null;
+}): Promise<MealEntry | null> {
+  assertIsoDate(input.date);
+  const dayLog = await getOrCreateDayLog(input.date);
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const cutoff = new Date(Date.now() - DUPLICATE_MEAL_LOOKBACK_MS).toISOString();
+  const kcal = Math.trunc(input.final_calories);
+
+  const { data, error } = await supabase
+    .from("meal_entries")
+    .select("*")
+    .eq("day_log_id", dayLog.id)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .gte("created_at", cutoff)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(`Buscar duplicado reciente: ${error.message}`);
+
+  const t = input.title ?? "";
+  const d = input.description ?? "";
+
+  for (const row of data ?? []) {
+    const m = row as MealEntry;
+    if (m.final_calories == null) continue;
+    if (Math.trunc(m.final_calories) !== kcal) continue;
+    if (!proteinMatches(input.final_protein_g ?? null, m.final_protein_g)) {
+      continue;
+    }
+    if (!newMealTextMatchesExisting(t, d, m)) continue;
+    return m;
+  }
+  return null;
+}
+
 export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
   assertIsoDate(input.date);
   if (typeof input.final_calories !== "number" || input.final_calories <= 0) {

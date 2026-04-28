@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   createMeal,
+  findRecentPossibleDuplicateMeal,
   softDeleteMeal,
   updateMeal,
 } from "@/lib/phase1/day-log";
@@ -23,12 +24,56 @@ function parseRequiredCalories(value: FormDataEntryValue | null): number {
   return Math.trunc(n);
 }
 
-export async function createMealAction(formData: FormData) {
+function parseCreateMealFromFormData(formData: FormData) {
   const date = String(formData.get("date") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const calories = parseRequiredCalories(formData.get("final_calories"));
   const protein = parseNumber(formData.get("final_protein_g"));
+  return { date, title, description, calories, protein };
+}
+
+/**
+ * true si ahora mismo otra comida en el último minuto coincide (título o descripción, kcal, proteína).
+ */
+export async function checkRecentDuplicateMealAction(
+  formData: FormData,
+): Promise<{ duplicate: boolean }> {
+  const { date, title, description, calories, protein } =
+    parseCreateMealFromFormData(formData);
+  const found = await findRecentPossibleDuplicateMeal({
+    date,
+    title: title || undefined,
+    description: description || undefined,
+    final_calories: calories,
+    final_protein_g: protein,
+  });
+  return { duplicate: found != null };
+}
+
+export type CreateMealActionResult =
+  | { ok: true }
+  | { ok: false; reason: "duplicate" };
+
+export async function createMealAction(
+  formData: FormData,
+): Promise<CreateMealActionResult> {
+  const { date, title, description, calories, protein } =
+    parseCreateMealFromFormData(formData);
+  const force = String(formData.get("force_duplicate") ?? "") === "1";
+
+  if (!force) {
+    const dup = await findRecentPossibleDuplicateMeal({
+      date,
+      title: title || undefined,
+      description: description || undefined,
+      final_calories: calories,
+      final_protein_g: protein,
+    });
+    if (dup) {
+      return { ok: false, reason: "duplicate" };
+    }
+  }
 
   await createMeal({
     date,
@@ -40,6 +85,7 @@ export async function createMealAction(formData: FormData) {
 
   revalidatePath("/today");
   revalidatePath("/history");
+  return { ok: true };
 }
 
 export async function updateMealAction(formData: FormData) {

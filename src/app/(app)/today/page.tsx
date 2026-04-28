@@ -3,11 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
-import {
-  createMealAction,
-  softDeleteMealAction,
-  updateMealAction,
-} from "./actions";
+import { CreateMealForm } from "./create-meal-form";
+import { softDeleteMealAction, updateMealAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,51 +66,7 @@ export default async function TodayPage() {
           <CardTitle className="text-base">Nueva comida</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createMealAction} className="space-y-3">
-            <input type="hidden" name="date" value={today} />
-            <div className="space-y-1">
-              <Label htmlFor="title">Título</Label>
-              <Input id="title" name="title" placeholder="Ej: Yogur + granola" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="final_calories">Calorías</Label>
-              <Input
-                id="final_calories"
-                name="final_calories"
-                type="number"
-                min={1}
-                step={1}
-                required
-                inputMode="numeric"
-                placeholder="Ej: 420"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="final_protein_g">Proteína (g)</Label>
-              <Input
-                id="final_protein_g"
-                name="final_protein_g"
-                type="number"
-                min={0}
-                step="0.1"
-                inputMode="numeric"
-                placeholder="Ej: 30"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="description">Descripción</Label>
-              <Input
-                id="description"
-                name="description"
-                placeholder="Opcional"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button className="h-11 w-full" type="submit">
-                Agregar comida
-              </Button>
-            </div>
-          </form>
+          <CreateMealForm date={today} />
         </CardContent>
       </Card>
 
