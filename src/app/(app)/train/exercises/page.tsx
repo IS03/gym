@@ -153,7 +153,11 @@ export default async function ExercisesPage({
                     <summary className="cursor-pointer text-sm font-medium">
                       Editar
                     </summary>
-                    <form action={updateExerciseAction} className="mt-3 space-y-3">
+                    <form
+                      key={ex.updated_at}
+                      action={updateExerciseAction}
+                      className="mt-3 space-y-3"
+                    >
                       <input type="hidden" name="id" value={ex.id} />
                       <div className="space-y-1">
                         <Label htmlFor={`n-${ex.id}`}>Nombre</Label>

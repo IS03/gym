@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listRoutines } from "@/lib/phase2/training";
+import { getInProgressSessionForUser, listRoutines } from "@/lib/phase2/training";
 import { startFreeSessionAction, startSessionFromRoutineAction } from "../../actions";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,7 @@ export default async function NewSessionPage({
   const date = typeof sp.date === "string" ? sp.date : today;
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
 
+  const inProgress = await getInProgressSessionForUser();
   const routines = await listRoutines({ includeArchived: false });
 
   async function startFree(formData: FormData) {
@@ -30,6 +33,46 @@ export default async function NewSessionPage({
     "use server";
     const sessionId = await startSessionFromRoutineAction(formData);
     redirect(`/train/session/${sessionId}`);
+  }
+
+  if (inProgress) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Nueva sesión</h1>
+          <p className="text-sm text-muted-foreground">
+            Ya tenés un entrenamiento en curso
+            {inProgress.log_date ? ` (${inProgress.log_date})` : ""}.
+          </p>
+        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Seguir entrenando</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Solo puede haber una sesión en curso. Continuá la existente o finalizala
+              con &quot;Terminar sesión&quot; para poder abrir otra.
+            </p>
+            <Link
+              href={`/train/session/${inProgress.session.id}`}
+              className={cn(buttonVariants(), "h-11 w-full inline-flex items-center justify-center")}
+            >
+              Continuar sesión
+            </Link>
+            <Link
+              href="/train"
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-11 w-full inline-flex items-center justify-center",
+              )}
+            >
+              Volver a Entrenar
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

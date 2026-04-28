@@ -14,6 +14,7 @@ type Props = {
     reps_reales: number | null;
     peso_real: number | null;
   };
+  readOnly?: boolean;
 };
 
 function toNullableNumber(value: string): number | null {
@@ -112,6 +113,21 @@ export function SessionExerciseAutosave(props: Props) {
         setError(e instanceof Error ? e.message : "Error inesperado.");
       }
     });
+  }
+
+  if (props.readOnly) {
+    return (
+      <div className="space-y-2 text-sm">
+        <p>
+          <span className="font-medium">Hecho: </span>
+          {isCompleted ? "Sí" : "No"}
+        </p>
+        <p>
+          <span className="font-medium">Real: </span>
+          {series || "—"} series · {reps || "—"} reps · {peso || "—"} kg
+        </p>
+      </div>
+    );
   }
 
   return (

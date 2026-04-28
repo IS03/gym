@@ -12,6 +12,7 @@ const initialState: State = { error: null };
 export function SessionCreateExerciseForm(props: {
   sessionId: string;
   muscleGroups: Array<{ value: string; label: string }>;
+  readOnly?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     async (_prev: State, formData: FormData): Promise<State> => {
@@ -24,6 +25,12 @@ export function SessionCreateExerciseForm(props: {
     },
     initialState,
   );
+
+  if (props.readOnly) {
+    return (
+      <p className="text-sm text-muted-foreground">La sesión está finalizada.</p>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-3">

@@ -38,10 +38,14 @@ export type RoutineExercise = {
   created_at: string;
 };
 
+export type WorkoutSessionStatus = "in_progress" | "completed";
+
 export type WorkoutSession = {
   id: string;
+  user_id: string;
   day_log_id: string;
   routine_id: string | null;
+  status: WorkoutSessionStatus;
   ended_at: string | null;
   created_at: string;
   updated_at: string;

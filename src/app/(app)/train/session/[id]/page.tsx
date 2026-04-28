@@ -36,6 +36,7 @@ export default async function SessionPage({
     getSession(id),
     listExercises({ includeArchived: false }),
   ]);
+  const isDone = session.status === "completed" || Boolean(session.ended_at);
   const completed = exercises.filter((e) => e.is_completed).length;
   const total = exercises.length;
 
@@ -52,47 +53,55 @@ export default async function SessionPage({
           <Button
             className="h-11 w-full"
             type="submit"
-            variant={session.ended_at ? "outline" : "default"}
-            disabled={Boolean(session.ended_at)}
+            variant={isDone ? "outline" : "default"}
+            disabled={isDone}
           >
-            {session.ended_at ? "Sesión terminada" : "Terminar sesión"}
+            {isDone ? "Sesión finalizada" : "Terminar sesión"}
           </Button>
         </form>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Agregar ejercicio existente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={addExistingExerciseToSessionAction} className="space-y-3">
-            <input type="hidden" name="session_id" value={id} />
-            <select
-              name="exercise_id"
-              className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-              required
-            >
-              {allExercises.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.nombre}
-                </option>
-              ))}
-            </select>
-            <Button className="h-11 w-full" type="submit" disabled={allExercises.length === 0}>
-              Agregar
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {!isDone ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Agregar ejercicio existente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={addExistingExerciseToSessionAction} className="space-y-3">
+              <input type="hidden" name="session_id" value={id} />
+              <select
+                name="exercise_id"
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                required
+              >
+                {allExercises.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.nombre}
+                  </option>
+                ))}
+              </select>
+              <Button className="h-11 w-full" type="submit" disabled={allExercises.length === 0}>
+                Agregar
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Crear ejercicio nuevo (y agregar)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SessionCreateExerciseForm sessionId={id} muscleGroups={[...MUSCLE_GROUPS]} />
-        </CardContent>
-      </Card>
+      {!isDone ? (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Crear ejercicio nuevo (y agregar)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SessionCreateExerciseForm
+              sessionId={id}
+              muscleGroups={[...MUSCLE_GROUPS]}
+              readOnly={isDone}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="space-y-3">
         <h2 className="text-base font-semibold tracking-tight">Ejercicios de la sesión</h2>
@@ -113,6 +122,7 @@ export default async function SessionPage({
                     <SessionExerciseAutosave
                       sessionId={id}
                       id={se.id}
+                      readOnly={isDone}
                       initial={{
                         is_completed: se.is_completed,
                         series_reales: se.series_reales,
@@ -121,13 +131,15 @@ export default async function SessionPage({
                       }}
                     />
 
-                    <form action={removeSessionExerciseAction}>
-                      <input type="hidden" name="session_id" value={id} />
-                      <input type="hidden" name="id" value={se.id} />
-                      <Button className="h-11 w-full" variant="destructive" type="submit">
-                        Quitar de la sesión
-                      </Button>
-                    </form>
+                    {!isDone ? (
+                      <form action={removeSessionExerciseAction}>
+                        <input type="hidden" name="session_id" value={id} />
+                        <input type="hidden" name="id" value={se.id} />
+                        <Button className="h-11 w-full" variant="destructive" type="submit">
+                          Quitar de la sesión
+                        </Button>
+                      </form>
+                    ) : null}
                   </CardContent>
                 </Card>
               );

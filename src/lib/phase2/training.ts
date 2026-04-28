@@ -7,6 +7,7 @@ import type {
   RoutineExercise,
   WorkoutSession,
   WorkoutSessionExercise,
+  WorkoutSessionStatus,
 } from "./types";
 
 async function getAuthedUserId() {
@@ -30,6 +31,58 @@ function asPostgrestError(err: unknown): { code?: string; message?: string } {
   return {
     code: typeof anyErr.code === "string" ? anyErr.code : undefined,
     message: typeof anyErr.message === "string" ? anyErr.message : undefined,
+  };
+}
+
+const MSG_SESSION_IN_PROGRESS =
+  "Ya tenés una sesión de entrenamiento en curso. Continuá esa sesión o finalizala antes de iniciar otra.";
+
+async function getWorkoutSessionForOwner(sessionId: string): Promise<WorkoutSession> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (error) throw new Error(`Leer sesión: ${error.message}`);
+  if (!data) throw new Error("Sesión no encontrada.");
+  if ((data as WorkoutSession).user_id !== userId) {
+    throw new Error("Forbidden.");
+  }
+  return data as WorkoutSession;
+}
+
+async function requireSessionInProgress(sessionId: string): Promise<void> {
+  const s = await getWorkoutSessionForOwner(sessionId);
+  if (s.status !== "in_progress") {
+    throw new Error("La sesión ya finalizó. No se puede modificar.");
+  }
+}
+
+export async function getInProgressSessionForUser(): Promise<{
+  session: WorkoutSession;
+  log_date: string;
+} | null> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data: session, error: sErr } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "in_progress")
+    .maybeSingle();
+  if (sErr) throw new Error(`Buscar sesión en curso: ${sErr.message}`);
+  if (!session) return null;
+  const { data: dayLog, error: dErr } = await supabase
+    .from("day_logs")
+    .select("log_date")
+    .eq("id", (session as WorkoutSession).day_log_id)
+    .single();
+  if (dErr) throw new Error(`Leer día de la sesión: ${dErr.message}`);
+  return {
+    session: session as WorkoutSession,
+    log_date: String((dayLog as { log_date: string }).log_date),
   };
 }
 
@@ -81,6 +134,7 @@ export async function listTrainingDaysInMonth(input: {
   let q = supabase
     .from("workout_sessions")
     .select("id, ended_at, routine_id, routine:routines(color), day_log:day_logs(log_date)")
+    .eq("status", "completed")
     .not("ended_at", "is", null)
     .gte("day_logs.log_date", start)
     .lt("day_logs.log_date", end);
@@ -129,6 +183,7 @@ export async function listEndedSessionsByDate(input: {
     .from("workout_sessions")
     .select("*, routine:routines(nombre)")
     .eq("day_log_id", dayLog.id)
+    .eq("status", "completed")
     .not("ended_at", "is", null)
     .order("ended_at", { ascending: false });
 
@@ -466,16 +521,29 @@ export async function startFreeSession(input: {
   const supabase = await createClient();
   await getAuthedUserId();
 
+  const existing = await getInProgressSessionForUser();
+  if (existing) {
+    throw new Error(MSG_SESSION_IN_PROGRESS);
+  }
+
   const { data, error } = await supabase
     .from("workout_sessions")
     .insert({
       day_log_id: dayLog.id,
+      user_id: dayLog.user_id,
       routine_id: null,
+      status: "in_progress" as WorkoutSessionStatus,
     })
     .select("*")
     .single();
 
-  if (error) throw new Error(`Crear workout_session: ${error.message}`);
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error(MSG_SESSION_IN_PROGRESS);
+    }
+    throw new Error(`Crear workout_session: ${error.message}`);
+  }
   return data as WorkoutSession;
 }
 
@@ -498,15 +566,28 @@ export async function startSessionFromRoutine(input: {
     .single();
   if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
 
+  const existing = await getInProgressSessionForUser();
+  if (existing) {
+    throw new Error(MSG_SESSION_IN_PROGRESS);
+  }
+
   const { data: session, error: sessErr } = await supabase
     .from("workout_sessions")
     .insert({
       day_log_id: dayLog.id,
+      user_id: dayLog.user_id,
       routine_id: routine.id,
+      status: "in_progress" as WorkoutSessionStatus,
     })
     .select("*")
     .single();
-  if (sessErr) throw new Error(`Crear workout_session: ${sessErr.message}`);
+  if (sessErr) {
+    const { code } = asPostgrestError(sessErr);
+    if (code === "23505") {
+      throw new Error(MSG_SESSION_IN_PROGRESS);
+    }
+    throw new Error(`Crear workout_session: ${sessErr.message}`);
+  }
 
   const { data: routineItems, error: itemsErr } = await supabase
     .from("routine_exercises")
@@ -567,11 +648,14 @@ export async function getSession(sessionId: string): Promise<{
 
 export async function finishSession(sessionId: string): Promise<WorkoutSession> {
   const supabase = await createClient();
-  await getAuthedUserId();
+  await requireSessionInProgress(sessionId);
 
   const { data, error } = await supabase
     .from("workout_sessions")
-    .update({ ended_at: new Date().toISOString() })
+    .update({
+      status: "completed" as WorkoutSessionStatus,
+      ended_at: new Date().toISOString(),
+    })
     .eq("id", sessionId)
     .select("*")
     .single();
@@ -586,6 +670,7 @@ export async function addExistingExerciseToSession(input: {
 }): Promise<WorkoutSessionExercise> {
   const supabase = await createClient();
   const userId = await getAuthedUserId();
+  await requireSessionInProgress(input.sessionId);
 
   const { data: exercise, error: exErr } = await supabase
     .from("exercises")
@@ -620,6 +705,7 @@ export async function createExerciseFromSession(input: {
   exercise: Exercise;
   sessionExercise: WorkoutSessionExercise;
 }> {
+  await requireSessionInProgress(input.sessionId);
   // Chequeo previo para avisar sin depender del unique error.
   const supabase = await createClient();
   const userId = await getAuthedUserId();
@@ -657,11 +743,18 @@ export async function removeSessionExercise(id: string): Promise<void> {
   const supabase = await createClient();
   await getAuthedUserId();
 
+  const { data: row, error: rErr } = await supabase
+    .from("workout_session_exercises")
+    .select("workout_session_id")
+    .eq("id", id)
+    .single();
+  if (rErr) throw new Error(`Leer ejercicio de sesión: ${rErr.message}`);
+  await requireSessionInProgress((row as { workout_session_id: string }).workout_session_id);
+
   const { error } = await supabase
     .from("workout_session_exercises")
     .delete()
-    .eq("id", id)
-    ;
+    .eq("id", id);
   if (error) throw new Error(`Borrar ejercicio de sesión: ${error.message}`);
 }
 
@@ -674,6 +767,14 @@ export async function updateSessionExercise(input: {
 }): Promise<WorkoutSessionExercise> {
   const supabase = await createClient();
   await getAuthedUserId();
+
+  const { data: row, error: rErr } = await supabase
+    .from("workout_session_exercises")
+    .select("workout_session_id")
+    .eq("id", input.id)
+    .single();
+  if (rErr) throw new Error(`Leer ejercicio de sesión: ${rErr.message}`);
+  await requireSessionInProgress((row as { workout_session_id: string }).workout_session_id);
 
   const patch: Record<string, unknown> = {};
   if (input.series_reales !== undefined) patch.series_reales = input.series_reales;
@@ -721,11 +822,12 @@ export async function listExerciseHistory(input: {
 
   const sessionIds = Array.from(new Set(rows.map((r) => r.workout_session_id)));
 
-  // 2) Traer sesiones + day_log_id
+  // 2) Traer sesiones + day_log_id (solo finalizadas cuentan como historial)
   const { data: sessions, error: sErr } = await supabase
     .from("workout_sessions")
     .select("*")
-    .in("id", sessionIds);
+    .in("id", sessionIds)
+    .eq("status", "completed");
   if (sErr) throw new Error(`Leer workout_sessions: ${sErr.message}`);
 
   const sessionsById = new Map<string, WorkoutSession>();
@@ -745,12 +847,11 @@ export async function listExerciseHistory(input: {
   const dayDateById = new Map<string, string>();
   for (const d of (dayLogs ?? []) as any[]) dayDateById.set(d.id, d.log_date);
 
+  const completedRows = rows.filter((se) => sessionsById.has(se.workout_session_id));
+
   // 5) Construir salida ordenada (por created_at desc de sessionExercise)
-  return rows.map((se) => {
-    const session = sessionsById.get(se.workout_session_id);
-    if (!session) {
-      throw new Error("Inconsistencia: sesión no encontrada para el historial.");
-    }
+  return completedRows.map((se) => {
+    const session = sessionsById.get(se.workout_session_id)!;
     const dayDate = dayDateById.get(session.day_log_id);
     if (!dayDate) {
       throw new Error("Inconsistencia: day_log no encontrado para el historial.");

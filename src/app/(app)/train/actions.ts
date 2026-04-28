@@ -135,6 +135,7 @@ export async function startFreeSessionAction(formData: FormData) {
   const date = str(formData, "date");
   const session = await startFreeSession({ date });
   revalidatePath("/train");
+  revalidatePath("/train/session/new");
   revalidatePath(`/train/session/${session.id}`);
   return session.id;
 }
@@ -144,6 +145,7 @@ export async function startSessionFromRoutineAction(formData: FormData) {
   const routineId = str(formData, "routine_id");
   const { session } = await startSessionFromRoutine({ date, routineId });
   revalidatePath("/train");
+  revalidatePath("/train/session/new");
   revalidatePath(`/train/session/${session.id}`);
   return session.id;
 }
@@ -188,6 +190,7 @@ export async function finishSessionAction(formData: FormData) {
   await finishSession(sessionId);
   revalidatePath(`/train/session/${sessionId}`);
   revalidatePath("/train");
+  revalidatePath("/train/session/new");
 }
 
 export async function updateSessionExerciseAction(formData: FormData) {
