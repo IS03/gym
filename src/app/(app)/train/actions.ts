@@ -197,9 +197,14 @@ export async function updateSessionExerciseAction(formData: FormData) {
   const sessionId = str(formData, "session_id");
   const id = str(formData, "id");
 
-  const is_completed_raw = formData.get("is_completed");
-  const is_completed =
-    is_completed_raw === null ? undefined : String(is_completed_raw) === "on";
+  // Solo tocar is_completed si el cliente envió la clave (marcar o desmarcar "Hecho").
+  // "1" = hecho, "0" = no hecho (el checkbox nunca manda is_completed: false con FormData).
+  let is_completed: boolean | undefined;
+  if (formData.has("is_completed")) {
+    is_completed = String(formData.get("is_completed")) === "1";
+  } else {
+    is_completed = undefined;
+  }
 
   await updateSessionExercise({
     id,
