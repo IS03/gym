@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Clock3, Ellipsis, Minus, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -76,11 +76,10 @@ type SetRowProps = {
   exerciseId: string;
   set: EditableWorkoutSet;
   setIndex: number;
-  setCount: number;
+  restLabel: string | null;
   readOnly: boolean;
   onChange: (updater: (set: EditableWorkoutSet) => EditableWorkoutSet) => void;
-  onCompleted: (completed: boolean) => void;
-  onRemove: () => void;
+  onStartTimer: () => void;
 };
 
 function compactNumber(value: number | null) {
@@ -92,22 +91,27 @@ function timerLabel(seconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function validRestSeconds(value: number | null) {
+  return value !== null && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function configuredRestLabel(minimum: number | null, maximum: number | null) {
+  return formatRestRange(validRestSeconds(minimum), validRestSeconds(maximum));
+}
+
 function SetRow({
   exerciseId,
   set,
   setIndex,
-  setCount,
+  restLabel,
   readOnly,
   onChange,
-  onCompleted,
-  onRemove,
+  onStartTimer,
 }: SetRowProps) {
-  const target = `${compactNumber(set.target_reps)} × ${compactNumber(set.target_weight_kg)} kg`;
-
   return (
     <div
       className={cn(
-        "grid grid-cols-[2rem_minmax(0,1fr)_4.25rem_4rem_2.75rem] items-center gap-1.5 rounded-xl border px-2 py-2 transition-[background-color,border-color] duration-150",
+        "grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem] items-center gap-x-1.5 gap-y-1 rounded-xl border px-2 py-2 transition-[background-color,border-color] duration-150",
         set.is_completed
           ? "border-emerald-500/25 bg-emerald-500/8"
           : "border-border/80 bg-background/40",
@@ -116,88 +120,115 @@ function SetRow({
       <span className="metric-number text-center text-sm font-semibold text-muted-foreground">
         {setIndex + 1}
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-xs text-muted-foreground">{target}</p>
-        {set.target_rir !== null ? (
-          <p className="text-[11px] text-muted-foreground">RIR {set.target_rir}</p>
-        ) : null}
+      <div className="min-w-0 space-y-0.5">
+        <Input
+          aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
+          className="metric-number h-10 px-1 text-center text-base font-semibold"
+          type="number"
+          min={0}
+          max={9999.99}
+          step="0.5"
+          inputMode="decimal"
+          readOnly={readOnly}
+          value={set.actual_weight_kg ?? ""}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              actual_weight_kg: nullableNumberFromInput(event.target.value),
+            }))
+          }
+        />
+        <p className="metric-number truncate text-center text-[10px] leading-none text-muted-foreground">
+          obj {compactNumber(set.target_weight_kg)}
+        </p>
       </div>
-      <Input
-        aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
-        className="metric-number h-10 px-1 text-center text-sm font-semibold"
-        type="number"
-        min={0}
-        max={9999.99}
-        step="0.5"
-        inputMode="decimal"
-        readOnly={readOnly}
-        value={set.actual_weight_kg ?? ""}
-        onChange={(event) =>
-          onChange((current) => ({
-            ...current,
-            actual_weight_kg: nullableNumberFromInput(event.target.value),
-          }))
-        }
-      />
-      <Input
-        aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
-        className="metric-number h-10 px-1 text-center text-sm font-semibold"
-        type="number"
-        min={0}
-        max={1000}
-        step={1}
-        inputMode="numeric"
-        readOnly={readOnly}
-        value={set.actual_reps ?? ""}
-        onChange={(event) =>
-          onChange((current) => ({
-            ...current,
-            actual_reps: nullableNumberFromInput(event.target.value),
-          }))
-        }
-      />
+      <div className="min-w-0 space-y-0.5">
+        <Input
+          aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
+          className="metric-number h-10 px-1 text-center text-base font-semibold"
+          type="number"
+          min={0}
+          max={1000}
+          step={1}
+          inputMode="numeric"
+          readOnly={readOnly}
+          value={set.actual_reps ?? ""}
+          onChange={(event) =>
+            onChange((current) => ({
+              ...current,
+              actual_reps: nullableNumberFromInput(event.target.value),
+            }))
+          }
+        />
+        <p className="metric-number truncate text-center text-[10px] leading-none text-muted-foreground">
+          obj {compactNumber(set.target_reps)}
+        </p>
+      </div>
+      <span
+        className="metric-number text-center text-sm font-semibold"
+        aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
+      >
+        {compactNumber(set.target_rir)}
+      </span>
       {readOnly ? (
         <span
-          className={cn(
-            "flex size-11 items-center justify-center rounded-xl",
-            set.is_completed ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground",
-          )}
+          className="flex size-11 items-center justify-center rounded-full"
           aria-label={set.is_completed ? "Serie completada" : "Serie pendiente"}
         >
-          {set.is_completed ? <Check className="size-5" aria-hidden /> : "—"}
-        </span>
-      ) : (
-        <div className="relative flex size-11 items-center justify-center">
-          <button
-            type="button"
+          <span
             className={cn(
-              "flex size-11 items-center justify-center rounded-xl border transition-[background-color,border-color,transform] duration-150 active:scale-95",
+              "flex size-7 items-center justify-center rounded-full border",
               set.is_completed
                 ? "border-emerald-500 bg-emerald-500 text-white"
-                : "border-border bg-background text-muted-foreground hover:border-primary/50",
+                : "border-border bg-transparent text-muted-foreground",
             )}
-            aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
-            aria-pressed={set.is_completed}
-            onClick={() => {
-              const next = !set.is_completed;
-              onChange((current) => ({ ...current, is_completed: next }));
-              onCompleted(next);
-            }}
           >
-            {set.is_completed ? <Check className="size-5" aria-hidden /> : null}
-          </button>
-          {setCount > 1 ? (
+            {set.is_completed ? <Check className="size-4" strokeWidth={3} aria-hidden /> : null}
+          </span>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="group flex size-11 touch-manipulation items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
+          aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
+          aria-pressed={set.is_completed}
+          onClick={() =>
+            onChange((current) => ({
+              ...current,
+              is_completed: !current.is_completed,
+            }))
+          }
+        >
+          <span
+            className={cn(
+              "flex size-7 items-center justify-center rounded-full border transition-[background-color,border-color,transform] duration-150 group-active:scale-95",
+              set.is_completed
+                ? "border-emerald-500 bg-emerald-500 text-white"
+                : "border-border bg-transparent text-muted-foreground group-hover:border-primary/50",
+            )}
+          >
+            {set.is_completed ? <Check className="size-4" strokeWidth={3} aria-hidden /> : null}
+          </span>
+        </button>
+      )}
+      {restLabel ? (
+        <div className="col-span-5 mt-1 flex min-w-0 items-center justify-between gap-2 border-t border-border/60 pt-1.5">
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            Descanso {restLabel}
+          </span>
+          {!readOnly ? (
             <button
               type="button"
-              className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm"
-              aria-label={`Quitar serie ${setIndex + 1}`}
-              onClick={onRemove}
+              className="flex h-8 shrink-0 touch-manipulation items-center gap-1 rounded-md px-2 text-xs font-medium text-primary transition-[background-color,transform] duration-150 hover:bg-primary/10 active:scale-95 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              onClick={onStartTimer}
+              aria-label={`Iniciar temporizador de descanso para la serie ${setIndex + 1}`}
             >
-              <Ellipsis className="size-3" aria-hidden />
+              <Clock3 className="size-3.5" aria-hidden />
+              Iniciar
             </button>
           ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -426,11 +457,14 @@ export function SessionEditor({
 
   function startRestTimer(exercise: WorkoutSessionClientDetail["exercises"][number]) {
     const seconds =
-      exercise.rest_max_seconds_snapshot ?? exercise.rest_min_seconds_snapshot ?? null;
-    if (!seconds || seconds <= 0) return;
+      validRestSeconds(exercise.rest_max_seconds_snapshot) ??
+      validRestSeconds(exercise.rest_min_seconds_snapshot);
+    if (seconds === null) return;
+    const now = Date.now();
+    setTimerNow(now);
     setRestTimer({
       exerciseName: exercise.nombre_snapshot,
-      endAt: Date.now() + seconds * 1000,
+      endAt: now + seconds * 1000,
     });
   }
 
@@ -780,6 +814,10 @@ export function SessionEditor({
             const status = statuses[exercise.id];
             const dirty = dirtyIds.has(exercise.id);
             const completedCount = payload.sets.filter((set) => set.is_completed).length;
+            const restLabel = configuredRestLabel(
+              exercise.rest_min_seconds_snapshot,
+              exercise.rest_max_seconds_snapshot,
+            );
             return (
               <Card
                 key={exercise.id}
@@ -848,24 +886,13 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  {formatRestRange(
-                    exercise.rest_min_seconds_snapshot,
-                    exercise.rest_max_seconds_snapshot,
-                  ) ? (
-                    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                      <span className="text-muted-foreground">Descanso entre series</span>
-                      <span className="font-medium">
-                        {formatRestRange(
-                          exercise.rest_min_seconds_snapshot,
-                          exercise.rest_max_seconds_snapshot,
-                        )}
-                      </span>
-                    </div>
-                  ) : null}
-
                   <div className="space-y-2">
-                    <div className="grid grid-cols-[2rem_minmax(0,1fr)_4.25rem_4rem_2.75rem] gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <span>#</span><span>Objetivo</span><span className="text-center">kg</span><span className="text-center">reps</span><span className="text-center">hecha</span>
+                    <div className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem] gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <span className="text-center">Serie</span>
+                      <span className="text-center">kg</span>
+                      <span className="text-center">reps</span>
+                      <span className="text-center">RIR</span>
+                      <span className="text-center" aria-label="Completada">✓</span>
                     </div>
                     {payload.sets.map((set, setIndex) => (
                       <SetRow
@@ -873,7 +900,7 @@ export function SessionEditor({
                         exerciseId={exercise.id}
                         set={set}
                         setIndex={setIndex}
-                        setCount={payload.sets.length}
+                        restLabel={restLabel}
                         readOnly={readOnly}
                         onChange={(updater) =>
                           updateExercise(exercise.id, (current) =>
@@ -885,17 +912,7 @@ export function SessionEditor({
                             }),
                           )
                         }
-                        onCompleted={(completed) => {
-                          if (completed) startRestTimer(exercise);
-                        }}
-                        onRemove={() =>
-                          updateExercise(exercise.id, (current) =>
-                            renumberWorkoutPayload({
-                              ...current,
-                              sets: current.sets.filter((_, currentIndex) => currentIndex !== setIndex),
-                            }),
-                          )
-                        }
+                        onStartTimer={() => startRestTimer(exercise)}
                       />
                     ))}
                   </div>
