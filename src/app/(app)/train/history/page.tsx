@@ -1,46 +1,32 @@
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listExercises } from "@/lib/phase2/training";
+import { getTrainingProgress } from "@/lib/phase2/training-robust";
+import { HistoryExerciseList } from "./history-exercise-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrainHistoryPage() {
-  const exercises = await listExercises({ includeArchived: false });
+  const [exercises, progress] = await Promise.all([
+    listExercises({ includeArchived: false }),
+    getTrainingProgress(),
+  ]);
+  const progressByExerciseId = new Map(
+    progress.exercises.map((exercise) => [exercise.exerciseId, exercise]),
+  );
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
-        <p className="text-sm text-muted-foreground">Elegí un ejercicio.</p>
+        <p className="text-sm text-muted-foreground">
+          Buscá un ejercicio y compará tus registros reales.
+        </p>
       </div>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Ejercicios</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {exercises.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay ejercicios todavía.</p>
-          ) : (
-            <div className="space-y-2">
-              {exercises.map((ex) => (
-                <Link
-                  key={ex.id}
-                  href={`/train/history/${ex.id}`}
-                  className="block rounded-md border bg-background px-4 py-3"
-                >
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-medium">{ex.nombre}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {ex.muscle_group_label ?? ex.grupo_muscular ?? "Sin grupo"}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <HistoryExerciseList
+        exercises={exercises.map((exercise) => ({
+          ...exercise,
+          progress: progressByExerciseId.get(exercise.id) ?? null,
+        }))}
+      />
     </div>
   );
 }

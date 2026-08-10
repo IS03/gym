@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { Check, ChevronDown, Clock3, Ellipsis, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import type {
   SessionMetadataInput,
   MuscleGroup,
   TrainingAdjustment,
+  EditableWorkoutSet,
   WorkoutExercisePayload,
   WorkoutSessionClientDetail,
 } from "@/lib/phase2/types";
@@ -64,6 +66,141 @@ type ExerciseStatus = {
   saved: boolean;
   error: string | null;
 };
+
+type RestTimerState = {
+  exerciseName: string;
+  endAt: number;
+};
+
+type SetRowProps = {
+  exerciseId: string;
+  set: EditableWorkoutSet;
+  setIndex: number;
+  setCount: number;
+  readOnly: boolean;
+  onChange: (updater: (set: EditableWorkoutSet) => EditableWorkoutSet) => void;
+  onCompleted: (completed: boolean) => void;
+  onRemove: () => void;
+};
+
+function compactNumber(value: number | null) {
+  return value === null ? "—" : String(value).replace(".", ",");
+}
+
+function timerLabel(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function SetRow({
+  exerciseId,
+  set,
+  setIndex,
+  setCount,
+  readOnly,
+  onChange,
+  onCompleted,
+  onRemove,
+}: SetRowProps) {
+  const target = `${compactNumber(set.target_reps)} × ${compactNumber(set.target_weight_kg)} kg`;
+
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-[2rem_minmax(0,1fr)_4.25rem_4rem_2.75rem] items-center gap-1.5 rounded-xl border px-2 py-2 transition-[background-color,border-color] duration-150",
+        set.is_completed
+          ? "border-emerald-500/25 bg-emerald-500/8"
+          : "border-border/80 bg-background/40",
+      )}
+    >
+      <span className="metric-number text-center text-sm font-semibold text-muted-foreground">
+        {setIndex + 1}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-xs text-muted-foreground">{target}</p>
+        {set.target_rir !== null ? (
+          <p className="text-[11px] text-muted-foreground">RIR {set.target_rir}</p>
+        ) : null}
+      </div>
+      <Input
+        aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
+        className="metric-number h-10 px-1 text-center text-sm font-semibold"
+        type="number"
+        min={0}
+        max={9999.99}
+        step="0.5"
+        inputMode="decimal"
+        readOnly={readOnly}
+        value={set.actual_weight_kg ?? ""}
+        onChange={(event) =>
+          onChange((current) => ({
+            ...current,
+            actual_weight_kg: nullableNumberFromInput(event.target.value),
+          }))
+        }
+      />
+      <Input
+        aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
+        className="metric-number h-10 px-1 text-center text-sm font-semibold"
+        type="number"
+        min={0}
+        max={1000}
+        step={1}
+        inputMode="numeric"
+        readOnly={readOnly}
+        value={set.actual_reps ?? ""}
+        onChange={(event) =>
+          onChange((current) => ({
+            ...current,
+            actual_reps: nullableNumberFromInput(event.target.value),
+          }))
+        }
+      />
+      {readOnly ? (
+        <span
+          className={cn(
+            "flex size-11 items-center justify-center rounded-xl",
+            set.is_completed ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground",
+          )}
+          aria-label={set.is_completed ? "Serie completada" : "Serie pendiente"}
+        >
+          {set.is_completed ? <Check className="size-5" aria-hidden /> : "—"}
+        </span>
+      ) : (
+        <div className="relative flex size-11 items-center justify-center">
+          <button
+            type="button"
+            className={cn(
+              "flex size-11 items-center justify-center rounded-xl border transition-[background-color,border-color,transform] duration-150 active:scale-95",
+              set.is_completed
+                ? "border-emerald-500 bg-emerald-500 text-white"
+                : "border-border bg-background text-muted-foreground hover:border-primary/50",
+            )}
+            aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
+            aria-pressed={set.is_completed}
+            onClick={() => {
+              const next = !set.is_completed;
+              onChange((current) => ({ ...current, is_completed: next }));
+              onCompleted(next);
+            }}
+          >
+            {set.is_completed ? <Check className="size-5" aria-hidden /> : null}
+          </button>
+          {setCount > 1 ? (
+            <button
+              type="button"
+              className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm"
+              aria-label={`Quitar serie ${setIndex + 1}`}
+              onClick={onRemove}
+            >
+              <Ellipsis className="size-3" aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function snapshotRecord(snapshot: string): Record<string, string | null> {
   try {
@@ -152,13 +289,25 @@ export function SessionEditor({
   const [storageError, setStorageError] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalPending, setGlobalPending] = useState(false);
-  const [selectedExerciseId, setSelectedExerciseId] = useState(
-    libraryExercises[0]?.id ?? "",
-  );
+  const [selectedExerciseId, setSelectedExerciseId] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
+  const [exerciseSearch, setExerciseSearch] = useState("");
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [collapsedExercises, setCollapsedExercises] = useState<Record<string, boolean>>({});
+  const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
+  const sessionExerciseLibraryIds = useMemo(
+    () => new Set(detail.exercises.map((exercise) => exercise.exercise_id)),
+    [detail.exercises],
+  );
   const filteredLibraryExercises = useMemo(
-    () => filterExercisesByMuscleGroup(libraryExercises, selectedMuscleGroup),
-    [libraryExercises, selectedMuscleGroup],
+    () =>
+      filterExercisesByMuscleGroup(libraryExercises, selectedMuscleGroup).filter(
+        (exercise) =>
+          !sessionExerciseLibraryIds.has(exercise.id) &&
+          exercise.nombre.toLocaleLowerCase("es").includes(exerciseSearch.trim().toLocaleLowerCase("es")),
+      ),
+    [exerciseSearch, libraryExercises, selectedMuscleGroup, sessionExerciseLibraryIds],
   );
   const activeSelectedExerciseId = filteredLibraryExercises.some(
     (exercise) => exercise.id === selectedExerciseId,
@@ -231,6 +380,16 @@ export function SessionEditor({
   const metadataDirty = !readOnly && !payloadsEqual(metadata, baseMetadata);
   const stats = completionStats(Object.values(currentPayloads));
   const hasUnsavedWork = dirtyIds.size > 0 || metadataDirty;
+  const restRemaining = restTimer
+    ? Math.max(0, Math.ceil((restTimer.endAt - timerNow) / 1000))
+    : 0;
+
+  useEffect(() => {
+    if (!restTimer) return;
+    setTimerNow(Date.now());
+    const interval = window.setInterval(() => setTimerNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, [restTimer]);
 
   useEffect(() => {
     if (!hasUnsavedWork) return;
@@ -263,6 +422,24 @@ export function SessionEditor({
       [exerciseId]: { pending: false, saved: false, error: null },
     }));
     persistExerciseDraft(exerciseId, next);
+  }
+
+  function startRestTimer(exercise: WorkoutSessionClientDetail["exercises"][number]) {
+    const seconds =
+      exercise.rest_max_seconds_snapshot ?? exercise.rest_min_seconds_snapshot ?? null;
+    if (!seconds || seconds <= 0) return;
+    setRestTimer({
+      exerciseName: exercise.nombre_snapshot,
+      endAt: Date.now() + seconds * 1000,
+    });
+  }
+
+  function updateRestTimer(seconds: number) {
+    setRestTimer((current) =>
+      current
+        ? { ...current, endAt: Math.max(Date.now(), current.endAt + seconds * 1000) }
+        : current,
+    );
   }
 
   function updateMetadata(
@@ -342,6 +519,7 @@ export function SessionEditor({
       setGlobalError(result.error);
       return;
     }
+    setExercisePickerOpen(false);
     router.refresh();
   }
 
@@ -476,67 +654,120 @@ export function SessionEditor({
       ) : null}
 
       {!readOnly ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Agregar ejercicio extra</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="extra-muscle-group">Filtrar por grupo muscular</Label>
-              <select
-                id="extra-muscle-group"
-                className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-                value={selectedMuscleGroup}
-                onChange={(event) => setSelectedMuscleGroup(event.target.value as MuscleGroupFilter)}
-                disabled={globalPending}
-              >
-                <option value="all">Todos los grupos</option>
-                {MUSCLE_GROUP_OPTIONS.map((group) => (
-                  <option key={group.value} value={group.value}>
-                    {group.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <select
-              aria-label="Ejercicio extra"
-              className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-              value={activeSelectedExerciseId}
-              onChange={(event) => setSelectedExerciseId(event.target.value)}
-              disabled={filteredLibraryExercises.length === 0 || globalPending}
+        <>
+          <Button
+            className="h-11 w-full"
+            type="button"
+            variant="outline"
+            onClick={() => setExercisePickerOpen(true)}
+          >
+            <Plus className="size-4" aria-hidden />
+            Agregar ejercicio
+          </Button>
+          {exercisePickerOpen ? (
+            <div
+              className="fixed inset-0 z-[60] flex items-end bg-black/45 px-2 pt-12 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="extra-exercise-title"
             >
-              {filteredLibraryExercises.length === 0 ? (
-                <option value="">No hay ejercicios para este grupo</option>
-              ) : (
-                filteredLibraryExercises.map((exercise) => (
-                  <option key={exercise.id} value={exercise.id}>
-                    {exercise.nombre}
-                  </option>
-                ))
-              )}
-            </select>
-            <Button
-              className="h-11 w-full"
-              type="button"
-              variant="outline"
-              disabled={!activeSelectedExerciseId || globalPending}
-              onClick={() => void addExistingExercise()}
-            >
-              Agregar a la sesión
-            </Button>
-            <details className="rounded-md border p-3">
-              <summary className="cursor-pointer text-sm font-medium">
-                Crear un ejercicio nuevo
-              </summary>
-              <div className="mt-3">
-                <SessionCreateExerciseForm
-                  sessionId={detail.session.id}
-                  muscleGroups={[...MUSCLE_GROUP_OPTIONS]}
-                />
+              <div className="max-h-[min(46rem,calc(100dvh-env(safe-area-inset-top)))] w-full rounded-t-[1.7rem] border border-border bg-card px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-200">
+                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 id="extra-exercise-title" className="text-lg font-semibold tracking-tight">
+                      Agregar ejercicio
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Los ejercicios de esta sesión no se pueden duplicar.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Cerrar selector de ejercicios"
+                    onClick={() => setExercisePickerOpen(false)}
+                  >
+                    <X aria-hidden />
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                  <Input
+                    aria-label="Buscar ejercicio"
+                    className="pl-9"
+                    value={exerciseSearch}
+                    placeholder="Buscar ejercicio"
+                    onChange={(event) => setExerciseSearch(event.target.value)}
+                  />
+                </div>
+                <div className="my-3 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={selectedMuscleGroup === "all" ? "default" : "outline"}
+                    onClick={() => setSelectedMuscleGroup("all")}
+                  >
+                    Todos
+                  </Button>
+                  {MUSCLE_GROUP_OPTIONS.map((group) => (
+                    <Button
+                      key={group.value}
+                      type="button"
+                      size="sm"
+                      variant={selectedMuscleGroup === group.value ? "default" : "outline"}
+                      onClick={() => setSelectedMuscleGroup(group.value)}
+                    >
+                      {group.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="max-h-[42dvh] space-y-1 overflow-y-auto pb-3">
+                  {filteredLibraryExercises.length === 0 ? (
+                    <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                      No hay ejercicios disponibles con ese filtro.
+                    </p>
+                  ) : (
+                    filteredLibraryExercises.map((exercise) => (
+                      <button
+                        key={exercise.id}
+                        type="button"
+                        className={cn(
+                          "flex min-h-12 w-full items-center justify-between rounded-xl px-3 text-left transition-colors",
+                          activeSelectedExerciseId === exercise.id
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted",
+                        )}
+                        onClick={() => setSelectedExerciseId(exercise.id)}
+                      >
+                        <span className="font-medium">{exercise.nombre}</span>
+                        <span className="text-xs opacity-70">{exercise.grupo_muscular ?? ""}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <Button
+                  className="h-12 w-full"
+                  type="button"
+                  disabled={!activeSelectedExerciseId || globalPending}
+                  onClick={() => void addExistingExercise()}
+                >
+                  {globalPending ? "Agregando…" : "Agregar a la sesión"}
+                </Button>
+                <details className="mt-3 rounded-xl border p-3">
+                  <summary className="cursor-pointer text-sm font-medium">Crear ejercicio nuevo</summary>
+                  <div className="mt-3">
+                    <SessionCreateExerciseForm
+                      sessionId={detail.session.id}
+                      muscleGroups={[...MUSCLE_GROUP_OPTIONS]}
+                    />
+                  </div>
+                </details>
               </div>
-            </details>
-          </CardContent>
-        </Card>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <section className="space-y-3">
@@ -550,7 +781,13 @@ export function SessionEditor({
             const dirty = dirtyIds.has(exercise.id);
             const completedCount = payload.sets.filter((set) => set.is_completed).length;
             return (
-              <Card key={exercise.id}>
+              <Card
+                key={exercise.id}
+                className={cn(
+                  "transition-[opacity,box-shadow] duration-150",
+                  completedCount === payload.sets.length && "border-emerald-500/25",
+                )}
+              >
                 <CardHeader className="space-y-1 pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -569,12 +806,31 @@ export function SessionEditor({
                           : ""}
                       </p>
                     </div>
-                    <span className="rounded-full border px-2 py-1 text-xs">
-                      {completedCount}/{payload.sets.length}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("metric-number rounded-full border px-2 py-1 text-xs", completedCount === payload.sets.length && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")}>
+                        {completedCount}/{payload.sets.length}
+                      </span>
+                      {completedCount === payload.sets.length ? (
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={collapsedExercises[exercise.id] ? "Mostrar ejercicio" : "Contraer ejercicio"}
+                          onClick={() =>
+                            setCollapsedExercises((current) => ({
+                              ...current,
+                              [exercise.id]: !current[exercise.id],
+                            }))
+                          }
+                        >
+                          <ChevronDown className={cn("size-4 transition-transform duration-150", collapsedExercises[exercise.id] && "-rotate-90")} aria-hidden />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {collapsedExercises[exercise.id] ? null : (
+                  <CardContent className="space-y-4">
                   {staleDraftIds.has(exercise.id) ? (
                     <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                       <p>
@@ -607,124 +863,40 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-[2rem_minmax(0,1fr)_4.25rem_4rem_2.75rem] gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <span>#</span><span>Objetivo</span><span className="text-center">kg</span><span className="text-center">reps</span><span className="text-center">hecha</span>
+                    </div>
                     {payload.sets.map((set, setIndex) => (
-                      <div key={set.set_number} className="space-y-2 rounded-md border p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <label className="flex items-center gap-2 text-sm font-medium">
-                            <input
-                              type="checkbox"
-                              className="size-5"
-                              checked={set.is_completed}
-                              disabled={readOnly}
-                              onChange={(event) =>
-                                updateExercise(exercise.id, (current) =>
-                                  renumberWorkoutPayload({
-                                    ...current,
-                                    sets: current.sets.map((currentSet, currentIndex) =>
-                                      currentIndex === setIndex
-                                        ? {
-                                            ...currentSet,
-                                            is_completed: event.target.checked,
-                                          }
-                                        : currentSet,
-                                    ),
-                                  }),
-                                )
-                              }
-                            />
-                            Serie {setIndex + 1}
-                          </label>
-                          <span className="text-xs text-muted-foreground">
-                            Objetivo: {set.target_reps ?? "—"} reps ·{" "}
-                            {set.target_weight_kg ?? "—"} kg
-                            {set.target_rir !== null ? ` · RIR ${set.target_rir}` : ""}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label htmlFor={`reps-${exercise.id}-${setIndex}`}>
-                              Repeticiones
-                            </Label>
-                            <Input
-                              id={`reps-${exercise.id}-${setIndex}`}
-                              type="number"
-                              min={0}
-                              max={1000}
-                              step={1}
-                              inputMode="numeric"
-                              readOnly={readOnly}
-                              value={set.actual_reps ?? ""}
-                              onChange={(event) =>
-                                updateExercise(exercise.id, (current) => ({
-                                  ...current,
-                                  sets: current.sets.map((currentSet, currentIndex) =>
-                                    currentIndex === setIndex
-                                      ? {
-                                          ...currentSet,
-                                          actual_reps: nullableNumberFromInput(
-                                            event.target.value,
-                                          ),
-                                        }
-                                      : currentSet,
-                                  ),
-                                }))
-                              }
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor={`weight-${exercise.id}-${setIndex}`}>
-                              Peso kg
-                            </Label>
-                            <Input
-                              id={`weight-${exercise.id}-${setIndex}`}
-                              type="number"
-                              min={0}
-                              max={9999.99}
-                              step="0.5"
-                              inputMode="decimal"
-                              readOnly={readOnly}
-                              value={set.actual_weight_kg ?? ""}
-                              onChange={(event) =>
-                                updateExercise(exercise.id, (current) => ({
-                                  ...current,
-                                  sets: current.sets.map((currentSet, currentIndex) =>
-                                    currentIndex === setIndex
-                                      ? {
-                                          ...currentSet,
-                                          actual_weight_kg: nullableNumberFromInput(
-                                            event.target.value,
-                                          ),
-                                        }
-                                      : currentSet,
-                                  ),
-                                }))
-                              }
-                            />
-                          </div>
-                        </div>
-                        {!readOnly ? (
-                          <Button
-                            className="w-full"
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={payload.sets.length === 1}
-                            onClick={() =>
-                              updateExercise(exercise.id, (current) =>
-                                renumberWorkoutPayload({
-                                  ...current,
-                                  sets: current.sets.filter(
-                                    (_, currentIndex) => currentIndex !== setIndex,
-                                  ),
-                                }),
-                              )
-                            }
-                          >
-                            Quitar serie
-                          </Button>
-                        ) : null}
-                      </div>
+                      <SetRow
+                        key={set.set_number}
+                        exerciseId={exercise.id}
+                        set={set}
+                        setIndex={setIndex}
+                        setCount={payload.sets.length}
+                        readOnly={readOnly}
+                        onChange={(updater) =>
+                          updateExercise(exercise.id, (current) =>
+                            renumberWorkoutPayload({
+                              ...current,
+                              sets: current.sets.map((currentSet, currentIndex) =>
+                                currentIndex === setIndex ? updater(currentSet) : currentSet,
+                              ),
+                            }),
+                          )
+                        }
+                        onCompleted={(completed) => {
+                          if (completed) startRestTimer(exercise);
+                        }}
+                        onRemove={() =>
+                          updateExercise(exercise.id, (current) =>
+                            renumberWorkoutPayload({
+                              ...current,
+                              sets: current.sets.filter((_, currentIndex) => currentIndex !== setIndex),
+                            }),
+                          )
+                        }
+                      />
                     ))}
                   </div>
 
@@ -762,32 +934,37 @@ export function SessionEditor({
                   ) : null}
 
                   <div className="space-y-1">
-                    <Label htmlFor={`decision-${exercise.id}`}>Próxima vez</Label>
-                    <select
-                      id={`decision-${exercise.id}`}
-                      className="h-11 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-60"
-                      value={payload.decision}
-                      disabled={readOnly}
-                      onChange={(event) =>
-                        updateExercise(exercise.id, (current) => ({
-                          ...current,
-                          decision: event.target.value as TrainingAdjustment,
-                        }))
-                      }
-                    >
+                    <Label>Próxima vez</Label>
+                    <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
                       {ADJUSTMENTS.map((adjustment) => (
-                        <option key={adjustment.value} value={adjustment.value}>
+                        <Button
+                          key={adjustment.value}
+                          type="button"
+                          size="sm"
+                          variant={payload.decision === adjustment.value ? "secondary" : "outline"}
+                          disabled={readOnly}
+                          aria-pressed={payload.decision === adjustment.value}
+                          onClick={() =>
+                            updateExercise(exercise.id, (current) => ({
+                              ...current,
+                              decision: adjustment.value,
+                            }))
+                          }
+                        >
                           {adjustment.label}
-                        </option>
+                        </Button>
                       ))}
-                    </select>
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor={`exercise-notes-${exercise.id}`}>Notas</Label>
+                  <details className="rounded-xl border border-border/80 px-3 py-2" open={payload.notes ? true : undefined}>
+                    <summary className="cursor-pointer text-sm font-medium">
+                      {payload.notes ? "Nota" : "Añadir nota"}
+                    </summary>
                     <textarea
                       id={`exercise-notes-${exercise.id}`}
-                      className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                      aria-label={`Nota para ${exercise.nombre_snapshot}`}
+                      className="mt-2 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
                       value={payload.notes}
                       disabled={readOnly}
                       onChange={(event) =>
@@ -797,7 +974,7 @@ export function SessionEditor({
                         }))
                       }
                     />
-                  </div>
+                  </details>
 
                   {exercise.routine_exercise_id && !readOnly ? (
                     <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
@@ -851,17 +1028,19 @@ export function SessionEditor({
                   ) : null}
 
                   {!readOnly ? (
-                    <Button
-                      className="h-11 w-full"
-                      type="button"
-                      variant="destructive"
-                      disabled={status?.pending}
-                      onClick={() =>
-                        void removeExercise(exercise.id, exercise.nombre_snapshot)
-                      }
-                    >
-                      Quitar de la sesión
-                    </Button>
+                    <details className="rounded-xl border border-destructive/20 px-3 py-2">
+                      <summary className="cursor-pointer text-sm text-muted-foreground">Más acciones</summary>
+                      <Button
+                        className="mt-2 h-10 w-full"
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={status?.pending}
+                        onClick={() => void removeExercise(exercise.id, exercise.nombre_snapshot)}
+                      >
+                        Quitar de la sesión
+                      </Button>
+                    </details>
                   ) : null}
 
                   <div aria-live="polite">
@@ -872,7 +1051,8 @@ export function SessionEditor({
                       <p className="text-sm text-destructive">{status.error}</p>
                     ) : null}
                   </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
             );
           })
@@ -884,7 +1064,11 @@ export function SessionEditor({
           <CardTitle className="text-base">Resumen de la sesión</CardTitle>
         </CardHeader>
         <CardContent>
-          <fieldset className="space-y-4 disabled:opacity-80" disabled={readOnly}>
+          <details open={readOnly || metadataDirty ? true : undefined}>
+            <summary className="cursor-pointer text-sm text-muted-foreground">
+              Energía, rendimiento, cinta y notas
+            </summary>
+          <fieldset className="mt-4 space-y-4 disabled:opacity-80" disabled={readOnly}>
           <div className="space-y-1">
             <Label htmlFor="session-name">Nombre</Label>
             <Input
@@ -1027,6 +1211,7 @@ export function SessionEditor({
             </div>
           ) : null}
           </fieldset>
+          </details>
         </CardContent>
       </Card>
 
@@ -1071,6 +1256,39 @@ export function SessionEditor({
       >
         Volver a Entrenar
       </Link>
+
+      {restTimer && !readOnly ? (
+        <aside
+          className="fixed inset-x-3 bottom-[calc(5.35rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[406px] rounded-2xl border border-orange-400/25 bg-card/85 px-3 py-2.5 shadow-xl shadow-black/15 backdrop-blur-xl"
+          aria-live="polite"
+          aria-label="Temporizador de descanso"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/15 text-orange-500">
+                <Clock3 className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs text-muted-foreground">Descanso · {restTimer.exerciseName}</p>
+                <p className="metric-number text-lg font-semibold tracking-tight text-orange-500">
+                  {restRemaining > 0 ? timerLabel(restRemaining) : "Listo"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button type="button" size="icon-sm" variant="ghost" aria-label="Restar 15 segundos" onClick={() => updateRestTimer(-15)}>
+                <Minus aria-hidden />
+              </Button>
+              <Button type="button" size="icon-sm" variant="ghost" aria-label="Sumar 15 segundos" onClick={() => updateRestTimer(15)}>
+                <Plus aria-hidden />
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setRestTimer(null)}>
+                Saltar
+              </Button>
+            </div>
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }

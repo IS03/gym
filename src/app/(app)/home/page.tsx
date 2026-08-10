@@ -9,8 +9,6 @@ import {
   Utensils,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
@@ -80,18 +78,15 @@ export default async function HomePage() {
   const hasTraining = (currentWeek?.sessions ?? 0) > 0;
 
   return (
-    <div className="space-y-7 pb-1">
+    <div className="space-y-6 pb-1">
       <header className="space-y-1">
-        <p className="text-sm font-medium capitalize text-primary">{todayLabel(today)}</p>
+        <p className="text-xs font-medium capitalize tracking-wide text-muted-foreground">{todayLabel(today)}</p>
         <h1 className="text-3xl font-semibold tracking-tight">Hola, {displayName}</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Todo lo importante de tu día, en un solo lugar.
-        </p>
       </header>
 
       <section aria-labelledby="home-focus-title" className="space-y-3">
         <h2 id="home-focus-title" className="sr-only">Acción principal</h2>
-        <Card className="bg-primary text-primary-foreground ring-0">
+        <Card className="surface-elevated border-primary/20 bg-primary text-primary-foreground ring-0">
           <CardContent className="flex flex-col gap-4 pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
@@ -99,7 +94,7 @@ export default async function HomePage() {
                   {inProgress ? "Entrenamiento en curso" : "Tu próximo paso"}
                 </p>
                 <h2 className="text-xl font-semibold tracking-tight">
-                  {inProgress ? "Volvé a tu sesión" : "Movete hoy"}
+                  {inProgress ? "Continuar entrenamiento" : "Iniciar entrenamiento"}
                 </h2>
                 <p className="text-sm leading-relaxed text-primary-foreground/75">
                   {inProgress
@@ -246,12 +241,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <Link
-        href="/train"
-        className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
-      >
-        Abrir entrenamiento
-      </Link>
     </div>
   );
 }

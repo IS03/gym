@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { listExercises } from "@/lib/phase2/training";
 import { listRobustExerciseHistory } from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
+
+function bestRecordedWeight(sets: Array<{ actual_weight_kg: number | null }>) {
+  const weights = sets.flatMap((set) =>
+    typeof set.actual_weight_kg === "number" ? [set.actual_weight_kg] : [],
+  );
+  return weights.length ? Math.max(...weights) : null;
+}
 
 export default async function ExerciseHistoryPage({
   params,
@@ -32,7 +40,13 @@ export default async function ExerciseHistoryPage({
         <p className="text-sm text-muted-foreground">Todavía no hay historial.</p>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => (
+          {items.map((item, index) => {
+            const previous = items[index + 1];
+            const currentBest = bestRecordedWeight(item.exercise.sets);
+            const previousBest = previous ? bestRecordedWeight(previous.exercise.sets) : null;
+            const difference =
+              currentBest !== null && previousBest !== null ? currentBest - previousBest : null;
+            return (
             <Card key={item.exercise.id}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{item.logDate}</CardTitle>
@@ -43,6 +57,11 @@ export default async function ExerciseHistoryPage({
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
+                {difference !== null && difference !== 0 ? (
+                  <p className={cn("metric-number rounded-xl px-3 py-2 text-sm font-medium", difference > 0 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+                    {difference > 0 ? "+" : ""}{difference} kg frente a la sesión anterior
+                  </p>
+                ) : null}
                 <div className="space-y-2">
                   {item.exercise.sets.map((set) => (
                     <div
@@ -68,7 +87,8 @@ export default async function ExerciseHistoryPage({
                 </Link>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

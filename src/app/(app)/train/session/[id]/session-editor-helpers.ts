@@ -74,6 +74,7 @@ export function clientDetailFromWorkoutDetail(
     logDate: detail.logDate,
     exercises: detail.exercises.map((exercise) => ({
       id: exercise.id,
+      exercise_id: exercise.exercise_id,
       routine_exercise_id: exercise.routine_exercise_id,
       nombre_snapshot: exercise.nombre_snapshot,
       grupo_muscular_snapshot: exercise.grupo_muscular_snapshot,

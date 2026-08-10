@@ -21,6 +21,10 @@ function formatProtein(n: number | null | undefined) {
 export default async function TodayPage() {
   const today = new Date().toISOString().slice(0, 10);
   const { dayLog, meals } = await getDayLogWithMeals(today);
+  const calories = dayLog.total_calories_consumed ?? 0;
+  const target = dayLog.target_kcal_snapshot;
+  const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
+  const remaining = target === null ? null : target - calories;
 
   return (
     <div className="space-y-6">
@@ -29,34 +33,23 @@ export default async function TodayPage() {
         <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
       </div>
 
-      <Card>
+      <Card className="surface-elevated">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Resumen</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Consumidas</span>
-            <span className="text-lg font-semibold">
-              {formatKcal(dayLog.total_calories_consumed)}
-            </span>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-end justify-between gap-3">
+              <div><p className="text-xs text-muted-foreground">Calorías</p><p className="metric-number text-2xl font-semibold tracking-tight">{calories} <span className="text-sm font-medium text-muted-foreground">/ {target ?? "—"} kcal</span></p></div>
+              <p className="text-right text-xs text-muted-foreground">{remaining === null ? "Sin objetivo" : remaining >= 0 ? `Restan ${remaining} kcal` : `${Math.abs(remaining)} kcal por encima`}</p>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Calorías del día" aria-valuemin={0} aria-valuemax={target ?? undefined} aria-valuenow={calories}>
+              <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
+            </div>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Target</span>
-            <span className="text-sm">
-              {formatKcal(dayLog.target_kcal_snapshot)}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Delta</span>
-            <span className="text-sm">
-              {dayLog.delta_vs_target === null
-                ? "—"
-                : `${dayLog.delta_vs_target >= 0 ? "+" : ""}${dayLog.delta_vs_target} kcal`}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Proteína</span>
-            <span className="text-sm">{formatProtein(dayLog.total_protein_g)}</span>
+          <div className="flex items-baseline justify-between border-t pt-3">
+            <span className="text-sm text-muted-foreground">Proteína registrada</span>
+            <span className="metric-number text-lg font-semibold">{formatProtein(dayLog.total_protein_g)}</span>
           </div>
         </CardContent>
       </Card>
@@ -77,8 +70,8 @@ export default async function TodayPage() {
         ) : (
           <div className="space-y-3">
             {meals.map((meal) => (
-              <Card key={meal.id}>
-                <CardHeader className="pb-3">
+              <Card key={meal.id} className="surface-elevated">
+                <CardHeader className="pb-2">
                   {meal.title ? (
                     <CardTitle className="text-base">{meal.title}</CardTitle>
                   ) : null}
@@ -158,12 +151,15 @@ export default async function TodayPage() {
                     </form>
                   </details>
 
-                  <form action={softDeleteMealAction}>
+                  <details className="rounded-xl border border-destructive/20 px-3 py-2">
+                    <summary className="cursor-pointer text-sm text-muted-foreground">Más acciones</summary>
+                  <form action={softDeleteMealAction} className="mt-2">
                     <input type="hidden" name="id" value={meal.id} />
-                    <Button className="h-11 w-full" type="submit" variant="destructive">
+                    <Button className="h-10 w-full" type="submit" size="sm" variant="destructive">
                       Borrar
                     </Button>
                   </form>
+                  </details>
                 </CardContent>
               </Card>
             ))}

@@ -206,6 +206,7 @@ export type WorkoutSessionClient = Pick<
 export type WorkoutSessionExerciseClient = Pick<
   WorkoutSessionExercise,
   | "id"
+  | "exercise_id"
   | "routine_exercise_id"
   | "nombre_snapshot"
   | "grupo_muscular_snapshot"
