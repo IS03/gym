@@ -11,7 +11,7 @@ export default async function HomePage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      redirect("/today");
+      redirect("/home");
     }
   } catch {
     // Variables de entorno ausentes o cliente no inicializable.

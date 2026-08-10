@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Dumbbell, LineChart, Settings } from "lucide-react";
+import { Dumbbell, House, LineChart, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/today", label: "Hoy", icon: CalendarDays },
+  { href: "/home", label: "Inicio", icon: House },
   { href: "/train", label: "Entrenar", icon: Dumbbell },
   { href: "/history", label: "Historial", icon: LineChart },
   { href: "/settings", label: "Ajustes", icon: Settings },
@@ -23,7 +23,7 @@ export function BottomNav() {
       <div className="mx-auto flex h-14 max-w-[430px] items-stretch justify-between gap-1 px-2">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
-            pathname === href || (href !== "/today" && pathname.startsWith(href));
+            pathname === href || (href !== "/home" && pathname.startsWith(href));
 
           return (
             <Link
