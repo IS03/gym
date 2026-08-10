@@ -81,6 +81,12 @@
   --sidebar-accent-foreground: oklch(0.3 0.08 285);
   --sidebar-border: oklch(0.89 0.008 285);
   --sidebar-ring: oklch(0.61 0.2 285);
+  --liquid-nav-bg: oklch(1 0.004 285 / 58%);
+  --liquid-nav-border: oklch(0.82 0.014 285 / 64%);
+  --liquid-nav-highlight: oklch(1 0 0 / 72%);
+  --liquid-nav-shadow: oklch(0.23 0.02 285 / 23%);
+  --liquid-nav-indicator: oklch(0.58 0.2 285 / 15%);
+  --liquid-nav-indicator-border: oklch(0.66 0.17 285 / 23%);
 }
 
 .dark {
@@ -115,6 +121,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.8 0.008 285 / 16%);
   --sidebar-ring: oklch(0.67 0.2 285);
+  --liquid-nav-bg: oklch(0.2 0.009 285 / 64%);
+  --liquid-nav-border: oklch(0.88 0.012 285 / 20%);
+  --liquid-nav-highlight: oklch(1 0 0 / 18%);
+  --liquid-nav-shadow: oklch(0 0 0 / 48%);
+  --liquid-nav-indicator: oklch(0.67 0.2 285 / 22%);
+  --liquid-nav-indicator-border: oklch(0.79 0.15 285 / 29%);
 }
 
 @layer base {
@@ -147,6 +159,99 @@
 
 .surface-elevated {
   box-shadow: 0 1px 1px oklch(0 0 0 / 10%), 0 14px 30px -24px oklch(0 0 0 / 55%);
+}
+
+/* One filtered material for the whole navigation bar. Its children only add tint and light. */
+.liquid-nav-wrapper {
+  isolation: isolate;
+}
+
+.liquid-nav-edge {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  height: calc(6.5rem + env(safe-area-inset-bottom));
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in oklch, var(--background) 8%, transparent) 42%,
+    color-mix(in oklch, var(--background) 24%, transparent) 100%
+  );
+}
+
+.liquid-nav {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--liquid-nav-border);
+  border-radius: 1.4rem;
+  background: var(--liquid-nav-bg);
+  box-shadow:
+    0 18px 38px -27px var(--liquid-nav-shadow),
+    0 3px 10px -8px var(--liquid-nav-shadow),
+    inset 0 1px 0 var(--liquid-nav-highlight),
+    inset 0 -1px 0 oklch(0 0 0 / 8%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%) brightness(1.045);
+  backdrop-filter: blur(22px) saturate(160%) brightness(1.045);
+}
+
+.liquid-nav::before,
+.liquid-nav::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.liquid-nav::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--liquid-nav-highlight) 42%, transparent) 0%,
+    transparent 34%,
+    oklch(0 0 0 / 4%) 100%
+  );
+}
+
+.liquid-nav::after {
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--liquid-nav-highlight) 52%, transparent),
+    inset 0 -1px 0 oklch(0 0 0 / 9%);
+}
+
+.liquid-nav-indicator {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  z-index: 1;
+  width: calc((100% - 0.5rem) / 4);
+  border: 1px solid var(--liquid-nav-indicator-border);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / 20%), transparent 52%),
+    var(--liquid-nav-indicator);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 24%),
+    inset 0 -1px 0 oklch(0 0 0 / 9%),
+    0 3px 9px -8px var(--liquid-nav-shadow);
+  transform: translate3d(calc(var(--liquid-nav-index) * 100%), 0, 0);
+  transition: transform 340ms cubic-bezier(0.2, 0.9, 0.2, 1), scale 150ms ease-out;
+  will-change: transform;
+}
+
+.liquid-nav:has(.liquid-nav-link:active) .liquid-nav-indicator {
+  scale: 1.025 0.965;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .liquid-nav {
+    background: color-mix(in oklch, var(--background) 88%, var(--card));
+  }
 }
 
 @media (max-width: 767px) {

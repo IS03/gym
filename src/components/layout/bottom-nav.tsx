@@ -14,13 +14,22 @@ const links = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const activeIndex = links.findIndex(
+    ({ href }) =>
+      pathname === href || (href !== "/home" && pathname.startsWith(href)),
+  );
 
   return (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className="liquid-nav-wrapper pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       aria-label="Navegación principal"
     >
-      <div className="pointer-events-auto mx-auto flex h-14 max-w-[406px] items-stretch justify-between gap-1 rounded-[1.35rem] border border-border/70 bg-background/80 p-1.5 shadow-[0_12px_35px_-18px_color-mix(in_oklch,var(--foreground)_70%,transparent)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/65">
+      <div className="liquid-nav-edge" aria-hidden />
+      <div
+        className="liquid-nav pointer-events-auto mx-auto grid h-[3.75rem] max-w-[406px] grid-cols-4 p-1"
+        style={{ "--liquid-nav-index": Math.max(activeIndex, 0) } as React.CSSProperties}
+      >
+        <span className="liquid-nav-indicator" aria-hidden />
         {links.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href || (href !== "/home" && pathname.startsWith(href));
@@ -29,14 +38,21 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[0.95rem] px-1 text-[11px] font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.94]",
+                "liquid-nav-link relative z-10 flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1rem] px-1 text-[11px] font-medium transition-[color,opacity,transform] duration-200 ease-out active:scale-[0.94]",
                 active
-                  ? "bg-primary/12 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="size-5 shrink-0" aria-hidden />
+              <Icon
+                className={cn(
+                  "size-[1.15rem] shrink-0 transition-transform duration-200 ease-out",
+                  active && "scale-[1.06]",
+                )}
+                aria-hidden
+              />
               <span className="truncate">{label}</span>
             </Link>
           );
