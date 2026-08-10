@@ -12,8 +12,9 @@ export function workoutPayloadFromDetail(
 ): WorkoutExercisePayload {
   const sets = exercise.sets.map((set) => ({
     set_number: set.set_number,
-    target_reps: set.target_reps,
-    target_weight_kg: set.target_weight_kg,
+      target_reps: set.target_reps,
+      target_weight_kg: set.target_weight_kg,
+      target_rir: set.target_rir,
     actual_reps: set.actual_reps,
     actual_weight_kg: set.actual_weight_kg,
     is_completed: set.is_completed,
@@ -79,6 +80,8 @@ export function clientDetailFromWorkoutDetail(
       muscle_group_label_snapshot: exercise.muscle_group_label_snapshot,
       implement_snapshot: exercise.implement_snapshot,
       weight_mode_snapshot: exercise.weight_mode_snapshot,
+      rest_min_seconds_snapshot: exercise.rest_min_seconds_snapshot,
+      rest_max_seconds_snapshot: exercise.rest_max_seconds_snapshot,
       decision: exercise.decision,
       decision_note: exercise.decision_note,
       apply_to_routine: exercise.apply_to_routine,
@@ -88,6 +91,7 @@ export function clientDetailFromWorkoutDetail(
         set_number: set.set_number,
         target_reps: set.target_reps,
         target_weight_kg: set.target_weight_kg,
+        target_rir: set.target_rir,
         actual_reps: set.actual_reps,
         actual_weight_kg: set.actual_weight_kg,
         is_completed: set.is_completed,

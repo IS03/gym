@@ -22,6 +22,7 @@ describe("borradores locales versionados", () => {
             set_number: 1,
             target_reps: 10,
             target_weight_kg: 20,
+            target_rir: 1,
             actual_reps: 10,
             actual_weight_kg: 20,
             is_completed: true,

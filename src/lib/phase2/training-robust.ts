@@ -628,6 +628,7 @@ export async function getTrainingProgress(): Promise<{
       set_number: set.set_number,
       target_reps: set.target_reps,
       target_weight_kg: asNumber(set.target_weight_kg),
+      target_rir: set.target_rir,
       actual_reps: set.actual_reps,
       actual_weight_kg: asNumber(set.actual_weight_kg),
       is_completed: set.is_completed,

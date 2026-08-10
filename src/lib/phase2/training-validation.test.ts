@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   nullableNumberFromInput,
+  validateRoutineExercisePayload,
   validateWorkoutExercisePayload,
 } from "./training-validation";
 import type { WorkoutExercisePayload } from "./types";
@@ -17,6 +18,7 @@ function payload(): WorkoutExercisePayload {
         set_number: 1,
         target_reps: 10,
         target_weight_kg: 20,
+        target_rir: 1,
         actual_reps: 10,
         actual_weight_kg: 20,
         is_completed: true,
@@ -46,5 +48,25 @@ describe("validación de entrenamiento", () => {
   it("acepta coma decimal en entradas móviles", () => {
     expect(nullableNumberFromInput("12,5")).toBe(12.5);
     expect(nullableNumberFromInput("")).toBeNull();
+  });
+
+  it("rechaza un descanso mínimo mayor al máximo", () => {
+    expect(() =>
+      validateRoutineExercisePayload({
+        next_adjustment: "maintain",
+        rest_min_seconds: 120,
+        rest_max_seconds: 90,
+        notes: "",
+        sets: [
+          {
+            set_number: 1,
+            target_reps: 10,
+            target_weight_kg: 20,
+            target_rir: 1,
+            notes: null,
+          },
+        ],
+      }),
+    ).toThrow("descanso mínimo");
   });
 });

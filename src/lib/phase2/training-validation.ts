@@ -67,6 +67,7 @@ export function validateRoutineSets(sets: EditableRoutineSet[]) {
     const number = index + 1;
     assertIntegerInRange(set.target_reps, `Repeticiones de serie ${number}`, 0, 1000);
     assertFiniteInRange(set.target_weight_kg, `Peso de serie ${number}`, 0, 9999.99);
+    assertIntegerInRange(set.target_rir, `RIR de serie ${number}`, 0, 10);
   });
 }
 
@@ -76,6 +77,7 @@ export function validateWorkoutSets(sets: EditableWorkoutSet[]) {
     const number = index + 1;
     assertIntegerInRange(set.target_reps, `Objetivo de serie ${number}`, 0, 1000);
     assertFiniteInRange(set.target_weight_kg, `Peso objetivo de serie ${number}`, 0, 9999.99);
+    assertIntegerInRange(set.target_rir, `RIR objetivo de serie ${number}`, 0, 10);
     assertIntegerInRange(set.actual_reps, `Repeticiones de serie ${number}`, 0, 1000);
     assertFiniteInRange(set.actual_weight_kg, `Peso real de serie ${number}`, 0, 9999.99);
 
@@ -87,6 +89,15 @@ export function validateWorkoutSets(sets: EditableWorkoutSet[]) {
 
 export function validateRoutineExercisePayload(payload: RoutineExercisePayload) {
   assertAdjustment(payload.next_adjustment);
+  assertIntegerInRange(payload.rest_min_seconds, "Descanso mínimo", 0, 3600);
+  assertIntegerInRange(payload.rest_max_seconds, "Descanso máximo", 0, 3600);
+  if (
+    payload.rest_min_seconds !== null &&
+    payload.rest_max_seconds !== null &&
+    payload.rest_min_seconds > payload.rest_max_seconds
+  ) {
+    throw new Error("El descanso mínimo no puede superar al máximo.");
+  }
   validateRoutineSets(payload.sets);
 }
 

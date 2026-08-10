@@ -4,7 +4,7 @@ import {
   validateWorkoutExercisePayload,
 } from "./training-validation";
 
-export const TRAINING_DRAFT_VERSION = 1 as const;
+export const TRAINING_DRAFT_VERSION = 2 as const;
 const DRAFT_EVENT = "gym-training-draft-change";
 
 export type WorkoutExerciseDraft = {

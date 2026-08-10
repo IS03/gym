@@ -51,6 +51,8 @@ export type RoutineExercise = {
   exercise_id: string;
   exercise_order: number;
   next_adjustment: TrainingAdjustment;
+  rest_min_seconds: number | null;
+  rest_max_seconds: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -63,6 +65,7 @@ export type RoutineExerciseSet = {
   set_number: number;
   target_reps: number | null;
   target_weight_kg: number | null;
+  target_rir: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -107,6 +110,8 @@ export type WorkoutSessionExercise = {
   muscle_group_label_snapshot: string | null;
   implement_snapshot: string | null;
   weight_mode_snapshot: string | null;
+  rest_min_seconds_snapshot: number | null;
+  rest_max_seconds_snapshot: number | null;
   planned_sets_count: number;
   next_adjustment_snapshot: TrainingAdjustment;
   decision: TrainingAdjustment;
@@ -129,6 +134,7 @@ export type WorkoutSet = {
   set_number: number;
   target_reps: number | null;
   target_weight_kg: number | null;
+  target_rir: number | null;
   actual_reps: number | null;
   actual_weight_kg: number | null;
   is_completed: boolean;
@@ -140,7 +146,7 @@ export type WorkoutSet = {
 
 export type EditableRoutineSet = Pick<
   RoutineExerciseSet,
-  "set_number" | "target_reps" | "target_weight_kg" | "notes"
+  "set_number" | "target_reps" | "target_weight_kg" | "target_rir" | "notes"
 >;
 
 export type EditableWorkoutSet = Pick<
@@ -148,6 +154,7 @@ export type EditableWorkoutSet = Pick<
   | "set_number"
   | "target_reps"
   | "target_weight_kg"
+  | "target_rir"
   | "actual_reps"
   | "actual_weight_kg"
   | "is_completed"
@@ -205,6 +212,8 @@ export type WorkoutSessionExerciseClient = Pick<
   | "muscle_group_label_snapshot"
   | "implement_snapshot"
   | "weight_mode_snapshot"
+  | "rest_min_seconds_snapshot"
+  | "rest_max_seconds_snapshot"
   | "decision"
   | "decision_note"
   | "apply_to_routine"
@@ -245,6 +254,8 @@ export type WorkoutExercisePayload = {
 
 export type RoutineExercisePayload = {
   next_adjustment: TrainingAdjustment;
+  rest_min_seconds: number | null;
+  rest_max_seconds: number | null;
   notes: string;
   sets: EditableRoutineSet[];
 };

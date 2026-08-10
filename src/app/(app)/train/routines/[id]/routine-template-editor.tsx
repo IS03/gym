@@ -12,6 +12,7 @@ import {
   saveRoutineExerciseTargetAction,
 } from "../../actions";
 import { nullableNumberFromInput, payloadsEqual } from "@/lib/phase2/training-validation";
+import { formatRestRange } from "@/lib/phase2/training-display";
 import type {
   RoutineExercisePayload,
   RoutineExerciseTemplate,
@@ -34,11 +35,14 @@ type ItemStatus = {
 function payloadFromTemplate(item: RoutineExerciseTemplate): RoutineExercisePayload {
   return {
     next_adjustment: item.next_adjustment,
+    rest_min_seconds: item.rest_min_seconds,
+    rest_max_seconds: item.rest_max_seconds,
     notes: item.notes ?? "",
     sets: item.sets.map((set) => ({
       set_number: set.set_number,
       target_reps: set.target_reps,
       target_weight_kg: set.target_weight_kg,
+      target_rir: set.target_rir,
       notes: set.notes,
     })),
   };
@@ -258,16 +262,17 @@ export function RoutineTemplateEditor({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <div className="grid grid-cols-[44px_1fr_1fr_40px] gap-2 text-xs font-medium text-muted-foreground">
+                <div className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_48px_36px] gap-2 text-xs font-medium text-muted-foreground">
                   <span>Serie</span>
                   <span>Reps</span>
-                  <span>Peso kg</span>
+                  <span>Peso</span>
+                  <span>RIR</span>
                   <span className="sr-only">Quitar</span>
                 </div>
                 {payload.sets.map((set, setIndex) => (
                   <div
                     key={set.set_number}
-                    className="grid grid-cols-[44px_1fr_1fr_40px] items-center gap-2"
+                    className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_48px_36px] items-center gap-2"
                   >
                     <span className="text-center text-sm font-medium">{setIndex + 1}</span>
                     <Input
@@ -316,6 +321,28 @@ export function RoutineTemplateEditor({
                         }))
                       }
                     />
+                    <Input
+                      aria-label={`RIR objetivo de serie ${setIndex + 1}`}
+                      type="number"
+                      min={0}
+                      max={10}
+                      step={1}
+                      inputMode="numeric"
+                      value={set.target_rir ?? ""}
+                      onChange={(event) =>
+                        updatePayload(item.id, (current) => ({
+                          ...current,
+                          sets: current.sets.map((currentSet, currentIndex) =>
+                            currentIndex === setIndex
+                              ? {
+                                  ...currentSet,
+                                  target_rir: nullableNumberFromInput(event.target.value),
+                                }
+                              : currentSet,
+                          ),
+                        }))
+                      }
+                    />
                     <Button
                       aria-label={`Quitar serie ${setIndex + 1}`}
                       type="button"
@@ -354,6 +381,7 @@ export function RoutineTemplateEditor({
                             set_number: current.sets.length + 1,
                             target_reps: previous?.target_reps ?? null,
                             target_weight_kg: previous?.target_weight_kg ?? null,
+                            target_rir: previous?.target_rir ?? null,
                             notes: null,
                           },
                         ],
@@ -363,6 +391,60 @@ export function RoutineTemplateEditor({
                 >
                   Agregar serie
                 </Button>
+              </div>
+
+              <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                <div>
+                  <Label>Descanso entre series</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {formatRestRange(
+                      payload.rest_min_seconds,
+                      payload.rest_max_seconds,
+                    ) ?? "Sin objetivo de descanso"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor={`rest-min-${item.id}`} className="text-xs">
+                      Mínimo (seg)
+                    </Label>
+                    <Input
+                      id={`rest-min-${item.id}`}
+                      type="number"
+                      min={0}
+                      max={3600}
+                      step={1}
+                      inputMode="numeric"
+                      value={payload.rest_min_seconds ?? ""}
+                      onChange={(event) =>
+                        updatePayload(item.id, (current) => ({
+                          ...current,
+                          rest_min_seconds: nullableNumberFromInput(event.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`rest-max-${item.id}`} className="text-xs">
+                      Máximo (seg)
+                    </Label>
+                    <Input
+                      id={`rest-max-${item.id}`}
+                      type="number"
+                      min={0}
+                      max={3600}
+                      step={1}
+                      inputMode="numeric"
+                      value={payload.rest_max_seconds ?? ""}
+                      onChange={(event) =>
+                        updatePayload(item.id, (current) => ({
+                          ...current,
+                          rest_max_seconds: nullableNumberFromInput(event.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -387,11 +469,12 @@ export function RoutineTemplateEditor({
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor={`notes-${item.id}`}>Notas del objetivo</Label>
+                <Label htmlFor={`notes-${item.id}`}>Observaciones</Label>
                 <textarea
                   id={`notes-${item.id}`}
                   className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm"
                   value={payload.notes}
+                  placeholder="Técnica, agarre u otra observación"
                   onChange={(event) =>
                     updatePayload(item.id, (current) => ({
                       ...current,

@@ -55,6 +55,7 @@ export default async function ExerciseHistoryPage({
                       </span>
                       <span className="text-muted-foreground">
                         Obj: {set.target_reps ?? "—"} × {set.target_weight_kg ?? "—"}
+                        {set.target_rir !== null ? ` · RIR ${set.target_rir}` : ""}
                       </span>
                     </div>
                   ))}

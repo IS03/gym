@@ -27,6 +27,7 @@ export default async function SessionPage({
       libraryExercises={exercises.map((exercise) => ({
         id: exercise.id,
         nombre: exercise.nombre,
+        grupo_muscular: exercise.grupo_muscular,
       }))}
     />
   );

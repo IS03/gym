@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
+  filterExercisesByMuscleGroup,
+  MUSCLE_GROUP_OPTIONS,
+  type MuscleGroupFilter,
+} from "@/lib/phase2/muscle-groups";
+import { formatRestRange } from "@/lib/phase2/training-display";
+import {
   appendWorkoutExerciseAction,
   cancelWorkoutSessionAction,
   finishWorkoutSessionAction,
@@ -33,6 +39,7 @@ import {
 } from "@/lib/phase2/training-validation";
 import type {
   SessionMetadataInput,
+  MuscleGroup,
   TrainingAdjustment,
   WorkoutExercisePayload,
   WorkoutSessionClientDetail,
@@ -51,17 +58,6 @@ const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
   { value: "increase_reps", label: "+ Repeticiones" },
   { value: "custom", label: "Personalizado" },
 ];
-
-const MUSCLE_GROUPS = [
-  { value: "pecho", label: "Pecho" },
-  { value: "espalda", label: "Espalda" },
-  { value: "piernas", label: "Piernas" },
-  { value: "hombros", label: "Hombros" },
-  { value: "bíceps", label: "Bíceps" },
-  { value: "tríceps", label: "Tríceps" },
-  { value: "abdomen", label: "Abdomen" },
-  { value: "cardio", label: "Cardio" },
-] as const;
 
 type ExerciseStatus = {
   pending: boolean;
@@ -104,7 +100,11 @@ export function SessionEditor({
   libraryExercises,
 }: {
   detail: WorkoutSessionClientDetail;
-  libraryExercises: Array<{ id: string; nombre: string }>;
+  libraryExercises: Array<{
+    id: string;
+    nombre: string;
+    grupo_muscular: MuscleGroup | null;
+  }>;
 }) {
   const router = useRouter();
   const readOnly = detail.session.status === "completed";
@@ -155,6 +155,16 @@ export function SessionEditor({
   const [selectedExerciseId, setSelectedExerciseId] = useState(
     libraryExercises[0]?.id ?? "",
   );
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
+  const filteredLibraryExercises = useMemo(
+    () => filterExercisesByMuscleGroup(libraryExercises, selectedMuscleGroup),
+    [libraryExercises, selectedMuscleGroup],
+  );
+  const activeSelectedExerciseId = filteredLibraryExercises.some(
+    (exercise) => exercise.id === selectedExerciseId,
+  )
+    ? selectedExerciseId
+    : (filteredLibraryExercises[0]?.id ?? "");
 
   const baseMetadata = useMemo(
     () => sessionMetadataFromSession(detail.session),
@@ -320,12 +330,12 @@ export function SessionEditor({
   }
 
   async function addExistingExercise() {
-    if (!selectedExerciseId) return;
+    if (!activeSelectedExerciseId) return;
     setGlobalPending(true);
     setGlobalError(null);
     const result = await appendWorkoutExerciseAction({
       sessionId: detail.session.id,
-      exerciseId: selectedExerciseId,
+      exerciseId: activeSelectedExerciseId,
     });
     setGlobalPending(false);
     if (!result.ok) {
@@ -471,17 +481,34 @@ export function SessionEditor({
             <CardTitle className="text-base">Agregar ejercicio extra</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="extra-muscle-group">Filtrar por grupo muscular</Label>
+              <select
+                id="extra-muscle-group"
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                value={selectedMuscleGroup}
+                onChange={(event) => setSelectedMuscleGroup(event.target.value as MuscleGroupFilter)}
+                disabled={globalPending}
+              >
+                <option value="all">Todos los grupos</option>
+                {MUSCLE_GROUP_OPTIONS.map((group) => (
+                  <option key={group.value} value={group.value}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <select
               aria-label="Ejercicio extra"
               className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-              value={selectedExerciseId}
+              value={activeSelectedExerciseId}
               onChange={(event) => setSelectedExerciseId(event.target.value)}
-              disabled={libraryExercises.length === 0 || globalPending}
+              disabled={filteredLibraryExercises.length === 0 || globalPending}
             >
-              {libraryExercises.length === 0 ? (
-                <option value="">No hay ejercicios disponibles</option>
+              {filteredLibraryExercises.length === 0 ? (
+                <option value="">No hay ejercicios para este grupo</option>
               ) : (
-                libraryExercises.map((exercise) => (
+                filteredLibraryExercises.map((exercise) => (
                   <option key={exercise.id} value={exercise.id}>
                     {exercise.nombre}
                   </option>
@@ -492,7 +519,7 @@ export function SessionEditor({
               className="h-11 w-full"
               type="button"
               variant="outline"
-              disabled={!selectedExerciseId || globalPending}
+              disabled={!activeSelectedExerciseId || globalPending}
               onClick={() => void addExistingExercise()}
             >
               Agregar a la sesión
@@ -504,7 +531,7 @@ export function SessionEditor({
               <div className="mt-3">
                 <SessionCreateExerciseForm
                   sessionId={detail.session.id}
-                  muscleGroups={[...MUSCLE_GROUPS]}
+                  muscleGroups={[...MUSCLE_GROUP_OPTIONS]}
                 />
               </div>
             </details>
@@ -565,6 +592,21 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
+                  {formatRestRange(
+                    exercise.rest_min_seconds_snapshot,
+                    exercise.rest_max_seconds_snapshot,
+                  ) ? (
+                    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                      <span className="text-muted-foreground">Descanso entre series</span>
+                      <span className="font-medium">
+                        {formatRestRange(
+                          exercise.rest_min_seconds_snapshot,
+                          exercise.rest_max_seconds_snapshot,
+                        )}
+                      </span>
+                    </div>
+                  ) : null}
+
                   <div className="space-y-3">
                     {payload.sets.map((set, setIndex) => (
                       <div key={set.set_number} className="space-y-2 rounded-md border p-3">
@@ -596,6 +638,7 @@ export function SessionEditor({
                           <span className="text-xs text-muted-foreground">
                             Objetivo: {set.target_reps ?? "—"} reps ·{" "}
                             {set.target_weight_kg ?? "—"} kg
+                            {set.target_rir !== null ? ` · RIR ${set.target_rir}` : ""}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -703,6 +746,7 @@ export function SessionEditor({
                                 set_number: current.sets.length + 1,
                                 target_reps: previous?.target_reps ?? null,
                                 target_weight_kg: previous?.target_weight_kg ?? null,
+                                target_rir: previous?.target_rir ?? null,
                                 actual_reps: previous?.actual_reps ?? null,
                                 actual_weight_kg: previous?.actual_weight_kg ?? null,
                                 is_completed: false,

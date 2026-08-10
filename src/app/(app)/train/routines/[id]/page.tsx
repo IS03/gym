@@ -41,7 +41,11 @@ export default async function RoutineDetailPage({
         <CardContent>
           <RoutineExerciseAddForm
             routineId={id}
-            exercises={allExercises.map((e) => ({ id: e.id, nombre: e.nombre }))}
+            exercises={allExercises.map((e) => ({
+              id: e.id,
+              nombre: e.nombre,
+              grupo_muscular: e.grupo_muscular,
+            }))}
           />
         </CardContent>
       </Card>
