@@ -1,6 +1,3 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,46 +5,19 @@ import type { Profile } from "@/lib/phase1/profile";
 import { saveProfileAction } from "./profile-actions";
 
 type ProfileFormProps = {
-  email: string | null;
   profile: Profile | null;
 };
 
-export function ProfileForm({ email, profile }: ProfileFormProps) {
-  const initial = useMemo(() => {
-    return {
-      display_name: profile?.display_name ?? "",
-      birth_date: profile?.birth_date ?? "",
-      sex: profile?.sex ?? "",
-      height_cm: profile?.height_cm == null ? "" : String(profile.height_cm),
-      current_weight_kg:
-        profile?.current_weight_kg == null ? "" : String(profile.current_weight_kg),
-    };
-  }, [
-    profile?.display_name,
-    profile?.birth_date,
-    profile?.sex,
-    profile?.height_cm,
-    profile?.current_weight_kg,
-  ]);
-
-  const [displayName, setDisplayName] = useState(initial.display_name);
-  const [birthDate, setBirthDate] = useState(initial.birth_date);
-  const [sex, setSex] = useState(initial.sex);
-  const [heightCm, setHeightCm] = useState(initial.height_cm);
-  const [weightKg, setWeightKg] = useState(initial.current_weight_kg);
-
+export function ProfileForm({ profile }: ProfileFormProps) {
   return (
     <form action={saveProfileAction} className="space-y-3">
-      <p className="text-xs text-muted-foreground">{email ?? "—"}</p>
-
       <div className="space-y-1">
-        <Label htmlFor="display_name">Nombre</Label>
+        <Label htmlFor="display_name">Cómo querés que te llamemos</Label>
         <Input
           id="display_name"
           name="display_name"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder="Opcional"
+          defaultValue={profile?.display_name ?? ""}
+          placeholder="Ej: Nacho"
         />
       </div>
 
@@ -58,8 +28,7 @@ export function ProfileForm({ email, profile }: ProfileFormProps) {
             id="birth_date"
             name="birth_date"
             type="date"
-            value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
+            defaultValue={profile?.birth_date ?? ""}
           />
         </div>
         <div className="space-y-1">
@@ -67,8 +36,7 @@ export function ProfileForm({ email, profile }: ProfileFormProps) {
           <select
             id="sex"
             name="sex"
-            value={sex}
-            onChange={(e) => setSex(e.target.value)}
+            defaultValue={profile?.sex ?? ""}
             className="h-11 w-full rounded-md border bg-background px-3 text-sm"
           >
             <option value="">—</option>
@@ -86,8 +54,9 @@ export function ProfileForm({ email, profile }: ProfileFormProps) {
             id="height_cm"
             name="height_cm"
             inputMode="numeric"
-            value={heightCm}
-            onChange={(e) => setHeightCm(e.target.value)}
+            defaultValue={
+              profile?.height_cm == null ? "" : String(profile.height_cm)
+            }
             placeholder="Ej: 178"
           />
         </div>
@@ -97,20 +66,23 @@ export function ProfileForm({ email, profile }: ProfileFormProps) {
             id="current_weight_kg"
             name="current_weight_kg"
             inputMode="decimal"
-            value={weightKg}
-            onChange={(e) => setWeightKg(e.target.value)}
-            placeholder="Ej: 82.4"
+            defaultValue={
+              profile?.current_weight_kg == null
+                ? ""
+                : String(profile.current_weight_kg)
+            }
+            placeholder="Ej: 64.0"
           />
         </div>
       </div>
 
-      <div className="rounded-md border bg-background px-4 py-3">
-        <p className="text-xs text-muted-foreground">Mantenimiento (estimado)</p>
+      <div className="rounded-xl border bg-muted/30 p-3">
+        <p className="text-xs text-muted-foreground">Calorías base estimadas</p>
         <p className="mt-1 text-lg font-semibold">
-          {profile?.maintenance_kcal_current ?? "—"} kcal
+          {profile?.bmr_kcal_current ?? "—"} kcal
         </p>
-        <p className="text-xs text-muted-foreground">
-          Fórmula de Harris–Benedict (según género, edad, altura y peso).
+        <p className="mt-1 text-xs text-muted-foreground">
+          Se calculan con Harris–Benedict a partir de tus datos actuales.
         </p>
       </div>
 
@@ -120,4 +92,3 @@ export function ProfileForm({ email, profile }: ProfileFormProps) {
     </form>
   );
 }
-

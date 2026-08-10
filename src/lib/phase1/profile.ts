@@ -66,13 +66,17 @@ export async function getAuthedUser() {
 }
 
 export async function getMyProfile(): Promise<Profile | null> {
-  const supabase = await createClient();
   const user = await getAuthedUser();
+  return getProfileForUser(user.id);
+}
+
+export async function getProfileForUser(userId: string): Promise<Profile | null> {
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw new Error(`Leer profiles: ${error.message}`);
@@ -133,4 +137,3 @@ export async function upsertMyProfile(input: {
   if (error) throw new Error(`Guardar profiles: ${error.message}`);
   return data as Profile;
 }
-

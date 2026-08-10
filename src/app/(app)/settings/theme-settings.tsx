@@ -26,7 +26,6 @@ export function ThemeSettings() {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium">Apariencia</p>
       <div className="flex gap-2">
         {(
           [
