@@ -116,15 +116,72 @@ export function renumberWorkoutPayload(
   };
 }
 
+export type ExercisePayloadEntry = {
+  id: string;
+  payload: WorkoutExercisePayload;
+};
+
+export function exerciseCompletion(payload: WorkoutExercisePayload) {
+  const completedSets = payload.sets.filter((set) => set.is_completed).length;
+  const totalSets = payload.sets.length;
+  return {
+    completedSets,
+    totalSets,
+    hasStarted: completedSets > 0,
+    isComplete: totalSets > 0 && completedSets === totalSets,
+  };
+}
+
+export function initialExpandedExerciseId(
+  exercises: ExercisePayloadEntry[],
+): string | null {
+  const partial = exercises.find(({ payload }) => {
+    const completion = exerciseCompletion(payload);
+    return completion.hasStarted && !completion.isComplete;
+  });
+  if (partial) return partial.id;
+
+  const incomplete = exercises.find(
+    ({ payload }) => !exerciseCompletion(payload).isComplete,
+  );
+  return incomplete?.id ?? null;
+}
+
+function compactMetric(value: number) {
+  return String(value).replace(".", ",");
+}
+
+export function completedExerciseSummary(
+  payload: WorkoutExercisePayload,
+): string | null {
+  const completedSets = payload.sets.filter((set) => set.is_completed);
+  if (completedSets.length === 0) return null;
+
+  const weights = completedSets
+    .map((set) => set.actual_weight_kg)
+    .filter((value): value is number => value !== null);
+  const weightSummary =
+    weights.length === completedSets.length
+      ? Math.min(...weights) === Math.max(...weights)
+        ? `${compactMetric(weights[0])} kg`
+        : `${compactMetric(Math.min(...weights))}–${compactMetric(Math.max(...weights))} kg`
+      : null;
+  const repsSummary = `${completedSets
+    .map((set) => (set.actual_reps === null ? "—" : compactMetric(set.actual_reps)))
+    .join(" / ")} reps`;
+
+  return [weightSummary, repsSummary].filter(Boolean).join(" · ");
+}
+
 export function completionStats(payloads: WorkoutExercisePayload[]) {
   let completedSets = 0;
   let totalSets = 0;
   let completedExercises = 0;
   for (const payload of payloads) {
-    const done = payload.sets.filter((set) => set.is_completed).length;
-    completedSets += done;
-    totalSets += payload.sets.length;
-    if (done > 0) completedExercises += 1;
+    const completion = exerciseCompletion(payload);
+    completedSets += completion.completedSets;
+    totalSets += completion.totalSets;
+    if (completion.isComplete) completedExercises += 1;
   }
   return { completedSets, totalSets, completedExercises };
 }

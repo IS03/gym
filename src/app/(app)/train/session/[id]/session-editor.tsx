@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -47,7 +47,10 @@ import type {
   WorkoutSessionClientDetail,
 } from "@/lib/phase2/types";
 import {
+  completedExerciseSummary,
   completionStats,
+  exerciseCompletion,
+  initialExpandedExerciseId,
   renumberWorkoutPayload,
   sessionMetadataFromSession,
   workoutPayloadFromDetail,
@@ -76,11 +79,12 @@ type SetRowProps = {
   exerciseId: string;
   set: EditableWorkoutSet;
   setIndex: number;
-  restLabel: string | null;
   readOnly: boolean;
   onChange: (updater: (set: EditableWorkoutSet) => EditableWorkoutSet) => void;
-  onStartTimer: () => void;
 };
+
+const SET_GRID_COLUMNS =
+  "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem]";
 
 function compactNumber(value: number | null) {
   return value === null ? "—" : String(value).replace(".", ",");
@@ -103,18 +107,17 @@ function SetRow({
   exerciseId,
   set,
   setIndex,
-  restLabel,
   readOnly,
   onChange,
-  onStartTimer,
 }: SetRowProps) {
   return (
     <div
       className={cn(
-        "grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem] items-center gap-x-1.5 gap-y-1 rounded-xl border px-2 py-2 transition-[background-color,border-color] duration-150",
+        "grid items-center gap-x-1.5 border-b border-border/60 px-1 py-2.5 transition-colors duration-150 last:border-b-0",
+        SET_GRID_COLUMNS,
         set.is_completed
-          ? "border-emerald-500/25 bg-emerald-500/8"
-          : "border-border/80 bg-background/40",
+          ? "bg-emerald-500/[0.06]"
+          : "bg-transparent",
       )}
     >
       <span className="metric-number text-center text-sm font-semibold text-muted-foreground">
@@ -211,24 +214,6 @@ function SetRow({
           </span>
         </button>
       )}
-      {restLabel ? (
-        <div className="col-span-5 mt-1 flex min-w-0 items-center justify-between gap-2 border-t border-border/60 pt-1.5">
-          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-            Descanso {restLabel}
-          </span>
-          {!readOnly ? (
-            <button
-              type="button"
-              className="flex h-8 shrink-0 touch-manipulation items-center gap-1 rounded-md px-2 text-xs font-medium text-primary transition-[background-color,transform] duration-150 hover:bg-primary/10 active:scale-95 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              onClick={onStartTimer}
-              aria-label={`Iniciar temporizador de descanso para la serie ${setIndex + 1}`}
-            >
-              <Clock3 className="size-3.5" aria-hidden />
-              Iniciar
-            </button>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -324,7 +309,6 @@ export function SessionEditor({
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
-  const [collapsedExercises, setCollapsedExercises] = useState<Record<string, boolean>>({});
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const sessionExerciseLibraryIds = useMemo(
@@ -387,6 +371,15 @@ export function SessionEditor({
     }
     return result;
   }, [draftById, exerciseIds, overrides, readOnly, serverPayloads, serverVersions]);
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(() =>
+    initialExpandedExerciseId(
+      detail.exercises.map((exercise) => ({
+        id: exercise.id,
+        payload: currentPayloads[exercise.id],
+      })),
+    ),
+  );
+  const appliedHydratedFocus = useRef(false);
 
   const staleDraftIds = useMemo(
     () =>
@@ -410,10 +403,35 @@ export function SessionEditor({
   );
   const metadataDirty = !readOnly && !payloadsEqual(metadata, baseMetadata);
   const stats = completionStats(Object.values(currentPayloads));
+  const progressPercent =
+    stats.totalSets === 0 ? 0 : Math.round((stats.completedSets / stats.totalSets) * 100);
   const hasUnsavedWork = dirtyIds.size > 0 || metadataDirty;
   const restRemaining = restTimer
     ? Math.max(0, Math.ceil((restTimer.endAt - timerNow) / 1000))
     : 0;
+
+  useEffect(() => {
+    if (appliedHydratedFocus.current) return;
+    appliedHydratedFocus.current = true;
+
+    const storedDrafts = snapshotRecord(getDraftSnapshot(draftKeys));
+    const hydratedExercises = detail.exercises.map((exercise) => {
+      const draft = readOnly
+        ? null
+        : parseWorkoutExerciseDraft(
+            storedDrafts[workoutDraftKey(detail.session.id, exercise.id)] ?? null,
+            exercise.id,
+          );
+      return {
+        id: exercise.id,
+        payload:
+          draft?.serverUpdatedAt === serverVersions[exercise.id]
+            ? draft.payload
+            : serverPayloads[exercise.id],
+      };
+    });
+    setExpandedExerciseId(initialExpandedExerciseId(hydratedExercises));
+  }, [detail.exercises, detail.session.id, draftKeys, readOnly, serverPayloads, serverVersions]);
 
   useEffect(() => {
     if (!restTimer) return;
@@ -649,37 +667,52 @@ export function SessionEditor({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {detail.session.session_name ??
-            detail.session.routine_name_snapshot ??
-            "Sesión libre"}
-        </h1>
-        <p className="text-sm text-muted-foreground">{detail.logDate}</p>
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-md border p-2">
-            <div className="font-semibold">{stats.completedExercises}</div>
-            <div className="text-muted-foreground">Ejercicios</div>
+    <div className="space-y-5">
+      <header className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">
+              {detail.session.session_name ??
+                detail.session.routine_name_snapshot ??
+                "Sesión libre"}
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">{detail.logDate}</p>
           </div>
-          <div className="rounded-md border p-2">
-            <div className="font-semibold">
-              {stats.completedSets}/{stats.totalSets}
-            </div>
-            <div className="text-muted-foreground">Series</div>
+          {!readOnly && (dirtyIds.size > 0 || metadataDirty) ? (
+            <span className="mt-1 shrink-0 rounded-full bg-amber-500/12 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              {dirtyIds.size + (metadataDirty ? 1 : 0)} sin guardar
+            </span>
+          ) : null}
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>
+              <span className="metric-number font-semibold text-foreground">
+                {stats.completedSets}
+              </span>{" "}
+              de {stats.totalSets} series · {stats.completedExercises} de{" "}
+              {detail.exercises.length} ejercicios
+            </span>
+            <span className="metric-number shrink-0 font-medium text-foreground">
+              {progressPercent}%
+            </span>
           </div>
-          <div className="rounded-md border p-2">
-            <div className="font-semibold">{dirtyIds.size}</div>
-            <div className="text-muted-foreground">Pendientes</div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label="Progreso del entrenamiento"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPercent}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
-      </div>
+      </header>
 
-      {!readOnly && (dirtyIds.size > 0 || metadataDirty) ? (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          El borrador queda en este dispositivo. Guardá cada ejercicio antes de finalizar.
-        </div>
-      ) : null}
       {storageError ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           El navegador no permitió guardar el borrador local. No cierres esta pestaña hasta
@@ -687,19 +720,8 @@ export function SessionEditor({
         </div>
       ) : null}
 
-      {!readOnly ? (
-        <>
-          <Button
-            className="h-11 w-full"
-            type="button"
-            variant="outline"
-            onClick={() => setExercisePickerOpen(true)}
-          >
-            <Plus className="size-4" aria-hidden />
-            Agregar ejercicio
-          </Button>
-          {exercisePickerOpen ? (
-            <div
+      {!readOnly && exercisePickerOpen ? (
+        <div
               className="fixed inset-0 z-[60] flex items-end bg-black/45 px-2 pt-12 backdrop-blur-[2px]"
               role="dialog"
               aria-modal="true"
@@ -799,13 +821,24 @@ export function SessionEditor({
                   </div>
                 </details>
               </div>
-            </div>
-          ) : null}
-        </>
+        </div>
       ) : null}
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">Ejercicios</h2>
+        <div className="flex min-h-9 items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Ejercicios</h2>
+          {!readOnly ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setExercisePickerOpen(true)}
+            >
+              <Plus className="size-4" aria-hidden />
+              Agregar
+            </Button>
+          ) : null}
+        </div>
         {detail.exercises.length === 0 ? (
           <p className="text-sm text-muted-foreground">Esta sesión no tiene ejercicios.</p>
         ) : (
@@ -813,65 +846,101 @@ export function SessionEditor({
             const payload = currentPayloads[exercise.id];
             const status = statuses[exercise.id];
             const dirty = dirtyIds.has(exercise.id);
-            const completedCount = payload.sets.filter((set) => set.is_completed).length;
+            const completion = exerciseCompletion(payload);
+            const expanded = expandedExerciseId === exercise.id;
+            const completedSummary = completedExerciseSummary(payload);
             const restLabel = configuredRestLabel(
               exercise.rest_min_seconds_snapshot,
               exercise.rest_max_seconds_snapshot,
             );
+            const exerciseContentId = `session-exercise-${exercise.id}`;
+            const exerciseMeta = [
+              exercise.muscle_group_label_snapshot ??
+                exercise.grupo_muscular_snapshot ??
+                "Sin grupo",
+              exercise.implement_snapshot,
+              exercise.weight_mode_snapshot,
+            ]
+              .filter(Boolean)
+              .join(" · ");
             return (
               <Card
                 key={exercise.id}
+                size="sm"
                 className={cn(
-                  "transition-[opacity,box-shadow] duration-150",
-                  completedCount === payload.sets.length && "border-emerald-500/25",
+                  "relative gap-0 overflow-hidden py-0 transition-[box-shadow] duration-200 motion-reduce:transition-none",
+                  expanded && "shadow-md ring-primary/35",
+                  completion.isComplete && !expanded && "ring-emerald-500/20",
                 )}
               >
-                <CardHeader className="space-y-1 pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-base">
-                        {exercise.nombre_snapshot}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">
-                        {exercise.muscle_group_label_snapshot ??
-                          exercise.grupo_muscular_snapshot ??
-                          "Sin grupo"}
-                        {exercise.implement_snapshot
-                          ? ` · ${exercise.implement_snapshot}`
-                          : ""}
-                        {exercise.weight_mode_snapshot
-                          ? ` · ${exercise.weight_mode_snapshot}`
-                          : ""}
+                {expanded ? (
+                  <span
+                    className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-primary"
+                    aria-hidden
+                  />
+                ) : null}
+                <CardHeader className="p-0">
+                  <button
+                    type="button"
+                    className="flex min-h-[4.25rem] w-full touch-manipulation items-center gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+                    aria-expanded={expanded}
+                    aria-controls={exerciseContentId}
+                    onClick={() => setExpandedExerciseId(expanded ? null : exercise.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {completion.isComplete ? (
+                          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <Check className="size-3" strokeWidth={3} aria-hidden />
+                          </span>
+                        ) : null}
+                        <h3 className="truncate text-sm font-semibold tracking-tight">
+                          {exercise.nombre_snapshot}
+                        </h3>
+                        {dirty ? (
+                          <span
+                            className="size-1.5 shrink-0 rounded-full bg-amber-500"
+                            aria-label="Cambios sin guardar"
+                          />
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {!expanded && completion.isComplete && completedSummary
+                          ? completedSummary
+                          : exerciseMeta}
                       </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn("metric-number rounded-full border px-2 py-1 text-xs", completedCount === payload.sets.length && "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400")}>
-                        {completedCount}/{payload.sets.length}
-                      </span>
-                      {completedCount === payload.sets.length ? (
-                        <Button
-                          type="button"
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={collapsedExercises[exercise.id] ? "Mostrar ejercicio" : "Contraer ejercicio"}
-                          onClick={() =>
-                            setCollapsedExercises((current) => ({
-                              ...current,
-                              [exercise.id]: !current[exercise.id],
-                            }))
-                          }
-                        >
-                          <ChevronDown className={cn("size-4 transition-transform duration-150", collapsedExercises[exercise.id] && "-rotate-90")} aria-hidden />
-                        </Button>
+                      {staleDraftIds.has(exercise.id) ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                          Borrador anterior sin aplicar
+                        </p>
                       ) : null}
                     </div>
-                  </div>
+                    <span
+                      className={cn(
+                        "metric-number shrink-0 rounded-full border px-2 py-1 text-xs font-medium",
+                        completion.isComplete &&
+                          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                      )}
+                    >
+                      {completion.completedSets}/{completion.totalSets}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
+                        expanded && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
                 </CardHeader>
-                {collapsedExercises[exercise.id] ? null : (
-                  <CardContent className="space-y-4">
+                {expanded ? (
+                  <CardContent
+                    id={exerciseContentId}
+                    className="space-y-3 border-t border-border/70 px-3 pb-3 pt-3"
+                  >
                   {staleDraftIds.has(exercise.id) ? (
-                    <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                      <p>
+                    <div className="space-y-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm">
+                      <p className="text-xs leading-relaxed">
                         Hay un borrador de una versión anterior. No se aplicó para evitar
                         sobrescribir cambios de otro dispositivo.
                       </p>
@@ -886,8 +955,13 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem] gap-1.5 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="overflow-hidden rounded-xl border border-border/75 bg-background/35">
+                    <div
+                      className={cn(
+                        "grid gap-x-1.5 border-b border-border/60 bg-muted/35 px-1 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                        SET_GRID_COLUMNS,
+                      )}
+                    >
                       <span className="text-center">Serie</span>
                       <span className="text-center">kg</span>
                       <span className="text-center">reps</span>
@@ -900,7 +974,6 @@ export function SessionEditor({
                         exerciseId={exercise.id}
                         set={set}
                         setIndex={setIndex}
-                        restLabel={restLabel}
                         readOnly={readOnly}
                         onChange={(updater) =>
                           updateExercise(exercise.id, (current) =>
@@ -912,17 +985,39 @@ export function SessionEditor({
                             }),
                           )
                         }
-                        onStartTimer={() => startRestTimer(exercise)}
                       />
                     ))}
                   </div>
 
+                  {restLabel ? (
+                    <div className="flex min-h-9 items-center justify-between gap-3 px-1">
+                      <p className="text-xs text-muted-foreground">
+                        Descanso{" "}
+                        <span className="metric-number font-semibold text-foreground">
+                          {restLabel}
+                        </span>
+                      </p>
+                      {!readOnly ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => startRestTimer(exercise)}
+                          aria-label={`Iniciar temporizador de descanso para ${exercise.nombre_snapshot}`}
+                        >
+                          <Clock3 className="size-3.5" aria-hidden />
+                          Iniciar
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   {!readOnly ? (
                     <Button
-                      className="w-full"
+                      className="h-9"
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       disabled={payload.sets.length >= 50}
                       onClick={() =>
                         updateExercise(exercise.id, (current) => {
@@ -946,146 +1041,207 @@ export function SessionEditor({
                         })
                       }
                     >
+                      <Plus className="size-3.5" aria-hidden />
                       Agregar serie
                     </Button>
                   ) : null}
 
-                  <div className="space-y-1">
-                    <Label>Próxima vez</Label>
-                    <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
-                      {ADJUSTMENTS.map((adjustment) => (
+                  {!readOnly ? (
+                    <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-3">
+                      <div className="min-w-0" aria-live="polite">
+                        <p
+                          className={cn(
+                            "flex items-center gap-1.5 text-xs font-medium",
+                            dirty || status?.pending
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-emerald-700 dark:text-emerald-300",
+                          )}
+                        >
+                          {dirty || status?.pending ? (
+                            <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                          ) : (
+                            <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
+                          )}
+                          {status?.pending
+                            ? "Guardando…"
+                            : dirty
+                              ? "Cambios sin guardar"
+                              : "Guardado"}
+                        </p>
+                        {status?.error ? (
+                          <p className="mt-1 text-xs leading-snug text-destructive">
+                            {status.error}
+                          </p>
+                        ) : null}
+                      </div>
+                      {dirty || status?.pending ? (
                         <Button
-                          key={adjustment.value}
+                          className="shrink-0"
                           type="button"
                           size="sm"
-                          variant={payload.decision === adjustment.value ? "secondary" : "outline"}
+                          disabled={status?.pending}
+                          onClick={() => void saveExercise(exercise.id)}
+                        >
+                          {status?.pending ? "Guardando…" : "Guardar"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <details className="group rounded-xl border border-border/75 bg-muted/15">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span>Progresión y próxima vez</span>
+                        {payload.notes || payload.decision_note || payload.apply_to_routine ? (
+                          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene configuración adicional" />
+                        ) : null}
+                      </span>
+                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                    </summary>
+                    <div className="space-y-4 border-t border-border/60 p-3">
+                      <div className="space-y-2">
+                        <Label>¿Qué hacer la próxima sesión?</Label>
+                        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
+                          {ADJUSTMENTS.map((adjustment) => (
+                            <Button
+                              key={adjustment.value}
+                              type="button"
+                              size="sm"
+                              variant={payload.decision === adjustment.value ? "secondary" : "outline"}
+                              disabled={readOnly}
+                              aria-pressed={payload.decision === adjustment.value}
+                              onClick={() =>
+                                updateExercise(exercise.id, (current) => ({
+                                  ...current,
+                                  decision: adjustment.value,
+                                }))
+                              }
+                            >
+                              {adjustment.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {payload.decision === "custom" || payload.decision_note ? (
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`decision-note-${exercise.id}`}>
+                            Indicación para la próxima vez
+                          </Label>
+                          <textarea
+                            id={`decision-note-${exercise.id}`}
+                            className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                            value={payload.decision_note}
+                            disabled={readOnly}
+                            placeholder="Ejemplo: probar 37,5 kg solo en la primera serie"
+                            onChange={(event) =>
+                              updateExercise(exercise.id, (current) => ({
+                                ...current,
+                                decision_note: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      ) : null}
+
+                      {exercise.routine_exercise_id ? (
+                        <label className="flex items-start gap-3 rounded-xl border border-border/75 bg-background/45 p-3 text-sm">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 size-5 shrink-0"
+                            checked={payload.apply_to_routine}
+                            disabled={readOnly}
+                            onChange={(event) =>
+                              updateExercise(exercise.id, (current) => ({
+                                ...current,
+                                apply_to_routine: event.target.checked,
+                              }))
+                            }
+                          />
+                          <span>
+                            <span className="block font-medium">
+                              Usar lo realizado como próximo objetivo
+                            </span>
+                            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                              Se aplica al finalizar y solo toma las series completadas.
+                            </span>
+                          </span>
+                        </label>
+                      ) : null}
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`exercise-notes-${exercise.id}`}>
+                          Nota del ejercicio
+                        </Label>
+                        <textarea
+                          id={`exercise-notes-${exercise.id}`}
+                          aria-label={`Nota para ${exercise.nombre_snapshot}`}
+                          className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                          value={payload.notes}
                           disabled={readOnly}
-                          aria-pressed={payload.decision === adjustment.value}
-                          onClick={() =>
+                          placeholder="Opcional"
+                          onChange={(event) =>
                             updateExercise(exercise.id, (current) => ({
                               ...current,
-                              decision: adjustment.value,
+                              notes: event.target.value,
                             }))
                           }
-                        >
-                          {adjustment.label}
-                        </Button>
-                      ))}
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  <details className="rounded-xl border border-border/80 px-3 py-2" open={payload.notes ? true : undefined}>
-                    <summary className="cursor-pointer text-sm font-medium">
-                      {payload.notes ? "Nota" : "Añadir nota"}
-                    </summary>
-                    <textarea
-                      id={`exercise-notes-${exercise.id}`}
-                      aria-label={`Nota para ${exercise.nombre_snapshot}`}
-                      className="mt-2 min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
-                      value={payload.notes}
-                      disabled={readOnly}
-                      onChange={(event) =>
-                        updateExercise(exercise.id, (current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }))
-                      }
-                    />
                   </details>
 
-                  {exercise.routine_exercise_id && !readOnly ? (
-                    <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 size-5"
-                        checked={payload.apply_to_routine}
-                        onChange={(event) =>
-                          updateExercise(exercise.id, (current) => ({
-                            ...current,
-                            apply_to_routine: event.target.checked,
-                          }))
-                        }
-                      />
-                      <span>
-                        <span className="block font-medium">
-                          Usar lo realizado como próximo objetivo
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Se aplica al finalizar. Está apagado por defecto para proteger la
-                          rutina actual.
-                        </span>
-                      </span>
-                    </label>
-                  ) : null}
-
                   {!readOnly ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        className="h-11"
-                        type="button"
-                        disabled={!dirty || status?.pending}
-                        onClick={() => void saveExercise(exercise.id)}
-                      >
-                        {status?.pending
-                          ? "Guardando…"
-                          : dirty
-                            ? "Guardar ejercicio"
-                            : "Guardado"}
-                      </Button>
-                      <Button
-                        className="h-11"
-                        type="button"
-                        variant="outline"
-                        disabled={!dirty || status?.pending}
-                        onClick={() => discardExerciseDraft(exercise.id)}
-                      >
-                        Descartar
-                      </Button>
-                    </div>
-                  ) : null}
-
-                  {!readOnly ? (
-                    <details className="rounded-xl border border-destructive/20 px-3 py-2">
-                      <summary className="cursor-pointer text-sm text-muted-foreground">Más acciones</summary>
-                      <Button
-                        className="mt-2 h-10 w-full"
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        disabled={status?.pending}
-                        onClick={() => void removeExercise(exercise.id, exercise.nombre_snapshot)}
-                      >
-                        Quitar de la sesión
-                      </Button>
+                    <details className="group rounded-xl border border-transparent">
+                      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+                        Más opciones del ejercicio
+                        <ChevronDown className="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                      </summary>
+                      <div className="grid gap-2 px-3 pb-3 pt-1 sm:grid-cols-2">
+                        {dirty ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={status?.pending}
+                            onClick={() => discardExerciseDraft(exercise.id)}
+                          >
+                            Descartar cambios
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={status?.pending}
+                          onClick={() => void removeExercise(exercise.id, exercise.nombre_snapshot)}
+                        >
+                          Quitar de la sesión
+                        </Button>
+                      </div>
                     </details>
                   ) : null}
-
-                  <div aria-live="polite">
-                    {status?.saved ? (
-                      <p className="text-sm text-emerald-600">Ejercicio guardado.</p>
-                    ) : null}
-                    {status?.error ? (
-                      <p className="text-sm text-destructive">{status.error}</p>
-                    ) : null}
-                  </div>
                   </CardContent>
-                )}
+                ) : null}
               </Card>
             );
           })
         )}
       </section>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Resumen de la sesión</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <details open={readOnly || metadataDirty ? true : undefined}>
-            <summary className="cursor-pointer text-sm text-muted-foreground">
-              Energía, rendimiento, cinta y notas
-            </summary>
-          <fieldset className="mt-4 space-y-4 disabled:opacity-80" disabled={readOnly}>
+      <Card size="sm" className="gap-0 py-0">
+        <details className="group">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+            <span className="flex min-w-0 items-center gap-2">
+              <CardTitle className="text-sm">Resumen de la sesión</CardTitle>
+              {metadataDirty ? (
+                <span className="size-1.5 shrink-0 rounded-full bg-amber-500" aria-label="Resumen con cambios" />
+              ) : null}
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <CardContent className="border-t border-border/70 px-3 pb-3 pt-4">
+          <fieldset className="space-y-4 disabled:opacity-80" disabled={readOnly}>
           <div className="space-y-1">
             <Label htmlFor="session-name">Nombre</Label>
             <Input
@@ -1228,8 +1384,8 @@ export function SessionEditor({
             </div>
           ) : null}
           </fieldset>
-          </details>
-        </CardContent>
+          </CardContent>
+        </details>
       </Card>
 
       {!readOnly ? (
@@ -1240,31 +1396,49 @@ export function SessionEditor({
             disabled={globalPending || dirtyIds.size > 0 || stats.completedSets === 0}
             onClick={() => void finishSession()}
           >
-            {globalPending ? "Procesando…" : "Finalizar sesión"}
-          </Button>
-          <Button
-            className="h-11 w-full"
-            type="button"
-            variant="destructive"
-            disabled={globalPending}
-            onClick={() => void cancelSession()}
-          >
-            Cancelar borrador de sesión
+            {globalPending ? "Procesando…" : "Finalizar entrenamiento"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Finalizar aplica a la rutina únicamente los ejercicios donde activaste
-            “Usar lo realizado como próximo objetivo”.
+            {dirtyIds.size > 0
+              ? `Guardá o descartá ${dirtyIds.size === 1 ? "el ejercicio pendiente" : `los ${dirtyIds.size} ejercicios pendientes`} para finalizar.`
+              : "Solo se actualiza la rutina donde activaste “Usar lo realizado como próximo objetivo”."}
           </p>
+          <div aria-live="polite">
+            {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}
+          </div>
+          <details className="group rounded-xl border border-transparent">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+              Más opciones
+              <ChevronDown className="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+            </summary>
+            <div className="px-3 pb-3 pt-1">
+              <Button
+                className="w-full"
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={globalPending}
+                onClick={() => void cancelSession()}
+              >
+                Cancelar entrenamiento
+              </Button>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Elimina solo esta sesión en curso; no toca la rutina ni el historial.
+              </p>
+            </div>
+          </details>
         </div>
       ) : (
-        <div className="rounded-md border bg-muted/30 p-3 text-sm">
+        <div className="rounded-xl border bg-muted/30 p-3 text-sm">
           Sesión finalizada. El historial está en modo lectura.
         </div>
       )}
 
-      <div aria-live="polite">
-        {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}
-      </div>
+      {readOnly && globalError ? (
+        <div aria-live="polite">
+          <p className="text-sm text-destructive">{globalError}</p>
+        </div>
+      ) : null}
 
       <Link
         href="/train"
