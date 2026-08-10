@@ -15,7 +15,7 @@ tampoco cambia si la plantilla se edita mientras está en curso.
 
 ## Modelo de datos
 
-La migración `20260805_0015_training_robust_rebuild.sql` es aditiva y conserva las tablas y
+La migración `20260810112232_training_robust_rebuild.sql` es aditiva y conserva las tablas y
 filas existentes.
 
 | Entidad | Responsabilidad |
@@ -91,7 +91,7 @@ dos. El historial por ejercicio muestra objetivo y ejecución de cada serie.
 ## Despliegue seguro
 
 1. Ejecutar tests, lint, TypeScript y build.
-2. Aplicar `20260805_0015_training_robust_rebuild.sql` en Supabase.
+2. Aplicar `20260810112232_training_robust_rebuild.sql` en Supabase.
 3. Ejecutar asesores de seguridad y performance.
 4. Desplegar la rama en Vercel como Preview.
 5. Probar login, importación, inicio, guardado, conflicto, finalización e historial.

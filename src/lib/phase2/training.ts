@@ -27,12 +27,31 @@ function assertNonEmpty(value: string, label: string) {
 
 function asPostgrestError(err: unknown): { code?: string; message?: string } {
   if (typeof err !== "object" || err === null) return {};
-  const anyErr = err as any;
+  const errorRecord = err as Record<string, unknown>;
   return {
-    code: typeof anyErr.code === "string" ? anyErr.code : undefined,
-    message: typeof anyErr.message === "string" ? anyErr.message : undefined,
+    code: typeof errorRecord.code === "string" ? errorRecord.code : undefined,
+    message:
+      typeof errorRecord.message === "string" ? errorRecord.message : undefined,
   };
 }
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+type TrainingDayQueryRow = {
+  day_log: { log_date: string } | Array<{ log_date: string }> | null;
+  routine: { color: string | null } | Array<{ color: string | null }> | null;
+};
+
+type EndedSessionQueryRow = WorkoutSession & {
+  routine: { nombre: string | null } | Array<{ nombre: string | null }> | null;
+};
+
+type RoutineExerciseQueryRow = RoutineExercise & {
+  exercise: Pick<Exercise, "id" | "nombre" | "grupo_muscular">;
+};
 
 const MSG_SESSION_IN_PROGRESS =
   "Ya tenés una sesión de entrenamiento en curso. Continuá esa sesión o finalizala antes de iniciar otra.";
@@ -145,10 +164,12 @@ export async function listTrainingDaysInMonth(input: {
   if (error) throw new Error(`Leer días entrenados: ${error.message}`);
 
   const out = new Map<string, Set<string>>();
-  for (const row of (data ?? []) as any[]) {
-    const date = row.day_log?.log_date ? String(row.day_log.log_date) : null;
+  for (const row of (data ?? []) as TrainingDayQueryRow[]) {
+    const dayLog = firstRelation(row.day_log);
+    const routine = firstRelation(row.routine);
+    const date = dayLog?.log_date ? String(dayLog.log_date) : null;
     if (!date) continue;
-    const color = row.routine?.color ? String(row.routine.color) : "#0f172a";
+    const color = routine?.color ? String(routine.color) : "#0f172a";
     const set = out.get(date) ?? new Set<string>();
     set.add(color);
     out.set(date, set);
@@ -192,7 +213,8 @@ export async function listEndedSessionsByDate(input: {
   const { data: sessions, error: sErr } = await q;
   if (sErr) throw new Error(`Leer sesiones: ${sErr.message}`);
 
-  const ids = (sessions ?? []).map((s: any) => s.id as string);
+  const sessionRows = (sessions ?? []) as EndedSessionQueryRow[];
+  const ids = sessionRows.map((session) => session.id);
   if (ids.length === 0) return [];
 
   const { data: ses, error: seErr } = await supabase
@@ -202,7 +224,10 @@ export async function listEndedSessionsByDate(input: {
   if (seErr) throw new Error(`Leer ejercicios de sesión: ${seErr.message}`);
 
   const agg = new Map<string, { total: number; done: number }>();
-  for (const r of (ses ?? []) as any[]) {
+  for (const r of (ses ?? []) as Array<{
+    workout_session_id: string;
+    is_completed: boolean;
+  }>) {
     const id = String(r.workout_session_id);
     const prev = agg.get(id) ?? { total: 0, done: 0 };
     prev.total += 1;
@@ -210,11 +235,12 @@ export async function listEndedSessionsByDate(input: {
     agg.set(id, prev);
   }
 
-  return (sessions ?? []).map((s: any) => {
-    const a = agg.get(String(s.id)) ?? { total: 0, done: 0 };
+  return sessionRows.map((sessionRow) => {
+    const a = agg.get(String(sessionRow.id)) ?? { total: 0, done: 0 };
+    const routine = firstRelation(sessionRow.routine);
     return {
-      session: s as WorkoutSession,
-      routineNombre: s.routine?.nombre ?? null,
+      session: sessionRow as WorkoutSession,
+      routineNombre: routine?.nombre ?? null,
       exercisesCount: a.total,
       completedCount: a.done,
     };
@@ -312,6 +338,7 @@ export async function listRoutines(params?: {
     .from("routines")
     .select("*")
     .eq("user_id", userId)
+    .order("routine_order", { ascending: true })
     .order("nombre", { ascending: true });
 
   if (!params?.includeArchived) q = q.eq("is_active", true);
@@ -407,11 +434,11 @@ export async function listRoutineExercises(routineId: string): Promise<
     `,
     )
     .eq("routine_id", routineId)
-    .order("created_at", { ascending: true });
+    .order("exercise_order", { ascending: true });
 
   if (error) throw new Error(`Leer routine_exercises: ${error.message}`);
 
-  const rows = (data ?? []) as any[];
+  const rows = (data ?? []) as RoutineExerciseQueryRow[];
   for (const r of rows) {
     if (!r.exercise || typeof r.exercise.id !== "string") {
       throw new Error("Inconsistencia: routine_exercises sin exercise.");
@@ -420,7 +447,7 @@ export async function listRoutineExercises(routineId: string): Promise<
   // RLS ya filtra por user (vía routine), pero agregamos check defensivo.
   // No podemos comparar user_id acá porque no viene en el join select.
   void userId;
-  return rows as any;
+  return rows;
 }
 
 export async function replaceRoutineExercises(input: {
@@ -606,11 +633,11 @@ export async function startSessionFromRoutine(input: {
     .order("created_at", { ascending: true });
   if (itemsErr) throw new Error(`Leer routine_exercises: ${itemsErr.message}`);
 
-  const inserts = (routineItems ?? []).map((it: any) => ({
-    workout_session_id: (session as any).id,
-    exercise_id: it.exercise.id as string,
-    nombre_snapshot: it.exercise.nombre as string,
-    grupo_muscular_snapshot: (it.exercise.grupo_muscular as MuscleGroup | null) ?? null,
+  const inserts = ((routineItems ?? []) as RoutineExerciseQueryRow[]).map((item) => ({
+    workout_session_id: (session as WorkoutSession).id,
+    exercise_id: item.exercise.id,
+    nombre_snapshot: item.exercise.nombre,
+    grupo_muscular_snapshot: item.exercise.grupo_muscular ?? null,
   }));
 
   let sessionExercises: WorkoutSessionExercise[] = [];
@@ -648,7 +675,10 @@ export async function getSession(sessionId: string): Promise<{
     .order("created_at", { ascending: true });
   if (exErr) throw new Error(`Leer ejercicios de sesión: ${exErr.message}`);
 
-  return { session: session as WorkoutSession, exercises: (exercises ?? []) as any };
+  return {
+    session: session as WorkoutSession,
+    exercises: (exercises ?? []) as WorkoutSessionExercise[],
+  };
 }
 
 export async function finishSession(sessionId: string): Promise<WorkoutSession> {
@@ -839,7 +869,7 @@ export async function listExerciseHistory(input: {
   for (const s of (sessions ?? []) as WorkoutSession[]) sessionsById.set(s.id, s);
 
   const dayLogIds = Array.from(
-    new Set((sessions ?? []).map((s: any) => s.day_log_id as string)),
+    new Set(((sessions ?? []) as WorkoutSession[]).map((session) => session.day_log_id)),
   );
 
   // 3) Traer day_logs para fechas
@@ -850,7 +880,9 @@ export async function listExerciseHistory(input: {
   if (dErr) throw new Error(`Leer day_logs: ${dErr.message}`);
 
   const dayDateById = new Map<string, string>();
-  for (const d of (dayLogs ?? []) as any[]) dayDateById.set(d.id, d.log_date);
+  for (const day of (dayLogs ?? []) as Array<{ id: string; log_date: string }>) {
+    dayDateById.set(day.id, day.log_date);
+  }
 
   const completedRows = rows.filter((se) => sessionsById.has(se.workout_session_id));
 
@@ -868,4 +900,3 @@ export async function listExerciseHistory(input: {
     };
   });
 }
-

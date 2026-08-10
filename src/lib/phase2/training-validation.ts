@@ -1,0 +1,127 @@
+import type {
+  EditableRoutineSet,
+  EditableWorkoutSet,
+  RoutineExercisePayload,
+  SessionMetadataInput,
+  TrainingAdjustment,
+  WorkoutExercisePayload,
+} from "./types";
+
+const ADJUSTMENTS = new Set<TrainingAdjustment>([
+  "maintain",
+  "increase_weight",
+  "increase_reps",
+  "custom",
+]);
+
+function assertFiniteInRange(
+  value: number | null,
+  label: string,
+  min: number,
+  max: number,
+) {
+  if (value === null) return;
+  if (!Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`${label} debe estar entre ${min} y ${max}.`);
+  }
+}
+
+function assertIntegerInRange(
+  value: number | null,
+  label: string,
+  min: number,
+  max: number,
+) {
+  assertFiniteInRange(value, label, min, max);
+  if (value !== null && !Number.isInteger(value)) {
+    throw new Error(`${label} debe ser un número entero.`);
+  }
+}
+
+export function assertAdjustment(
+  value: string,
+  label = "Ajuste",
+): asserts value is TrainingAdjustment {
+  if (!ADJUSTMENTS.has(value as TrainingAdjustment)) {
+    throw new Error(`${label} inválido.`);
+  }
+}
+
+export function assertConsecutiveSets(
+  sets: ReadonlyArray<{ set_number: number }>,
+) {
+  if (sets.length < 1 || sets.length > 50) {
+    throw new Error("La cantidad de series debe estar entre 1 y 50.");
+  }
+
+  sets.forEach((set, index) => {
+    if (set.set_number !== index + 1) {
+      throw new Error("Las series deben estar numeradas en orden desde 1.");
+    }
+  });
+}
+
+export function validateRoutineSets(sets: EditableRoutineSet[]) {
+  assertConsecutiveSets(sets);
+  sets.forEach((set, index) => {
+    const number = index + 1;
+    assertIntegerInRange(set.target_reps, `Repeticiones de serie ${number}`, 0, 1000);
+    assertFiniteInRange(set.target_weight_kg, `Peso de serie ${number}`, 0, 9999.99);
+  });
+}
+
+export function validateWorkoutSets(sets: EditableWorkoutSet[]) {
+  assertConsecutiveSets(sets);
+  sets.forEach((set, index) => {
+    const number = index + 1;
+    assertIntegerInRange(set.target_reps, `Objetivo de serie ${number}`, 0, 1000);
+    assertFiniteInRange(set.target_weight_kg, `Peso objetivo de serie ${number}`, 0, 9999.99);
+    assertIntegerInRange(set.actual_reps, `Repeticiones de serie ${number}`, 0, 1000);
+    assertFiniteInRange(set.actual_weight_kg, `Peso real de serie ${number}`, 0, 9999.99);
+
+    if (set.is_completed && set.actual_reps === null) {
+      throw new Error(`Completá las repeticiones de la serie ${number}.`);
+    }
+  });
+}
+
+export function validateRoutineExercisePayload(payload: RoutineExercisePayload) {
+  assertAdjustment(payload.next_adjustment);
+  validateRoutineSets(payload.sets);
+}
+
+export function validateWorkoutExercisePayload(payload: WorkoutExercisePayload) {
+  assertAdjustment(payload.decision, "Decisión");
+  validateWorkoutSets(payload.sets);
+
+  const hasCompletedSet = payload.sets.some((set) => set.is_completed);
+  if (payload.is_completed !== hasCompletedSet) {
+    throw new Error("El estado del ejercicio no coincide con sus series realizadas.");
+  }
+}
+
+export function validateSessionMetadata(metadata: SessionMetadataInput) {
+  assertIntegerInRange(metadata.energy_level, "Energía", 1, 5);
+  assertIntegerInRange(metadata.performance_level, "Rendimiento", 1, 5);
+  assertIntegerInRange(metadata.pain_level, "Dolor", 0, 10);
+  assertFiniteInRange(metadata.treadmill_minutes, "Minutos de cinta", 0, 1440);
+  assertFiniteInRange(metadata.treadmill_distance_km, "Distancia de cinta", 0, 1000);
+  assertFiniteInRange(metadata.treadmill_speed_kmh, "Velocidad de cinta", 0, 100);
+  assertFiniteInRange(
+    metadata.treadmill_incline_percent,
+    "Inclinación de cinta",
+    0,
+    100,
+  );
+}
+
+export function nullableNumberFromInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function payloadsEqual<T>(left: T, right: T): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}

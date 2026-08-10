@@ -381,6 +381,10 @@ for each row execute function public.workout_session_exercises_assign_order();
 create index if not exists idx_workout_session_exercises_user_session
 on public.workout_session_exercises (user_id, workout_session_id, exercise_order);
 
+create index if not exists idx_workout_session_exercises_routine_exercise
+on public.workout_session_exercises (routine_exercise_id)
+where routine_exercise_id is not null;
+
 create or replace function public.workout_session_exercises_init_robust()
 returns trigger
 language plpgsql
@@ -1153,6 +1157,21 @@ begin
       where workout_session_exercise_id = p_session_exercise_id) <> v_sets_count then
     raise exception 'Las series deben tener números únicos';
   end if;
+  if exists (
+    select 1
+    from (
+      select
+        min(set_number) as first_number,
+        max(set_number) as last_number,
+        count(*)::integer as total
+      from public.workout_sets
+      where workout_session_exercise_id = p_session_exercise_id
+    ) numbered
+    where numbered.first_number <> 1
+      or numbered.last_number <> numbered.total
+  ) then
+    raise exception 'Las series deben estar numeradas en orden desde 1';
+  end if;
 
   return v_updated_at;
 end;
@@ -1220,6 +1239,22 @@ begin
     target_weight_kg numeric,
     notes text
   );
+
+  if exists (
+    select 1
+    from (
+      select
+        min(set_number) as first_number,
+        max(set_number) as last_number,
+        count(*)::integer as total
+      from public.routine_exercise_sets
+      where routine_exercise_id = p_routine_exercise_id
+    ) numbered
+    where numbered.first_number <> 1
+      or numbered.last_number <> numbered.total
+  ) then
+    raise exception 'Las series deben estar numeradas en orden desde 1';
+  end if;
 
   return v_updated_at;
 end;
@@ -1319,6 +1354,18 @@ begin
 
   if v_session.id is null then
     raise exception 'La sesión no existe o ya finalizó';
+  end if;
+
+  if not exists (
+    select 1
+    from public.workout_session_exercises se
+    join public.workout_sets ws
+      on ws.workout_session_exercise_id = se.id
+    where se.workout_session_id = p_session_id
+      and se.is_completed
+      and ws.is_completed
+  ) then
+    raise exception 'Marcá y guardá al menos una serie antes de finalizar';
   end if;
 
   for v_exercise in

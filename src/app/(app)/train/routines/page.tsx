@@ -1,20 +1,36 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listRoutines } from "@/lib/phase2/training";
+import { getInitialPlanStatus } from "@/lib/phase2/training-robust";
 import { RoutineCreateForm } from "./routine-create-form";
 import { RoutineDeleteButton } from "./routine-delete-button";
+import { InitialPlanImportButton } from "./initial-plan-import-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoutinesPage() {
-  const routines = await listRoutines({ includeArchived: false });
+  const [routines, initialPlan] = await Promise.all([
+    listRoutines({ includeArchived: false }),
+    getInitialPlanStatus(),
+  ]);
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Rutinas</h1>
-        <p className="text-sm text-muted-foreground">Plantillas reutilizables.</p>
+        <p className="text-sm text-muted-foreground">
+          Plantillas por serie. Editarlas no cambia tu historial.
+        </p>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Plan de la planilla</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InitialPlanImportButton imported={initialPlan.imported} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3">
@@ -63,4 +79,3 @@ export default async function RoutinesPage() {
     </div>
   );
 }
-

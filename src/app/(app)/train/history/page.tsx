@@ -32,7 +32,7 @@ export default async function TrainHistoryPage() {
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-medium">{ex.nombre}</span>
                     <span className="text-xs text-muted-foreground">
-                      {ex.grupo_muscular ?? "Sin grupo"}
+                      {ex.muscle_group_label ?? ex.grupo_muscular ?? "Sin grupo"}
                     </span>
                   </div>
                 </Link>
@@ -44,4 +44,3 @@ export default async function TrainHistoryPage() {
     </div>
   );
 }
-

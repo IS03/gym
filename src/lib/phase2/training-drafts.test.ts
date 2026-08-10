@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+import {
+  parseWorkoutExerciseDraft,
+  TRAINING_DRAFT_VERSION,
+} from "./training-drafts";
+
+describe("borradores locales versionados", () => {
+  it("recupera un borrador válido del ejercicio correcto", () => {
+    const raw = JSON.stringify({
+      version: TRAINING_DRAFT_VERSION,
+      sessionExerciseId: "exercise-1",
+      serverUpdatedAt: "2026-08-10T10:00:00.000Z",
+      savedAt: "2026-08-10T10:01:00.000Z",
+      payload: {
+        is_completed: true,
+        decision: "maintain",
+        decision_note: "",
+        apply_to_routine: false,
+        notes: "",
+        sets: [
+          {
+            set_number: 1,
+            target_reps: 10,
+            target_weight_kg: 20,
+            actual_reps: 10,
+            actual_weight_kg: 20,
+            is_completed: true,
+            notes: null,
+          },
+        ],
+      },
+    });
+    expect(parseWorkoutExerciseDraft(raw, "exercise-1")?.payload.is_completed).toBe(
+      true,
+    );
+  });
+
+  it("ignora versiones, IDs o series inválidas", () => {
+    expect(parseWorkoutExerciseDraft("{}", "exercise-1")).toBeNull();
+    expect(
+      parseWorkoutExerciseDraft(
+        JSON.stringify({
+          version: TRAINING_DRAFT_VERSION,
+          sessionExerciseId: "otro",
+          serverUpdatedAt: "x",
+          savedAt: "x",
+          payload: {},
+        }),
+        "exercise-1",
+      ),
+    ).toBeNull();
+  });
+});

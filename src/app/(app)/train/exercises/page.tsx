@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listExercises } from "@/lib/phase2/training";
+import type { MuscleGroup } from "@/lib/phase2/types";
 import { ExerciseFilterForm } from "./exercise-filter-form";
 import {
   createExerciseAction,
@@ -30,10 +31,17 @@ export default async function ExercisesPage({
 }) {
   const sp = (await searchParams) ?? {};
   const group = typeof sp.group === "string" ? sp.group : "";
+  const knownGroups = new Set<string>(MUSCLE_GROUPS.map((item) => item.value));
+  const muscleGroup: MuscleGroup | "none" | undefined =
+    group === "none"
+      ? "none"
+      : knownGroups.has(group)
+        ? (group as MuscleGroup)
+        : undefined;
 
   const exercises = await listExercises({
     includeArchived: false,
-    muscleGroup: (group === "none" ? "none" : (group as any)) || undefined,
+    muscleGroup,
   });
 
   return (
@@ -247,4 +255,3 @@ export default async function ExercisesPage({
     </div>
   );
 }
-

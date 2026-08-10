@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
+import { todayInCordoba } from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrainPage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInCordoba();
   const inProgress = await getInProgressSessionForUser();
 
   return (
@@ -15,7 +16,7 @@ export default async function TrainPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Entrenar</h1>
         <p className="text-sm text-muted-foreground">
-          Sesiones del día, rutinas y biblioteca (Fase 2A).
+          Series reales, objetivos y progreso sin alterar el historial.
         </p>
       </div>
 
@@ -63,6 +64,12 @@ export default async function TrainPage() {
               Rutinas
             </Link>
           </div>
+          <Link
+            href="/train/progress"
+            className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
+          >
+            Progreso y resumen semanal
+          </Link>
           <Link
             href="/train/history"
             className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}

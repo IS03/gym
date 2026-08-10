@@ -5,6 +5,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getInProgressSessionForUser, listRoutines } from "@/lib/phase2/training";
+import { todayInCordoba } from "@/lib/phase2/training-robust";
 import { startFreeSessionAction, startSessionFromRoutineAction } from "../../actions";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ export default async function NewSessionPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = (await searchParams) ?? {};
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInCordoba();
   const date = typeof sp.date === "string" ? sp.date : today;
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
 
@@ -140,4 +141,3 @@ export default async function NewSessionPage({
     </div>
   );
 }
-

@@ -14,12 +14,25 @@ import {
   removeSessionExercise,
   removeRoutineExercise,
   replaceRoutineExercises,
-  startFreeSession,
-  startSessionFromRoutine,
   updateExercise,
   updateRoutine,
   updateSessionExercise,
 } from "@/lib/phase2/training";
+import {
+  appendWorkoutExercise,
+  cancelWorkoutSession,
+  finishWorkoutSession,
+  importInitialTrainingPlan,
+  moveRoutineExerciseTarget,
+  saveRoutineExerciseTarget,
+  saveWorkoutExercise,
+  startWorkoutSession,
+} from "@/lib/phase2/training-robust";
+import type {
+  RoutineExercisePayload,
+  SessionMetadataInput,
+  WorkoutExercisePayload,
+} from "@/lib/phase2/types";
 
 function str(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -124,13 +137,16 @@ export async function replaceRoutineExercisesAction(formData: FormData) {
 
   // items_json: [{exercise_id}]
   const itemsJson = str(formData, "items_json");
-  const items = itemsJson ? (JSON.parse(itemsJson) as any[]) : [];
+  const parsed: unknown = itemsJson ? JSON.parse(itemsJson) : [];
+  const items = Array.isArray(parsed) ? parsed : [];
 
   await replaceRoutineExercises({
     routineId,
-    items: items.map((it) => ({
-      exercise_id: String(it.exercise_id),
-    })),
+    items: items.flatMap((item) => {
+      if (typeof item !== "object" || item === null) return [];
+      const exerciseId = (item as Record<string, unknown>).exercise_id;
+      return typeof exerciseId === "string" ? [{ exercise_id: exerciseId }] : [];
+    }),
   });
 
   revalidatePath(`/train/routines/${routineId}`);
@@ -152,21 +168,21 @@ export async function removeRoutineExerciseAction(formData: FormData) {
 
 export async function startFreeSessionAction(formData: FormData) {
   const date = str(formData, "date");
-  const session = await startFreeSession({ date });
+  const sessionId = await startWorkoutSession({ date, routineId: null });
   revalidatePath("/train");
   revalidatePath("/train/session/new");
-  revalidatePath(`/train/session/${session.id}`);
-  return session.id;
+  revalidatePath(`/train/session/${sessionId}`);
+  return sessionId;
 }
 
 export async function startSessionFromRoutineAction(formData: FormData) {
   const date = str(formData, "date");
   const routineId = str(formData, "routine_id");
-  const { session } = await startSessionFromRoutine({ date, routineId });
+  const sessionId = await startWorkoutSession({ date, routineId });
   revalidatePath("/train");
   revalidatePath("/train/session/new");
-  revalidatePath(`/train/session/${session.id}`);
-  return session.id;
+  revalidatePath(`/train/session/${sessionId}`);
+  return sessionId;
 }
 
 export async function addExistingExerciseToSessionAction(formData: FormData) {
@@ -236,3 +252,110 @@ export async function updateSessionExerciseAction(formData: FormData) {
   revalidatePath(`/train/session/${sessionId}`);
 }
 
+export type TrainingActionResult<T = undefined> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
+
+function actionError(error: unknown): string {
+  return error instanceof Error ? error.message : "Error inesperado.";
+}
+
+export async function importInitialTrainingPlanAction(): Promise<
+  TrainingActionResult<{ routines: number; exercises: number }>
+> {
+  try {
+    const result = await importInitialTrainingPlan();
+    revalidatePath("/train");
+    revalidatePath("/train/routines");
+    revalidatePath("/train/exercises");
+    return { ok: true, data: result };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function saveRoutineExerciseTargetAction(input: {
+  routineId: string;
+  routineExerciseId: string;
+  payload: RoutineExercisePayload;
+}): Promise<TrainingActionResult<{ updatedAt: string }>> {
+  try {
+    const updatedAt = await saveRoutineExerciseTarget(input);
+    revalidatePath(`/train/routines/${input.routineId}`);
+    return { ok: true, data: { updatedAt } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function moveRoutineExerciseTargetAction(input: {
+  routineId: string;
+  routineExerciseId: string;
+  direction: -1 | 1;
+}): Promise<TrainingActionResult> {
+  try {
+    await moveRoutineExerciseTarget(input);
+    revalidatePath(`/train/routines/${input.routineId}`);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function appendWorkoutExerciseAction(input: {
+  sessionId: string;
+  exerciseId: string;
+}): Promise<TrainingActionResult<{ sessionExerciseId: string }>> {
+  try {
+    const sessionExerciseId = await appendWorkoutExercise(input);
+    revalidatePath(`/train/session/${input.sessionId}`);
+    return { ok: true, data: { sessionExerciseId } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function saveWorkoutExerciseAction(input: {
+  sessionId: string;
+  sessionExerciseId: string;
+  expectedUpdatedAt: string;
+  payload: WorkoutExercisePayload;
+}): Promise<TrainingActionResult<{ updatedAt: string }>> {
+  try {
+    const updatedAt = await saveWorkoutExercise(input);
+    revalidatePath(`/train/session/${input.sessionId}`);
+    return { ok: true, data: { updatedAt } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function finishWorkoutSessionAction(input: {
+  sessionId: string;
+  metadata: SessionMetadataInput;
+}): Promise<TrainingActionResult<{ sessionId: string }>> {
+  try {
+    const sessionId = await finishWorkoutSession(input);
+    revalidatePath("/train");
+    revalidatePath("/train/calendar");
+    revalidatePath("/train/history");
+    revalidatePath("/train/progress");
+    revalidatePath(`/train/session/${input.sessionId}`);
+    return { ok: true, data: { sessionId } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function cancelWorkoutSessionAction(input: {
+  sessionId: string;
+}): Promise<TrainingActionResult> {
+  try {
+    await cancelWorkoutSession(input.sessionId);
+    revalidatePath("/train");
+    revalidatePath("/train/session/new");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
