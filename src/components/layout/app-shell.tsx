@@ -7,9 +7,9 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pt-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))]">
+      <main className="mx-auto flex w-full max-w-[430px] flex-1 flex-col px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300">
         {children}
-      </div>
+      </main>
       <BottomNav />
     </div>
   );

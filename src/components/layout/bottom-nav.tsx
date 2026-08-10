@@ -17,10 +17,10 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_-20px_color-mix(in_oklch,var(--foreground)_45%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/75"
       aria-label="Navegación principal"
     >
-      <div className="mx-auto flex h-14 max-w-md items-stretch justify-between px-1">
+      <div className="mx-auto flex h-14 max-w-[430px] items-stretch justify-between gap-1 px-2">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href || (href !== "/today" && pathname.startsWith(href));
@@ -30,10 +30,10 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[11px] font-medium transition-colors",
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-medium transition-[color,background-color,transform] duration-150 ease-out active:scale-[0.96]",
                 active
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-primary/12 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <Icon className="size-5 shrink-0" aria-hidden />
