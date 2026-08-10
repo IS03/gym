@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Appgym",
     short_name: "Appgym",
     description: "Seguimiento personal de nutrición y entrenamiento.",
-    start_url: "/today",
+    start_url: "/home",
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",

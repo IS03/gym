@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/today";
+  const next = searchParams.get("next") ?? "/home";
 
   if (!url || !anonKey || !code) {
     return NextResponse.redirect(`${origin}/login?error=auth`);

@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      redirect("/today");
+      redirect("/home");
     }
   } catch {
     // Sin variables de entorno: se muestra el formulario con error al enviar.
