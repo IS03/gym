@@ -29,10 +29,12 @@ export default async function TodayPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Hoy</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Nutrición de hoy</h1>
         <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
       </div>
 
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+      <aside className="space-y-6 lg:sticky lg:top-8 lg:col-span-4">
       <Card className="surface-elevated">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Resumen</CardTitle>
@@ -62,8 +64,9 @@ export default async function TodayPage() {
           <CreateMealForm date={today} />
         </CardContent>
       </Card>
+      </aside>
 
-      <div className="space-y-3">
+      <div className="space-y-3 lg:col-span-8">
         <h2 className="text-base font-semibold tracking-tight">Comidas</h2>
         {meals.length === 0 ? (
           <p className="text-sm text-muted-foreground">Todavía no cargaste comidas.</p>
@@ -165,6 +168,7 @@ export default async function TodayPage() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

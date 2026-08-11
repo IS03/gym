@@ -16,7 +16,7 @@ export default async function TrainHistoryPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial de ejercicios</h1>
         <p className="text-sm text-muted-foreground">
           Buscá un ejercicio y compará tus registros reales.
         </p>

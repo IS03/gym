@@ -54,13 +54,14 @@ export default async function TrainCalendarPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Calendario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Calendario</h1>
         <p className="text-sm text-muted-foreground">
           Días entrenados (sesiones terminadas).
         </p>
       </div>
 
-      <Card>
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+      <Card className="lg:sticky lg:top-8 lg:col-span-4">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Filtros</CardTitle>
         </CardHeader>
@@ -114,7 +115,7 @@ export default async function TrainCalendarPage({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="lg:col-span-8">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{month}</CardTitle>
         </CardHeader>
@@ -136,7 +137,7 @@ export default async function TrainCalendarPage({
                   key={d.date}
                   href={`/train/day?date=${d.date}${routineId ? `&routine_id=${routineId}` : ""}`}
                   className={cn(
-                    "flex h-10 items-center justify-center rounded-md border text-sm",
+                    "flex h-10 items-center justify-center rounded-md border text-sm lg:h-16",
                     d.inMonth ? "bg-background" : "bg-muted/30 text-muted-foreground",
                     trained ? "border-foreground font-semibold" : "border-border",
                   )}
@@ -164,7 +165,7 @@ export default async function TrainCalendarPage({
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
-

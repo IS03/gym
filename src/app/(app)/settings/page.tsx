@@ -17,12 +17,14 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Ajustes</h1>
         <p className="text-sm text-muted-foreground">
           Tu cuenta, información personal y preferencias de OWNLEVEL.
         </p>
       </div>
 
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+      <div className="space-y-6 lg:col-span-8">
       <section className="space-y-3" aria-labelledby="settings-profile">
         <div className="flex items-center gap-2">
           <UserRound className="size-4 text-primary" aria-hidden />
@@ -62,7 +64,9 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </section>
+      </div>
 
+      <div className="space-y-6 lg:col-span-4">
       <section className="space-y-3" aria-labelledby="settings-app-data">
         <div className="flex items-center gap-2">
           <Palette className="size-4 text-primary" aria-hidden />
@@ -107,6 +111,8 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </section>
+      </div>
+      </div>
     </div>
   );
 }

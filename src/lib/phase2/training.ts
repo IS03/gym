@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
+import {
+  buildRoutineOverviews,
+  type RoutineOverview,
+  type RoutineOverviewSourceRow,
+} from "./routine-overview";
 import type {
   Exercise,
   MuscleGroup,
@@ -346,6 +351,26 @@ export async function listRoutines(params?: {
   const { data, error } = await q;
   if (error) throw new Error(`Leer routines: ${error.message}`);
   return (data ?? []) as Routine[];
+}
+
+export async function listRoutineOverviews(
+  routineIds: string[],
+): Promise<Map<string, RoutineOverview>> {
+  if (routineIds.length === 0) return buildRoutineOverviews([], []);
+
+  const supabase = await createClient();
+  await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .select(
+      "id, routine_id, exercise_order, exercise:exercises(nombre, grupo_muscular, muscle_group_label), sets:routine_exercise_sets(id)",
+    )
+    .in("routine_id", routineIds)
+    .order("exercise_order", { ascending: true });
+
+  if (error) throw new Error(`Leer resumen de rutinas: ${error.message}`);
+
+  return buildRoutineOverviews(routineIds, (data ?? []) as RoutineOverviewSourceRow[]);
 }
 
 export async function createRoutine(input: {

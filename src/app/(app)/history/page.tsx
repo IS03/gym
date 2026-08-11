@@ -31,13 +31,14 @@ export default async function HistoryPage({
     return (
       <div className="space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
           <p className="text-sm text-muted-foreground">
             Elegí una fecha para ver el resumen y sus comidas.
           </p>
         </div>
 
-        <Card>
+        <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+        <Card className="lg:order-2 lg:col-span-4 lg:sticky lg:top-8">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Ir a una fecha</CardTitle>
           </CardHeader>
@@ -56,12 +57,12 @@ export default async function HistoryPage({
           </CardContent>
         </Card>
 
-        <div className="space-y-3">
+        <div className="space-y-3 lg:order-1 lg:col-span-8">
           <h2 className="text-base font-semibold tracking-tight">Últimos días</h2>
           {days.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay días todavía.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
               {days.map((d) => (
                 <Link
                   key={d.id}
@@ -79,6 +80,7 @@ export default async function HistoryPage({
             </div>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -88,11 +90,12 @@ export default async function HistoryPage({
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
         <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
       </div>
 
-      <Card>
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+      <Card className="lg:col-span-4 lg:sticky lg:top-8">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Resumen del día</CardTitle>
         </CardHeader>
@@ -118,7 +121,7 @@ export default async function HistoryPage({
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
+      <div className="space-y-3 lg:col-span-8">
         <h2 className="text-base font-semibold tracking-tight">Comidas</h2>
         {meals.length === 0 ? (
           <p className="text-sm text-muted-foreground">No hay comidas activas ese día.</p>
@@ -144,8 +147,9 @@ export default async function HistoryPage({
           </div>
         )}
       </div>
+      </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 lg:ml-auto lg:w-[420px]">
         <form action="/history" className="flex gap-2">
           <input
             type="date"

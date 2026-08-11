@@ -24,7 +24,7 @@ export default async function RoutineDetailPage({
     .join(",");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
           {template.routine.nombre}

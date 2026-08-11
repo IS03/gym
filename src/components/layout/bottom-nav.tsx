@@ -21,7 +21,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="liquid-nav-wrapper pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className="liquid-nav-wrapper pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
       aria-label="Navegación principal"
     >
       <div className="liquid-nav-edge" aria-hidden />

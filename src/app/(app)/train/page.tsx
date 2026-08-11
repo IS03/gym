@@ -15,13 +15,14 @@ export default async function TrainPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Entrenar</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Entrenar</h1>
         <p className="text-sm text-muted-foreground">
           Registrá tu sesión y seguí tu progreso.
         </p>
       </div>
 
-      <Card className="surface-elevated border-primary/20 bg-primary text-primary-foreground ring-0">
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
+      <Card className="surface-elevated border-primary/20 bg-primary text-primary-foreground ring-0 lg:col-span-7 lg:min-h-72 lg:justify-center">
         <CardContent className="space-y-4 pt-4">
           {inProgress ? (
             <>
@@ -58,7 +59,7 @@ export default async function TrainPage() {
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
+      <section className="space-y-3 lg:col-span-5">
         <h2 className="text-base font-semibold tracking-tight">Tu entrenamiento</h2>
         <div className="grid grid-cols-2 gap-3">
           <Link href="/train/routines" className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 transition-transform duration-150 active:scale-[0.98]">
@@ -78,9 +79,13 @@ export default async function TrainPage() {
             <span><span className="block text-sm font-semibold">Calendario</span><span className="text-xs text-muted-foreground">Constancia</span></span>
           </Link>
         </div>
+        <Link href="/train/exercises" className={cn(buttonVariants({ variant: "outline" }), "mt-4 hidden h-11 w-full lg:flex")}>
+          Administrar ejercicios
+        </Link>
       </section>
+      </div>
 
-      <Link href="/train/exercises" className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}>
+      <Link href="/train/exercises" className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full lg:hidden")}>
         Administrar ejercicios
       </Link>
     </div>

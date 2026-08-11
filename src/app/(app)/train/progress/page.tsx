@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Activity, Clock3, Dumbbell, ListChecks } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatTrainingMinutes } from "@/lib/phase2/training-progress-summary";
@@ -55,12 +57,13 @@ export default async function TrainingProgressPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Progreso</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso</h1>
         <p className="text-sm text-muted-foreground">
           Solo cuenta sesiones finalizadas y series marcadas como hechas.
         </p>
       </div>
 
+      <div className="space-y-6 lg:hidden">
       <Card className="surface-elevated">
         <CardContent className="pt-4">
           <p className="text-xs text-muted-foreground">Esta semana</p>
@@ -221,6 +224,112 @@ export default async function TrainingProgressPage() {
       >
         Volver a Entrenar
       </Link>
+      </div>
+
+      <div className="hidden space-y-6 lg:block">
+        <section className="grid grid-cols-4 gap-4" aria-label="Resumen de esta semana">
+          {[
+            { label: "Entrenamientos", value: String(currentWeek?.sessions ?? 0), icon: Dumbbell },
+            { label: "Series", value: String(currentWeek?.sets ?? 0), icon: ListChecks },
+            { label: "Duración", value: formatTrainingMinutes(currentWeek?.minutes ?? 0), icon: Clock3 },
+            { label: "Volumen", value: `${rounded(currentWeek?.volumeKg ?? 0)} kg`, icon: Activity },
+          ].map(({ label, value, icon: Icon }) => (
+            <Card key={label} size="sm">
+              <CardContent className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="metric-number mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+                </div>
+                <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="size-5" aria-hidden />
+                </span>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <section className="grid grid-cols-12 gap-5" aria-label="Reporte semanal detallado">
+          <Card className="col-span-8">
+            <CardContent className="pt-5">
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold tracking-tight">Evolución semanal</h2>
+                <p className="text-sm text-muted-foreground">Volumen acumulado de las últimas ocho semanas.</p>
+              </div>
+              <WeeklyVolumeChart weeks={progress.weeks} />
+            </CardContent>
+          </Card>
+
+          <Card id="desktop-weekly-report" className="col-span-4 scroll-mt-6">
+            <CardContent className="space-y-5 pt-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                  {currentWeek ? `Semana ${formatWeekRange(currentWeek)}` : "Esta semana"}
+                </p>
+                <h2 className="mt-1 text-lg font-semibold tracking-tight">Distribución del trabajo</h2>
+              </div>
+              <MuscleDistribution values={currentWeek?.muscleGroups ?? {}} limit={7} />
+              {routines.length > 0 && (
+                <div className="space-y-2 border-t pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Rutinas</p>
+                  {routines.map(([name, count]) => (
+                    <div key={name} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate">{name}</span>
+                      <span className="metric-number text-muted-foreground">×{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {hasPreviousWeek && previousWeek && (
+                <div className="space-y-2 border-t pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Contra la semana anterior</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-muted-foreground">Entrenamientos</span>
+                    <span className="metric-number text-right font-medium">{comparisonLabel(currentWeek?.sessions ?? 0, previousWeek.sessions)}</span>
+                    <span className="text-muted-foreground">Series</span>
+                    <span className="metric-number text-right font-medium">{comparisonLabel(currentWeek?.sets ?? 0, previousWeek.sets)}</span>
+                    <span className="text-muted-foreground">Duración anterior</span>
+                    <span className="metric-number text-right font-medium">{formatTrainingMinutes(previousWeek.minutes)}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="space-y-3" aria-labelledby="exercise-progress-title">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 id="exercise-progress-title" className="text-lg font-semibold tracking-tight">Progreso por ejercicio</h2>
+              <p className="text-sm text-muted-foreground">Último registro, mejor carga y volumen histórico.</p>
+            </div>
+            <span className="text-xs text-muted-foreground">{progress.exercises.length} ejercicios con historial</span>
+          </div>
+          {progress.exercises.length === 0 ? (
+            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Finalizá una sesión para empezar a ver progreso.</CardContent></Card>
+          ) : (
+            <Card className="gap-0 py-0">
+              <div className="grid grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_110px_100px_120px_88px] gap-4 border-b bg-muted/35 px-5 py-3 text-xs font-semibold text-muted-foreground">
+                <span>Ejercicio</span><span>Grupo</span><span>Última vez</span><span className="text-right">Mejor kg</span><span className="text-right">Volumen</span><span />
+              </div>
+              <div className="divide-y">
+                {progress.exercises.map((exercise) => (
+                  <div key={exercise.exerciseId} className="grid grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_110px_100px_120px_88px] items-center gap-4 px-5 py-3.5 text-sm transition-colors hover:bg-muted/25">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{exercise.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{exercise.sessions} {exercise.sessions === 1 ? "sesión" : "sesiones"} · {ADJUSTMENT_LABELS[exercise.lastDecision]}</p>
+                    </div>
+                    <span className="truncate text-muted-foreground">{exercise.muscleGroup ?? "Sin grupo"}</span>
+                    <span className="metric-number text-muted-foreground">{exercise.lastDate}</span>
+                    <span className="metric-number text-right font-medium">{exercise.bestWeightKg ?? "—"}</span>
+                    <span className="metric-number text-right font-medium">{rounded(exercise.totalVolumeKg)} kg</span>
+                    <Link href={`/train/history/${exercise.exerciseId}`} className="text-right text-sm font-medium text-primary hover:underline">Ver</Link>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,15 +1,20 @@
 import Link from "next/link";
 import {
+  Activity,
+  ArrowRight,
   ArrowUpRight,
   CalendarDays,
   ChartNoAxesCombined,
+  Clock3,
   Dumbbell,
+  Flame,
   ListChecks,
   Play,
   Utensils,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BrandSymbol } from "@/components/brand/brand-symbol";
+import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
@@ -96,7 +101,8 @@ export default async function HomePage() {
   const visibleMuscles = muscleGroups.slice(0, 3);
 
   return (
-    <div className="space-y-6 pb-1">
+    <>
+    <div className="space-y-6 pb-1 lg:hidden">
       <header className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <BrandSymbol decorative className="size-8" />
@@ -293,5 +299,159 @@ export default async function HomePage() {
       </section>
 
     </div>
+
+    <div className="hidden space-y-8 lg:block">
+      <header className="flex items-end justify-between gap-6">
+        <div className="space-y-1">
+          <p className="text-sm font-medium capitalize text-muted-foreground">{todayLabel(today)}</p>
+          <h1 className="text-4xl font-semibold tracking-tight">Hola, {displayName}</h1>
+          <p className="text-sm text-muted-foreground">Tu entrenamiento, nutrición y progreso en un solo lugar.</p>
+        </div>
+        <Link
+          href="/train/progress"
+          className="flex h-10 items-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium transition-colors hover:bg-muted"
+        >
+          Abrir reportes <ArrowUpRight className="size-4" aria-hidden />
+        </Link>
+      </header>
+
+      <section className="grid grid-cols-12 gap-5" aria-label="Estado de hoy">
+        <Card className="surface-elevated col-span-8 justify-between border-primary/20 bg-primary text-primary-foreground ring-0">
+          <CardContent className="flex min-h-56 flex-col justify-between gap-8 pt-5">
+            <div className="flex items-start justify-between gap-8">
+              <div className="max-w-xl space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary-foreground/65">
+                  {inProgress ? "Entrenamiento en curso" : "Tu próximo paso"}
+                </p>
+                <h2 className="text-3xl font-semibold tracking-tight">
+                  {inProgress ? "Continuá donde lo dejaste" : "¿Listo para entrenar?"}
+                </h2>
+                <p className="text-sm leading-relaxed text-primary-foreground/75">
+                  {inProgress
+                    ? `Tu sesión del ${inProgress.log_date} está guardada y lista para continuar.`
+                    : hasTraining
+                      ? "Ya sumaste una sesión esta semana. Elegí tu próxima rutina y mantené el ritmo."
+                      : "Elegí una rutina, registrá tus series y empezá a construir la semana."}
+                </p>
+              </div>
+              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary-foreground/14">
+                {inProgress ? <Play className="size-7" aria-hidden /> : <Dumbbell className="size-7" aria-hidden />}
+              </span>
+            </div>
+            <Link
+              href={inProgress ? `/train/session/${inProgress.session.id}` : `/train/session/new?date=${today}`}
+              className="flex h-11 w-fit min-w-52 items-center justify-center gap-2 rounded-lg bg-primary-foreground px-5 text-sm font-semibold text-primary transition-[background-color,transform] hover:bg-primary-foreground/90 active:scale-[0.98]"
+            >
+              {inProgress ? "Continuar sesión" : "Iniciar entrenamiento"}
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="surface-elevated col-span-4">
+          <CardContent className="flex h-full min-h-56 flex-col justify-between gap-5 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.13em] text-muted-foreground">Nutrición de hoy</p>
+                <p className="mt-2 metric-number text-3xl font-semibold tracking-tight">
+                  {number(calories)} <span className="text-sm font-medium text-muted-foreground">kcal</span>
+                </p>
+              </div>
+              <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Flame className="size-5" aria-hidden />
+              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{target && target > 0 ? `${Math.max(target - calories, 0)} kcal restantes` : "Sin objetivo configurado"}</span>
+                <span>{target && target > 0 ? `${number(target)} kcal` : "—"}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${calorieProgress}%` }} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-border border-t pt-4">
+              <div>
+                <p className="metric-number text-lg font-semibold">{number(dayLog.total_protein_g ?? 0)} g</p>
+                <p className="text-xs text-muted-foreground">Proteína</p>
+              </div>
+              <div className="pl-4">
+                <p className="metric-number text-lg font-semibold">{meals.length}</p>
+                <p className="text-xs text-muted-foreground">Comidas</p>
+              </div>
+            </div>
+            <Link href="/today" className="text-sm font-medium text-primary hover:underline">Abrir nutrición</Link>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-4 gap-4" aria-label="Métricas de esta semana">
+        {[
+          { label: "Sesiones", value: String(currentWeek?.sessions ?? 0), icon: Dumbbell },
+          { label: "Series completadas", value: String(currentWeek?.sets ?? 0), icon: ListChecks },
+          { label: "Tiempo entrenado", value: formatTrainingMinutes(currentWeek?.minutes ?? 0), icon: Clock3 },
+          { label: "Volumen total", value: `${number(currentWeek?.volumeKg ?? 0)} kg`, icon: Activity },
+        ].map(({ label, value, icon: Icon }) => (
+          <Card key={label} size="sm">
+            <CardContent className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="metric-number mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+              </div>
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="size-5" aria-hidden />
+              </span>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-12 gap-5" aria-label="Análisis semanal">
+        <Card className="col-span-8">
+          <CardContent className="pt-5">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">Evolución de volumen</h2>
+                <p className="text-sm text-muted-foreground">Últimas ocho semanas con sesiones registradas.</p>
+              </div>
+              <Link href="/train/progress" className="text-sm font-medium text-primary hover:underline">Ver detalle</Link>
+            </div>
+            <WeeklyVolumeChart weeks={trainingProgress.weeks} />
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-4">
+          <CardContent className="space-y-5 pt-5">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Distribución semanal</h2>
+              <p className="text-sm text-muted-foreground">Series completadas por músculo.</p>
+            </div>
+            <MuscleDistribution values={currentWeek?.muscleGroups ?? {}} limit={6} />
+            {routines.length > 0 && (
+              <div className="border-t pt-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Rutinas realizadas</p>
+                <p className="mt-2 text-sm leading-relaxed">{routines.map(([name, count]) => `${name} ×${count}`).join(" · ")}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="desktop-home-shortcuts">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 id="desktop-home-shortcuts" className="text-lg font-semibold tracking-tight">Planificá y revisá</h2>
+            <p className="text-sm text-muted-foreground">Accesos a las herramientas que más usás fuera del entrenamiento.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          <QuickAccess href="/today" icon={Utensils} title="Nutrición" description="Cargá comidas y revisá tu día." />
+          <QuickAccess href="/train/routines" icon={ListChecks} title="Rutinas" description="Organizá y editá tu plan." />
+          <QuickAccess href="/train/calendar" icon={CalendarDays} title="Calendario" description="Mirá tu constancia mensual." />
+          <QuickAccess href="/train/history" icon={ChartNoAxesCombined} title="Historial" description="Compará registros por ejercicio." />
+        </div>
+      </section>
+    </div>
+    </>
   );
 }

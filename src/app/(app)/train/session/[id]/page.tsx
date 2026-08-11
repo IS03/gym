@@ -21,14 +21,16 @@ export default async function SessionPage({
     .join(",")}`;
 
   return (
-    <SessionEditor
-      key={editorKey}
-      detail={clientDetail}
-      libraryExercises={exercises.map((exercise) => ({
-        id: exercise.id,
-        nombre: exercise.nombre,
-        grupo_muscular: exercise.grupo_muscular,
-      }))}
-    />
+    <div className="lg:mx-auto lg:max-w-[760px]">
+      <SessionEditor
+        key={editorKey}
+        detail={clientDetail}
+        libraryExercises={exercises.map((exercise) => ({
+          id: exercise.id,
+          nombre: exercise.nombre,
+          grupo_muscular: exercise.grupo_muscular,
+        }))}
+      />
+    </div>
   );
 }

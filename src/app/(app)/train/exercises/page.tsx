@@ -45,7 +45,7 @@ export default async function ExercisesPage({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
         <p className="text-sm text-muted-foreground">Tus ejercicios generales.</p>

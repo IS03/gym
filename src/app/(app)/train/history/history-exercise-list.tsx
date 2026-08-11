@@ -35,11 +35,11 @@ export function HistoryExerciseList({ exercises }: { exercises: HistoryExercise[
 
   return (
     <div className="space-y-3">
-      <div className="relative">
+      <div className="relative lg:max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar ejercicio" aria-label="Buscar ejercicio" />
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+      <div className="flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] lg:flex-wrap lg:overflow-visible">
         <Button type="button" size="sm" variant={group === "all" ? "default" : "outline"} onClick={() => setGroup("all")}>Todos</Button>
         {MUSCLE_GROUP_OPTIONS.map((option) => (
           <Button key={option.value} type="button" size="sm" variant={group === option.value ? "default" : "outline"} onClick={() => setGroup(option.value)}>{option.label}</Button>
@@ -48,7 +48,7 @@ export function HistoryExerciseList({ exercises }: { exercises: HistoryExercise[
       {visibleExercises.length === 0 ? (
         <p className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">No hay ejercicios con ese filtro.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
           {visibleExercises.map((exercise) => {
             const last = lastSetLabel(exercise.progress);
             return (

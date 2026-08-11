@@ -28,7 +28,7 @@ export default async function ExerciseHistoryPage({
   const exercise = allExercises.find((e) => e.id === exerciseId) ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:mx-auto lg:max-w-5xl">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">
           {exercise?.nombre ?? "Ejercicio"}
