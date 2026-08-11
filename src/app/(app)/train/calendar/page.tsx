@@ -1,36 +1,12 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { addMonths, buildMonthGrid, formatMonthLabel } from "@/lib/phase2/training-calendar";
 import { cn } from "@/lib/utils";
 import { listRoutines, listTrainingDaysInMonth } from "@/lib/phase2/training";
+import { todayInCordoba } from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
-
-function isoMonth(d: Date) {
-  return d.toISOString().slice(0, 7); // YYYY-MM
-}
-
-function addMonths(month: string, delta: number) {
-  const [y, m] = month.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return isoMonth(dt);
-}
-
-function monthGrid(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  const first = new Date(Date.UTC(y, m - 1, 1));
-  const startDow = (first.getUTCDay() + 6) % 7; // lunes=0
-  const start = new Date(Date.UTC(y, m - 1, 1 - startDow));
-
-  const days: Array<{ date: string; inMonth: boolean }> = [];
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(start);
-    d.setUTCDate(start.getUTCDate() + i);
-    const date = d.toISOString().slice(0, 10);
-    days.push({ date, inMonth: d.getUTCMonth() === m - 1 });
-  }
-  return days;
-}
 
 export default async function TrainCalendarPage({
   searchParams,
@@ -38,7 +14,7 @@ export default async function TrainCalendarPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = (await searchParams) ?? {};
-  const month = typeof sp.month === "string" ? sp.month : isoMonth(new Date());
+  const month = (typeof sp.month === "string" ? sp.month : todayInCordoba().slice(0, 7)) as `${number}-${number}`;
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
 
   const [routines, trainedDays] = await Promise.all([
@@ -49,7 +25,7 @@ export default async function TrainCalendarPage({
     }),
   ]);
 
-  const days = monthGrid(month);
+  const days = buildMonthGrid(month, { full: true });
 
   return (
     <div className="space-y-6">
@@ -117,7 +93,7 @@ export default async function TrainCalendarPage({
 
       <Card className="lg:col-span-8">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">{month}</CardTitle>
+          <CardTitle className="text-base">{formatMonthLabel(month)}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-2 text-center text-xs text-muted-foreground">

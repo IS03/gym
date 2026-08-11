@@ -1,102 +1,107 @@
 import Link from "next/link";
-import { CalendarDays, ChartNoAxesCombined, Dumbbell, ListChecks, Play, Plus, TimerReset } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  ChartNoAxesCombined,
+  ListChecks,
+  ListPlus,
+  Plus,
+  TimerReset,
+} from "lucide-react";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { TrainingMonthPreview } from "@/components/training/training-month-preview";
 import {
   getInProgressSessionForUser,
+  listTrainingDaysInMonth,
   listWorkoutStartRoutines,
 } from "@/lib/phase2/training";
+import { todayInCordoba } from "@/lib/phase2/training-robust";
+import { toWorkoutStartActiveSession } from "@/lib/phase2/workout-start";
 
 export const dynamic = "force-dynamic";
 
+const trainingLinks = [
+  {
+    href: "/train/routines",
+    label: "Rutinas",
+    description: "Tu plan",
+    icon: ListChecks,
+  },
+  {
+    href: "/train/progress",
+    label: "Progreso",
+    description: "Tu evolución",
+    icon: ChartNoAxesCombined,
+  },
+  {
+    href: "/train/history",
+    label: "Historial",
+    description: "Por ejercicio",
+    icon: TimerReset,
+  },
+  {
+    href: "/train/exercises",
+    label: "Ejercicios",
+    description: "Administrar",
+    icon: ListPlus,
+  },
+] as const;
+
 export default async function TrainPage() {
-  const [inProgress, workoutStartRoutines] = await Promise.all([
+  const today = todayInCordoba();
+  const month = today.slice(0, 7) as `${number}-${number}`;
+  const [inProgress, workoutStartRoutines, trainedDays] = await Promise.all([
     getInProgressSessionForUser(),
     listWorkoutStartRoutines(),
+    listTrainingDaysInMonth({ month }),
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Entrenar</h1>
-        <p className="text-sm text-muted-foreground">
-          Registrá tu sesión y seguí tu progreso.
-        </p>
-      </div>
-
-      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
-      <Card className="surface-elevated border-primary/20 bg-primary text-primary-foreground ring-0 lg:col-span-7 lg:min-h-72 lg:justify-center">
-        <CardContent className="space-y-4 pt-4">
-          {inProgress ? (
-            <>
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-foreground/15"><Play className="size-5" aria-hidden /></span>
-                <div>
-                  <p className="text-sm font-medium text-primary-foreground/75">Sesión en curso</p>
-                  <h2 className="text-xl font-semibold tracking-tight">Continuar entrenamiento</h2>
-                  <p className="mt-1 text-sm text-primary-foreground/75">{inProgress.log_date ? `Iniciada el ${inProgress.log_date}.` : "Tu sesión sigue lista."}</p>
-                </div>
-              </div>
-              <Link
-                href={`/train/session/${inProgress.session.id}`}
-                className="flex h-11 items-center justify-center rounded-xl bg-primary-foreground px-3 text-sm font-medium text-primary transition-transform duration-150 active:scale-[0.98]"
-              >
-                Retomar sesión
-              </Link>
-            </>
-          ) : (
-            <>
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-foreground/15"><Dumbbell className="size-5" aria-hidden /></span>
-                <div>
-                  <p className="text-sm font-medium text-primary-foreground/75">Listo cuando vos estés</p>
-                  <h2 className="text-xl font-semibold tracking-tight">Empezá a entrenar</h2>
-                  <p className="mt-1 text-sm text-primary-foreground/75">Elegí una rutina o iniciá una sesión libre.</p>
-                </div>
-              </div>
-              <StartWorkoutSheet
-                routines={workoutStartRoutines}
-                activeSession={null}
-                triggerClassName="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-primary-foreground px-3 text-sm font-medium text-primary outline-none transition-transform duration-150 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
-              >
-                <Plus className="size-4" aria-hidden /> Iniciar sesión
-              </StartWorkoutSheet>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <section className="space-y-3 lg:col-span-5">
-        <h2 className="text-base font-semibold tracking-tight">Tu entrenamiento</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/train/routines" className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 transition-transform duration-150 active:scale-[0.98]">
-            <ListChecks className="size-5 text-primary" aria-hidden />
-            <span><span className="block text-sm font-semibold">Rutinas</span><span className="text-xs text-muted-foreground">Tu plan</span></span>
-          </Link>
-          <Link href="/train/progress" className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 transition-transform duration-150 active:scale-[0.98]">
-            <ChartNoAxesCombined className="size-5 text-primary" aria-hidden />
-            <span><span className="block text-sm font-semibold">Progreso</span><span className="text-xs text-muted-foreground">Esta semana</span></span>
-          </Link>
-          <Link href="/train/history" className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 transition-transform duration-150 active:scale-[0.98]">
-            <TimerReset className="size-5 text-primary" aria-hidden />
-            <span><span className="block text-sm font-semibold">Historial</span><span className="text-xs text-muted-foreground">Por ejercicio</span></span>
-          </Link>
-          <Link href="/train/calendar" className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 transition-transform duration-150 active:scale-[0.98]">
-            <CalendarDays className="size-5 text-primary" aria-hidden />
-            <span><span className="block text-sm font-semibold">Calendario</span><span className="text-xs text-muted-foreground">Constancia</span></span>
-          </Link>
+    <div className="space-y-6 pb-16 lg:pb-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Entrenar</h1>
+          <p className="text-sm text-muted-foreground">
+            Registrá tu sesión y seguí tu progreso.
+          </p>
         </div>
-        <Link href="/train/exercises" className={cn(buttonVariants({ variant: "outline" }), "mt-4 hidden h-11 w-full lg:flex")}>
-          Administrar ejercicios
-        </Link>
-      </section>
+        <StartWorkoutSheet
+          routines={workoutStartRoutines}
+          activeSession={inProgress ? toWorkoutStartActiveSession(inProgress) : null}
+          triggerAriaLabel="Iniciar entrenamiento"
+          triggerClassName="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex size-14 touch-manipulation items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_24px_-10px_color-mix(in_oklch,var(--primary)_65%,transparent)] outline-none transition-[background-color,box-shadow,transform,opacity] duration-200 ease-out motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:zoom-in-95 hover:bg-primary/90 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-95 lg:static lg:ml-auto lg:inline-flex lg:h-11 lg:w-auto lg:gap-2 lg:rounded-lg lg:px-4 lg:text-sm lg:font-medium lg:shadow-sm"
+        >
+          <Plus className="size-5" aria-hidden />
+          <span className="sr-only lg:not-sr-only">Nueva sesión</span>
+        </StartWorkoutSheet>
       </div>
 
-      <Link href="/train/exercises" className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full lg:hidden")}>
-        Administrar ejercicios
-      </Link>
+      <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-5">
+        <section className="lg:col-span-7">
+          <TrainingMonthPreview
+            month={month}
+            today={today}
+            trainedDays={trainedDays}
+          />
+        </section>
+
+        <section className="mt-6 space-y-3 lg:col-span-5 lg:mt-0">
+          <h2 className="text-base font-semibold tracking-tight">Tu entrenamiento</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {trainingLinks.map(({ href, label, description, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 outline-none transition-[border-color,box-shadow,transform] duration-150 hover:border-primary/25 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+              >
+                <Icon className="size-5 text-primary" aria-hidden />
+                <span>
+                  <span className="block text-sm font-semibold">{label}</span>
+                  <span className="text-xs text-muted-foreground">{description}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

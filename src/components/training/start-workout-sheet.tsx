@@ -23,6 +23,7 @@ type StartWorkoutSheetProps = {
   initialRoutineId?: string;
   children?: ReactNode;
   triggerClassName?: string;
+  triggerAriaLabel?: string;
   presentation?: "modal" | "inline";
 };
 
@@ -260,6 +261,7 @@ export function StartWorkoutSheet({
   initialRoutineId,
   children,
   triggerClassName,
+  triggerAriaLabel,
   presentation = "modal",
 }: StartWorkoutSheetProps) {
   const router = useRouter();
@@ -352,7 +354,11 @@ export function StartWorkoutSheet({
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Trigger type="button" className={triggerClassName}>
+      <Dialog.Trigger
+        type="button"
+        className={triggerClassName}
+        aria-label={triggerAriaLabel}
+      >
         {children}
       </Dialog.Trigger>
       <Dialog.Portal>
