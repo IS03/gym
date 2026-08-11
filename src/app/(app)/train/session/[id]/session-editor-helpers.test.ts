@@ -3,6 +3,10 @@ import {
   completedExerciseSummary,
   completionStats,
   initialExpandedExerciseId,
+  formatWorkoutClockTime,
+  formatWorkoutDuration,
+  formatWorkoutTimeRange,
+  getWorkoutElapsedMilliseconds,
   renumberWorkoutPayload,
 } from "./session-editor-helpers";
 import type { WorkoutExercisePayload } from "@/lib/phase2/types";
@@ -92,5 +96,36 @@ describe("borrador de sesión", () => {
       is_completed: true,
     };
     expect(completedExerciseSummary(value)).toBe("20–22,5 kg · 10 / 8 reps");
+  });
+});
+
+describe("tiempo de sesión", () => {
+  it("formatea duraciones en minutos y horas", () => {
+    expect(formatWorkoutDuration(0)).toBe("<1 min");
+    expect(formatWorkoutDuration(7 * 60_000)).toBe("7 min");
+    expect(formatWorkoutDuration(64 * 60_000)).toBe("1 h 04 min");
+    expect(formatWorkoutDuration(123 * 60_000)).toBe("2 h 03 min");
+  });
+
+  it("calcula la duración con timestamps completos, incluso al cambiar de día", () => {
+    expect(
+      getWorkoutElapsedMilliseconds("2026-08-10T23:50:00.000Z", "2026-08-11T00:25:00.000Z"),
+    ).toBe(35 * 60_000);
+  });
+
+  it("muestra el rango horario local de Córdoba", () => {
+    expect(formatWorkoutClockTime("2026-08-10T19:08:00.000Z")).toBe("16:08");
+    expect(
+      formatWorkoutTimeRange("2026-08-10T19:08:00.000Z", "2026-08-10T20:24:00.000Z"),
+    ).toBe("16:08–17:24");
+  });
+
+  it("degrada de forma segura ante timestamps inválidos o duración negativa", () => {
+    expect(getWorkoutElapsedMilliseconds(null, "2026-08-10T19:08:00.000Z")).toBeNull();
+    expect(getWorkoutElapsedMilliseconds("2026-08-10T19:08:00.000Z", "inválido")).toBeNull();
+    expect(
+      getWorkoutElapsedMilliseconds("2026-08-10T20:00:00.000Z", "2026-08-10T19:00:00.000Z"),
+    ).toBeNull();
+    expect(formatWorkoutTimeRange(null, "2026-08-10T20:24:00.000Z")).toBeNull();
   });
 });

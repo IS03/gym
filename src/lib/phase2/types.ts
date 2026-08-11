@@ -191,6 +191,8 @@ export type WorkoutSessionClient = Pick<
   | "routine_name_snapshot"
   | "session_name"
   | "status"
+  | "started_at"
+  | "ended_at"
   | "energy_level"
   | "performance_level"
   | "pain_level"

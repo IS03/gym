@@ -60,6 +60,8 @@ export function clientDetailFromWorkoutDetail(
       routine_name_snapshot: session.routine_name_snapshot,
       session_name: session.session_name,
       status: session.status,
+      started_at: session.started_at,
+      ended_at: session.ended_at,
       energy_level: session.energy_level,
       performance_level: session.performance_level,
       pain_level: session.pain_level,
@@ -184,4 +186,55 @@ export function completionStats(payloads: WorkoutExercisePayload[]) {
     if (completion.isComplete) completedExercises += 1;
   }
   return { completedSets, totalSets, completedExercises };
+}
+
+const CORDOBA_TIME_ZONE = "America/Argentina/Cordoba";
+
+function timestampMilliseconds(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const milliseconds = new Date(value).getTime();
+  return Number.isFinite(milliseconds) ? milliseconds : null;
+}
+
+export function formatWorkoutClockTime(value: string | null | undefined): string | null {
+  const milliseconds = timestampMilliseconds(value);
+  if (milliseconds === null) return null;
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: CORDOBA_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(milliseconds));
+}
+
+export function getWorkoutElapsedMilliseconds(
+  startedAt: string | null | undefined,
+  endedAt: string | null | undefined,
+): number | null {
+  const start = timestampMilliseconds(startedAt);
+  const end = timestampMilliseconds(endedAt);
+  if (start === null || end === null || end < start) return null;
+  return end - start;
+}
+
+export function formatWorkoutDuration(milliseconds: number | null): string | null {
+  if (milliseconds === null || !Number.isFinite(milliseconds) || milliseconds < 0) {
+    return null;
+  }
+  const minutes = Math.floor(milliseconds / 60_000);
+  if (minutes === 0) return "<1 min";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return hours === 0
+    ? `${minutes} min`
+    : `${hours} h ${String(remainingMinutes).padStart(2, "0")} min`;
+}
+
+export function formatWorkoutTimeRange(
+  startedAt: string | null | undefined,
+  endedAt: string | null | undefined,
+): string | null {
+  const start = formatWorkoutClockTime(startedAt);
+  const end = formatWorkoutClockTime(endedAt);
+  return start && end ? `${start}–${end}` : null;
 }

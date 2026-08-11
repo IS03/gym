@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -51,6 +51,10 @@ import {
   completionStats,
   exerciseCompletion,
   initialExpandedExerciseId,
+  formatWorkoutClockTime,
+  formatWorkoutDuration,
+  formatWorkoutTimeRange,
+  getWorkoutElapsedMilliseconds,
   renumberWorkoutPayload,
   sessionMetadataFromSession,
   workoutPayloadFromDetail,
@@ -101,6 +105,66 @@ function validRestSeconds(value: number | null) {
 
 function configuredRestLabel(minimum: number | null, maximum: number | null) {
   return formatRestRange(validRestSeconds(minimum), validRestSeconds(maximum));
+}
+
+function SessionTiming({
+  startedAt,
+  endedAt,
+  isActive,
+}: {
+  startedAt: string | null;
+  endedAt: string | null;
+  isActive: boolean;
+}) {
+  const startedAtMilliseconds = startedAt ? new Date(startedAt).getTime() : Number.NaN;
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      if (!isActive) return () => {};
+      const refresh = () => onStoreChange();
+      const onVisibilityChange = () => {
+        if (document.visibilityState === "visible") refresh();
+      };
+      const interval = window.setInterval(refresh, 60_000);
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      return () => {
+        window.clearInterval(interval);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      };
+    },
+    [isActive],
+  );
+  const getSnapshot = useCallback(() => Date.now(), []);
+  const getServerSnapshot = useCallback(
+    () => (Number.isFinite(startedAtMilliseconds) ? startedAtMilliseconds : 0),
+    [startedAtMilliseconds],
+  );
+  const now = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const startedClock = formatWorkoutClockTime(startedAt);
+
+  if (!startedClock) return null;
+
+  if (isActive) {
+    const duration = formatWorkoutDuration(
+      getWorkoutElapsedMilliseconds(startedAt, new Date(now).toISOString()),
+    );
+    return duration ? (
+      <p className="metric-number text-xs text-muted-foreground">
+        Iniciada {startedClock} · {duration}
+      </p>
+    ) : null;
+  }
+
+  const range = formatWorkoutTimeRange(startedAt, endedAt);
+  const duration = formatWorkoutDuration(getWorkoutElapsedMilliseconds(startedAt, endedAt));
+  return range && duration ? (
+    <p className="metric-number text-xs text-muted-foreground">
+      {range} · {duration}
+    </p>
+  ) : (
+    <p className="metric-number text-xs text-muted-foreground">
+      Iniciada {startedClock}
+    </p>
+  );
 }
 
 function SetRow({
@@ -711,6 +775,11 @@ export function SessionEditor({
             />
           </div>
         </div>
+        <SessionTiming
+          startedAt={detail.session.started_at}
+          endedAt={detail.session.ended_at}
+          isActive={!readOnly}
+        />
       </header>
 
       {storageError ? (
