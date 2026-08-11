@@ -2,22 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dumbbell, House, LineChart, Settings } from "lucide-react";
+import { Dumbbell, House, LineChart, Utensils } from "lucide-react";
+import {
+  bottomNavItems,
+  getActiveBottomNavIndex,
+  isBottomNavItemActive,
+  type BottomNavItemId,
+} from "@/components/layout/bottom-nav-config";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/home", label: "Inicio", icon: House },
-  { href: "/train", label: "Entrenar", icon: Dumbbell },
-  { href: "/history", label: "Historial", icon: LineChart },
-  { href: "/settings", label: "Ajustes", icon: Settings },
-] as const;
+const icons: Record<BottomNavItemId, React.ComponentType<{ className?: string }>> = {
+  home: House,
+  train: Dumbbell,
+  nutrition: Utensils,
+  history: LineChart,
+};
 
 export function BottomNav() {
   const pathname = usePathname();
-  const activeIndex = links.findIndex(
-    ({ href }) =>
-      pathname === href || (href !== "/home" && pathname.startsWith(href)),
-  );
+  const activeIndex = getActiveBottomNavIndex(pathname);
 
   return (
     <nav
@@ -27,12 +30,15 @@ export function BottomNav() {
       <div className="liquid-nav-edge" aria-hidden />
       <div
         className="liquid-nav pointer-events-auto mx-auto grid h-[3.75rem] max-w-[406px] grid-cols-4 p-1"
-        style={{ "--liquid-nav-index": Math.max(activeIndex, 0) } as React.CSSProperties}
+        style={{ "--liquid-nav-index": activeIndex >= 0 ? activeIndex : 0 } as React.CSSProperties}
       >
-        <span className="liquid-nav-indicator" aria-hidden />
-        {links.map(({ href, label, icon: Icon }) => {
-          const active =
-            pathname === href || (href !== "/home" && pathname.startsWith(href));
+        <span
+          className={cn("liquid-nav-indicator", activeIndex < 0 && "opacity-0")}
+          aria-hidden
+        />
+        {bottomNavItems.map(({ id, href, label }) => {
+          const Icon = icons[id];
+          const active = isBottomNavItemActive(pathname, href);
 
           return (
             <Link

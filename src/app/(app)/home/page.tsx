@@ -6,10 +6,12 @@ import {
   CalendarDays,
   ChartNoAxesCombined,
   Clock3,
+  ChevronRight,
   Dumbbell,
   Flame,
   ListChecks,
   Play,
+  UserRound,
   Utensils,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +19,11 @@ import { BrandSymbol } from "@/components/brand/brand-symbol";
 import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
+import {
+  getCompactProfile,
+  HOME_SETTINGS_HREF,
+  mobileHomeDateLabel,
+} from "@/lib/home-header";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
 import { addUtcDays, formatTrainingMinutes, mondayOfIsoDate } from "@/lib/phase2/training-progress-summary";
 import { getTrainingProgress, todayInCordoba } from "@/lib/phase2/training-robust";
@@ -93,6 +100,7 @@ export default async function HomePage() {
   const target = dayLog.target_kcal_snapshot;
   const calorieProgress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
   const displayName = profile?.display_name?.trim() || "vos";
+  const compactProfile = getCompactProfile(profile?.display_name);
   const hasTraining = (currentWeek?.sessions ?? 0) > 0;
   const weekStart = currentWeek?.weekStart ?? mondayOfIsoDate(today);
   const trainingDays = new Set(currentWeek?.trainingDays ?? []);
@@ -103,14 +111,29 @@ export default async function HomePage() {
   return (
     <>
     <div className="space-y-6 pb-1 lg:hidden">
-      <header className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <BrandSymbol decorative className="size-8" />
-          <p className="text-right text-xs font-medium capitalize tracking-wide text-muted-foreground">
-            {todayLabel(today)}
+      <header className="flex items-start justify-between gap-4">
+        <BrandSymbol decorative className="mt-1 size-8" />
+        <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
+          <Link
+            href={HOME_SETTINGS_HREF}
+            aria-label="Abrir perfil y ajustes"
+            className="flex h-11 max-w-full min-w-0 items-center gap-2 rounded-full border border-border/80 bg-card/80 px-2.5 shadow-sm outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.97]"
+          >
+            <span
+              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+              aria-hidden
+            >
+              {compactProfile.initial ?? <UserRound className="size-3.5" />}
+            </span>
+            <span className="max-w-32 truncate text-sm font-medium">
+              {compactProfile.label}
+            </span>
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
+          <p className="pr-2 text-right text-[10px] font-normal leading-none text-muted-foreground">
+            {mobileHomeDateLabel(today)}
           </p>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight">Hola, {displayName}</h1>
       </header>
 
       <section aria-labelledby="home-focus-title" className="space-y-3">
