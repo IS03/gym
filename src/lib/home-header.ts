@@ -17,11 +17,3 @@ export function getCompactProfile(displayName: string | null | undefined): Compa
 
   return { label, initial };
 }
-
-export function mobileHomeDateLabel(date: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "numeric",
-    month: "long",
-    timeZone: "America/Argentina/Cordoba",
-  }).format(new Date(`${date}T12:00:00Z`));
-}

@@ -23,7 +23,6 @@ import { getMyProfile } from "@/lib/phase1/profile";
 import {
   getCompactProfile,
   HOME_SETTINGS_HREF,
-  mobileHomeDateLabel,
 } from "@/lib/home-header";
 import {
   getInProgressSessionForUser,
@@ -116,29 +115,27 @@ export default async function HomePage() {
   return (
     <>
     <div className="space-y-6 pb-1 lg:hidden">
-      <header className="flex items-start justify-between gap-4">
-        <BrandSymbol decorative className="mt-1 size-8" />
-        <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
-          <Link
-            href={HOME_SETTINGS_HREF}
-            aria-label="Abrir perfil y ajustes"
-            className="flex h-11 max-w-full min-w-0 items-center gap-2 rounded-full border border-border/80 bg-card/80 px-2.5 shadow-sm outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.97]"
+      <header className="flex items-center justify-between gap-4">
+        <BrandSymbol decorative className="size-8" />
+        <Link
+          href={HOME_SETTINGS_HREF}
+          aria-label="Abrir perfil y ajustes"
+          className="home-profile-link group flex h-11 max-w-full min-w-0 items-center gap-2 rounded-full border border-border/80 bg-card/80 px-2.5 shadow-sm outline-none transition-[background-color,border-color,transform,box-shadow] duration-[120ms] ease-out hover:border-border hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.97] active:border-primary/20 active:bg-muted/80"
+        >
+          <span
+            className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+            aria-hidden
           >
-            <span
-              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
-              aria-hidden
-            >
-              {compactProfile.initial ?? <UserRound className="size-3.5" />}
-            </span>
-            <span className="max-w-32 truncate text-sm font-medium">
-              {compactProfile.label}
-            </span>
-            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </Link>
-          <p className="pr-2 text-right text-[10px] font-normal leading-none text-muted-foreground">
-            {mobileHomeDateLabel(today)}
-          </p>
-        </div>
+            {compactProfile.initial ?? <UserRound className="size-3.5" />}
+          </span>
+          <span className="max-w-32 truncate text-sm font-medium">
+            {compactProfile.label}
+          </span>
+          <ChevronRight
+            className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-active:translate-x-0.5"
+            aria-hidden
+          />
+        </Link>
       </header>
 
       <section aria-labelledby="home-focus-title" className="space-y-3">

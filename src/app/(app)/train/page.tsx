@@ -67,7 +67,7 @@ export default async function TrainPage() {
           routines={workoutStartRoutines}
           activeSession={inProgress ? toWorkoutStartActiveSession(inProgress) : null}
           triggerAriaLabel="Iniciar entrenamiento"
-          triggerClassName="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex size-14 touch-manipulation items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_24px_-10px_color-mix(in_oklch,var(--primary)_65%,transparent)] outline-none transition-[background-color,box-shadow,transform,opacity] duration-200 ease-out motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:zoom-in-95 hover:bg-primary/90 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-95 lg:static lg:ml-auto lg:inline-flex lg:h-11 lg:w-auto lg:gap-2 lg:rounded-lg lg:px-4 lg:text-sm lg:font-medium lg:shadow-sm"
+          triggerClassName="workout-fab-enter fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex size-14 touch-manipulation items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_24px_-10px_color-mix(in_oklch,var(--primary)_65%,transparent)] outline-none transition-[background-color,box-shadow,transform,opacity] duration-100 ease-out hover:bg-primary/90 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-95 lg:static lg:ml-auto lg:inline-flex lg:h-11 lg:w-auto lg:gap-2 lg:rounded-lg lg:px-4 lg:text-sm lg:font-medium lg:shadow-sm"
         >
           <Plus className="size-5" aria-hidden />
           <span className="sr-only lg:not-sr-only">Nueva sesión</span>

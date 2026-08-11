@@ -88,8 +88,8 @@ type SetRowProps = {
   onChange: (updater: (set: EditableWorkoutSet) => EditableWorkoutSet) => void;
 };
 
-const SET_GRID_COLUMNS =
-  "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.25rem_2.75rem]";
+const SET_GRID_LAYOUT =
+  "grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem] items-center gap-x-1 px-1";
 
 function compactNumber(value: number | null) {
   return value === null ? "—" : String(value).replace(".", ",");
@@ -178,8 +178,8 @@ function SetRow({
   return (
     <div
       className={cn(
-        "grid items-center gap-x-1.5 border-b border-border/60 px-1 py-2.5 transition-colors duration-150 last:border-b-0",
-        SET_GRID_COLUMNS,
+        "border-b border-border/60 py-2.5 transition-colors duration-150 last:border-b-0",
+        SET_GRID_LAYOUT,
         set.is_completed
           ? "bg-emerald-500/[0.06]"
           : "bg-transparent",
@@ -233,14 +233,14 @@ function SetRow({
         </p>
       </div>
       <span
-        className="metric-number text-center text-sm font-semibold"
+        className="metric-number flex w-full items-center justify-center text-center text-sm font-semibold"
         aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
       >
         {compactNumber(set.target_rir)}
       </span>
       {readOnly ? (
         <span
-          className="flex size-11 items-center justify-center rounded-full"
+          className="flex size-11 justify-self-center items-center justify-center rounded-full"
           aria-label={set.is_completed ? "Serie completada" : "Serie pendiente"}
         >
           <span
@@ -257,7 +257,7 @@ function SetRow({
       ) : (
         <button
           type="button"
-          className="group flex size-11 touch-manipulation items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="group flex size-11 touch-manipulation justify-self-center items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
           aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
           aria-pressed={set.is_completed}
           onClick={() =>
@@ -1032,15 +1032,15 @@ export function SessionEditor({
                   <div className="overflow-hidden rounded-xl border border-border/75 bg-background/35">
                     <div
                       className={cn(
-                        "grid gap-x-1.5 border-b border-border/60 bg-muted/35 px-1 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
-                        SET_GRID_COLUMNS,
+                        "border-b border-border/60 bg-muted/35 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                        SET_GRID_LAYOUT,
                       )}
                     >
-                      <span className="text-center">Serie</span>
-                      <span className="text-center">kg</span>
-                      <span className="text-center">reps</span>
-                      <span className="text-center">RIR</span>
-                      <span className="text-center" aria-label="Completada">✓</span>
+                      <span className="flex items-center justify-center text-center">Serie</span>
+                      <span className="flex items-center justify-center text-center">kg</span>
+                      <span className="flex items-center justify-center text-center">reps</span>
+                      <span className="flex items-center justify-center text-center">RIR</span>
+                      <span className="flex items-center justify-center text-center" aria-label="Completada">✓</span>
                     </div>
                     {payload.sets.map((set, setIndex) => (
                       <SetRow
@@ -1470,12 +1470,16 @@ export function SessionEditor({
           <div aria-live="polite">
             {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}
           </div>
-          <details className="group rounded-xl border border-transparent">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+          <details className="group relative overflow-hidden rounded-xl border border-transparent">
+            <span
+              className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-destructive/70"
+              aria-hidden
+            />
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-4 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
               Más opciones
               <ChevronDown className="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
             </summary>
-            <div className="px-3 pb-3 pt-1">
+            <div className="px-4 pb-3 pt-1">
               <Button
                 className="w-full"
                 type="button"

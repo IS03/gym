@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import { Check, ChevronRight, Dumbbell, X } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { startWorkoutFromSheetAction } from "@/app/(app)/train/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   getInitialWorkoutSelection,
+  getWorkoutOptionDelayMs,
   getRoutineStartMeta,
   getWorkoutStartCtaLabel,
   type WorkoutStartActiveSession,
@@ -50,6 +51,9 @@ function StartWorkoutContent({
 }: StartWorkoutContentProps) {
   const titleClassName = "text-xl font-semibold tracking-tight";
   const descriptionClassName = "mt-1 text-sm text-muted-foreground";
+  const ctaLabel = pending
+    ? "Iniciando…"
+    : getWorkoutStartCtaLabel(selection, routines);
 
   return (
     <>
@@ -96,7 +100,12 @@ function StartWorkoutContent({
       {activeSession ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 px-4 py-5 sm:px-5">
-            <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-4">
+            <div
+              className={cn(
+                "rounded-xl border border-primary/25 bg-primary/[0.06] p-4",
+                modal && "workout-active-session-enter",
+              )}
+            >
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                   <Dumbbell className="size-5" aria-hidden />
@@ -142,50 +151,61 @@ function StartWorkoutContent({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {routines.map((routine) => {
+                  {routines.map((routine, index) => {
                     const selected =
                       selection?.kind === "routine" &&
                       selection.routineId === routine.id;
                     return (
-                      <button
+                      <div
                         key={routine.id}
-                        type="button"
-                        aria-pressed={selected}
-                        disabled={pending}
-                        onClick={() =>
-                          onSelect({ kind: "routine", routineId: routine.id })
+                        style={
+                          modal
+                            ? ({
+                                "--workout-option-delay": `${getWorkoutOptionDelayMs(index)}ms`,
+                              } as CSSProperties)
+                            : undefined
                         }
-                        className={cn(
-                          "flex min-h-16 w-full touch-manipulation items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60",
-                          selected &&
-                            "border-primary/45 bg-primary/[0.06] shadow-[inset_0_0_0_1px] shadow-primary/10",
-                        )}
+                        className={modal ? "workout-option-enter" : undefined}
                       >
-                        <span
-                          className="size-2.5 shrink-0 rounded-full border border-foreground/10"
-                          style={{ backgroundColor: routine.color ?? "transparent" }}
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">
-                            {routine.name}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            {getRoutineStartMeta(routine)}
-                          </span>
-                        </span>
-                        <span
+                        <button
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={pending}
+                          onClick={() =>
+                            onSelect({ kind: "routine", routineId: routine.id })
+                          }
                           className={cn(
-                            "flex size-6 shrink-0 items-center justify-center rounded-full border text-primary transition-opacity",
-                            selected
-                              ? "border-primary/30 bg-primary/10 opacity-100"
-                              : "opacity-0",
+                            "workout-option-button flex min-h-16 w-full touch-manipulation items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 ease-out hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60",
+                            selected &&
+                              "border-primary/45 bg-primary/[0.06] shadow-[inset_0_0_0_1px] shadow-primary/10",
                           )}
-                          aria-hidden
                         >
-                          <Check className="size-3.5" />
-                        </span>
-                      </button>
+                          <span
+                            className="size-2.5 shrink-0 rounded-full border border-foreground/10"
+                            style={{ backgroundColor: routine.color ?? "transparent" }}
+                            aria-hidden
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">
+                              {routine.name}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              {getRoutineStartMeta(routine)}
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              "workout-selection-check flex size-6 shrink-0 items-center justify-center rounded-full border text-primary transition-[background-color,border-color,opacity,transform] duration-150 ease-out",
+                              selected
+                                ? "scale-100 border-primary/30 bg-primary/10 opacity-100"
+                                : "scale-70 border-transparent opacity-0",
+                            )}
+                            aria-hidden
+                          >
+                            <Check className="size-3.5" />
+                          </span>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -193,45 +213,59 @@ function StartWorkoutContent({
 
               <div className="my-4 h-px bg-border/70" aria-hidden />
 
-              <button
-                type="button"
-                aria-pressed={selection?.kind === "free"}
-                disabled={pending}
-                onClick={() => onSelect({ kind: "free" })}
-                className={cn(
-                  "flex min-h-16 w-full touch-manipulation items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60",
-                  selection?.kind === "free" &&
-                    "border-primary/45 bg-primary/[0.06] shadow-[inset_0_0_0_1px] shadow-primary/10",
-                )}
+              <div
+                style={
+                  modal
+                    ? ({
+                        "--workout-option-delay": `${getWorkoutOptionDelayMs(routines.length)}ms`,
+                      } as CSSProperties)
+                    : undefined
+                }
+                className={modal ? "workout-option-enter" : undefined}
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                  <Dumbbell className="size-4" aria-hidden />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">Sesión libre</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Empezar sin una rutina
-                  </span>
-                </span>
-                <span
+                <button
+                  type="button"
+                  aria-pressed={selection?.kind === "free"}
+                  disabled={pending}
+                  onClick={() => onSelect({ kind: "free" })}
                   className={cn(
-                    "flex size-6 shrink-0 items-center justify-center rounded-full border text-primary transition-opacity",
-                    selection?.kind === "free"
-                      ? "border-primary/30 bg-primary/10 opacity-100"
-                      : "opacity-0",
+                    "workout-option-button flex min-h-16 w-full touch-manipulation items-center gap-3 rounded-xl border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,border-color,transform,box-shadow] duration-150 ease-out hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60",
+                    selection?.kind === "free" &&
+                      "border-primary/45 bg-primary/[0.06] shadow-[inset_0_0_0_1px] shadow-primary/10",
                   )}
-                  aria-hidden
                 >
-                  <Check className="size-3.5" />
-                </span>
-              </button>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Dumbbell className="size-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">Sesión libre</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Empezar sin una rutina
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "workout-selection-check flex size-6 shrink-0 items-center justify-center rounded-full border text-primary transition-[background-color,border-color,opacity,transform] duration-150 ease-out",
+                      selection?.kind === "free"
+                        ? "scale-100 border-primary/30 bg-primary/10 opacity-100"
+                        : "scale-70 border-transparent opacity-0",
+                    )}
+                    aria-hidden
+                  >
+                    <Check className="size-3.5" />
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
           <footer className="border-t border-border/70 bg-card px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 lg:pb-5">
             {error && (
               <p
-                className="mb-2 text-sm leading-relaxed text-destructive"
+                className={cn(
+                  "mb-2 text-sm leading-relaxed text-destructive",
+                  modal && "workout-error-enter",
+                )}
                 role="status"
                 aria-live="polite"
               >
@@ -240,13 +274,16 @@ function StartWorkoutContent({
             )}
             <Button
               type="button"
-              className="h-12 w-full font-semibold"
+              className="h-12 w-full overflow-hidden font-semibold"
               disabled={!selection || pending}
               onClick={onStart}
             >
-              {pending
-                ? "Iniciando…"
-                : getWorkoutStartCtaLabel(selection, routines)}
+              <span
+                key={ctaLabel}
+                className={modal ? "workout-cta-label" : undefined}
+              >
+                {ctaLabel}
+              </span>
             </Button>
           </footer>
         </div>
@@ -362,9 +399,9 @@ export function StartWorkoutSheet({
         {children}
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[70] bg-black/45 opacity-100 backdrop-blur-[2px] transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
+        <Dialog.Backdrop className="workout-sheet-backdrop fixed inset-0 z-[70] bg-black/45 backdrop-blur-[2px]" />
         <Dialog.Viewport className="fixed inset-0 z-[71] flex items-end justify-center overflow-hidden lg:items-center lg:p-6">
-          <Dialog.Popup className="flex max-h-[min(88dvh,52rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:max-h-[min(80dvh,44rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]">
+          <Dialog.Popup className="workout-sheet-popup flex max-h-[min(88dvh,52rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none lg:max-h-[min(80dvh,44rem)] lg:max-w-lg lg:rounded-2xl lg:border">
             {content}
           </Dialog.Popup>
         </Dialog.Viewport>

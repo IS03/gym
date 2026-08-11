@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   getCompactProfile,
   HOME_SETTINGS_HREF,
-  mobileHomeDateLabel,
 } from "./home-header";
 
 describe("getCompactProfile", () => {
@@ -34,9 +33,5 @@ describe("getCompactProfile", () => {
 describe("cabecera mobile de Home", () => {
   it("enlaza al hub existente de perfil y ajustes", () => {
     expect(HOME_SETTINGS_HREF).toBe("/settings");
-  });
-
-  it("presenta la fecha como metadata breve", () => {
-    expect(mobileHomeDateLabel("2026-08-11")).toBe("11 de agosto");
   });
 });

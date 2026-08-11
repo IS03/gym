@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { todayInCordoba } from "./cordoba-date";
 import {
   getInitialWorkoutSelection,
+  getWorkoutOptionDelayMs,
   getRoutineStartMeta,
   getWorkoutStartCtaLabel,
   toWorkoutStartActiveSession,
@@ -38,6 +39,13 @@ describe("selector de inicio de entrenamiento", () => {
   it("usa gramática singular y plural en los conteos", () => {
     expect(getRoutineStartMeta(routines[0])).toBe("9 ejercicios · 25 series");
     expect(getRoutineStartMeta(routines[1])).toBe("1 ejercicio · 1 serie");
+  });
+
+  it("mantiene sutil y acotado el stagger de las opciones", () => {
+    expect([0, 1, 2, 3, 4, 8].map(getWorkoutOptionDelayMs)).toEqual([
+      0, 25, 50, 75, 100, 100,
+    ]);
+    expect(getWorkoutOptionDelayMs(-1)).toBe(0);
   });
 
   it("resume una sesión activa con el nombre de la rutina", () => {

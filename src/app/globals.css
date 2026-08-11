@@ -161,6 +161,111 @@
   box-shadow: 0 1px 1px oklch(0 0 0 / 10%), 0 14px 30px -24px oklch(0 0 0 / 55%);
 }
 
+@keyframes workout-fab-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes workout-feedback-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workout-error-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -2px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workout-cta-label-enter {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .workout-fab-enter {
+    animation: workout-fab-enter 220ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+}
+
+.workout-sheet-backdrop {
+  opacity: 1;
+  transition: opacity 180ms ease-out;
+}
+
+.workout-sheet-backdrop[data-starting-style],
+.workout-sheet-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.workout-sheet-backdrop[data-ending-style] {
+  transition-duration: 200ms;
+}
+
+.workout-sheet-popup {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease-out;
+}
+
+.workout-sheet-popup[data-starting-style] {
+  opacity: 0.88;
+  transform: translate3d(0, 24px, 0);
+}
+
+.workout-sheet-popup[data-ending-style] {
+  opacity: 0.85;
+  transform: translate3d(0, 20px, 0);
+  transition-duration: 200ms;
+}
+
+.workout-option-enter {
+  animation: workout-feedback-enter 160ms ease-out var(--workout-option-delay, 0ms) backwards;
+}
+
+.workout-active-session-enter {
+  animation: workout-feedback-enter 170ms ease-out backwards;
+}
+
+.workout-error-enter {
+  animation: workout-error-enter 150ms ease-out backwards;
+}
+
+.workout-cta-label {
+  animation: workout-cta-label-enter 120ms ease-out backwards;
+}
+
+@media (min-width: 1024px) {
+  .workout-sheet-popup[data-starting-style] {
+    opacity: 0.9;
+    transform: translate3d(0, 8px, 0) scale(0.98);
+  }
+
+  .workout-sheet-popup[data-ending-style] {
+    opacity: 0.88;
+    transform: translate3d(0, 8px, 0) scale(0.98);
+  }
+}
+
 .auth-shell {
   background:
     radial-gradient(circle at 50% 0%, oklch(0.67 0.2 285 / 11%), transparent 34rem),
@@ -304,5 +409,27 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .workout-fab-enter,
+  .workout-option-enter,
+  .workout-active-session-enter,
+  .workout-error-enter,
+  .workout-cta-label {
+    animation: none !important;
+  }
+
+  .workout-sheet-popup,
+  .workout-sheet-popup[data-starting-style],
+  .workout-sheet-popup[data-ending-style] {
+    transform: none !important;
+  }
+
+  .workout-fab-enter:active,
+  .workout-option-button:active,
+  .home-profile-link:active,
+  .home-profile-link svg,
+  .workout-selection-check {
+    transform: none !important;
   }
 }

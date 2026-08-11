@@ -43,6 +43,10 @@ export function getWorkoutStartCtaLabel(
   return routine ? `Empezar ${routine.name}` : "Elegí una opción";
 }
 
+export function getWorkoutOptionDelayMs(index: number): number {
+  return Math.min(Math.max(index, 0) * 25, 100);
+}
+
 function countLabel(value: number, singular: string, plural: string) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
