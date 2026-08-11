@@ -15,6 +15,7 @@ import type {
   WorkoutSessionExercise,
   WorkoutSessionStatus,
 } from "./types";
+import type { ExerciseRoutineMembership } from "./exercise-insights";
 
 async function getAuthedUserId() {
   const supabase = await createClient();
@@ -352,6 +353,34 @@ export async function listRoutines(params?: {
   const { data, error } = await q;
   if (error) throw new Error(`Leer routines: ${error.message}`);
   return (data ?? []) as Routine[];
+}
+
+type RoutineMembershipQueryRow = {
+  exercise_id: string;
+  routine: Pick<Routine, "id" | "nombre" | "color"> | Pick<Routine, "id" | "nombre" | "color">[] | null;
+};
+
+export async function listExerciseRoutineMemberships(
+  routineIds: string[],
+): Promise<Map<string, ExerciseRoutineMembership[]>> {
+  if (routineIds.length === 0) return new Map();
+  const supabase = await createClient();
+  await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .select("exercise_id, routine:routines(id, nombre, color)")
+    .in("routine_id", routineIds);
+  if (error) throw new Error(`Leer relaciones ejercicio-rutina: ${error.message}`);
+
+  const memberships = new Map<string, ExerciseRoutineMembership[]>();
+  for (const row of (data ?? []) as RoutineMembershipQueryRow[]) {
+    const routine = firstRelation(row.routine);
+    if (!routine) continue;
+    const current = memberships.get(row.exercise_id) ?? [];
+    current.push({ id: routine.id, nombre: routine.nombre, color: routine.color });
+    memberships.set(row.exercise_id, current);
+  }
+  return memberships;
 }
 
 export async function listRoutineOverviews(

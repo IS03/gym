@@ -1,14 +1,16 @@
-import { listExercises } from "@/lib/phase2/training";
+import { listExerciseRoutineMemberships, listExercises, listRoutines } from "@/lib/phase2/training";
 import { getTrainingProgress } from "@/lib/phase2/training-robust";
 import { HistoryExerciseList } from "./history-exercise-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrainHistoryPage() {
-  const [exercises, progress] = await Promise.all([
+  const [exercises, progress, routines] = await Promise.all([
     listExercises({ includeArchived: false }),
     getTrainingProgress(),
+    listRoutines({ includeArchived: false }),
   ]);
+  const memberships = await listExerciseRoutineMemberships(routines.map((routine) => routine.id));
   const progressByExerciseId = new Map(
     progress.exercises.map((exercise) => [exercise.exerciseId, exercise]),
   );
@@ -25,7 +27,9 @@ export default async function TrainHistoryPage() {
         exercises={exercises.map((exercise) => ({
           ...exercise,
           progress: progressByExerciseId.get(exercise.id) ?? null,
+          routineIds: (memberships.get(exercise.id) ?? []).map((membership) => membership.id),
         }))}
+        routines={routines.map((routine) => ({ id: routine.id, nombre: routine.nombre }))}
       />
     </div>
   );

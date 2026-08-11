@@ -1,100 +1,76 @@
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { ExerciseReportView } from "@/components/training/exercise-report-view";
 import { listExercises } from "@/lib/phase2/training";
-import { listRobustExerciseHistory } from "@/lib/phase2/training-robust";
+import {
+  listRobustExerciseHistory,
+  listRobustExerciseHistoryRoutineOptions,
+  todayInCordoba,
+} from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
 
-function bestRecordedWeight(sets: Array<{ actual_weight_kg: number | null }>) {
-  const weights = sets.flatMap((set) =>
-    typeof set.actual_weight_kg === "number" ? [set.actual_weight_kg] : [],
-  );
-  return weights.length ? Math.max(...weights) : null;
+const PERIODS = new Set(["30d", "90d", "6m", "all"]);
+
+function isoDaysBefore(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() - days);
+  return value.toISOString().slice(0, 10);
+}
+
+function periodStart(period: string) {
+  const today = todayInCordoba();
+  if (period === "30d") return isoDaysBefore(today, 30);
+  if (period === "6m") {
+    const value = new Date(`${today}T12:00:00Z`);
+    value.setUTCMonth(value.getUTCMonth() - 6);
+    return value.toISOString().slice(0, 10);
+  }
+  return period === "all" ? undefined : isoDaysBefore(today, 90);
 }
 
 export default async function ExerciseHistoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ exerciseId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { exerciseId } = await params;
-
-  const [allExercises, items] = await Promise.all([
-    listExercises({ includeArchived: false }),
-    listRobustExerciseHistory({ exerciseId, limit: 20 }),
+  const sp = (await searchParams) ?? {};
+  const rawPeriod = typeof sp.period === "string" && PERIODS.has(sp.period) ? sp.period : "90d";
+  const routineId = typeof sp.routine_id === "string" && sp.routine_id ? sp.routine_id : null;
+  const [allExercises, items, routineOptions] = await Promise.all([
+    listExercises({ includeArchived: true }),
+    listRobustExerciseHistory({ exerciseId, fromDate: periodStart(rawPeriod), routineId: routineId ?? undefined, limit: 20 }),
+    listRobustExerciseHistoryRoutineOptions(exerciseId),
   ]);
+  const exercise = allExercises.find((item) => item.id === exerciseId) ?? null;
+  const cameFromProgress = sp.from === "progress";
 
-  const exercise = allExercises.find((e) => e.id === exerciseId) ?? null;
-
-  return (
-    <div className="space-y-6 lg:mx-auto lg:max-w-5xl">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {exercise?.nombre ?? "Ejercicio"}
-        </h1>
-        <p className="text-sm text-muted-foreground">Últimas sesiones.</p>
-      </div>
-
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Todavía no hay historial.</p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((item, index) => {
-            const previous = items[index + 1];
-            const currentBest = bestRecordedWeight(item.exercise.sets);
-            const previousBest = previous ? bestRecordedWeight(previous.exercise.sets) : null;
-            const difference =
-              currentBest !== null && previousBest !== null ? currentBest - previousBest : null;
-            return (
-            <Card key={item.exercise.id}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{item.logDate}</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  {item.session.routine_name_snapshot ??
-                    item.session.session_name ??
-                    "Sesión libre"}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {difference !== null && difference !== 0 ? (
-                  <p className={cn("metric-number rounded-xl px-3 py-2 text-sm font-medium", difference > 0 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
-                    {difference > 0 ? "+" : ""}{difference} kg frente a la sesión anterior
-                  </p>
-                ) : null}
-                <div className="space-y-2">
-                  {item.exercise.sets.map((set) => (
-                    <div
-                      key={set.id}
-                      className="grid grid-cols-[52px_1fr_1fr] gap-2 rounded-md border px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium">S{set.set_number}</span>
-                      <span>
-                        Real: {set.actual_reps ?? "—"} × {set.actual_weight_kg ?? "—"} kg
-                      </span>
-                      <span className="text-muted-foreground">
-                        Obj: {set.target_reps ?? "—"} × {set.target_weight_kg ?? "—"}
-                        {set.target_rir !== null ? ` · RIR ${set.target_rir}` : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <Link
-                  href={`/train/session/${item.session.id}`}
-                  className="block text-sm font-medium underline"
-                >
-                  Ver sesión
-                </Link>
-              </CardContent>
-            </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <Link href="/train/history" className="text-sm font-medium underline">
-        Volver
-      </Link>
-    </div>
-  );
+  return <ExerciseReportView
+    exerciseName={exercise?.nombre ?? "Ejercicio"}
+    muscleLabel={exercise?.muscle_group_label ?? exercise?.grupo_muscular ?? null}
+    period={rawPeriod}
+    routineId={routineId}
+    routines={routineOptions}
+    backHref={cameFromProgress ? "/train/progress" : "/train/history"}
+    backLabel={cameFromProgress ? "Progreso" : "Historial"}
+    source={cameFromProgress ? "progress" : "history"}
+    sessions={items.map((item) => ({
+      sessionId: item.session.id,
+      logDate: item.logDate,
+      routineId: item.session.routine_id,
+      routineName: item.session.routine_name_snapshot ?? item.session.session_name ?? "Sesión libre",
+      decision: item.exercise.decision,
+      sets: item.exercise.sets.map((set) => ({
+        id: set.id,
+        set_number: set.set_number,
+        target_reps: set.target_reps,
+        target_weight_kg: set.target_weight_kg,
+        target_rir: set.target_rir,
+        actual_reps: set.actual_reps,
+        actual_weight_kg: set.actual_weight_kg,
+        is_completed: set.is_completed,
+      })),
+    }))}
+  />;
 }

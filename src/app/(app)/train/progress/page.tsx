@@ -1,21 +1,13 @@
-import Link from "next/link";
 import { Activity, Clock3, Dumbbell, ListChecks } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ExerciseDirectory } from "@/components/training/exercise-directory";
 import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { formatTrainingMinutes } from "@/lib/phase2/training-progress-summary";
 import { getTrainingProgress } from "@/lib/phase2/training-robust";
-import type { TrainingAdjustment, WeeklyTrainingSummary } from "@/lib/phase2/types";
+import { listExerciseRoutineMemberships, listExercises, listRoutines } from "@/lib/phase2/training";
+import type { WeeklyTrainingSummary } from "@/lib/phase2/types";
 
 export const dynamic = "force-dynamic";
-
-const ADJUSTMENT_LABELS: Record<TrainingAdjustment, string> = {
-  maintain: "Mantener",
-  increase_weight: "+ Peso",
-  increase_reps: "+ Repeticiones",
-  custom: "Personalizado",
-};
 
 function rounded(value: number) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(value);
@@ -46,7 +38,26 @@ function comparisonLabel(current: number, previous: number) {
 }
 
 export default async function TrainingProgressPage() {
-  const progress = await getTrainingProgress();
+  const [progress, activeRoutines, exercises] = await Promise.all([
+    getTrainingProgress(),
+    listRoutines({ includeArchived: false }),
+    listExercises({ includeArchived: false }),
+  ]);
+  const memberships = await listExerciseRoutineMemberships(activeRoutines.map((routine) => routine.id));
+  const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+  const exerciseDirectoryItems = progress.exercises.map((exercise) => ({
+    id: exercise.exerciseId,
+    name: exercise.name,
+    muscleGroup: exerciseById.get(exercise.exerciseId)?.grupo_muscular ?? null,
+    muscleLabel: exercise.muscleGroup ?? exerciseById.get(exercise.exerciseId)?.muscle_group_label ?? null,
+    lastDate: exercise.lastDate,
+    sessions: exercise.sessions,
+    bestWeightKg: exercise.bestWeightKg,
+    totalVolumeKg: exercise.totalVolumeKg,
+    lastDecision: exercise.lastDecision,
+    lastSets: exercise.lastSets,
+    routineIds: (memberships.get(exercise.exerciseId) ?? []).map((membership) => membership.id),
+  }));
   const currentWeek = progress.weeks[0];
   const previousWeek = progress.weeks[1];
   const hasPreviousWeek = Boolean(previousWeek && previousWeek.sessions > 0);
@@ -159,71 +170,9 @@ export default async function TrainingProgressPage() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold tracking-tight">Por ejercicio</h2>
-        {progress.exercises.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Finalizá una sesión para empezar a ver progreso.
-          </p>
-        ) : (
-          progress.exercises.map((exercise) => (
-            <Card key={exercise.exerciseId}>
-              <CardHeader className="space-y-1 pb-3">
-                <CardTitle className="text-base">{exercise.name}</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  {exercise.muscleGroup ?? "Sin grupo"} · última vez {exercise.lastDate}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="rounded-md border p-2">
-                    <div className="font-semibold">{exercise.sessions}</div>
-                    <div className="text-muted-foreground">Sesiones</div>
-                  </div>
-                  <div className="rounded-md border p-2">
-                    <div className="font-semibold">
-                      {exercise.bestWeightKg === null ? "—" : exercise.bestWeightKg}
-                    </div>
-                    <div className="text-muted-foreground">Mejor kg</div>
-                  </div>
-                  <div className="rounded-md border p-2">
-                    <div className="font-semibold">{rounded(exercise.totalVolumeKg)}</div>
-                    <div className="text-muted-foreground">Volumen kg</div>
-                  </div>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <p>
-                    <span className="font-medium">Últimas series: </span>
-                    {exercise.lastSets.length === 0
-                      ? "—"
-                      : exercise.lastSets
-                          .map(
-                            (set) =>
-                              `${set.actual_reps ?? "—"}×${set.actual_weight_kg ?? "—"}`,
-                          )
-                          .join(" · ")}
-                  </p>
-                  <p>
-                    <span className="font-medium">Próxima vez: </span>
-                    {ADJUSTMENT_LABELS[exercise.lastDecision]}
-                  </p>
-                </div>
-                <Link
-                  href={`/train/history/${exercise.exerciseId}`}
-                  className={cn(buttonVariants({ variant: "outline" }), "h-10 w-full")}
-                >
-                  Ver historial
-                </Link>
-              </CardContent>
-            </Card>
-          ))
-        )}
+        <p className="text-sm text-muted-foreground">Un resumen rápido: abrí un ejercicio para ver su reporte completo.</p>
+        <ExerciseDirectory items={exerciseDirectoryItems} routines={activeRoutines.map((routine) => ({ id: routine.id, nombre: routine.nombre }))} mode="progress" />
       </section>
-
-      <Link
-        href="/train"
-        className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
-      >
-        Volver a Entrenar
-      </Link>
       </div>
 
       <div className="hidden space-y-6 lg:block">
@@ -302,32 +251,9 @@ export default async function TrainingProgressPage() {
               <h2 id="exercise-progress-title" className="text-lg font-semibold tracking-tight">Progreso por ejercicio</h2>
               <p className="text-sm text-muted-foreground">Último registro, mejor carga y volumen histórico.</p>
             </div>
-            <span className="text-xs text-muted-foreground">{progress.exercises.length} ejercicios con historial</span>
+            <span className="text-xs text-muted-foreground">Buscá, filtrá y abrí un reporte</span>
           </div>
-          {progress.exercises.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Finalizá una sesión para empezar a ver progreso.</CardContent></Card>
-          ) : (
-            <Card className="gap-0 py-0">
-              <div className="grid grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_110px_100px_120px_88px] gap-4 border-b bg-muted/35 px-5 py-3 text-xs font-semibold text-muted-foreground">
-                <span>Ejercicio</span><span>Grupo</span><span>Última vez</span><span className="text-right">Mejor kg</span><span className="text-right">Volumen</span><span />
-              </div>
-              <div className="divide-y">
-                {progress.exercises.map((exercise) => (
-                  <div key={exercise.exerciseId} className="grid grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.8fr)_110px_100px_120px_88px] items-center gap-4 px-5 py-3.5 text-sm transition-colors hover:bg-muted/25">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{exercise.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{exercise.sessions} {exercise.sessions === 1 ? "sesión" : "sesiones"} · {ADJUSTMENT_LABELS[exercise.lastDecision]}</p>
-                    </div>
-                    <span className="truncate text-muted-foreground">{exercise.muscleGroup ?? "Sin grupo"}</span>
-                    <span className="metric-number text-muted-foreground">{exercise.lastDate}</span>
-                    <span className="metric-number text-right font-medium">{exercise.bestWeightKg ?? "—"}</span>
-                    <span className="metric-number text-right font-medium">{rounded(exercise.totalVolumeKg)} kg</span>
-                    <Link href={`/train/history/${exercise.exerciseId}`} className="text-right text-sm font-medium text-primary hover:underline">Ver</Link>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <ExerciseDirectory items={exerciseDirectoryItems} routines={activeRoutines.map((routine) => ({ id: routine.id, nombre: routine.nombre }))} mode="progress" />
         </section>
       </div>
     </div>

@@ -348,21 +348,46 @@ export type RobustExerciseHistoryItem = {
 
 export async function listRobustExerciseHistory(input: {
   exerciseId: string;
+  fromDate?: string;
+  routineId?: string;
   limit?: number;
 }): Promise<RobustExerciseHistoryItem[]> {
   const { supabase, userId } = await getAuthedContext();
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+  let daysQuery = supabase
+    .from("day_logs")
+    .select("id, log_date")
+    .eq("user_id", userId)
+    .order("log_date", { ascending: false })
+    .limit(500);
+  if (input.fromDate) daysQuery = daysQuery.gte("log_date", input.fromDate);
+  const { data: rawDays, error: daysError } = await daysQuery;
+  if (daysError) throw new Error(`Leer fechas históricas: ${daysError.message}`);
+  const days = (rawDays ?? []) as Array<{ id: string; log_date: string }>;
+  if (days.length === 0) return [];
+
+  let sessionsQuery = supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in("day_log_id", days.map((day) => day.id))
+    .order("ended_at", { ascending: false })
+    .limit(500);
+  if (input.routineId) sessionsQuery = sessionsQuery.eq("routine_id", input.routineId);
+  const { data: rawSessions, error: sessionError } = await sessionsQuery;
+  if (sessionError) throw new Error(`Leer sesiones históricas: ${sessionError.message}`);
+  const sessions = (rawSessions ?? []) as WorkoutSession[];
+  if (sessions.length === 0) return [];
+
   const { data: rawExercises, error: exerciseError } = await supabase
     .from("workout_session_exercises")
     .select("*, sets:workout_sets(*)")
     .eq("user_id", userId)
     .eq("exercise_id", input.exerciseId)
     .eq("is_completed", true)
-    .order("created_at", { ascending: false })
-    .limit(limit * 2);
-  if (exerciseError) {
-    throw new Error(`Leer historial del ejercicio: ${exerciseError.message}`);
-  }
+    .in("workout_session_id", sessions.map((session) => session.id));
+  if (exerciseError) throw new Error(`Leer historial del ejercicio: ${exerciseError.message}`);
 
   const exercises = ((rawExercises ?? []) as RawSessionExercise[]).map((row) => ({
     ...row,
@@ -370,32 +395,8 @@ export async function listRobustExerciseHistory(input: {
   }));
   if (exercises.length === 0) return [];
 
-  const sessionIds = [...new Set(exercises.map((row) => row.workout_session_id))];
-  const { data: rawSessions, error: sessionError } = await supabase
-    .from("workout_sessions")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "completed")
-    .in("id", sessionIds);
-  if (sessionError) throw new Error(`Leer sesiones históricas: ${sessionError.message}`);
-
-  const sessions = (rawSessions ?? []) as WorkoutSession[];
   const sessionById = new Map(sessions.map((session) => [session.id, session]));
-  const dayLogIds = [...new Set(sessions.map((session) => session.day_log_id))];
-  if (dayLogIds.length === 0) return [];
-
-  const { data: rawDays, error: daysError } = await supabase
-    .from("day_logs")
-    .select("id, log_date")
-    .eq("user_id", userId)
-    .in("id", dayLogIds);
-  if (daysError) throw new Error(`Leer fechas históricas: ${daysError.message}`);
-  const dateByDayLog = new Map(
-    ((rawDays ?? []) as Array<{ id: string; log_date: string }>).map((day) => [
-      day.id,
-      day.log_date,
-    ]),
-  );
+  const dateByDayLog = new Map(days.map((day) => [day.id, day.log_date]));
 
   return exercises
     .flatMap((exercise): RobustExerciseHistoryItem[] => {
@@ -407,6 +408,19 @@ export async function listRobustExerciseHistory(input: {
     })
     .sort((left, right) => right.logDate.localeCompare(left.logDate))
     .slice(0, limit);
+}
+
+export async function listRobustExerciseHistoryRoutineOptions(exerciseId: string) {
+  const items = await listRobustExerciseHistory({ exerciseId, limit: 100 });
+  const routines = new Map<string, { id: string; nombre: string }>();
+  for (const item of items) {
+    if (!item.session.routine_id) continue;
+    routines.set(item.session.routine_id, {
+      id: item.session.routine_id,
+      nombre: item.session.routine_name_snapshot ?? item.session.session_name ?? "Rutina",
+    });
+  }
+  return [...routines.values()].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
 }
 
 type CompletedTrainingData = {
