@@ -197,7 +197,6 @@ export type WorkoutSessionClient = Pick<
   | "performance_level"
   | "pain_level"
   | "pain_note"
-  | "abs_completed"
   | "treadmill_minutes"
   | "treadmill_distance_km"
   | "treadmill_speed_kmh"
@@ -238,7 +237,6 @@ export type SessionMetadataInput = {
   performance_level: number | null;
   pain_level: number | null;
   pain_note: string;
-  abs_completed: boolean;
   treadmill_minutes: number | null;
   treadmill_distance_km: number | null;
   treadmill_speed_kmh: number | null;

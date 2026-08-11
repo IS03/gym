@@ -41,7 +41,6 @@ export function sessionMetadataFromSession(
     performance_level: session.performance_level,
     pain_level: session.pain_level,
     pain_note: session.pain_note ?? "",
-    abs_completed: session.abs_completed,
     treadmill_minutes: session.treadmill_minutes,
     treadmill_distance_km: session.treadmill_distance_km,
     treadmill_speed_kmh: session.treadmill_speed_kmh,
@@ -66,7 +65,6 @@ export function clientDetailFromWorkoutDetail(
       performance_level: session.performance_level,
       pain_level: session.pain_level,
       pain_note: session.pain_note,
-      abs_completed: session.abs_completed,
       treadmill_minutes: session.treadmill_minutes,
       treadmill_distance_km: session.treadmill_distance_km,
       treadmill_speed_kmh: session.treadmill_speed_kmh,
@@ -102,6 +100,27 @@ export function clientDetailFromWorkoutDetail(
       })),
     })),
   };
+}
+
+/**
+ * Cardio belongs to a real session exercise. Prefer the enum snapshot and use
+ * the historical label only as a compatibility fallback for older snapshots.
+ */
+export function sessionHasCardioExercise(
+  exercises: ReadonlyArray<
+    Pick<
+      WorkoutSessionExerciseClient,
+      "grupo_muscular_snapshot" | "muscle_group_label_snapshot"
+    >
+  >,
+) {
+  return exercises.some(
+    (exercise) =>
+      exercise.grupo_muscular_snapshot === "cardio" ||
+      (exercise.grupo_muscular_snapshot === null &&
+        exercise.muscle_group_label_snapshot?.trim().toLocaleLowerCase("es-AR") ===
+          "cardio"),
+  );
 }
 
 export function renumberWorkoutPayload(

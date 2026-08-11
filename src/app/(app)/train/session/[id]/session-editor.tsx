@@ -56,6 +56,7 @@ import {
   formatWorkoutTimeRange,
   getWorkoutElapsedMilliseconds,
   renumberWorkoutPayload,
+  sessionHasCardioExercise,
   sessionMetadataFromSession,
   workoutPayloadFromDetail,
 } from "./session-editor-helpers";
@@ -405,6 +406,10 @@ export function SessionEditor({
   const metadata = readOnly
     ? baseMetadata
     : metadataOverride ?? metadataDraft?.metadata ?? baseMetadata;
+  const hasCardioExercise = useMemo(
+    () => sessionHasCardioExercise(detail.exercises),
+    [detail.exercises],
+  );
 
   const draftById = useMemo(
     () =>
@@ -1363,65 +1368,55 @@ export function SessionEditor({
               }
             />
           </div>
-          <label className="flex items-center gap-3 rounded-md border p-3 text-sm">
-            <input
-              type="checkbox"
-              className="size-5"
-              checked={metadata.abs_completed}
-              disabled={readOnly}
-              onChange={(event) =>
-                updateMetadata((current) => ({
-                  ...current,
-                  abs_completed: event.target.checked,
-                }))
-              }
-            />
-            <span className="font-medium">Hice abdominales</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label>Minutos de cinta</Label>
-              {metadataInput(
-                metadata.treadmill_minutes,
-                (value) =>
-                  updateMetadata((current) => ({ ...current, treadmill_minutes: value })),
-                { min: 0, max: 1440, step: 0.5, label: "Minutos de cinta" },
-              )}
+          {hasCardioExercise ? (
+            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
+              <p className="text-sm font-medium">Cardio</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>Minutos de cinta</Label>
+                  {metadataInput(
+                    metadata.treadmill_minutes,
+                    (value) =>
+                      updateMetadata((current) => ({ ...current, treadmill_minutes: value })),
+                    { min: 0, max: 1440, step: 0.5, label: "Minutos de cinta" },
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Distancia km</Label>
+                  {metadataInput(
+                    metadata.treadmill_distance_km,
+                    (value) =>
+                      updateMetadata((current) => ({
+                        ...current,
+                        treadmill_distance_km: value,
+                      })),
+                    { min: 0, max: 1000, step: 0.01, label: "Distancia de cinta" },
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Velocidad km/h</Label>
+                  {metadataInput(
+                    metadata.treadmill_speed_kmh,
+                    (value) =>
+                      updateMetadata((current) => ({ ...current, treadmill_speed_kmh: value })),
+                    { min: 0, max: 100, step: 0.1, label: "Velocidad de cinta" },
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Inclinación %</Label>
+                  {metadataInput(
+                    metadata.treadmill_incline_percent,
+                    (value) =>
+                      updateMetadata((current) => ({
+                        ...current,
+                        treadmill_incline_percent: value,
+                      })),
+                    { min: 0, max: 100, step: 0.5, label: "Inclinación de cinta" },
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Distancia km</Label>
-              {metadataInput(
-                metadata.treadmill_distance_km,
-                (value) =>
-                  updateMetadata((current) => ({
-                    ...current,
-                    treadmill_distance_km: value,
-                  })),
-                { min: 0, max: 1000, step: 0.01, label: "Distancia de cinta" },
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Velocidad km/h</Label>
-              {metadataInput(
-                metadata.treadmill_speed_kmh,
-                (value) =>
-                  updateMetadata((current) => ({ ...current, treadmill_speed_kmh: value })),
-                { min: 0, max: 100, step: 0.1, label: "Velocidad de cinta" },
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Inclinación %</Label>
-              {metadataInput(
-                metadata.treadmill_incline_percent,
-                (value) =>
-                  updateMetadata((current) => ({
-                    ...current,
-                    treadmill_incline_percent: value,
-                  })),
-                { min: 0, max: 100, step: 0.5, label: "Inclinación de cinta" },
-              )}
-            </div>
-          </div>
+          ) : null}
           <div className="space-y-1">
             <Label htmlFor="session-notes">Notas generales</Label>
             <textarea

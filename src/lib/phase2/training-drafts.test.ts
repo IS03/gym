@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseSessionMetadataDraft,
   parseWorkoutExerciseDraft,
   TRAINING_DRAFT_VERSION,
 } from "./training-drafts";
@@ -50,5 +51,42 @@ describe("borradores locales versionados", () => {
         "exercise-1",
       ),
     ).toBeNull();
+  });
+
+  it("conserva los campos válidos de metadata y descarta abs_completed legado", () => {
+    const draft = parseSessionMetadataDraft(
+      JSON.stringify({
+        version: TRAINING_DRAFT_VERSION,
+        sessionId: "session-1",
+        savedAt: "2026-08-10T10:01:00.000Z",
+        metadata: {
+          session_name: "CINTA",
+          energy_level: 4,
+          performance_level: 5,
+          pain_level: 0,
+          pain_note: "",
+          abs_completed: true,
+          treadmill_minutes: 15,
+          treadmill_distance_km: 1.2,
+          treadmill_speed_kmh: 5,
+          treadmill_incline_percent: 8,
+          notes: "Bien",
+        },
+      }),
+      "session-1",
+    );
+
+    expect(draft?.metadata).toEqual({
+      session_name: "CINTA",
+      energy_level: 4,
+      performance_level: 5,
+      pain_level: 0,
+      pain_note: "",
+      treadmill_minutes: 15,
+      treadmill_distance_km: 1.2,
+      treadmill_speed_kmh: 5,
+      treadmill_incline_percent: 8,
+      notes: "Bien",
+    });
   });
 });

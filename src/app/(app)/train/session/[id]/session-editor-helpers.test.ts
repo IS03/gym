@@ -8,8 +8,10 @@ import {
   formatWorkoutTimeRange,
   getWorkoutElapsedMilliseconds,
   renumberWorkoutPayload,
+  sessionHasCardioExercise,
+  sessionMetadataFromSession,
 } from "./session-editor-helpers";
-import type { WorkoutExercisePayload } from "@/lib/phase2/types";
+import type { WorkoutExercisePayload, WorkoutSessionClient } from "@/lib/phase2/types";
 
 function payload(): WorkoutExercisePayload {
   return {
@@ -127,5 +129,66 @@ describe("tiempo de sesión", () => {
       getWorkoutElapsedMilliseconds("2026-08-10T20:00:00.000Z", "2026-08-10T19:00:00.000Z"),
     ).toBeNull();
     expect(formatWorkoutTimeRange(null, "2026-08-10T20:24:00.000Z")).toBeNull();
+  });
+});
+
+describe("metadata de sesión", () => {
+  it("no lleva abs_completed al payload nuevo aunque un registro legado lo tenga", () => {
+    const legacySession = {
+      id: "session-1",
+      routine_name_snapshot: "PUSH",
+      session_name: null,
+      status: "completed",
+      started_at: "2026-08-10T19:00:00.000Z",
+      ended_at: "2026-08-10T20:00:00.000Z",
+      energy_level: 4,
+      performance_level: 5,
+      pain_level: 0,
+      pain_note: null,
+      abs_completed: true,
+      treadmill_minutes: null,
+      treadmill_distance_km: null,
+      treadmill_speed_kmh: null,
+      treadmill_incline_percent: null,
+      notes: null,
+    } as unknown as WorkoutSessionClient;
+
+    expect(sessionMetadataFromSession(legacySession)).toEqual({
+      session_name: "PUSH",
+      energy_level: 4,
+      performance_level: 5,
+      pain_level: 0,
+      pain_note: "",
+      treadmill_minutes: null,
+      treadmill_distance_km: null,
+      treadmill_speed_kmh: null,
+      treadmill_incline_percent: null,
+      notes: "",
+    });
+  });
+
+  it("muestra metadata cardio sólo si un snapshot estructurado lo indica", () => {
+    const strength = {
+      grupo_muscular_snapshot: "pecho" as const,
+      muscle_group_label_snapshot: "Pecho",
+    };
+    const abs = {
+      grupo_muscular_snapshot: "abdomen" as const,
+      muscle_group_label_snapshot: "Abdomen",
+    };
+    const cardio = {
+      grupo_muscular_snapshot: "cardio" as const,
+      muscle_group_label_snapshot: "Cardio",
+    };
+
+    expect(sessionHasCardioExercise([strength])).toBe(false); // PUSH / PULL
+    expect(sessionHasCardioExercise([abs])).toBe(false); // ABS
+    expect(sessionHasCardioExercise([cardio])).toBe(true); // CINTA
+    expect(sessionHasCardioExercise([strength, cardio])).toBe(true); // Mixta
+    expect(
+      sessionHasCardioExercise([
+        { grupo_muscular_snapshot: null, muscle_group_label_snapshot: "  Cardio  " },
+      ]),
+    ).toBe(true);
   });
 });

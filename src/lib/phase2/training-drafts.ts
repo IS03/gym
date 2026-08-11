@@ -75,7 +75,13 @@ export function parseSessionMetadataDraft(
     ) {
       return null;
     }
-    const draft = value as SessionMetadataDraft;
+    const metadata = { ...value.metadata };
+    // Un borrador de una versión anterior puede contener este campo ya retirado.
+    delete metadata.abs_completed;
+    const draft = {
+      ...value,
+      metadata,
+    } as SessionMetadataDraft;
     validateSessionMetadata(draft.metadata);
     return draft;
   } catch {
