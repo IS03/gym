@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BrandSymbol } from "@/components/brand/brand-symbol";
+import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
@@ -24,7 +25,10 @@ import {
   HOME_SETTINGS_HREF,
   mobileHomeDateLabel,
 } from "@/lib/home-header";
-import { getInProgressSessionForUser } from "@/lib/phase2/training";
+import {
+  getInProgressSessionForUser,
+  listWorkoutStartRoutines,
+} from "@/lib/phase2/training";
 import { addUtcDays, formatTrainingMinutes, mondayOfIsoDate } from "@/lib/phase2/training-progress-summary";
 import { getTrainingProgress, todayInCordoba } from "@/lib/phase2/training-robust";
 
@@ -88,11 +92,12 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
 
 export default async function HomePage() {
   const today = todayInCordoba();
-  const [profile, todayData, inProgress, trainingProgress] = await Promise.all([
+  const [profile, todayData, inProgress, trainingProgress, workoutStartRoutines] = await Promise.all([
     getMyProfile(),
     getDayLogWithMeals(today),
     getInProgressSessionForUser(),
     getTrainingProgress(),
+    listWorkoutStartRoutines(),
   ]);
   const { dayLog, meals } = todayData;
   const currentWeek = trainingProgress.weeks[0];
@@ -160,16 +165,22 @@ export default async function HomePage() {
                 {inProgress ? <Play className="size-5" aria-hidden /> : <Dumbbell className="size-5" aria-hidden />}
               </span>
             </div>
-            <Link
-              href={
-                inProgress
-                  ? `/train/session/${inProgress.session.id}`
-                  : `/train/session/new?date=${today}`
-              }
-              className="flex h-11 items-center justify-center rounded-lg bg-primary-foreground px-3 text-sm font-medium text-primary transition-colors duration-150 hover:bg-primary-foreground/90 active:scale-[0.98]"
-            >
-              {inProgress ? "Continuar sesión" : "Iniciar entrenamiento"}
-            </Link>
+            {inProgress ? (
+              <Link
+                href={`/train/session/${inProgress.session.id}`}
+                className="flex h-11 items-center justify-center rounded-lg bg-primary-foreground px-3 text-sm font-medium text-primary transition-colors duration-150 hover:bg-primary-foreground/90 active:scale-[0.98]"
+              >
+                Continuar sesión
+              </Link>
+            ) : (
+              <StartWorkoutSheet
+                routines={workoutStartRoutines}
+                activeSession={null}
+                triggerClassName="flex h-11 items-center justify-center rounded-lg bg-primary-foreground px-3 text-sm font-medium text-primary outline-none transition-[background-color,transform] duration-150 hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+              >
+                Iniciar entrenamiento
+              </StartWorkoutSheet>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -361,13 +372,24 @@ export default async function HomePage() {
                 {inProgress ? <Play className="size-7" aria-hidden /> : <Dumbbell className="size-7" aria-hidden />}
               </span>
             </div>
-            <Link
-              href={inProgress ? `/train/session/${inProgress.session.id}` : `/train/session/new?date=${today}`}
-              className="flex h-11 w-fit min-w-52 items-center justify-center gap-2 rounded-lg bg-primary-foreground px-5 text-sm font-semibold text-primary transition-[background-color,transform] hover:bg-primary-foreground/90 active:scale-[0.98]"
-            >
-              {inProgress ? "Continuar sesión" : "Iniciar entrenamiento"}
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
+            {inProgress ? (
+              <Link
+                href={`/train/session/${inProgress.session.id}`}
+                className="flex h-11 w-fit min-w-52 items-center justify-center gap-2 rounded-lg bg-primary-foreground px-5 text-sm font-semibold text-primary transition-[background-color,transform] hover:bg-primary-foreground/90 active:scale-[0.98]"
+              >
+                Continuar sesión
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            ) : (
+              <StartWorkoutSheet
+                routines={workoutStartRoutines}
+                activeSession={null}
+                triggerClassName="flex h-11 w-fit min-w-52 items-center justify-center gap-2 rounded-lg bg-primary-foreground px-5 text-sm font-semibold text-primary outline-none transition-[background-color,transform] hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+              >
+                Iniciar entrenamiento
+                <ArrowRight className="size-4" aria-hidden />
+              </StartWorkoutSheet>
+            )}
           </CardContent>
         </Card>
 

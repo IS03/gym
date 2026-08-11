@@ -1,16 +1,21 @@
 import Link from "next/link";
 import { CalendarDays, ChartNoAxesCombined, Dumbbell, ListChecks, Play, Plus, TimerReset } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getInProgressSessionForUser } from "@/lib/phase2/training";
-import { todayInCordoba } from "@/lib/phase2/training-robust";
+import {
+  getInProgressSessionForUser,
+  listWorkoutStartRoutines,
+} from "@/lib/phase2/training";
 
 export const dynamic = "force-dynamic";
 
 export default async function TrainPage() {
-  const today = todayInCordoba();
-  const inProgress = await getInProgressSessionForUser();
+  const [inProgress, workoutStartRoutines] = await Promise.all([
+    getInProgressSessionForUser(),
+    listWorkoutStartRoutines(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -51,9 +56,13 @@ export default async function TrainPage() {
                   <p className="mt-1 text-sm text-primary-foreground/75">Elegí una rutina o iniciá una sesión libre.</p>
                 </div>
               </div>
-              <Link href={`/train/session/new?date=${today}`} className="flex h-11 items-center justify-center rounded-xl bg-primary-foreground px-3 text-sm font-medium text-primary transition-transform duration-150 active:scale-[0.98]">
+              <StartWorkoutSheet
+                routines={workoutStartRoutines}
+                activeSession={null}
+                triggerClassName="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-primary-foreground px-3 text-sm font-medium text-primary outline-none transition-transform duration-150 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
+              >
                 <Plus className="size-4" aria-hidden /> Iniciar sesión
-              </Link>
+              </StartWorkoutSheet>
             </>
           )}
         </CardContent>

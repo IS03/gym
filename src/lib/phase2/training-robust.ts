@@ -2,6 +2,7 @@ import "server-only";
 
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import { createClient } from "@/lib/supabase/server";
+import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import { buildWeeklyTrainingSummaries } from "./training-progress-summary";
 import {
@@ -84,16 +85,7 @@ function throwRpcError(label: string, value: unknown): never {
   throw new Error(`${label}: ${message ?? "error inesperado."}`);
 }
 
-export function todayInCordoba(date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Cordoba",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
-}
+export { todayInCordoba } from "./cordoba-date";
 
 export async function getInitialPlanStatus(): Promise<{
   imported: boolean;

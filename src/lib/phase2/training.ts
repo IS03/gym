@@ -5,6 +5,7 @@ import {
   type RoutineOverview,
   type RoutineOverviewSourceRow,
 } from "./routine-overview";
+import type { WorkoutStartRoutine } from "./workout-start";
 import type {
   Exercise,
   MuscleGroup,
@@ -371,6 +372,22 @@ export async function listRoutineOverviews(
   if (error) throw new Error(`Leer resumen de rutinas: ${error.message}`);
 
   return buildRoutineOverviews(routineIds, (data ?? []) as RoutineOverviewSourceRow[]);
+}
+
+export async function listWorkoutStartRoutines(): Promise<WorkoutStartRoutine[]> {
+  const routines = await listRoutines({ includeArchived: false });
+  const overviews = await listRoutineOverviews(routines.map((routine) => routine.id));
+
+  return routines.map((routine) => {
+    const overview = overviews.get(routine.id);
+    return {
+      id: routine.id,
+      name: routine.nombre,
+      color: routine.color,
+      exerciseCount: overview?.exerciseCount ?? 0,
+      setCount: overview?.setCount ?? 0,
+    };
+  });
 }
 
 export async function createRoutine(input: {

@@ -11,6 +11,7 @@ import {
   archiveRoutine,
   createRoutine,
   finishSession,
+  getInProgressSessionForUser,
   removeSessionExercise,
   removeRoutineExercise,
   replaceRoutineExercises,
@@ -27,7 +28,12 @@ import {
   saveRoutineExerciseTarget,
   saveWorkoutExercise,
   startWorkoutSession,
+  todayInCordoba,
 } from "@/lib/phase2/training-robust";
+import {
+  toWorkoutStartActiveSession,
+  type StartWorkoutActionResult,
+} from "@/lib/phase2/workout-start";
 import type {
   RoutineExercisePayload,
   SessionMetadataInput,
@@ -167,7 +173,7 @@ export async function removeRoutineExerciseAction(formData: FormData) {
 }
 
 export async function startFreeSessionAction(formData: FormData) {
-  const date = str(formData, "date");
+  const date = str(formData, "date") || todayInCordoba();
   const sessionId = await startWorkoutSession({ date, routineId: null });
   revalidatePath("/train");
   revalidatePath("/train/session/new");
@@ -176,13 +182,54 @@ export async function startFreeSessionAction(formData: FormData) {
 }
 
 export async function startSessionFromRoutineAction(formData: FormData) {
-  const date = str(formData, "date");
+  const date = str(formData, "date") || todayInCordoba();
   const routineId = str(formData, "routine_id");
   const sessionId = await startWorkoutSession({ date, routineId });
   revalidatePath("/train");
   revalidatePath("/train/session/new");
   revalidatePath(`/train/session/${sessionId}`);
   return sessionId;
+}
+
+export async function startWorkoutFromSheetAction(input: {
+  routineId: string | null;
+}): Promise<StartWorkoutActionResult> {
+  if (input.routineId !== null && !input.routineId.trim()) {
+    return { status: "error", message: "Elegí una rutina válida." };
+  }
+
+  const formData = new FormData();
+  if (input.routineId !== null) {
+    formData.set("routine_id", input.routineId);
+  }
+
+  try {
+    const sessionId =
+      input.routineId === null
+        ? await startFreeSessionAction(formData)
+        : await startSessionFromRoutineAction(formData);
+    return { status: "started", sessionId };
+  } catch (error) {
+    try {
+      const activeSession = await getInProgressSessionForUser();
+      if (activeSession) {
+        return {
+          status: "active",
+          session: toWorkoutStartActiveSession(activeSession),
+        };
+      }
+    } catch {
+      // El error original describe mejor el fallo de creación.
+    }
+
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "No pudimos iniciar el entrenamiento. Probá de nuevo.",
+    };
+  }
 }
 
 export async function addExistingExerciseToSessionAction(formData: FormData) {
