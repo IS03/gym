@@ -19,7 +19,7 @@ export default async function SettingsPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Ajustes</h1>
         <p className="text-sm text-muted-foreground">
-          Tu cuenta, información personal y preferencias de Appgym.
+          Tu cuenta, información personal y preferencias de OWNLEVEL.
         </p>
       </div>
 

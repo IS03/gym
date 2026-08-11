@@ -9,6 +9,7 @@ import {
   Utensils,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { BrandSymbol } from "@/components/brand/brand-symbol";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
@@ -96,8 +97,13 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6 pb-1">
-      <header className="space-y-1">
-        <p className="text-xs font-medium capitalize tracking-wide text-muted-foreground">{todayLabel(today)}</p>
+      <header className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <BrandSymbol decorative className="size-8" />
+          <p className="text-right text-xs font-medium capitalize tracking-wide text-muted-foreground">
+            {todayLabel(today)}
+          </p>
+        </div>
         <h1 className="text-3xl font-semibold tracking-tight">Hola, {displayName}</h1>
       </header>
 

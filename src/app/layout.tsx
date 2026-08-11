@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { THEME_INIT_INLINE_SCRIPT } from "@/lib/app-theme";
+import { ownlevelMetadata } from "@/lib/brand-metadata";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,22 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "Appgym",
-    template: "%s · Appgym",
-  },
-  description: "Seguimiento personal de nutrición y entrenamiento.",
-  applicationName: "Appgym",
-  appleWebApp: {
-    capable: true,
-    title: "Appgym",
-    statusBarStyle: "default",
-  },
-  formatDetection: {
-    telephone: false,
-  },
-};
+export const metadata: Metadata = ownlevelMetadata;
 
 export const viewport: Viewport = {
   width: "device-width",
