@@ -3,6 +3,7 @@ import "server-only";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import { createClient } from "@/lib/supabase/server";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
+import { buildWeeklyTrainingSummaries } from "./training-progress-summary";
 import {
   validateRoutineExercisePayload,
   validateSessionMetadata,
@@ -452,7 +453,6 @@ async function loadCompletedTrainingData(): Promise<CompletedTrainingData> {
         .from("workout_session_exercises")
         .select("*")
         .eq("user_id", userId)
-        .eq("is_completed", true)
         .in("workout_session_id", sessionIds),
       supabase
         .from("day_logs")
@@ -492,34 +492,7 @@ async function loadCompletedTrainingData(): Promise<CompletedTrainingData> {
   };
 }
 
-function parseIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00.000Z`);
-}
-
-function isoDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
-function addUtcDays(value: string, days: number): string {
-  const date = parseIsoDate(value);
-  date.setUTCDate(date.getUTCDate() + days);
-  return isoDate(date);
-}
-
-export function mondayOfIsoDate(value: string): string {
-  const date = parseIsoDate(value);
-  const offset = (date.getUTCDay() + 6) % 7;
-  date.setUTCDate(date.getUTCDate() - offset);
-  return isoDate(date);
-}
-
-function sessionMinutes(session: WorkoutSession): number {
-  if (!session.started_at || !session.ended_at) return 0;
-  const milliseconds =
-    new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
-  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return 0;
-  return Math.round(milliseconds / 60_000);
-}
+export { mondayOfIsoDate } from "./training-progress-summary";
 
 function workoutSetVolume(set: WorkoutSet): number {
   return (set.actual_reps ?? 0) * (set.actual_weight_kg ?? 0);
@@ -541,58 +514,11 @@ export async function getTrainingProgress(): Promise<{
     sets.sort((left, right) => left.set_number - right.set_number);
   }
 
-  const currentWeek = mondayOfIsoDate(todayInCordoba());
-  const sessionDates = data.sessions
-    .map((session) => data.dateByDayLog.get(session.day_log_id))
-    .filter((date): date is string => Boolean(date));
-  const firstWeek = sessionDates.length
-    ? mondayOfIsoDate([...sessionDates].sort()[0])
-    : currentWeek;
-
-  const weekMap = new Map<string, WeeklyTrainingSummary>();
-  let cursor = firstWeek;
-  let guard = 0;
-  while (cursor <= currentWeek && guard < 520) {
-    weekMap.set(cursor, {
-      weekStart: cursor,
-      weekEnd: addUtcDays(cursor, 6),
-      sessions: 0,
-      exercises: 0,
-      sets: 0,
-      minutes: 0,
-      volumeKg: 0,
-      routines: {},
-    });
-    cursor = addUtcDays(cursor, 7);
-    guard += 1;
-  }
-
-  for (const session of data.sessions) {
-    const date = data.dateByDayLog.get(session.day_log_id);
-    if (!date) continue;
-    const summary = weekMap.get(mondayOfIsoDate(date));
-    if (!summary) continue;
-    summary.sessions += 1;
-    summary.minutes += sessionMinutes(session);
-    const routineName = session.routine_name_snapshot ?? session.session_name ?? "Sesión libre";
-    summary.routines[routineName] = (summary.routines[routineName] ?? 0) + 1;
-  }
-
-  for (const exercise of data.sessionExercises) {
-    const session = sessionById.get(exercise.workout_session_id);
-    if (!session) continue;
-    const date = data.dateByDayLog.get(session.day_log_id);
-    if (!date) continue;
-    const summary = weekMap.get(mondayOfIsoDate(date));
-    if (!summary) continue;
-    summary.exercises += 1;
-    const sets = setsByExercise.get(exercise.id) ?? [];
-    summary.sets += sets.length;
-    summary.volumeKg += sets.reduce((total, set) => total + workoutSetVolume(set), 0);
-  }
+  const weeks = buildWeeklyTrainingSummaries(data, todayInCordoba());
 
   const groupedByCatalogExercise = new Map<string, WorkoutSessionExercise[]>();
   for (const exercise of data.sessionExercises) {
+    if (!exercise.is_completed) continue;
     const current = groupedByCatalogExercise.get(exercise.exercise_id) ?? [];
     current.push(exercise);
     groupedByCatalogExercise.set(exercise.exercise_id, current);
@@ -654,9 +580,7 @@ export async function getTrainingProgress(): Promise<{
   }
 
   return {
-    weeks: [...weekMap.values()].sort((left, right) =>
-      right.weekStart.localeCompare(left.weekStart),
-    ),
+    weeks,
     exercises: exerciseProgress.sort((left, right) =>
       left.name.localeCompare(right.name, "es"),
     ),

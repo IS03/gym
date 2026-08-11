@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { getInProgressSessionForUser } from "@/lib/phase2/training";
+import { addUtcDays, formatTrainingMinutes, mondayOfIsoDate } from "@/lib/phase2/training-progress-summary";
 import { getTrainingProgress, todayInCordoba } from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,17 @@ function todayLabel(date: string) {
     month: "long",
     timeZone: "America/Argentina/Cordoba",
   }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function descendingEntries(values: Record<string, number>) {
+  return Object.entries(values).sort(
+    ([leftName, leftValue], [rightName, rightValue]) =>
+      rightValue - leftValue || leftName.localeCompare(rightName, "es"),
+  );
+}
+
+function trainingLabel(sessions: number) {
+  return `${sessions} ${sessions === 1 ? "entrenamiento" : "entrenamientos"}`;
 }
 
 type QuickAccessProps = {
@@ -76,6 +88,11 @@ export default async function HomePage() {
   const calorieProgress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
   const displayName = profile?.display_name?.trim() || "vos";
   const hasTraining = (currentWeek?.sessions ?? 0) > 0;
+  const weekStart = currentWeek?.weekStart ?? mondayOfIsoDate(today);
+  const trainingDays = new Set(currentWeek?.trainingDays ?? []);
+  const routines = descendingEntries(currentWeek?.routines ?? {});
+  const muscleGroups = descendingEntries(currentWeek?.muscleGroups ?? {});
+  const visibleMuscles = muscleGroups.slice(0, 3);
 
   return (
     <div className="space-y-6 pb-1">
@@ -178,35 +195,63 @@ export default async function HomePage() {
           <h2 id="home-progress-title" className="text-base font-semibold tracking-tight">
             Progreso de la semana
           </h2>
-          <Link href="/train/progress" className="text-xs font-medium text-primary hover:underline">
-            Ver detalle
+          <Link href="/train/progress#weekly-report" className="text-xs font-medium text-primary hover:underline">
+            Ver reporte semanal
           </Link>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Card size="sm">
-            <CardContent className="pt-3 text-center">
-              <p className="text-xl font-semibold">{currentWeek?.sessions ?? 0}</p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">Sesiones</p>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardContent className="pt-3 text-center">
-              <p className="text-xl font-semibold">{currentWeek?.sets ?? 0}</p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">Series</p>
-            </CardContent>
-          </Card>
-          <Card size="sm">
-            <CardContent className="pt-3 text-center">
-              <p className="text-xl font-semibold">{currentWeek?.minutes ?? 0}</p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">Minutos</p>
-            </CardContent>
-          </Card>
-        </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          {hasTraining
-            ? `Llevás ${currentWeek?.exercises ?? 0} ejercicios y ${number(currentWeek?.volumeKg ?? 0)} kg de volumen registrado.`
-            : "Cuando finalices tu primera sesión, vas a ver acá tu avance semanal."}
-        </p>
+        <Card className="surface-elevated">
+          <CardContent className="space-y-4 pt-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                Esta semana
+              </p>
+              <p className="mt-1 text-xl font-semibold tracking-tight">
+                {hasTraining
+                  ? `${trainingLabel(currentWeek?.sessions ?? 0)} · ${formatTrainingMinutes(currentWeek?.minutes ?? 0)}`
+                  : "0 entrenamientos"}
+              </p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {hasTraining
+                  ? `${currentWeek?.sets ?? 0} ${(currentWeek?.sets ?? 0) === 1 ? "serie" : "series"} completadas`
+                  : "Todavía no registraste una sesión esta semana."}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1.5" aria-label="Días entrenados de esta semana">
+              {["L", "M", "X", "J", "V", "S", "D"].map((label, index) => {
+                const date = addUtcDays(weekStart, index);
+                const trained = trainingDays.has(date);
+                return (
+                  <div key={date} className="flex flex-col items-center gap-1 text-[10px] text-muted-foreground">
+                    <span>{label}</span>
+                    <span
+                      className={`size-2 rounded-full ${trained ? "bg-primary shadow-[0_0_0_3px] shadow-primary/12" : "bg-muted-foreground/25"}`}
+                      aria-label={trained ? `${label}: entrenaste` : `${label}: sin entrenamiento`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {hasTraining && (
+              <div className="space-y-2 border-t border-border/70 pt-3 text-xs leading-relaxed">
+                {routines.length > 0 && (
+                  <p className="text-foreground">
+                    {routines.map(([name, count]) => `${name} ×${count}`).join(" · ")}
+                  </p>
+                )}
+                {visibleMuscles.length > 0 && (
+                  <p className="text-muted-foreground">
+                    {visibleMuscles.map(([name, sets]) => `${name} ${sets}`).join(" · ")}
+                    {muscleGroups.length > visibleMuscles.length
+                      ? ` · +${muscleGroups.length - visibleMuscles.length} ${muscleGroups.length - visibleMuscles.length === 1 ? "músculo" : "músculos"}`
+                      : ""}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       <section aria-labelledby="home-shortcuts-title" className="space-y-3">

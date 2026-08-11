@@ -272,6 +272,8 @@ export type WeeklyTrainingSummary = {
   minutes: number;
   volumeKg: number;
   routines: Record<string, number>;
+  muscleGroups: Record<string, number>;
+  trainingDays: string[];
 };
 
 export type ExerciseProgressSummary = {
