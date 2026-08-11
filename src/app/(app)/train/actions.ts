@@ -122,11 +122,22 @@ export async function createRoutineAction(
   }
 }
 
-export async function deleteRoutineAction(formData: FormData) {
-  const id = str(formData, "id");
-  if (!id) throw new Error("Falta id de rutina.");
+export async function archiveRoutineAction(id: string) {
+  if (!id.trim()) throw new Error("Falta id de rutina.");
   await archiveRoutine(id);
   revalidatePath("/train/routines");
+  revalidatePath(`/train/routines/${id}`);
+  revalidatePath("/train");
+  revalidatePath("/train/session/new");
+}
+
+export async function restoreRoutineAction(id: string) {
+  if (!id.trim()) throw new Error("Falta id de rutina.");
+  await updateRoutine({ id, is_active: true });
+  revalidatePath("/train/routines");
+  revalidatePath(`/train/routines/${id}`);
+  revalidatePath("/train");
+  revalidatePath("/train/session/new");
 }
 
 export async function updateRoutineAction(formData: FormData) {

@@ -15,7 +15,7 @@ export function InitialPlanImportButton({ imported }: { imported: boolean }) {
     if (
       imported &&
       !window.confirm(
-        "Esto restaurará Pecho, Espalda y Piernas con los objetivos de la planilla. No modifica sesiones anteriores ni otras rutinas. ¿Continuar?",
+        "Esto restaurará Pecho, Espalda y Piernas con los objetivos iniciales. No modifica sesiones anteriores ni otras rutinas. ¿Continuar?",
       )
     ) {
       return;
@@ -48,11 +48,11 @@ export function InitialPlanImportButton({ imported }: { imported: boolean }) {
         {pending
           ? "Cargando…"
           : imported
-            ? "Restaurar desde la planilla"
-            : "Cargar rutinas de la planilla"}
+            ? "Restaurar plan inicial"
+            : "Cargar plan inicial"}
       </Button>
       <p className="text-xs text-muted-foreground">
-        Importación repetible: no toca nutrición ni reescribe entrenamientos guardados.
+        Operación repetible: no toca nutrición ni reescribe entrenamientos guardados.
       </p>
       <div aria-live="polite">
         {message ? <p className="text-sm text-emerald-600">{message}</p> : null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,22 @@ const ROUTINE_COLORS = [
   { value: "#a855f7", label: "Violeta" },
 ] as const;
 
-export function RoutineCreateForm() {
+export function RoutineCreateForm({
+  autoFocus = false,
+  submitLabel = "Crear rutina",
+  onPendingChange,
+}: {
+  autoFocus?: boolean;
+  submitLabel?: string;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [onPendingChange, pending]);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,7 +60,13 @@ export function RoutineCreateForm() {
     <form onSubmit={onSubmit} className="space-y-3">
       <div className="space-y-1">
         <Label htmlFor="nombre">Nombre</Label>
-        <Input id="nombre" name="nombre" placeholder="Ej: Pecho" required />
+        <Input
+          id="nombre"
+          name="nombre"
+          placeholder="Ej: Push B"
+          autoFocus={autoFocus}
+          required
+        />
       </div>
       <div className="space-y-1">
         <Label htmlFor="color">Color</Label>
@@ -69,7 +87,7 @@ export function RoutineCreateForm() {
         <p className="text-sm text-destructive">{error}</p>
       ) : null}
       <Button className="h-11 w-full" type="submit" disabled={pending}>
-        {pending ? "Creando..." : "Crear"}
+        {pending ? "Creando…" : submitLabel}
       </Button>
     </form>
   );
