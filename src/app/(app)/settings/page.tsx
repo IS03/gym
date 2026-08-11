@@ -15,7 +15,7 @@ export default async function SettingsPage() {
   const initial = displayName.slice(0, 1).toUpperCase();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-1 motion-safe:duration-[180ms] motion-safe:ease-out">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Ajustes</h1>
         <p className="text-sm text-muted-foreground">

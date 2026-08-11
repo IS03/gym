@@ -89,7 +89,8 @@ type SetRowProps = {
 };
 
 const SET_GRID_LAYOUT =
-  "grid grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem] items-center gap-x-1 px-1";
+  "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem]";
+const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1 px-1`;
 
 function compactNumber(value: number | null) {
   return value === null ? "—" : String(value).replace(".", ",");
@@ -178,16 +179,18 @@ function SetRow({
   return (
     <div
       className={cn(
-        "border-b border-border/60 py-2.5 transition-colors duration-150 last:border-b-0",
-        SET_GRID_LAYOUT,
+        SET_GRID_SHARED,
+        "items-center border-b border-border/60 py-2.5 transition-colors duration-150 last:border-b-0",
         set.is_completed
           ? "bg-emerald-500/[0.06]"
           : "bg-transparent",
       )}
     >
-      <span className="metric-number text-center text-sm font-semibold text-muted-foreground">
-        {setIndex + 1}
-      </span>
+      <div className="flex min-w-0 items-center justify-center">
+        <span className="metric-number text-sm font-semibold text-muted-foreground">
+          {setIndex + 1}
+        </span>
+      </div>
       <div className="min-w-0 space-y-0.5">
         <Input
           aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
@@ -232,15 +235,17 @@ function SetRow({
           obj {compactNumber(set.target_reps)}
         </p>
       </div>
-      <span
-        className="metric-number flex w-full items-center justify-center text-center text-sm font-semibold"
-        aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
-      >
-        {compactNumber(set.target_rir)}
-      </span>
-      {readOnly ? (
+      <div className="flex min-w-0 items-center justify-center">
         <span
-          className="flex size-11 justify-self-center items-center justify-center rounded-full"
+          className="metric-number text-sm font-semibold"
+          aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
+        >
+          {compactNumber(set.target_rir)}
+        </span>
+      </div>
+      {readOnly ? (
+        <div
+          className="flex min-w-0 items-center justify-center"
           aria-label={set.is_completed ? "Serie completada" : "Serie pendiente"}
         >
           <span
@@ -253,11 +258,11 @@ function SetRow({
           >
             {set.is_completed ? <Check className="size-4" strokeWidth={3} aria-hidden /> : null}
           </span>
-        </span>
+        </div>
       ) : (
         <button
           type="button"
-          className="group flex size-11 touch-manipulation justify-self-center items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="group flex size-11 min-w-0 touch-manipulation justify-self-center items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
           aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
           aria-pressed={set.is_completed}
           onClick={() =>
@@ -1033,14 +1038,14 @@ export function SessionEditor({
                     <div
                       className={cn(
                         "border-b border-border/60 bg-muted/35 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
-                        SET_GRID_LAYOUT,
+                        SET_GRID_SHARED,
                       )}
                     >
-                      <span className="flex items-center justify-center text-center">Serie</span>
-                      <span className="flex items-center justify-center text-center">kg</span>
-                      <span className="flex items-center justify-center text-center">reps</span>
-                      <span className="flex items-center justify-center text-center">RIR</span>
-                      <span className="flex items-center justify-center text-center" aria-label="Completada">✓</span>
+                      <div className="flex min-w-0 items-center justify-center">Serie</div>
+                      <div className="flex min-w-0 items-center justify-center">kg</div>
+                      <div className="flex min-w-0 items-center justify-center">reps</div>
+                      <div className="flex min-w-0 items-center justify-center">RIR</div>
+                      <div className="flex min-w-0 items-center justify-center" aria-label="Completada">✓</div>
                     </div>
                     {payload.sets.map((set, setIndex) => (
                       <SetRow
@@ -1470,27 +1475,26 @@ export function SessionEditor({
           <div aria-live="polite">
             {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}
           </div>
-          <details className="group relative overflow-hidden rounded-xl border border-transparent">
+          <details className="group relative rounded-xl border border-border/80 px-3 py-2">
             <span
-              className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-destructive/70"
+              className="pointer-events-none absolute bottom-2.5 left-3 top-2.5 w-0.5 rounded-full bg-destructive/70"
               aria-hidden
             />
-            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between rounded-xl px-4 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+            <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg py-1 pl-4 pr-2 text-sm font-medium outline-none transition-[background-color,color] duration-150 hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
               Más opciones
-              <ChevronDown className="size-3.5 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+              <ChevronDown className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" aria-hidden />
             </summary>
-            <div className="px-4 pb-3 pt-1">
+            <div className="space-y-2 pb-1 pl-4 pt-2">
               <Button
-                className="w-full"
+                className="h-11 w-full"
                 type="button"
-                size="sm"
                 variant="destructive"
                 disabled={globalPending}
                 onClick={() => void cancelSession()}
               >
                 Cancelar entrenamiento
               </Button>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 Elimina solo esta sesión en curso; no toca la rutina ni el historial.
               </p>
             </div>

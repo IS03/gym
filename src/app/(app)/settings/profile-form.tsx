@@ -21,13 +21,14 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         />
       </div>
 
-      <div className="grid gap-3 min-[430px]:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="min-w-0 space-y-1">
           <Label htmlFor="birth_date">Nacimiento</Label>
           <Input
             id="birth_date"
             name="birth_date"
             type="date"
+            className="w-full min-w-0 max-w-full"
             defaultValue={profile?.birth_date ?? ""}
           />
         </div>
@@ -37,7 +38,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             id="sex"
             name="sex"
             defaultValue={profile?.sex ?? ""}
-            className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 pr-8 text-base transition-[color,border-color,box-shadow] duration-150 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 md:text-sm"
+            className="h-11 w-full min-w-0 max-w-full rounded-lg border border-input bg-background px-3 pr-8 text-base transition-[color,border-color,box-shadow] duration-150 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 md:text-sm"
           >
             <option value="">—</option>
             <option value="male">Masculino</option>
