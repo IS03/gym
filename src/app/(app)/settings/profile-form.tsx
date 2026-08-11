@@ -10,7 +10,7 @@ type ProfileFormProps = {
 
 export function ProfileForm({ profile }: ProfileFormProps) {
   return (
-    <form action={saveProfileAction} className="space-y-3">
+    <form action={saveProfileAction} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="display_name">Cómo querés que te llamemos</Label>
         <Input
@@ -21,8 +21,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
+      <div className="grid gap-3 min-[430px]:grid-cols-2">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="birth_date">Nacimiento</Label>
           <Input
             id="birth_date"
@@ -31,13 +31,13 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             defaultValue={profile?.birth_date ?? ""}
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="sex">Género</Label>
           <select
             id="sex"
             name="sex"
             defaultValue={profile?.sex ?? ""}
-            className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-11 w-full min-w-0 rounded-lg border border-input bg-background px-3 pr-8 text-base transition-[color,border-color,box-shadow] duration-150 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 md:text-sm"
           >
             <option value="">—</option>
             <option value="male">Masculino</option>
@@ -47,8 +47,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
+      <div className="grid gap-3 min-[430px]:grid-cols-2">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="height_cm">Altura (cm)</Label>
           <Input
             id="height_cm"
@@ -60,7 +60,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             placeholder="Ej: 178"
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="current_weight_kg">Peso (kg)</Label>
           <Input
             id="current_weight_kg"

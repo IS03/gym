@@ -33,9 +33,11 @@ describe("identidad OWNLEVEL", () => {
       name: "OWNLEVEL",
       short_name: "OWNLEVEL",
       start_url: "/home",
+      background_color: "#0d0d12",
+      theme_color: "#0d0d12",
       icons: [
-        { src: brandAssets.appIcon192, sizes: "192x192" },
-        { src: brandAssets.appIcon512, sizes: "512x512" },
+        { src: brandAssets.appIcon192, sizes: "192x192", purpose: "any" },
+        { src: brandAssets.appIcon512, sizes: "512x512", purpose: "any" },
       ],
     });
   });

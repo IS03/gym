@@ -11,7 +11,7 @@ export const ownlevelMetadata = {
   appleWebApp: {
     capable: true,
     title: "OWNLEVEL",
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
   },
   formatDetection: {
     telephone: false,
@@ -26,19 +26,21 @@ export function ownlevelManifest(): MetadataRoute.Manifest {
     start_url: "/home",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#ffffff",
-    theme_color: "#0a0a0a",
+    background_color: "#0d0d12",
+    theme_color: "#0d0d12",
     lang: "es",
     icons: [
       {
         src: brandAssets.appIcon192,
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
       },
       {
         src: brandAssets.appIcon512,
         sizes: "512x512",
         type: "image/png",
+        purpose: "any",
       },
     ],
   };
