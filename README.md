@@ -18,7 +18,9 @@ Copiá `.env.example` a `.env.local` y completá:
 
 **Vercel:** en el proyecto → **Settings → Environment Variables**, las mismas dos variables para **Production** (y **Preview** si usás previews). Sin esto el deploy no puede validar sesión. Volvé a desplegar tras agregarlas.
 
-**Supabase → Authentication → URL configuration:** agregá `https://<tu-dominio-vercel>.vercel.app/auth/callback` (y `http://localhost:3000/auth/callback` para local) en *Redirect URLs*.
+**Supabase → Authentication → URL Configuration:** configurá **Site URL** como `https://www.ownlevel.fit` y agregá `https://www.ownlevel.fit/auth/callback` (además de `http://localhost:3000/auth/callback` para desarrollo) en *Redirect URLs*.
+
+El login arma su callback desde el origen actual, por lo que no necesita una URL de producción hardcodeada: en producción redirige a `https://www.ownlevel.fit/auth/callback`.
 
 ## Scripts
 
