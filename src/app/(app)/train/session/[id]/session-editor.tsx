@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,7 @@ import {
   formatWorkoutDuration,
   formatWorkoutTimeRange,
   getWorkoutElapsedMilliseconds,
+  nextSessionReminder,
   renumberWorkoutPayload,
   sessionHasCardioExercise,
   sessionMetadataFromSession,
@@ -972,6 +973,12 @@ export function SessionEditor({
               exercise.rest_min_seconds_snapshot,
               exercise.rest_max_seconds_snapshot,
             );
+            const receivedReminder = !readOnly
+              ? nextSessionReminder(
+                  exercise.next_adjustment_snapshot,
+                  exercise.next_adjustment_note_snapshot,
+                )
+              : null;
             const exerciseContentId = `session-exercise-${exercise.id}`;
             const exerciseMeta = [
               exercise.muscle_group_label_snapshot ??
@@ -1028,6 +1035,12 @@ export function SessionEditor({
                           ? completedSummary
                           : exerciseMeta}
                       </p>
+                      {receivedReminder ? (
+                        <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
+                          <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                          <span className="truncate">Revisar hoy · {receivedReminder}</span>
+                        </p>
+                      ) : null}
                       {staleDraftIds.has(exercise.id) ? (
                         <p className="mt-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                           Borrador anterior sin aplicar
@@ -1071,6 +1084,18 @@ export function SessionEditor({
                       >
                         Descartar borrador viejo
                       </Button>
+                    </div>
+                  ) : null}
+
+                  {receivedReminder ? (
+                    <div className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm text-primary">
+                      <ArrowUpRight className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">Revisar hoy</p>
+                        <p className="mt-0.5 break-words font-medium text-foreground">
+                          {receivedReminder}
+                        </p>
+                      </div>
                     </div>
                   ) : null}
 
@@ -1211,7 +1236,7 @@ export function SessionEditor({
                     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
                       <span className="flex min-w-0 items-center gap-2">
                         <span>Progresión y próxima vez</span>
-                        {payload.notes || payload.decision_note || payload.apply_to_routine ? (
+                        {payload.notes || payload.decision === "custom" || payload.apply_to_routine ? (
                           <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene configuración adicional" />
                         ) : null}
                       </span>
@@ -1233,6 +1258,8 @@ export function SessionEditor({
                                 updateExercise(exercise.id, (current) => ({
                                   ...current,
                                   decision: adjustment.value,
+                                  decision_note:
+                                    adjustment.value === "custom" ? current.decision_note : "",
                                 }))
                               }
                             >
@@ -1240,12 +1267,15 @@ export function SessionEditor({
                             </Button>
                           ))}
                         </div>
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          Es sólo un recordatorio para la próxima vez; no modifica peso ni repeticiones.
+                        </p>
                       </div>
 
-                      {payload.decision === "custom" || payload.decision_note ? (
+                      {payload.decision === "custom" ? (
                         <div className="space-y-1.5">
                           <Label htmlFor={`decision-note-${exercise.id}`}>
-                            Indicación para la próxima vez
+                            Recordatorio para la próxima vez
                           </Label>
                           <textarea
                             id={`decision-note-${exercise.id}`}
@@ -1260,6 +1290,9 @@ export function SessionEditor({
                               }))
                             }
                           />
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            Se mostrará una sola vez al volver a abrir esta rutina.
+                          </p>
                         </div>
                       ) : null}
 

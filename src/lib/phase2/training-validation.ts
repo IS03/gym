@@ -104,6 +104,9 @@ export function validateRoutineExercisePayload(payload: RoutineExercisePayload) 
 
 export function validateWorkoutExercisePayload(payload: WorkoutExercisePayload) {
   assertAdjustment(payload.decision, "Decisión");
+  if (payload.decision === "custom" && !payload.decision_note.trim()) {
+    throw new Error("Escribí el recordatorio personalizado para la próxima vez.");
+  }
   validateWorkoutSets(payload.sets);
 
   const hasCompletedSet = payload.sets.some((set) => set.is_completed);

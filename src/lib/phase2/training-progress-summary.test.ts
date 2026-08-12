@@ -47,6 +47,7 @@ function exercise(overrides: Partial<WorkoutSessionExercise> = {}): WorkoutSessi
     rest_max_seconds_snapshot: null,
     planned_sets_count: 3,
     next_adjustment_snapshot: "maintain",
+    next_adjustment_note_snapshot: null,
     decision: "maintain",
     decision_note: null,
     apply_to_routine: false,

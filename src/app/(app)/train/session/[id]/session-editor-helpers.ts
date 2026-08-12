@@ -32,6 +32,30 @@ export function workoutPayloadFromDetail(
   };
 }
 
+/**
+ * A reminder belongs to the session that created it, not to the new decision
+ * the user is making now. Keep the display formatting in one place so the
+ * collapsed and expanded exercise cards cannot disagree.
+ */
+export function nextSessionReminder(
+  adjustment: WorkoutSessionExerciseClient["next_adjustment_snapshot"],
+  note: WorkoutSessionExerciseClient["next_adjustment_note_snapshot"],
+): string | null {
+  switch (adjustment) {
+    case "increase_weight":
+      return "Subir peso";
+    case "increase_reps":
+      return "Subir repeticiones";
+    case "custom": {
+      const normalized = note?.trim();
+      return normalized || null;
+    }
+    case "maintain":
+    default:
+      return null;
+  }
+}
+
 export function sessionMetadataFromSession(
   session: WorkoutSessionClient,
 ): SessionMetadataInput {
@@ -83,6 +107,8 @@ export function clientDetailFromWorkoutDetail(
       weight_mode_snapshot: exercise.weight_mode_snapshot,
       rest_min_seconds_snapshot: exercise.rest_min_seconds_snapshot,
       rest_max_seconds_snapshot: exercise.rest_max_seconds_snapshot,
+      next_adjustment_snapshot: exercise.next_adjustment_snapshot,
+      next_adjustment_note_snapshot: exercise.next_adjustment_note_snapshot,
       decision: exercise.decision,
       decision_note: exercise.decision_note,
       apply_to_routine: exercise.apply_to_routine,

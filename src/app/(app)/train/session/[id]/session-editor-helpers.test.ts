@@ -3,6 +3,7 @@ import {
   completedExerciseSummary,
   completionStats,
   initialExpandedExerciseId,
+  nextSessionReminder,
   formatWorkoutClockTime,
   formatWorkoutDuration,
   formatWorkoutTimeRange,
@@ -46,6 +47,16 @@ function payload(): WorkoutExercisePayload {
 }
 
 describe("borrador de sesión", () => {
+  it("muestra sólo el recordatorio heredado y no reutiliza la decisión nueva", () => {
+    expect(nextSessionReminder("increase_weight", null)).toBe("Subir peso");
+    expect(nextSessionReminder("increase_reps", null)).toBe("Subir repeticiones");
+    expect(nextSessionReminder("custom", " Probar 30 kg en la primera serie ")).toBe(
+      "Probar 30 kg en la primera serie",
+    );
+    expect(nextSessionReminder("maintain", null)).toBeNull();
+    expect(nextSessionReminder("custom", "   ")).toBeNull();
+  });
+
   it("renumera al quitar una serie y conserva el estado global", () => {
     const value = payload();
     value.sets = [value.sets[1]];

@@ -46,6 +46,14 @@ describe("validación de entrenamiento", () => {
     );
   });
 
+  it("exige una nota sólo para el recordatorio personalizado", () => {
+    const value = payload();
+    value.decision = "custom";
+    expect(() => validateWorkoutExercisePayload(value)).toThrow("recordatorio personalizado");
+    value.decision_note = "Probar 30 kg en la primera serie";
+    expect(() => validateWorkoutExercisePayload(value)).not.toThrow();
+  });
+
   it("acepta coma decimal en entradas móviles", () => {
     expect(nullableNumberFromInput("12,5")).toBe(12.5);
     expect(nullableNumberFromInput("")).toBeNull();

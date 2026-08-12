@@ -51,6 +51,7 @@ export type RoutineExercise = {
   exercise_id: string;
   exercise_order: number;
   next_adjustment: TrainingAdjustment;
+  next_adjustment_note: string | null;
   rest_min_seconds: number | null;
   rest_max_seconds: number | null;
   notes: string | null;
@@ -114,6 +115,7 @@ export type WorkoutSessionExercise = {
   rest_max_seconds_snapshot: number | null;
   planned_sets_count: number;
   next_adjustment_snapshot: TrainingAdjustment;
+  next_adjustment_note_snapshot: string | null;
   decision: TrainingAdjustment;
   decision_note: string | null;
   apply_to_routine: boolean;
@@ -264,6 +266,8 @@ export type WorkoutSessionExerciseClient = Pick<
   | "weight_mode_snapshot"
   | "rest_min_seconds_snapshot"
   | "rest_max_seconds_snapshot"
+  | "next_adjustment_snapshot"
+  | "next_adjustment_note_snapshot"
   | "decision"
   | "decision_note"
   | "apply_to_routine"
