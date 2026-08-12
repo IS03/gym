@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { listExercises } from "@/lib/phase2/training";
 import { getWorkoutSessionDetail } from "@/lib/phase2/training-robust";
 import { SessionEditor } from "./session-editor";
@@ -11,10 +12,9 @@ export default async function SessionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [detail, exercises] = await Promise.all([
-    getWorkoutSessionDetail(id),
-    listExercises({ includeArchived: false }),
-  ]);
+  const detail = await getWorkoutSessionDetail(id);
+  if (!detail) notFound();
+  const exercises = await listExercises({ includeArchived: false });
   const clientDetail = clientDetailFromWorkoutDetail(detail);
   const editorKey = `${detail.session.updated_at}:${clientDetail.exercises
     .map((exercise) => `${exercise.id}:${exercise.updated_at}`)

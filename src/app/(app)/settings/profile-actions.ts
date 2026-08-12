@@ -9,17 +9,8 @@ import {
   formatWeightKg,
   parseOptionalWeight,
   shouldRecordCurrentWeight,
-} from "@/lib/weight-history";
-
-export type ProfileSaveState = {
-  status: "idle" | "success" | "partial" | "error";
-  message: string | null;
-};
-
-export const initialProfileSaveState: ProfileSaveState = {
-  status: "idle",
-  message: null,
-};
+} from "../../../lib/weight-history";
+import type { ProfileSaveState } from "./profile-state";
 
 function parseNumber(value: FormDataEntryValue | null): number | null {
   if (value === null) return null;

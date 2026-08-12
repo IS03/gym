@@ -6,6 +6,7 @@ import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import { buildWeeklyTrainingSummaries } from "./training-progress-summary";
 import { daysBetweenIsoDates } from "./session-history";
+import { resolveWorkoutSessionLookup } from "./training-session-lookup";
 import {
   validateCompletedSessionCorrection,
   validateRoutineExercisePayload,
@@ -255,17 +256,21 @@ type RawSessionExercise = WorkoutSessionExercise & {
 
 export async function getWorkoutSessionDetail(
   sessionId: string,
-): Promise<WorkoutSessionDetail> {
+): Promise<WorkoutSessionDetail | null> {
   const { supabase, userId } = await getAuthedContext();
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
     .select("*")
     .eq("id", sessionId)
     .eq("user_id", userId)
-    .single();
-  if (sessionError) throw new Error(`Leer sesión: ${sessionError.message}`);
+    .maybeSingle();
 
-  const typedSession = session as WorkoutSession;
+  const typedSession = resolveWorkoutSessionLookup(
+    (session ?? null) as WorkoutSession | null,
+    sessionError,
+  );
+  if (!typedSession) return null;
+
   const [{ data: dayLog, error: dayError }, { data: rows, error: rowsError }] =
     await Promise.all([
       supabase
