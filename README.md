@@ -1,37 +1,149 @@
-# Appgym
+<p align="center">
+  <img src="./public/brand/ownlevel-lockup-horizontal.png" alt="OWNLEVEL" width="320" />
+</p>
 
-PWA (Next.js + Supabase) — seguimiento de nutrición y entrenamiento (en desarrollo).
+# OWNLEVEL
 
-## Requisitos
+OWNLEVEL es una PWA personal de seguimiento físico que centraliza entrenamiento, nutrición y evolución corporal en una sola experiencia mobile-first.
 
-- Node 20+
-- Proyecto en [Supabase](https://supabase.com) con Auth activo
+**Producción:** https://ownlevel.fit
+
+## Qué incluye
+
+### Entrenamiento
+
+- Rutinas editables y ordenables.
+- Biblioteca de ejercicios con objetivos por serie.
+- Inicio rápido desde rutina o sesión libre.
+- Una única sesión activa por usuario.
+- Registro de peso, repeticiones, RIR objetivo, descansos y series completadas.
+- Draft local y autosave no bloqueante durante el entrenamiento.
+- Historial de sesiones y corrección controlada de registros completados.
+- Historial y progreso por ejercicio.
+- Calendario de entrenamiento, continuidad y reportes semanales.
+- Recordatorios de progresión para la próxima sesión.
+
+### Nutrición
+
+- Registro diario de comidas.
+- Calorías y proteína por entrada.
+- Totales diarios contra objetivos.
+- Edición y eliminación controlada de registros.
+- Base preparada para ampliar reportes nutricionales sin duplicar la fuente de verdad.
+
+### Progreso
+
+- Resumen semanal de entrenamiento.
+- Duración, volumen, series y distribución muscular.
+- Comparación entre semanas.
+- Evolución por ejercicio.
+- Historial de peso corporal.
+
+### Experiencia
+
+- PWA responsive, diseñada primero para iPhone/mobile.
+- Navegación dedicada para mobile y desktop.
+- Tema claro/oscuro.
+- Autenticación con Supabase Auth.
+- Zona horaria de producto: `America/Argentina/Cordoba`.
+
+## Stack
+
+| Capa | Tecnología |
+| --- | --- |
+| Framework | Next.js 16 (App Router) |
+| UI | React 19, TypeScript, Tailwind CSS 4 |
+| Componentes | Base UI / shadcn, Lucide |
+| Backend | Supabase Postgres + Auth + RLS |
+| Hosting | Vercel |
+| PWA | `@ducanh2912/next-pwa` |
+| Tests | Vitest |
+
+## Estructura principal
+
+```text
+src/
+  app/                 rutas y pantallas
+  components/          UI compartida
+  lib/                 dominio, acceso a datos y utilidades
+supabase/
+  migrations/          esquema y cambios de base de datos
+public/
+  brand/               identidad visual de OWNLEVEL
+docs/
+  product/             definición funcional
+  architecture/        decisiones de arquitectura
+  development/         reglas de ingeniería
+  history/             decisiones históricas consolidadas
+  archive/             documentación histórica no vigente
+```
+
+## Desarrollo local
+
+### Requisitos
+
+- Node.js 20+
+- Un proyecto de Supabase con Auth habilitado
+
+### Instalación
+
+```bash
+git clone https://github.com/IS03/gym.git
+cd gym
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+La aplicación queda disponible en `http://localhost:3000`.
 
 ## Variables de entorno
 
-Copiá `.env.example` a `.env.local` y completá:
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-| Variable | Dónde obtenerla |
-| -------- | --------------- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Misma pantalla, clave **anon** o **publishable** (pública) |
+Usar únicamente la clave pública `anon`/`publishable` en el cliente. La `service_role` no debe exponerse en frontend.
 
-**Vercel:** en el proyecto → **Settings → Environment Variables**, las mismas dos variables para **Production** (y **Preview** si usás previews). Sin esto el deploy no puede validar sesión. Volvé a desplegar tras agregarlas.
+Para autenticación local y producción, configurar en Supabase los callbacks correspondientes, incluyendo:
 
-**Supabase → Authentication → URL Configuration:** configurá **Site URL** como `https://www.ownlevel.fit` y agregá `https://www.ownlevel.fit/auth/callback` (además de `http://localhost:3000/auth/callback` para desarrollo) en *Redirect URLs*.
-
-El login arma su callback desde el origen actual, por lo que no necesita una URL de producción hardcodeada: en producción redirige a `https://www.ownlevel.fit/auth/callback`.
+```text
+http://localhost:3000/auth/callback
+https://ownlevel.fit/auth/callback
+```
 
 ## Scripts
 
 ```bash
-npm run dev     # desarrollo (Turbopack; PWA desactivada en next.config)
-npm run build   # producción (Webpack; requerido por @ducanh2912/next-pwa)
-npm run start
-npm run lint
+npm run dev      # desarrollo
+npm run test     # tests
+npm run lint     # ESLint
+npm run build    # build de producción con Webpack
+npm run start    # servidor de producción
 ```
 
-## Notas de despliegue
+`npm run build` utiliza `next build --webpack` por compatibilidad con la configuración PWA actual.
 
-- `next build` usa **`--webpack`** por el plugin PWA; en local `next dev` no lo necesita.
-- Las rutas autenticadas usan `dynamic = "force-dynamic"` para no ejecutar el layout con Supabase durante el prerender del build (compatible con builds en CI sin `.env` embebido).
+## Principios de arquitectura
+
+- Rutina y sesión son entidades distintas.
+- Una sesión iniciada conserva snapshots históricos.
+- Una sesión completada no se reabre para corregirla.
+- La interfaz puede trabajar de forma optimista, pero la finalización exige persistencia confirmada.
+- Las mutaciones de datos respetan ownership y RLS.
+- Las fechas lógicas del producto se resuelven en horario de Córdoba.
+- Mobile no debe degradarse para mejorar desktop.
+
+## Documentación
+
+La documentación vigente está indexada en [`docs/README.md`](./docs/README.md).
+
+Documentos principales:
+
+- [Visión de producto](./docs/product/product-overview.md)
+- [Arquitectura de entrenamiento](./docs/architecture/training-system.md)
+- [Guía de ingeniería](./docs/development/engineering-guidelines.md)
+- [Historial de decisiones](./docs/history/technical-decisions.md)
+
+Los documentos históricos anteriores se conservan en `docs/archive/` y no deben utilizarse como fuente de verdad sin contrastarlos con el código actual.
