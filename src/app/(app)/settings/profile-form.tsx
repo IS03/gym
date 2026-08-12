@@ -1,16 +1,27 @@
+"use client";
+
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/lib/phase1/profile";
-import { saveProfileAction } from "./profile-actions";
+import {
+  initialProfileSaveState,
+  saveProfileAction,
+} from "./profile-actions";
 
 type ProfileFormProps = {
   profile: Profile | null;
 };
 
 export function ProfileForm({ profile }: ProfileFormProps) {
+  const [state, formAction, pending] = useActionState(
+    saveProfileAction,
+    initialProfileSaveState,
+  );
+
   return (
-    <form action={saveProfileAction} className="space-y-4">
+    <form action={formAction} className="space-y-4">
       <div className="space-y-1">
         <Label htmlFor="display_name">Cómo querés que te llamemos</Label>
         <Input
@@ -87,9 +98,24 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         </p>
       </div>
 
-      <Button className="h-11 w-full" type="submit">
-        Guardar perfil
-      </Button>
+      <div className="space-y-2">
+        <Button className="h-11 w-full" type="submit" disabled={pending}>
+          {pending ? "Guardando…" : "Guardar perfil"}
+        </Button>
+        <p
+          aria-live="polite"
+          className={
+            state.status === "error"
+              ? "text-sm text-destructive"
+              : state.status === "success"
+                ? "text-sm text-primary"
+                : "text-sm text-muted-foreground"
+          }
+          role={state.status === "error" ? "alert" : undefined}
+        >
+          {state.message}
+        </p>
+      </div>
     </form>
   );
 }

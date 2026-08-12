@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import type { DayLog, MealEntry } from "./types";
+import {
+  parseOptionalWeight,
+  type WeightHistoryPoint,
+} from "../weight-history";
 
 export type IsoDate = `${number}-${number}-${number}`; // YYYY-MM-DD
 
@@ -237,3 +241,81 @@ export async function listRecentDays(limit = 14): Promise<DayLog[]> {
   return (data ?? []) as DayLog[];
 }
 
+export async function listWeightHistory(limit = 366): Promise<WeightHistoryPoint[]> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const safeLimit = Math.min(Math.max(limit, 1), 1000);
+
+  const { data, error } = await supabase
+    .from("day_logs")
+    .select("id, log_date, weight_kg")
+    .eq("user_id", userId)
+    .not("weight_kg", "is", null)
+    .order("log_date", { ascending: true })
+    .limit(safeLimit);
+
+  if (error) throw new Error(`Leer historial de peso: ${error.message}`);
+  return (data ?? []) as WeightHistoryPoint[];
+}
+
+export async function recordWeightForDate(input: {
+  date: string;
+  weightKg: number;
+}): Promise<WeightHistoryPoint> {
+  assertIsoDate(input.date);
+  const parsed = parseOptionalWeight(String(input.weightKg));
+  if (!parsed.ok || parsed.value === null) {
+    throw new Error(parsed.ok ? "El peso es obligatorio." : parsed.error);
+  }
+
+  const dayLog = await getOrCreateDayLog(input.date);
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("day_logs")
+    .update({ weight_kg: parsed.value })
+    .eq("id", dayLog.id)
+    .eq("user_id", userId)
+    .select("id, log_date, weight_kg")
+    .single();
+
+  if (error) throw new Error(`Guardar peso histórico: ${error.message}`);
+  return data as WeightHistoryPoint;
+}
+
+export async function updateWeightHistoryEntry(input: {
+  logDate: string;
+  weightKg: number;
+}): Promise<WeightHistoryPoint> {
+  assertIsoDate(input.logDate);
+  const parsed = parseOptionalWeight(String(input.weightKg));
+  if (!parsed.ok || parsed.value === null) {
+    throw new Error(parsed.ok ? "El peso es obligatorio." : parsed.error);
+  }
+
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("day_logs")
+    .update({ weight_kg: parsed.value })
+    .eq("user_id", userId)
+    .eq("log_date", input.logDate)
+    .select("id, log_date, weight_kg")
+    .single();
+
+  if (error) throw new Error(`Editar peso histórico: ${error.message}`);
+  return data as WeightHistoryPoint;
+}
+
+export async function deleteWeightHistoryEntry(logDate: string): Promise<void> {
+  assertIsoDate(logDate);
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { error } = await supabase
+    .from("day_logs")
+    .update({ weight_kg: null })
+    .eq("user_id", userId)
+    .eq("log_date", logDate);
+
+  if (error) throw new Error(`Eliminar peso histórico: ${error.message}`);
+}
