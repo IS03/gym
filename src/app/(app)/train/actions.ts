@@ -384,7 +384,8 @@ export async function saveWorkoutExerciseAction(input: {
 }): Promise<TrainingActionResult<{ updatedAt: string }>> {
   try {
     const updatedAt = await saveWorkoutExercise(input);
-    revalidatePath(`/train/session/${input.sessionId}`);
+    // Background autosave reconciles this exercise in the client. Structural
+    // changes and finalization still revalidate the session explicitly.
     return { ok: true, data: { updatedAt } };
   } catch (error) {
     return { ok: false, error: actionError(error) };

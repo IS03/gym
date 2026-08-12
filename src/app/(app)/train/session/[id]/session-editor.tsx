@@ -39,6 +39,7 @@ import {
   nullableNumberFromInput,
   payloadsEqual,
 } from "@/lib/phase2/training-validation";
+import { ExerciseAutosaveQueue } from "@/lib/phase2/exercise-autosave";
 import type {
   SessionMetadataInput,
   MuscleGroup,
@@ -89,13 +90,17 @@ type SetRowProps = {
   set: EditableWorkoutSet;
   setIndex: number;
   readOnly: boolean;
-  onChange: (updater: (set: EditableWorkoutSet) => EditableWorkoutSet) => void;
+  onChange: (
+    updater: (set: EditableWorkoutSet) => EditableWorkoutSet,
+    options?: { immediate?: boolean },
+  ) => void;
 };
 
 const SET_GRID_LAYOUT =
   "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem]";
 const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1 px-1`;
 const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
+const EXERCISE_AUTOSAVE_DEBOUNCE_MS = 850;
 
 function finishConfirmationKey(sessionId: string) {
   return `${FINISH_CONFIRMATION_KEY_PREFIX}${sessionId}`;
@@ -275,10 +280,13 @@ function SetRow({
           aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
           aria-pressed={set.is_completed}
           onClick={() =>
-            onChange((current) => ({
-              ...current,
-              is_completed: !current.is_completed,
-            }))
+            onChange(
+              (current) => ({
+                ...current,
+                is_completed: !current.is_completed,
+              }),
+              { immediate: true },
+            )
           }
         >
           <span
@@ -381,9 +389,14 @@ export function SessionEditor({
   );
   const [overrides, setOverrides] = useState<Record<string, WorkoutExercisePayload>>({});
   const [statuses, setStatuses] = useState<Record<string, ExerciseStatus>>({});
+  const mountedRef = useRef(true);
+  const serverPayloadsRef = useRef(initialPayloads);
+  const serverVersionsRef = useRef(initialVersions);
+  const latestPayloadsRef = useRef(initialPayloads);
   const [storageError, setStorageError] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalPending, setGlobalPending] = useState(false);
+  const [finishStage, setFinishStage] = useState<"saving" | "finishing" | null>(null);
   const [finishConfirmationOpen, setFinishConfirmationOpen] = useState(false);
   const [selectedExerciseId, setSelectedExerciseId] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
@@ -391,6 +404,68 @@ export function SessionEditor({
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const autosaveRef = useRef<ExerciseAutosaveQueue<WorkoutExercisePayload> | null>(null);
+  if (autosaveRef.current === null) {
+    autosaveRef.current = new ExerciseAutosaveQueue<WorkoutExercisePayload>({
+      debounceMs: EXERCISE_AUTOSAVE_DEBOUNCE_MS,
+      equals: payloadsEqual,
+      save: async ({ exerciseId, payload, expectedUpdatedAt }) => {
+        const result = await saveWorkoutExerciseAction({
+          sessionId: detail.session.id,
+          sessionExerciseId: exerciseId,
+          expectedUpdatedAt,
+          payload,
+        });
+        if (!result.ok) throw new Error(result.error);
+        return result.data;
+      },
+      onStateChange: (exerciseId, state) => {
+        if (!mountedRef.current) return;
+        setStatuses((current) => ({
+          ...current,
+          [exerciseId]: {
+            pending: state.phase === "saving",
+            saved: state.phase === "saved",
+            error: state.error,
+          },
+        }));
+      },
+      onSaved: (
+        exerciseId,
+        { savedPayload, latestPayload, updatedAt, hasNewerChanges },
+      ) => {
+        serverPayloadsRef.current = {
+          ...serverPayloadsRef.current,
+          [exerciseId]: savedPayload,
+        };
+        serverVersionsRef.current = {
+          ...serverVersionsRef.current,
+          [exerciseId]: updatedAt,
+        };
+
+        if (hasNewerChanges) {
+          writeExerciseDraft(exerciseId, latestPayload, updatedAt);
+        } else {
+          latestPayloadsRef.current = {
+            ...latestPayloadsRef.current,
+            [exerciseId]: savedPayload,
+          };
+          removeDraft(workoutDraftKey(detail.session.id, exerciseId));
+        }
+
+        if (!mountedRef.current) return;
+        setServerPayloads((current) => ({ ...current, [exerciseId]: savedPayload }));
+        setServerVersions((current) => ({ ...current, [exerciseId]: updatedAt }));
+        if (!hasNewerChanges) {
+          setOverrides((current) => {
+            const next = { ...current };
+            delete next[exerciseId];
+            return next;
+          });
+        }
+      },
+    });
+  }
   const sessionExerciseLibraryIds = useMemo(
     () => new Set(detail.exercises.map((exercise) => exercise.exercise_id)),
     [detail.exercises],
@@ -486,6 +561,9 @@ export function SessionEditor({
     [currentPayloads, exerciseIds, serverPayloads],
   );
   const metadataDirty = !readOnly && !payloadsEqual(metadata, baseMetadata);
+  const interactionLocked = readOnly || finishStage !== null;
+  const syncingCount = Object.values(statuses).filter((status) => status.pending).length;
+  const syncErrorCount = Object.values(statuses).filter((status) => status.error).length;
   const stats = completionStats(Object.values(currentPayloads));
   const progressPercent =
     stats.totalSets === 0 ? 0 : Math.round((stats.completedSets / stats.totalSets) * 100);
@@ -493,6 +571,42 @@ export function SessionEditor({
   const restRemaining = restTimer
     ? Math.max(0, Math.ceil((restTimer.endAt - timerNow) / 1000))
     : 0;
+
+  useEffect(() => {
+    latestPayloadsRef.current = currentPayloads;
+  }, [currentPayloads]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const autosave = autosaveRef.current;
+    autosave?.activate();
+    return () => {
+      mountedRef.current = false;
+      autosave?.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const autosave = autosaveRef.current;
+    for (const exercise of detail.exercises) {
+      autosave?.register({
+        exerciseId: exercise.id,
+        serverVersion: serverVersionsRef.current[exercise.id] ?? exercise.updated_at,
+        serverPayload: serverPayloadsRef.current[exercise.id] ?? initialPayloads[exercise.id],
+        localPayload: currentPayloads[exercise.id],
+      });
+    }
+  }, [currentPayloads, detail.exercises, initialPayloads, readOnly]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    const retryWhenOnline = () => {
+      void autosaveRef.current?.flushAll(exerciseIds);
+    };
+    window.addEventListener("online", retryWhenOnline);
+    return () => window.removeEventListener("online", retryWhenOnline);
+  }, [exerciseIds, readOnly]);
 
   useEffect(() => {
     if (appliedHydratedFocus.current) return;
@@ -546,28 +660,31 @@ export function SessionEditor({
     }
   }, [detail.session.id, detail.session.status]);
 
-  function persistExerciseDraft(exerciseId: string, payload: WorkoutExercisePayload) {
+  function writeExerciseDraft(
+    exerciseId: string,
+    payload: WorkoutExercisePayload,
+    serverUpdatedAt = serverVersionsRef.current[exerciseId],
+  ) {
     const saved = writeDraft(workoutDraftKey(detail.session.id, exerciseId), {
       version: TRAINING_DRAFT_VERSION,
       sessionExerciseId: exerciseId,
-      serverUpdatedAt: serverVersions[exerciseId],
+      serverUpdatedAt,
       savedAt: new Date().toISOString(),
       payload,
     });
-    if (!saved) setStorageError(true);
+    if (!saved && mountedRef.current) setStorageError(true);
   }
 
   function updateExercise(
     exerciseId: string,
     updater: (current: WorkoutExercisePayload) => WorkoutExercisePayload,
+    options?: { immediate?: boolean },
   ) {
-    const next = updater(currentPayloads[exerciseId]);
+    const next = updater(latestPayloadsRef.current[exerciseId]);
+    latestPayloadsRef.current = { ...latestPayloadsRef.current, [exerciseId]: next };
     setOverrides((current) => ({ ...current, [exerciseId]: next }));
-    setStatuses((current) => ({
-      ...current,
-      [exerciseId]: { pending: false, saved: false, error: null },
-    }));
-    persistExerciseDraft(exerciseId, next);
+    writeExerciseDraft(exerciseId, next);
+    autosaveRef.current?.change(exerciseId, next, options);
   }
 
   function startRestTimer(exercise: WorkoutSessionClientDetail["exercises"][number]) {
@@ -605,7 +722,15 @@ export function SessionEditor({
     if (!saved) setStorageError(true);
   }
 
-  function discardExerciseDraft(exerciseId: string) {
+  async function discardExerciseDraft(exerciseId: string) {
+    await autosaveRef.current?.discardLocal(
+      exerciseId,
+      serverPayloadsRef.current[exerciseId],
+    );
+    latestPayloadsRef.current = {
+      ...latestPayloadsRef.current,
+      [exerciseId]: serverPayloadsRef.current[exerciseId],
+    };
     setOverrides((current) => {
       const next = { ...current };
       delete next[exerciseId];
@@ -618,41 +743,13 @@ export function SessionEditor({
     removeDraft(workoutDraftKey(detail.session.id, exerciseId));
   }
 
-  async function saveExercise(exerciseId: string) {
-    setStatuses((current) => ({
-      ...current,
-      [exerciseId]: { pending: true, saved: false, error: null },
-    }));
-    const payload = currentPayloads[exerciseId];
-    const result = await saveWorkoutExerciseAction({
-      sessionId: detail.session.id,
-      sessionExerciseId: exerciseId,
-      expectedUpdatedAt: serverVersions[exerciseId],
-      payload,
-    });
-    if (!result.ok) {
-      setStatuses((current) => ({
-        ...current,
-        [exerciseId]: { pending: false, saved: false, error: result.error },
-      }));
-      return;
-    }
+  function retryExercise(exerciseId: string) {
+    void autosaveRef.current?.retry(exerciseId);
+  }
 
-    setServerPayloads((current) => ({ ...current, [exerciseId]: payload }));
-    setServerVersions((current) => ({
-      ...current,
-      [exerciseId]: result.data.updatedAt,
-    }));
-    setOverrides((current) => {
-      const next = { ...current };
-      delete next[exerciseId];
-      return next;
-    });
-    removeDraft(workoutDraftKey(detail.session.id, exerciseId));
-    setStatuses((current) => ({
-      ...current,
-      [exerciseId]: { pending: false, saved: true, error: null },
-    }));
+  function toggleExercise(exerciseId: string) {
+    if (expandedExerciseId) void autosaveRef.current?.flush(expandedExerciseId);
+    setExpandedExerciseId((current) => (current === exerciseId ? null : exerciseId));
   }
 
   async function addExistingExercise() {
@@ -673,18 +770,8 @@ export function SessionEditor({
   }
 
   async function removeExercise(exerciseId: string, name: string) {
-    if (dirtyIds.has(exerciseId)) {
-      setStatuses((current) => ({
-        ...current,
-        [exerciseId]: {
-          pending: false,
-          saved: false,
-          error: "Descartá o guardá el borrador antes de quitar este ejercicio.",
-        },
-      }));
-      return;
-    }
     if (!window.confirm(`¿Quitar ${name} de esta sesión?`)) return;
+    await autosaveRef.current?.pauseAndWait(exerciseId);
     setStatuses((current) => ({
       ...current,
       [exerciseId]: { pending: true, saved: false, error: null },
@@ -694,9 +781,11 @@ export function SessionEditor({
     formData.set("id", exerciseId);
     try {
       await removeSessionExerciseAction(formData);
+      await autosaveRef.current?.remove(exerciseId);
       removeDraft(workoutDraftKey(detail.session.id, exerciseId));
       router.refresh();
     } catch (error) {
+      autosaveRef.current?.resume(exerciseId);
       setStatuses((current) => ({
         ...current,
         [exerciseId]: {
@@ -709,22 +798,36 @@ export function SessionEditor({
   }
 
   async function finishSession() {
-    if (dirtyIds.size > 0) {
-      setGlobalError("Guardá o descartá todos los ejercicios pendientes antes de finalizar.");
-      return;
-    }
     if (stats.completedSets === 0) {
-      setGlobalError("Marcá y guardá al menos una serie antes de finalizar.");
+      setGlobalError("Marcá al menos una serie antes de finalizar.");
       return;
     }
     setGlobalPending(true);
+    setFinishStage("saving");
     setGlobalError(null);
+    const failedExerciseIds = await autosaveRef.current?.flushAll(exerciseIds) ?? [];
+    if (failedExerciseIds.length > 0) {
+      const names = failedExerciseIds.map(
+        (exerciseId) =>
+          detail.exercises.find((exercise) => exercise.id === exerciseId)?.nombre_snapshot ??
+          "Ejercicio",
+      );
+      setGlobalPending(false);
+      setFinishStage(null);
+      setGlobalError(
+        `No pudimos finalizar todavía. No se pudo guardar: ${names.join(", ")}. Reintentá cuando tengas conexión.`,
+      );
+      return;
+    }
+
+    setFinishStage("finishing");
     const result = await finishWorkoutSessionAction({
       sessionId: detail.session.id,
       metadata,
     });
     setGlobalPending(false);
     if (!result.ok) {
+      setFinishStage(null);
       setGlobalError(result.error);
       return;
     }
@@ -738,6 +841,7 @@ export function SessionEditor({
     } catch {
       // Saving succeeded. Keep the existing flow functional if browser storage is unavailable.
     }
+    autosaveRef.current?.dispose();
     for (const key of draftKeys) removeDraft(key);
     router.refresh();
   }
@@ -752,12 +856,17 @@ export function SessionEditor({
     }
     setGlobalPending(true);
     setGlobalError(null);
+    await Promise.all(
+      exerciseIds.map((exerciseId) => autosaveRef.current?.pauseAndWait(exerciseId)),
+    );
     const result = await cancelWorkoutSessionAction({ sessionId: detail.session.id });
     setGlobalPending(false);
     if (!result.ok) {
+      for (const exerciseId of exerciseIds) autosaveRef.current?.resume(exerciseId);
       setGlobalError(result.error);
       return;
     }
+    autosaveRef.current?.dispose();
     for (const key of draftKeys) removeDraft(key);
     router.replace("/train");
     router.refresh();
@@ -784,9 +893,20 @@ export function SessionEditor({
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">{formatSessionDate(detail.logDate)}</p>
           </div>
-          {!readOnly && (dirtyIds.size > 0 || metadataDirty) ? (
-            <span className="mt-1 shrink-0 rounded-full bg-amber-500/12 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
-              {dirtyIds.size + (metadataDirty ? 1 : 0)} sin guardar
+          {!readOnly && (syncErrorCount > 0 || syncingCount > 0 || metadataDirty) ? (
+            <span
+              className={cn(
+                "mt-1 shrink-0 rounded-full px-2 py-1 text-[11px] font-medium",
+                syncErrorCount > 0
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
+              {syncErrorCount > 0
+                ? `${syncErrorCount} sin sincronizar`
+                : syncingCount > 0
+                  ? "Sincronizando"
+                  : "Resumen en borrador"}
             </span>
           ) : null}
         </div>
@@ -952,6 +1072,7 @@ export function SessionEditor({
               type="button"
               size="sm"
               variant="ghost"
+              disabled={globalPending}
               onClick={() => setExercisePickerOpen(true)}
             >
               <Plus className="size-4" aria-hidden />
@@ -1011,7 +1132,7 @@ export function SessionEditor({
                     className="flex min-h-[4.25rem] w-full touch-manipulation items-center gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                     aria-expanded={expanded}
                     aria-controls={exerciseContentId}
-                    onClick={() => setExpandedExerciseId(expanded ? null : exercise.id)}
+                    onClick={() => toggleExercise(exercise.id)}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-1.5">
@@ -1035,6 +1156,21 @@ export function SessionEditor({
                           ? completedSummary
                           : exerciseMeta}
                       </p>
+                      {status?.pending ? (
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                          Guardando…
+                        </p>
+                      ) : status?.error ? (
+                        <p className="mt-0.5 text-[11px] font-medium text-destructive">
+                          Sin sincronizar
+                        </p>
+                      ) : status?.saved ? (
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                          <Check className="size-3" strokeWidth={2.5} aria-hidden />
+                          Guardado
+                        </p>
+                      ) : null}
                       {receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
                           <ArrowUpRight className="size-3 shrink-0" aria-hidden />
@@ -1118,15 +1254,18 @@ export function SessionEditor({
                         exerciseId={exercise.id}
                         set={set}
                         setIndex={setIndex}
-                        readOnly={readOnly}
-                        onChange={(updater) =>
-                          updateExercise(exercise.id, (current) =>
-                            renumberWorkoutPayload({
-                              ...current,
-                              sets: current.sets.map((currentSet, currentIndex) =>
-                                currentIndex === setIndex ? updater(currentSet) : currentSet,
-                              ),
-                            }),
+                        readOnly={interactionLocked}
+                        onChange={(updater, options) =>
+                          updateExercise(
+                            exercise.id,
+                            (current) =>
+                              renumberWorkoutPayload({
+                                ...current,
+                                sets: current.sets.map((currentSet, currentIndex) =>
+                                  currentIndex === setIndex ? updater(currentSet) : currentSet,
+                                ),
+                              }),
+                            options,
                           )
                         }
                       />
@@ -1141,7 +1280,7 @@ export function SessionEditor({
                           {restLabel}
                         </span>
                       </p>
-                      {!readOnly ? (
+                      {!interactionLocked ? (
                         <Button
                           type="button"
                           size="sm"
@@ -1162,7 +1301,7 @@ export function SessionEditor({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      disabled={payload.sets.length >= 50}
+                      disabled={interactionLocked || payload.sets.length >= 50}
                       onClick={() =>
                         updateExercise(exercise.id, (current) => {
                           const previous = current.sets[current.sets.length - 1];
@@ -1196,20 +1335,26 @@ export function SessionEditor({
                         <p
                           className={cn(
                             "flex items-center gap-1.5 text-xs font-medium",
-                            dirty || status?.pending
-                              ? "text-amber-700 dark:text-amber-300"
-                              : "text-emerald-700 dark:text-emerald-300",
+                            status?.error
+                              ? "text-destructive"
+                              : status?.pending
+                                ? "text-primary"
+                                : dirty
+                                  ? "text-muted-foreground"
+                                  : "text-emerald-700 dark:text-emerald-300",
                           )}
                         >
-                          {dirty || status?.pending ? (
+                          {dirty || status?.pending || status?.error ? (
                             <span className="size-1.5 rounded-full bg-current" aria-hidden />
                           ) : (
                             <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
                           )}
-                          {status?.pending
+                          {status?.error
+                            ? "No se pudo guardar"
+                            : status?.pending
                             ? "Guardando…"
                             : dirty
-                              ? "Cambios sin guardar"
+                              ? "Cambios locales"
                               : "Guardado"}
                         </p>
                         {status?.error ? (
@@ -1218,15 +1363,15 @@ export function SessionEditor({
                           </p>
                         ) : null}
                       </div>
-                      {dirty || status?.pending ? (
+                      {status?.error ? (
                         <Button
                           className="shrink-0"
                           type="button"
                           size="sm"
-                          disabled={status?.pending}
-                          onClick={() => void saveExercise(exercise.id)}
+                          variant="outline"
+                          onClick={() => retryExercise(exercise.id)}
                         >
-                          {status?.pending ? "Guardando…" : "Guardar"}
+                          Reintentar
                         </Button>
                       ) : null}
                     </div>
@@ -1252,15 +1397,21 @@ export function SessionEditor({
                               type="button"
                               size="sm"
                               variant={payload.decision === adjustment.value ? "secondary" : "outline"}
-                              disabled={readOnly}
+                              disabled={interactionLocked}
                               aria-pressed={payload.decision === adjustment.value}
                               onClick={() =>
-                                updateExercise(exercise.id, (current) => ({
-                                  ...current,
-                                  decision: adjustment.value,
-                                  decision_note:
-                                    adjustment.value === "custom" ? current.decision_note : "",
-                                }))
+                                updateExercise(
+                                  exercise.id,
+                                  (current) => ({
+                                    ...current,
+                                    decision: adjustment.value,
+                                    decision_note:
+                                      adjustment.value === "custom" ? current.decision_note : "",
+                                  }),
+                                  adjustment.value === "custom"
+                                    ? undefined
+                                    : { immediate: true },
+                                )
                               }
                             >
                               {adjustment.label}
@@ -1281,7 +1432,7 @@ export function SessionEditor({
                             id={`decision-note-${exercise.id}`}
                             className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
                             value={payload.decision_note}
-                            disabled={readOnly}
+                            disabled={interactionLocked}
                             placeholder="Ejemplo: probar 37,5 kg solo en la primera serie"
                             onChange={(event) =>
                               updateExercise(exercise.id, (current) => ({
@@ -1302,12 +1453,16 @@ export function SessionEditor({
                             type="checkbox"
                             className="mt-0.5 size-5 shrink-0"
                             checked={payload.apply_to_routine}
-                            disabled={readOnly}
+                            disabled={interactionLocked}
                             onChange={(event) =>
-                              updateExercise(exercise.id, (current) => ({
-                                ...current,
-                                apply_to_routine: event.target.checked,
-                              }))
+                              updateExercise(
+                                exercise.id,
+                                (current) => ({
+                                  ...current,
+                                  apply_to_routine: event.target.checked,
+                                }),
+                                { immediate: true },
+                              )
                             }
                           />
                           <span>
@@ -1330,7 +1485,7 @@ export function SessionEditor({
                           aria-label={`Nota para ${exercise.nombre_snapshot}`}
                           className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
                           value={payload.notes}
-                          disabled={readOnly}
+                          disabled={interactionLocked}
                           placeholder="Opcional"
                           onChange={(event) =>
                             updateExercise(exercise.id, (current) => ({
@@ -1355,8 +1510,8 @@ export function SessionEditor({
                             type="button"
                             size="sm"
                             variant="outline"
-                            disabled={status?.pending}
-                            onClick={() => discardExerciseDraft(exercise.id)}
+                            disabled={globalPending}
+                            onClick={() => void discardExerciseDraft(exercise.id)}
                           >
                             Descartar cambios
                           </Button>
@@ -1365,7 +1520,7 @@ export function SessionEditor({
                           type="button"
                           size="sm"
                           variant="destructive"
-                          disabled={status?.pending}
+                          disabled={globalPending}
                           onClick={() => void removeExercise(exercise.id, exercise.nombre_snapshot)}
                         >
                           Quitar de la sesión
@@ -1393,7 +1548,7 @@ export function SessionEditor({
             <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
           </summary>
           <CardContent className="border-t border-border/70 px-3 pb-3 pt-4">
-          <fieldset className="space-y-4 disabled:opacity-80" disabled={readOnly}>
+          <fieldset className="space-y-4 disabled:opacity-80" disabled={interactionLocked}>
           <div className="space-y-1">
             <Label htmlFor="session-name">Nombre</Label>
             <Input
@@ -1535,14 +1690,16 @@ export function SessionEditor({
           <Button
             className="h-12 w-full"
             type="button"
-            disabled={globalPending || dirtyIds.size > 0 || stats.completedSets === 0}
+            disabled={globalPending || stats.completedSets === 0}
             onClick={() => void finishSession()}
           >
-            {globalPending ? "Procesando…" : "Finalizar entrenamiento"}
+            {finishStage ? "Finalizando…" : "Finalizar entrenamiento"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            {dirtyIds.size > 0
-              ? `Guardá o descartá ${dirtyIds.size === 1 ? "el ejercicio pendiente" : `los ${dirtyIds.size} ejercicios pendientes`} para finalizar.`
+            {finishStage === "saving"
+              ? "Guardando los últimos cambios antes de cerrar la sesión…"
+              : finishStage === "finishing"
+                ? "Todos los ejercicios están sincronizados. Cerrando la sesión…"
               : "Solo se actualiza la rutina donde activaste “Usar lo realizado como próximo objetivo”."}
           </p>
           <div aria-live="polite">
