@@ -134,6 +134,16 @@ describe("buildWeeklyTrainingSummaries", () => {
     expect(weeks[0]).toMatchObject({ sessions: 2, sets: 2, minutes: 75, muscleGroups: { Pecho: 1, Piernas: 1 } });
   });
 
+  it("excluye una sesión descartada de reportes sin tocar otras sesiones", () => {
+    const weeks = summaries({
+      sessions: [session(), session({ id: "discarded", day_log_id: "day-2", status: "discarded" })],
+      exercises: [exercise(), exercise({ id: "exercise-2", workout_session_id: "discarded" })],
+      sets: [set(), set({ id: "set-2", workout_session_exercise_id: "exercise-2" })],
+      dates: [["day-1", "2026-08-10"], ["day-2", "2026-08-10"]],
+    });
+    expect(weeks[0]).toMatchObject({ sessions: 1, sets: 1, volumeKg: 800 });
+  });
+
   it("groups routine snapshots, muscles, and duplicate training days", () => {
     const weeks = summaries({
       sessions: [

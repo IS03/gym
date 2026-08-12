@@ -71,7 +71,7 @@ export type RoutineExerciseSet = {
   updated_at: string;
 };
 
-export type WorkoutSessionStatus = "in_progress" | "completed";
+export type WorkoutSessionStatus = "in_progress" | "completed" | "discarded";
 
 export type WorkoutSession = {
   id: string;
@@ -183,6 +183,54 @@ export type WorkoutSessionDetail = {
   session: WorkoutSession;
   logDate: string;
   exercises: WorkoutSessionExerciseDetail[];
+};
+
+export type CompletedSessionSummary = {
+  id: string;
+  routineId: string | null;
+  routineName: string;
+  logDate: string;
+  startedAt: string;
+  endedAt: string;
+  durationMilliseconds: number | null;
+  exercisesCompleted: number;
+  completedSets: number;
+  muscleGroups: string[];
+};
+
+export type RoutineContinuity = {
+  routineId: string;
+  routineName: string;
+  lastLogDate: string | null;
+  daysSince: number | null;
+};
+
+export type CompletedSessionCorrectionInput = {
+  sessionId: string;
+  expectedSessionUpdatedAt: string;
+  metadata: Pick<
+    SessionMetadataInput,
+    | "energy_level"
+    | "performance_level"
+    | "pain_level"
+    | "pain_note"
+    | "treadmill_minutes"
+    | "treadmill_distance_km"
+    | "treadmill_speed_kmh"
+    | "treadmill_incline_percent"
+    | "notes"
+  >;
+  exercises: Array<{
+    id: string;
+    expectedUpdatedAt: string;
+    notes: string;
+    sets: Array<{
+      id: string;
+      actual_reps: number | null;
+      actual_weight_kg: number | null;
+      notes: string;
+    }>;
+  }>;
 };
 
 export type WorkoutSessionClient = Pick<

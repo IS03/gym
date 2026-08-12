@@ -52,7 +52,7 @@ export default async function ExerciseHistoryPage({
     period={rawPeriod}
     routineId={routineId}
     routines={routineOptions}
-    backHref={cameFromProgress ? "/train/progress" : "/train/history"}
+    backHref={cameFromProgress ? "/train/progress" : "/train/history?view=exercises"}
     backLabel={cameFromProgress ? "Progreso" : "Historial"}
     source={cameFromProgress ? "progress" : "history"}
     sessions={items.map((item) => ({

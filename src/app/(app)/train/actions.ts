@@ -22,6 +22,8 @@ import {
 import {
   appendWorkoutExercise,
   cancelWorkoutSession,
+  correctCompletedWorkoutSession,
+  discardCompletedWorkoutSession,
   finishWorkoutSession,
   importInitialTrainingPlan,
   moveRoutineExerciseTarget,
@@ -36,6 +38,7 @@ import {
 } from "@/lib/phase2/workout-start";
 import type {
   RoutineExercisePayload,
+  CompletedSessionCorrectionInput,
   SessionMetadataInput,
   WorkoutExercisePayload,
 } from "@/lib/phase2/types";
@@ -413,6 +416,38 @@ export async function cancelWorkoutSessionAction(input: {
     revalidatePath("/train");
     revalidatePath("/train/session/new");
     return { ok: true, data: undefined };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+function revalidateCompletedSessionViews(sessionId: string) {
+  revalidatePath("/home");
+  revalidatePath("/train/history");
+  revalidatePath("/train/progress");
+  revalidatePath("/train/calendar");
+  revalidatePath(`/train/session/${sessionId}`);
+}
+
+export async function correctCompletedWorkoutSessionAction(
+  input: CompletedSessionCorrectionInput,
+): Promise<TrainingActionResult<{ sessionId: string }>> {
+  try {
+    const sessionId = await correctCompletedWorkoutSession(input);
+    revalidateCompletedSessionViews(sessionId);
+    return { ok: true, data: { sessionId } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
+}
+
+export async function discardCompletedWorkoutSessionAction(input: {
+  sessionId: string;
+}): Promise<TrainingActionResult<{ sessionId: string }>> {
+  try {
+    const sessionId = await discardCompletedWorkoutSession(input.sessionId);
+    revalidateCompletedSessionViews(sessionId);
+    return { ok: true, data: { sessionId } };
   } catch (error) {
     return { ok: false, error: actionError(error) };
   }

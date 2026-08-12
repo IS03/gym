@@ -1,6 +1,7 @@
 import type {
   EditableRoutineSet,
   EditableWorkoutSet,
+  CompletedSessionCorrectionInput,
   RoutineExercisePayload,
   SessionMetadataInput,
   TrainingAdjustment,
@@ -124,6 +125,26 @@ export function validateSessionMetadata(metadata: SessionMetadataInput) {
     0,
     100,
   );
+}
+
+export function validateCompletedSessionCorrection(input: CompletedSessionCorrectionInput) {
+  if (!input.sessionId.trim() || !input.expectedSessionUpdatedAt.trim()) {
+    throw new Error("La sesión a corregir no es válida.");
+  }
+  validateSessionMetadata({
+    session_name: "",
+    ...input.metadata,
+  });
+  for (const exercise of input.exercises) {
+    if (!exercise.id.trim() || !exercise.expectedUpdatedAt.trim()) {
+      throw new Error("Uno de los ejercicios a corregir no es válido.");
+    }
+    for (const set of exercise.sets) {
+      if (!set.id.trim()) throw new Error("Una de las series a corregir no es válida.");
+      assertIntegerInRange(set.actual_reps, "Repeticiones realizadas", 0, 1000);
+      assertFiniteInRange(set.actual_weight_kg, "Peso realizado", 0, 9999.99);
+    }
+  }
 }
 
 export function nullableNumberFromInput(value: string): number | null {

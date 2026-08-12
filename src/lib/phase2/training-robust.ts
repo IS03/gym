@@ -5,18 +5,23 @@ import { createClient } from "@/lib/supabase/server";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import { buildWeeklyTrainingSummaries } from "./training-progress-summary";
+import { daysBetweenIsoDates } from "./session-history";
 import {
+  validateCompletedSessionCorrection,
   validateRoutineExercisePayload,
   validateSessionMetadata,
   validateWorkoutExercisePayload,
 } from "./training-validation";
 import type {
   EditableWorkoutSet,
+  CompletedSessionCorrectionInput,
+  CompletedSessionSummary,
   ExerciseProgressSummary,
   Routine,
   RoutineExercisePayload,
   RoutineExerciseSet,
   RoutineExerciseTemplate,
+  RoutineContinuity,
   SessionMetadataInput,
   WeeklyTrainingSummary,
   WorkoutExercisePayload,
@@ -338,6 +343,169 @@ export async function cancelWorkoutSession(sessionId: string) {
     .maybeSingle();
   if (error) throw new Error(`Cancelar sesión: ${error.message}`);
   if (!data) throw new Error("La sesión no existe o ya fue finalizada.");
+}
+
+function sessionDisplayName(session: WorkoutSession) {
+  return session.routine_name_snapshot ?? session.session_name ?? "Sesión libre";
+}
+
+function sessionDurationMilliseconds(session: WorkoutSession) {
+  if (!session.started_at || !session.ended_at) return null;
+  const milliseconds = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
+  return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : null;
+}
+
+export async function listCompletedSessionHistory(input?: { limit?: number }) {
+  const { supabase, userId } = await getAuthedContext();
+  const limit = Math.min(Math.max(input?.limit ?? 20, 1), 100);
+  const { data: rawSessions, error: sessionError } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .not("ended_at", "is", null)
+    .order("ended_at", { ascending: false })
+    .limit(limit);
+  if (sessionError) throw new Error(`Leer sesiones recientes: ${sessionError.message}`);
+  const sessions = (rawSessions ?? []) as WorkoutSession[];
+  if (sessions.length === 0) return [] as CompletedSessionSummary[];
+
+  const sessionIds = sessions.map((session) => session.id);
+  const dayLogIds = [...new Set(sessions.map((session) => session.day_log_id))];
+  const [{ data: rawDays, error: daysError }, { data: rawExercises, error: exercisesError }] = await Promise.all([
+    supabase.from("day_logs").select("id, log_date").eq("user_id", userId).in("id", dayLogIds),
+    supabase
+      .from("workout_session_exercises")
+      .select("id, workout_session_id, is_completed, muscle_group_label_snapshot, grupo_muscular_snapshot")
+      .eq("user_id", userId)
+      .in("workout_session_id", sessionIds),
+  ]);
+  if (daysError) throw new Error(`Leer fechas de sesiones: ${daysError.message}`);
+  if (exercisesError) throw new Error(`Leer ejercicios de sesiones: ${exercisesError.message}`);
+  const exercises = (rawExercises ?? []) as Array<Pick<WorkoutSessionExercise, "id" | "workout_session_id" | "is_completed" | "muscle_group_label_snapshot" | "grupo_muscular_snapshot">>;
+  const exerciseIds = exercises.map((exercise) => exercise.id);
+  const { data: rawSets, error: setsError } = exerciseIds.length
+    ? await supabase
+        .from("workout_sets")
+        .select("workout_session_exercise_id")
+        .eq("user_id", userId)
+        .eq("is_completed", true)
+        .in("workout_session_exercise_id", exerciseIds)
+    : { data: [], error: null };
+  if (setsError) throw new Error(`Leer series de sesiones: ${setsError.message}`);
+
+  const dateByDayLog = new Map(
+    ((rawDays ?? []) as Array<{ id: string; log_date: string }>).map((day) => [day.id, day.log_date]),
+  );
+  const exercisesBySession = new Map<string, typeof exercises>();
+  const sessionIdByExercise = new Map(exercises.map((exercise) => [exercise.id, exercise.workout_session_id]));
+  for (const exercise of exercises) {
+    const items = exercisesBySession.get(exercise.workout_session_id) ?? [];
+    items.push(exercise);
+    exercisesBySession.set(exercise.workout_session_id, items);
+  }
+  const completedSetsBySession = new Map<string, number>();
+  for (const set of (rawSets ?? []) as Array<{ workout_session_exercise_id: string }>) {
+    const sessionId = sessionIdByExercise.get(set.workout_session_exercise_id);
+    if (sessionId) completedSetsBySession.set(sessionId, (completedSetsBySession.get(sessionId) ?? 0) + 1);
+  }
+
+  return sessions.flatMap((session): CompletedSessionSummary[] => {
+    const logDate = dateByDayLog.get(session.day_log_id);
+    if (!logDate || !session.ended_at) return [];
+    const sessionExercises = exercisesBySession.get(session.id) ?? [];
+    const muscleGroups = [...new Set(sessionExercises
+      .filter((exercise) => exercise.is_completed)
+      .map((exercise) => exercise.muscle_group_label_snapshot ?? exercise.grupo_muscular_snapshot)
+      .filter((group): group is string => Boolean(group)))];
+    return [{
+      id: session.id,
+      routineId: session.routine_id,
+      routineName: sessionDisplayName(session),
+      logDate,
+      startedAt: session.started_at,
+      endedAt: session.ended_at,
+      durationMilliseconds: sessionDurationMilliseconds(session),
+      exercisesCompleted: sessionExercises.filter((exercise) => exercise.is_completed).length,
+      completedSets: completedSetsBySession.get(session.id) ?? 0,
+      muscleGroups,
+    }];
+  });
+}
+
+export async function getSessionContinuity(today = todayInCordoba()) {
+  const { supabase, userId } = await getAuthedContext();
+  const { data: rawRoutines, error: routinesError } = await supabase
+    .from("routines")
+    .select("id, nombre")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("routine_order", { ascending: true });
+  if (routinesError) throw new Error(`Leer rutinas activas: ${routinesError.message}`);
+  const routines = (rawRoutines ?? []) as Array<{ id: string; nombre: string }>;
+  if (routines.length === 0) return [] as RoutineContinuity[];
+  const { data: rawSessions, error: sessionsError } = await supabase
+    .from("workout_sessions")
+    .select("routine_id, day_log_id, ended_at")
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .in("routine_id", routines.map((routine) => routine.id))
+    .not("ended_at", "is", null)
+    .order("ended_at", { ascending: false })
+    .limit(500);
+  if (sessionsError) throw new Error(`Leer continuidad de rutinas: ${sessionsError.message}`);
+  const sessions = (rawSessions ?? []) as Array<{ routine_id: string; day_log_id: string; ended_at: string }>;
+  const dayLogIds = [...new Set(sessions.map((session) => session.day_log_id))];
+  const { data: rawDays, error: daysError } = dayLogIds.length
+    ? await supabase.from("day_logs").select("id, log_date").eq("user_id", userId).in("id", dayLogIds)
+    : { data: [], error: null };
+  if (daysError) throw new Error(`Leer fechas de continuidad: ${daysError.message}`);
+  const dateByDayLog = new Map(
+    ((rawDays ?? []) as Array<{ id: string; log_date: string }>).map((day) => [day.id, day.log_date]),
+  );
+  const lastDateByRoutine = new Map<string, string>();
+  for (const session of sessions) {
+    const logDate = dateByDayLog.get(session.day_log_id);
+    if (logDate && !lastDateByRoutine.has(session.routine_id)) lastDateByRoutine.set(session.routine_id, logDate);
+  }
+  return routines.map((routine) => {
+    const lastLogDate = lastDateByRoutine.get(routine.id) ?? null;
+    return {
+      routineId: routine.id,
+      routineName: routine.nombre,
+      lastLogDate,
+      daysSince: lastLogDate ? daysBetweenIsoDates(lastLogDate, today) : null,
+    };
+  });
+}
+
+export async function correctCompletedWorkoutSession(input: CompletedSessionCorrectionInput) {
+  validateCompletedSessionCorrection(input);
+  const { supabase } = await getAuthedContext();
+  const { data, error } = await supabase.rpc("correct_completed_workout_session", {
+    p_session_id: input.sessionId,
+    p_expected_session_updated_at: input.expectedSessionUpdatedAt,
+    p_payload: {
+      metadata: input.metadata,
+      exercises: input.exercises.map((exercise) => ({
+        id: exercise.id,
+        expected_updated_at: exercise.expectedUpdatedAt,
+        notes: exercise.notes,
+        sets: exercise.sets,
+      })),
+    },
+  });
+  if (error) throwRpcError("Guardar correcciones", error);
+  return requireUuid(data, "Guardar correcciones");
+}
+
+export async function discardCompletedWorkoutSession(sessionId: string) {
+  const { supabase } = await getAuthedContext();
+  const { data, error } = await supabase.rpc("discard_completed_workout_session", {
+    p_session_id: sessionId,
+  });
+  if (error) throwRpcError("Eliminar sesión", error);
+  return requireUuid(data, "Eliminar sesión");
 }
 
 export type RobustExerciseHistoryItem = {

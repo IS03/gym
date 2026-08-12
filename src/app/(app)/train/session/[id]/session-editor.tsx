@@ -15,6 +15,7 @@ import {
   type MuscleGroupFilter,
 } from "@/lib/phase2/muscle-groups";
 import { formatRestRange } from "@/lib/phase2/training-display";
+import { formatSessionDate } from "@/lib/phase2/session-history";
 import {
   appendWorkoutExerciseAction,
   cancelWorkoutSessionAction,
@@ -61,6 +62,7 @@ import {
   workoutPayloadFromDetail,
 } from "./session-editor-helpers";
 import { SessionCreateExerciseForm } from "./session-create-exercise-form";
+import { CompletedSessionActions } from "./completed-session-actions";
 
 const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
   { value: "maintain", label: "Mantener" },
@@ -330,7 +332,7 @@ export function SessionEditor({
   }>;
 }) {
   const router = useRouter();
-  const readOnly = detail.session.status === "completed";
+  const readOnly = detail.session.status !== "in_progress";
   const exerciseIds = useMemo(
     () => detail.exercises.map((exercise) => exercise.id),
     [detail.exercises],
@@ -750,7 +752,7 @@ export function SessionEditor({
                 detail.session.routine_name_snapshot ??
                 "Sesión libre"}
             </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">{detail.logDate}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{formatSessionDate(detail.logDate)}</p>
           </div>
           {!readOnly && (dirtyIds.size > 0 || metadataDirty) ? (
             <span className="mt-1 shrink-0 rounded-full bg-amber-500/12 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-300">
@@ -790,6 +792,15 @@ export function SessionEditor({
           endedAt={detail.session.ended_at}
           isActive={!readOnly}
         />
+        {detail.session.status === "completed" ? (
+          <CompletedSessionActions
+            sessionId={detail.session.id}
+            sessionName={detail.session.routine_name_snapshot ?? detail.session.session_name ?? "Sesión libre"}
+            dateLabel={formatSessionDate(detail.logDate)}
+            timingLabel={formatWorkoutTimeRange(detail.session.started_at, detail.session.ended_at)}
+            completedSets={stats.completedSets}
+          />
+        ) : null}
       </header>
 
       {storageError ? (
