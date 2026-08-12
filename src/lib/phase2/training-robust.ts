@@ -355,17 +355,35 @@ function sessionDurationMilliseconds(session: WorkoutSession) {
   return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : null;
 }
 
-export async function listCompletedSessionHistory(input?: { limit?: number }) {
+export async function listCompletedSessionHistory(input?: {
+  limit?: number;
+  logDate?: string;
+}) {
   const { supabase, userId } = await getAuthedContext();
   const limit = Math.min(Math.max(input?.limit ?? 20, 1), 100);
-  const { data: rawSessions, error: sessionError } = await supabase
+  const logDate = input?.logDate?.trim();
+  const { data: matchingDays, error: matchingDaysError } = logDate
+    ? await supabase
+        .from("day_logs")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("log_date", logDate)
+    : { data: null, error: null };
+  if (matchingDaysError) throw new Error(`Leer día de sesiones: ${matchingDaysError.message}`);
+  const matchingDayIds = (matchingDays ?? []) as Array<{ id: string }>;
+  if (logDate && matchingDayIds.length === 0) return [] as CompletedSessionSummary[];
+
+  let sessionsQuery = supabase
     .from("workout_sessions")
     .select("*")
     .eq("user_id", userId)
     .eq("status", "completed")
     .not("ended_at", "is", null)
-    .order("ended_at", { ascending: false })
-    .limit(limit);
+    .order("ended_at", { ascending: false });
+  if (matchingDayIds.length > 0) {
+    sessionsQuery = sessionsQuery.in("day_log_id", matchingDayIds.map((day) => day.id));
+  }
+  const { data: rawSessions, error: sessionError } = await sessionsQuery.limit(limit);
   if (sessionError) throw new Error(`Leer sesiones recientes: ${sessionError.message}`);
   const sessions = (rawSessions ?? []) as WorkoutSession[];
   if (sessions.length === 0) return [] as CompletedSessionSummary[];

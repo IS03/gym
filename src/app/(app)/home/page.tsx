@@ -29,7 +29,9 @@ import {
   listWorkoutStartRoutines,
 } from "@/lib/phase2/training";
 import { addUtcDays, formatTrainingMinutes, mondayOfIsoDate } from "@/lib/phase2/training-progress-summary";
-import { getTrainingProgress, todayInCordoba } from "@/lib/phase2/training-robust";
+import { getTrainingProgress, listCompletedSessionHistory, todayInCordoba } from "@/lib/phase2/training-robust";
+import { formatWorkoutDuration, formatWorkoutTimeRange } from "../train/session/[id]/session-editor-helpers";
+import type { CompletedSessionSummary } from "@/lib/phase2/types";
 
 export const dynamic = "force-dynamic";
 
@@ -89,14 +91,74 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
   );
 }
 
+function plural(value: number, singular: string, pluralValue = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : pluralValue}`;
+}
+
+function TodayCompletedSessions({ sessions }: { sessions: CompletedSessionSummary[] }) {
+  return (
+    <section aria-labelledby="today-sessions-title" className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 id="today-sessions-title" className="text-base font-semibold tracking-tight lg:text-lg">
+            Sesiones de hoy
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Abrí una sesión para revisarla, corregirla o eliminarla.
+          </p>
+        </div>
+        <Link href="/train/history?view=sessions" className="shrink-0 text-xs font-medium text-primary hover:underline lg:text-sm">
+          Ver historial
+        </Link>
+      </div>
+      {sessions.length === 0 ? (
+        <Card>
+          <CardContent className="py-6 text-center text-sm text-muted-foreground">
+            Todavía no completaste una sesión hoy.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-2 lg:grid-cols-2">
+          {sessions.map((session) => {
+            const range = formatWorkoutTimeRange(session.startedAt, session.endedAt);
+            const duration = formatWorkoutDuration(session.durationMilliseconds);
+            return (
+              <Link
+                key={session.id}
+                href={`/train/session/${session.id}`}
+                className="group flex min-h-[88px] items-center gap-3 rounded-xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/8 outline-none transition-[background-color,transform,box-shadow] duration-150 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]"
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Dumbbell className="size-[18px]" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{session.routineName}</span>
+                  <span className="metric-number mt-1 block text-xs text-muted-foreground">
+                    {[range, duration].filter(Boolean).join(" · ") || "Sesión completada"}
+                  </span>
+                  <span className="metric-number mt-1 block text-xs text-muted-foreground">
+                    {plural(session.exercisesCompleted, "ejercicio")} · {plural(session.completedSets, "serie")}
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default async function HomePage() {
   const today = todayInCordoba();
-  const [profile, todayData, inProgress, trainingProgress, workoutStartRoutines] = await Promise.all([
+  const [profile, todayData, inProgress, trainingProgress, workoutStartRoutines, todaySessions] = await Promise.all([
     getMyProfile(),
     getDayLogWithMeals(today),
     getInProgressSessionForUser(),
     getTrainingProgress(),
     listWorkoutStartRoutines(),
+    listCompletedSessionHistory({ logDate: today, limit: 20 }),
   ]);
   const { dayLog, meals } = todayData;
   const currentWeek = trainingProgress.weeks[0];
@@ -297,6 +359,8 @@ export default async function HomePage() {
         </Card>
       </section>
 
+      <TodayCompletedSessions sessions={todaySessions} />
+
       <section aria-labelledby="home-shortcuts-title" className="space-y-3">
         <h2 id="home-shortcuts-title" className="text-base font-semibold tracking-tight">
           Accesos rápidos
@@ -478,6 +542,8 @@ export default async function HomePage() {
           </CardContent>
         </Card>
       </section>
+
+      <TodayCompletedSessions sessions={todaySessions} />
 
       <section className="space-y-3" aria-labelledby="desktop-home-shortcuts">
         <div className="flex items-center justify-between">
