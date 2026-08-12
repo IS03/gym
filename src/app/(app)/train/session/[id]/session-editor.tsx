@@ -63,6 +63,7 @@ import {
 } from "./session-editor-helpers";
 import { SessionCreateExerciseForm } from "./session-create-exercise-form";
 import { CompletedSessionActions } from "./completed-session-actions";
+import { WorkoutFinishedDialog } from "./workout-finished-dialog";
 
 const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
   { value: "maintain", label: "Mantener" },
@@ -93,6 +94,11 @@ type SetRowProps = {
 const SET_GRID_LAYOUT =
   "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem]";
 const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1 px-1`;
+const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
+
+function finishConfirmationKey(sessionId: string) {
+  return `${FINISH_CONFIRMATION_KEY_PREFIX}${sessionId}`;
+}
 
 function compactNumber(value: number | null) {
   return value === null ? "—" : String(value).replace(".", ",");
@@ -377,6 +383,7 @@ export function SessionEditor({
   const [storageError, setStorageError] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalPending, setGlobalPending] = useState(false);
+  const [finishConfirmationOpen, setFinishConfirmationOpen] = useState(false);
   const [selectedExerciseId, setSelectedExerciseId] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
   const [exerciseSearch, setExerciseSearch] = useState("");
@@ -524,6 +531,19 @@ export function SessionEditor({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [hasUnsavedWork]);
+
+  useEffect(() => {
+    if (detail.session.status !== "completed") return;
+
+    const key = finishConfirmationKey(detail.session.id);
+    try {
+      if (window.sessionStorage.getItem(key) !== "1") return;
+      window.sessionStorage.removeItem(key);
+      setFinishConfirmationOpen(true);
+    } catch {
+      // The confirmation is optional browser UI; the saved session remains correct if storage is unavailable.
+    }
+  }, [detail.session.id, detail.session.status]);
 
   function persistExerciseDraft(exerciseId: string, payload: WorkoutExercisePayload) {
     const saved = writeDraft(workoutDraftKey(detail.session.id, exerciseId), {
@@ -707,8 +727,17 @@ export function SessionEditor({
       setGlobalError(result.error);
       return;
     }
+    try {
+      // This transient marker is consumed after the refreshed completed detail mounts.
+      // Clearing it on page hide also prevents it from surviving a browser reload.
+      const key = finishConfirmationKey(detail.session.id);
+      const clearConfirmation = () => window.sessionStorage.removeItem(key);
+      window.sessionStorage.setItem(key, "1");
+      window.addEventListener("pagehide", clearConfirmation, { once: true });
+    } catch {
+      // Saving succeeded. Keep the existing flow functional if browser storage is unavailable.
+    }
     for (const key of draftKeys) removeDraft(key);
-    router.replace(`/train/session/${detail.session.id}`);
     router.refresh();
   }
 
@@ -1522,6 +1551,21 @@ export function SessionEditor({
           <p className="text-sm text-destructive">{globalError}</p>
         </div>
       ) : null}
+
+      <WorkoutFinishedDialog
+        open={finishConfirmationOpen}
+        onOpenChange={setFinishConfirmationOpen}
+        sessionName={
+          detail.session.routine_name_snapshot ?? detail.session.session_name ?? "Sesión libre"
+        }
+        duration={formatWorkoutDuration(
+          getWorkoutElapsedMilliseconds(detail.session.started_at, detail.session.ended_at),
+        )}
+        completedSets={stats.completedSets}
+        completedExercises={Object.values(currentPayloads).filter((payload) =>
+          payload.sets.some((set) => set.is_completed),
+        ).length}
+      />
 
       <Link
         href="/train"
