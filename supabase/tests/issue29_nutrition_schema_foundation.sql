@@ -386,6 +386,41 @@ begin
     or to_regclass('public.idx_day_logs_work_schedule_period') is null then
     raise exception 'falta un índice de cobertura para una FK nutricional';
   end if;
+
+  if exists (
+    select 1
+    from (
+      values
+        (
+          'idx_day_logs_nutrition_goal_period',
+          array['nutrition_goal_period_id', 'user_id']::text[]
+        ),
+        (
+          'idx_day_logs_expenditure_rule_period',
+          array['expenditure_rule_period_id', 'user_id']::text[]
+        ),
+        (
+          'idx_day_logs_work_schedule_period',
+          array['work_schedule_period_id', 'user_id']::text[]
+        )
+    ) expected(index_name, column_names)
+    where not exists (
+      select 1
+      from pg_index i
+      join pg_class idx on idx.oid = i.indexrelid
+      cross join lateral (
+        select array_agg(att.attname::text order by keys.ordinality) as names
+        from unnest(i.indkey) with ordinality keys(attnum, ordinality)
+        join pg_attribute att
+          on att.attrelid = i.indrelid
+         and att.attnum = keys.attnum
+      ) actual
+      where idx.relname = expected.index_name
+        and actual.names = expected.column_names
+    )
+  ) then
+    raise exception 'un índice no cubre ambas columnas de su FK de ownership';
+  end if;
 end;
 $$;
 
