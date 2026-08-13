@@ -13,13 +13,17 @@ Los objetivos, reglas de gasto y horarios son períodos versionados por
 
 Calorías, proteína, carbohidratos y grasas consumidos se agregan desde
 `meal_entries` activas mediante una única función transaccional. Target
-nutricional y gasto estimado usan snapshots nuevos: `target_kcal_snapshot` y
-`maintenance_kcal_snapshot` no cambian todavía su semántica BMR/legacy.
+nutricional y gasto estimado usan `nutrition_target_kcal_snapshot` y
+`estimated_expenditure_kcal_snapshot`; `target_kcal_snapshot` y
+`maintenance_kcal_snapshot` conservan únicamente semántica legacy.
 
 La infraestructura de importación e idempotencia queda creada sin importar
-datos ni cargar objetivos reales. El motor diario, la derivación de gym desde
-sesiones `completed` y el cambio definitivo del motor energético quedan para
-la fase siguiente del issue #29.
+datos ni cargar objetivos reales. El motor diario separa BMR antropométrico,
+target por período nutricional y gasto por regla de actividad. Los campos
+`maintenance_kcal_current` y `target_kcal_current` se preservan como legacy,
+sin consumers nutricionales nuevos. Cambios de `completed`, overrides o un
+nuevo período vigente refrescan sólo el día relacionado; no existe un backfill
+automático del histórico.
 
 ### Sesiones persistentes y únicas — #1
 

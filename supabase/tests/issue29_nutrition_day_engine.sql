@@ -384,7 +384,8 @@ begin
 end;
 $$;
 
--- Un día existente no se reinterpreta en una lectura get-or-create.
+-- PR 3 sincroniza la fuente explícita al escribirla; una lectura posterior con
+-- get-or-create debe devolver ese snapshot sin volver a reinterpretarlo.
 update public.day_logs
 set work_override = false,
     work_override_source = 'manual_test',
@@ -396,8 +397,8 @@ declare
   v_existing public.day_logs;
 begin
   v_existing := public.get_or_create_day_log('2026-01-05');
-  if v_existing.work_effective_snapshot is distinct from true
-    or v_existing.work_source_snapshot <> 'schedule' then
+  if v_existing.work_effective_snapshot is distinct from false
+    or v_existing.work_source_snapshot <> 'override' then
     raise exception 'get_or_create reescribió snapshots de un día existente';
   end if;
 end;

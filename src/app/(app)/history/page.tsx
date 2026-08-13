@@ -87,7 +87,7 @@ export default async function HistoryPage({
     );
   }
 
-  const { dayLog, meals } = await getNutritionDay(date, {
+  const { dayLog, meals, context } = await getNutritionDay(date, {
     createIfMissing: false,
   });
 
@@ -141,14 +141,14 @@ export default async function HistoryPage({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-sm text-muted-foreground">Target</span>
-            <span className="text-sm">{formatKcal(dayLog.target_kcal_snapshot)}</span>
+            <span className="text-sm">{formatKcal(context.targets.calories)}</span>
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-sm text-muted-foreground">Delta</span>
             <span className="text-sm">
-              {dayLog.delta_vs_target === null
+              {context.metrics.deltaVsNutritionTarget === null
                 ? "—"
-                : `${dayLog.delta_vs_target >= 0 ? "+" : ""}${dayLog.delta_vs_target} kcal`}
+                : `${context.metrics.deltaVsNutritionTarget >= 0 ? "+" : ""}${context.metrics.deltaVsNutritionTarget} kcal`}
             </span>
           </div>
         </CardContent>

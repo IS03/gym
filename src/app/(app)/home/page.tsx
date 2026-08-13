@@ -160,10 +160,10 @@ export default async function HomePage() {
     listWorkoutStartRoutines(),
     listCompletedSessionHistory({ logDate: today, limit: 20 }),
   ]);
-  const { dayLog, meals } = todayData;
+  const { dayLog, meals, context } = todayData;
   const currentWeek = trainingProgress.weeks[0];
   const calories = dayLog.total_calories_consumed ?? 0;
-  const target = dayLog.target_kcal_snapshot;
+  const target = context.targets.calories;
   const calorieProgress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
   const displayName = profile?.display_name?.trim() || "vos";
   const compactProfile = getCompactProfile(profile?.display_name);

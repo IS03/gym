@@ -21,9 +21,9 @@ function formatProtein(n: number | null | undefined) {
 
 export default async function TodayPage() {
   const today = todayInCordoba();
-  const { dayLog, meals } = await getNutritionDay(today);
+  const { dayLog, meals, context } = await getNutritionDay(today);
   const calories = dayLog.total_calories_consumed ?? 0;
-  const target = dayLog.target_kcal_snapshot;
+  const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
   const remaining = target === null ? null : target - calories;
 
@@ -44,7 +44,7 @@ export default async function TodayPage() {
           <div className="space-y-2">
             <div className="flex items-end justify-between gap-3">
               <div><p className="text-xs text-muted-foreground">Calorías</p><p className="metric-number text-2xl font-semibold tracking-tight">{calories} <span className="text-sm font-medium text-muted-foreground">/ {target ?? "—"} kcal</span></p></div>
-              <p className="text-right text-xs text-muted-foreground">{remaining === null ? "Sin objetivo" : remaining >= 0 ? `Restan ${remaining} kcal` : `${Math.abs(remaining)} kcal por encima`}</p>
+              <p className="text-right text-xs text-muted-foreground">{remaining === null ? "Sin objetivo configurado" : remaining >= 0 ? `Restan ${remaining} kcal` : `${Math.abs(remaining)} kcal por encima`}</p>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Calorías del día" aria-valuemin={0} aria-valuemax={target ?? undefined} aria-valuenow={calories}>
               <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />

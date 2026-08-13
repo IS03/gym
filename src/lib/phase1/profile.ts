@@ -10,7 +10,9 @@ export type Profile = {
   height_cm: number | null;
   current_weight_kg: number | null;
   bmr_kcal_current: number | null;
+  /** @deprecated Compatibilidad histórica; no es el gasto nutricional nuevo. */
   maintenance_kcal_current: number | null;
+  /** @deprecated Compatibilidad histórica; no es el objetivo nutricional nuevo. */
   target_kcal_current: number | null;
   goal_type: string | null;
   created_at: string;

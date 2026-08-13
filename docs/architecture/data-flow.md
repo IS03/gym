@@ -13,10 +13,11 @@ los tests.
 
 | Dato | Estado actual / planificación | Histórico / ejecución | Escritura canónica | Principales dependencias |
 | --- | --- | --- | --- | --- |
-| Perfil personal | `profiles` | No aplica | `upsertMyProfile` desde Ajustes | Perfil, BMR y objetivos actuales |
-| Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual, objetivos y tendencias |
+| Perfil personal | `profiles` | No aplica | `upsertMyProfile` desde Ajustes | Perfil y fuentes antropométricas |
+| BMR | `profiles.bmr_kcal_current` | `day_logs.bmr_kcal_snapshot` | `trg_profiles_derive_bmr` | sexo, nacimiento, altura y último peso |
+| Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual y tendencias |
 | Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on` | acciones de Cuerpo | Últimas medidas y gráficos |
-| Objetivos nutricionales legacy | `profiles.bmr_kcal_current`, `maintenance_kcal_current`, `target_kcal_current`, `goal_type` | columnas legacy `*_snapshot` de `day_logs` | perfil actual; snapshot al crear el día y sincronización del día corriente | resumen y deltas legacy |
+| Energía legacy | `profiles.maintenance_kcal_current`, `target_kcal_current`, `goal_type` (deprecated) | `maintenance_kcal_snapshot`, `target_kcal_snapshot`, `goal_type_snapshot` | preservación histórica; sin consumidores nutricionales nuevos | deltas legacy únicamente |
 | Plan nutricional versionado | `nutrition_goal_periods` (motor activo, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | objetivos sin reescritura histórica |
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (motor activo, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | gasto estimado y contexto del día |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
@@ -33,25 +34,30 @@ detalle: las comidas viven en `meal_entries`, las sesiones en
 
 ## Perfil y snapshots nutricionales
 
-`profiles` representa configuración actual. Un `day_log` nuevo se obtiene con
-`get_or_create_day_log(p_log_date)`, que deriva el usuario de `auth.uid()` y
-copia los valores actuales del perfil como snapshots.
+`profiles` representa configuración antropométrica actual. Un `day_log` nuevo
+se obtiene con `get_or_create_day_log(p_log_date)`, que deriva el usuario de
+`auth.uid()`, captura `bmr_kcal_current` y materializa de forma separada el
+contexto del motor nutricional.
 
-`tr_profiles_derive_current_energy` es la implementación canónica de la regla
-vigente de Harris–Benedict: deriva BMR, mantenimiento y target base desde sexo,
-nacimiento, altura, peso y la fecha de Córdoba. La aplicación escribe los datos
-fuente y lee los valores derivados devueltos por la base.
+`trg_profiles_derive_bmr` es la única implementación antropométrica canónica de
+Harris–Benedict. Deriva exclusivamente BMR desde sexo, nacimiento, altura, el
+último peso y la fecha de Córdoba. No calcula el objetivo nutricional ni el
+gasto estimado.
 
-Cuando cambia BMR, mantenimiento, target o tipo de objetivo, el trigger
-`tr_profiles_sync_today_snapshots` actualiza únicamente el `day_log` de la
-fecha actual en `America/Argentina/Cordoba`. No busca ni reescribe días
-anteriores.
+`maintenance_kcal_current` y `target_kcal_current` permanecen en `profiles`
+como columnas legacy/deprecated. Sus valores existentes no se destruyen, pero
+ya no se derivan desde BMR, no se copian a días nuevos y no alimentan Home,
+Today, History ni el motor nutricional.
+
+Cuando cambia una fuente antropométrica, `tr_profiles_sync_today_bmr` actualiza
+únicamente `bmr_kcal_snapshot` del `day_log` de hoy en
+`America/Argentina/Cordoba`, si existe. No busca ni reescribe días anteriores.
 
 Por lo tanto:
 
-- un cambio actual puede afectar el día abierto de hoy y días futuros;
+- un cambio antropométrico puede afectar BMR actual y el snapshot de hoy;
 - un día pasado conserva los snapshots con los que fue creado;
-- `delta_vs_target` y `delta_vs_maintenance` se calculan contra esos snapshots;
+- `delta_vs_target` y `delta_vs_maintenance` sólo conservan semántica legacy;
 - un cambio de comida recalcula totales y deltas mediante el trigger de
   `meal_entries`, dentro de la misma transacción de esa comida.
 
@@ -64,8 +70,7 @@ es una proyección del último hecho cronológico y vive en
 Reglas implementadas:
 
 1. Registrar o editar el punto cronológicamente más reciente actualiza, en la
-   misma transacción de Postgres, peso actual, BMR/mantenimiento/target y los
-   snapshots de hoy.
+   misma transacción de Postgres, peso actual, BMR y el snapshot BMR de hoy.
 2. Editar un punto antiguo no modifica el perfil.
 3. Eliminar un punto antiguo no modifica el perfil.
 4. Eliminar el último punto hace que el perfil tome el punto anterior; si no
@@ -157,9 +162,8 @@ La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 - `nutrition_import_runs` para registrar imports aplicados reproducibles;
 - `foods` como catálogo personal con ownership estricto.
 
-No se cargaron los objetivos históricos ni la matriz real, no se importó el
-Google Sheet y no existen triggers nutricionales sobre entrenamiento en esta
-fase. Las cinco tablas nuevas permanecen vacías en producción.
+No se cargaron los objetivos históricos ni la matriz real y no se importó el
+Google Sheet. Las cinco tablas nuevas permanecen vacías en producción.
 
 Las columnas `target_kcal_snapshot`, `maintenance_kcal_snapshot`,
 `delta_vs_target` y `delta_vs_maintenance` conservan su semántica legacy/BMR.
@@ -200,8 +204,28 @@ ciclo de bloqueos.
 
 `get_or_create_day_log(p_log_date)` conserva su firma sin `user_id`. Sólo al
 insertar un día nuevo materializa su contexto nutricional; si la fila ya
-existía, la devuelve sin reinterpretar sus snapshots. No crea configuración ni
-toca las columnas legacy/BMR.
+existía, la devuelve sin reinterpretar sus snapshots. El día nuevo captura BMR,
+pero no copia `maintenance_kcal_current` ni `target_kcal_current`; no crea
+configuración.
+
+### Sincronización de fuentes
+
+La materialización automática sigue siendo puntual, no un backfill:
+
+- cambiar `work_override`, `gym_override` o `expenditure_override_kcal`
+  refresca ese mismo `day_log` desde Postgres;
+- cuando una sesión agrega o quita el estado `completed`, se refresca sólo el
+  día relacionado. Varias sesiones siguen resolviendo un único booleano y al
+  descartar la última se vuelve al override o a `false`;
+- insertar un período que pasa a ser el vigente para hoy refresca únicamente
+  el día actual, si existe. Un período futuro o histórico superado por una
+  versión posterior no reinterpreta días materializados.
+
+Los triggers son consumidores laterales: no escriben ejercicios, sets,
+progresión ni snapshots de entrenamiento. El trigger de overrides escucha sólo
+columnas fuente; `refresh_nutrition_day` escribe columnas snapshot distintas,
+por lo que no existe recursión. Todas las rutas de totales/refresco toman
+primero el lock de `day_logs`, compatible con `recalculate_day_log`.
 
 ### Read model de aplicación e History
 
@@ -215,6 +239,10 @@ Home y Today pueden asegurar el día con `createIfMissing = true`. History usa
 vacío, no crea un `day_log`, no refresca snapshots ni modifica timestamps. Los
 snapshots históricos sólo cambian por una materialización/corrección explícita
 o una importación controlada futura.
+
+Home, Today e History muestran `nutrition_target_kcal_snapshot` a través del
+read model. Si no hay un período configurado, el objetivo es `null`; nunca se
+usa BMR ni `target_kcal_snapshot` como fallback silencioso.
 
 ## Día de producto y timestamps
 
