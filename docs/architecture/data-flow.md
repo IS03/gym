@@ -17,8 +17,8 @@ los tests.
 | Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual, objetivos y tendencias |
 | Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on` | acciones de Cuerpo | Últimas medidas y gráficos |
 | Objetivos nutricionales legacy | `profiles.bmr_kcal_current`, `maintenance_kcal_current`, `target_kcal_current`, `goal_type` | columnas legacy `*_snapshot` de `day_logs` | perfil actual; snapshot al crear el día y sincronización del día corriente | resumen y deltas legacy |
-| Plan nutricional versionado | `nutrition_goal_periods` (infraestructura, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | el futuro motor diario | objetivos sin reescritura histórica |
-| Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (infraestructura, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | el futuro motor diario | gasto estimado y contexto del día |
+| Plan nutricional versionado | `nutrition_goal_periods` (motor activo, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | objetivos sin reescritura histórica |
+| Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (motor activo, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | gasto estimado y contexto del día |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Biblioteca de ejercicios | `exercises` | snapshots de sesión | acciones de Biblioteca | rutinas y nuevas sesiones |
@@ -123,7 +123,7 @@ ejecutar progresión. Los reportes se actualizan porque leen los hechos
 corregidos. Las consultas de historial, calendario y progreso filtran
 `status = 'completed'`; `discarded` queda fuera.
 
-## Nutrición: regla para la próxima ampliación
+## Nutrición: motor diario canónico
 
 La arquitectura actual ya define dos niveles:
 
@@ -147,10 +147,9 @@ patrón:
 No corresponde crear otra tabla de “totales diarios” ni guardar macros
 consumidos en `profiles`.
 
-### Fundación nutricional inactiva
+### Fundación y configuración pendiente
 
-La migración `20260813150000_nutrition_schema_foundation.sql` prepara, sin
-activar todavía el motor diario:
+La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 
 - períodos versionados de objetivos, gasto y horario habitual;
 - campos de actividad, overrides, referencias y snapshots en `day_logs`;
@@ -160,8 +159,7 @@ activar todavía el motor diario:
 
 No se cargaron los objetivos históricos ni la matriz real, no se importó el
 Google Sheet y no existen triggers nutricionales sobre entrenamiento en esta
-fase. La selección del período vigente y la resolución de trabajo/gym quedan
-para el motor diario de la fase siguiente.
+fase. Las cinco tablas nuevas permanecen vacías en producción.
 
 Las columnas `target_kcal_snapshot`, `maintenance_kcal_snapshot`,
 `delta_vs_target` y `delta_vs_maintenance` conservan su semántica legacy/BMR.
@@ -173,6 +171,50 @@ Un `legacy_daily_summary` activo no puede convivir con comidas detalladas
 activas en el mismo día. La base serializa las escrituras del día y aplica la
 regla antes de recalcular, de modo que UI, importadores e integraciones futuras
 compartan la misma protección.
+
+### Resolución y materialización
+
+`resolve_nutrition_context(p_log_date)` es la única resolución dinámica. Es
+read-only, obtiene ownership de `auth.uid()` y aplica estas reglas:
+
+1. El horario vigente es el de mayor `effective_from <= fecha`. El día de la
+   semana determina trabajo habitual; un `day_logs.work_override` explícito
+   gana. Los pasos son sólo contexto.
+2. Gym es verdadero cuando existe al menos una sesión `completed` del día. Una
+   o varias sesiones producen el mismo booleano. `in_progress` y `discarded`
+   no cuentan. Si no hay `completed`, `gym_override = true` puede actuar como
+   fallback. La fuente queda en `workout`, `override` o `none`.
+3. El plan de objetivos vigente es el de mayor `effective_from <= fecha`; se
+   eligen calorías, proteína y agua de la variante con/sin gym. Sin período
+   aplicable, los valores son `null`.
+4. La regla de gasto vigente usa exactamente una de las cuatro combinaciones
+   trabajo/gym. `expenditure_override_kcal` gana si existe. Pasos, agua y mate
+   no participan del cálculo.
+
+`refresh_nutrition_day(p_day_log_id)` es una operación separada y explícita:
+toma primero un lock sobre `day_logs`, persiste IDs, fuentes y snapshots, y
+calcula `delta_vs_nutrition_target = consumo - target` y
+`energy_balance_kcal = consumo - gasto`. Sigue el mismo orden de lock que
+`recalculate_day_log` para serializar cambios del agregado sin introducir un
+ciclo de bloqueos.
+
+`get_or_create_day_log(p_log_date)` conserva su firma sin `user_id`. Sólo al
+insertar un día nuevo materializa su contexto nutricional; si la fila ya
+existía, la devuelve sin reinterpretar sus snapshots. No crea configuración ni
+toca las columnas legacy/BMR.
+
+### Read model de aplicación e History
+
+`getNutritionDay(date, options)` en `src/lib/nutrition/` es el wrapper servidor
+tipado común a Home, Today y History. Devuelve día, comidas, contexto,
+objetivos, gasto, macros, balances, fuentes e IDs de períodos sin reconstruir
+reglas en React.
+
+Home y Today pueden asegurar el día con `createIfMissing = true`. History usa
+`createIfMissing = false`: consultar una fecha inexistente devuelve un estado
+vacío, no crea un `day_log`, no refresca snapshots ni modifica timestamps. Los
+snapshots históricos sólo cambian por una materialización/corrección explícita
+o una importación controlada futura.
 
 ## Día de producto y timestamps
 

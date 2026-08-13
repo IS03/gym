@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants, Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getDayLogWithMeals, listRecentDays } from "@/lib/phase1/day-log";
+import { listRecentDays } from "@/lib/phase1/day-log";
+import { getNutritionDay } from "@/lib/nutrition/day";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,38 @@ export default async function HistoryPage({
     );
   }
 
-  const { dayLog, meals } = await getDayLogWithMeals(date);
+  const { dayLog, meals } = await getNutritionDay(date, {
+    createIfMissing: false,
+  });
+
+  if (!dayLog) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
+          <p className="text-sm text-muted-foreground">{date}</p>
+        </div>
+        <Card>
+          <CardContent className="space-y-4 py-6">
+            <p className="text-sm text-muted-foreground">
+              No existe un registro para esa fecha.
+            </p>
+            <form action="/history" className="flex gap-2">
+              <input
+                type="date"
+                name="date"
+                defaultValue={date}
+                className="h-11 flex-1 rounded-md border bg-background px-3 text-sm"
+              />
+              <Button className="h-11" type="submit" variant="outline">
+                Cambiar fecha
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -41,25 +41,6 @@ export async function getOrCreateDayLog(date: string): Promise<DayLog> {
   return data as DayLog;
 }
 
-export async function getDayLogWithMeals(date: string): Promise<{
-  dayLog: DayLog;
-  meals: MealEntry[];
-}> {
-  const dayLog = await getOrCreateDayLog(date);
-  const supabase = await createClient();
-
-  const { data: meals, error } = await supabase
-    .from("meal_entries")
-    .select("*")
-    .eq("day_log_id", dayLog.id)
-    .is("deleted_at", null)
-    .order("consumed_at", { ascending: false });
-
-  if (error) throw new Error(`Leer meal_entries: ${error.message}`);
-
-  return { dayLog, meals: (meals ?? []) as MealEntry[] };
-}
-
 export type CreateMealInput = {
   date: string;
   consumed_at?: string;

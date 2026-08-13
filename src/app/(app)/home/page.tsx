@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { BrandSymbol } from "@/components/brand/brand-symbol";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
-import { getDayLogWithMeals } from "@/lib/phase1/day-log";
+import { getNutritionDay } from "@/lib/nutrition/day";
 import { getMyProfile } from "@/lib/phase1/profile";
 import {
   getCompactProfile,
@@ -154,7 +154,7 @@ export default async function HomePage() {
   const today = todayInCordoba();
   const [profile, todayData, inProgress, trainingProgress, workoutStartRoutines, todaySessions] = await Promise.all([
     getMyProfile(),
-    getDayLogWithMeals(today),
+    getNutritionDay(today),
     getInProgressSessionForUser(),
     getTrainingProgress(),
     listWorkoutStartRoutines(),
