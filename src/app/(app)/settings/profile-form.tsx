@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/lib/phase1/profile";
-import {
-  initialProfileSaveState,
-  saveProfileAction,
-} from "./profile-actions";
+import { saveProfileAction } from "./profile-actions";
+import { initialProfileSaveState } from "./profile-state";
 
 type ProfileFormProps = {
   profile: Profile | null;

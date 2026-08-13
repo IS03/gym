@@ -9,7 +9,8 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("../../../lib/phase1/profile", () => ({ getMyProfile: mocks.getMyProfile, upsertMyProfile: mocks.upsertMyProfile, syncTodayNutritionSnapshots: mocks.syncTodayNutritionSnapshots }));
 vi.mock("../../../lib/phase1/day-log", () => ({ listWeightHistory: mocks.listWeightHistory, recordWeightForDate: mocks.recordWeightForDate }));
 
-import { initialProfileSaveState, saveProfileAction } from "./profile-actions";
+import { saveProfileAction } from "./profile-actions";
+import { initialProfileSaveState } from "./profile-state";
 
 function form(weight: string, name = "Nacho") {
   const data = new FormData();

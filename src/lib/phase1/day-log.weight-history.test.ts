@@ -93,7 +93,6 @@ describe("persistencia de historial de peso", () => {
       syncedCurrentWeight: true,
     });
     expect(client.rpc).toHaveBeenCalledWith("get_or_create_day_log", {
-      p_user_id: userId,
       p_log_date: "2026-08-11",
     });
     expect(builder.update).toHaveBeenCalledWith({ weight_kg: 64.8 });

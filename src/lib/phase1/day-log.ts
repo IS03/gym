@@ -29,10 +29,9 @@ async function getAuthedUserId() {
 export async function getOrCreateDayLog(date: string): Promise<DayLog> {
   assertIsoDate(date);
   const supabase = await createClient();
-  const userId = await getAuthedUserId();
+  await getAuthedUserId();
 
   const { data, error } = await supabase.rpc("get_or_create_day_log", {
-    p_user_id: userId,
     p_log_date: date,
   });
 
