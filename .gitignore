@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# local import data and dry-run reports (never commit personal source data)
+/tmp/
+/temp/
+
 # next.js
 /.next/
 /out/

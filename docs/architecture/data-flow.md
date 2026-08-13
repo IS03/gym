@@ -163,6 +163,32 @@ La protección de doble envío compara fecha, texto, calorías y los tres macros
 durante la ventana reciente. Conserva la diferencia entre `null` y `0`; el
 usuario puede confirmar explícitamente “Guardar igual”.
 
+### Importación histórica: plan previo a la escritura
+
+El importador del issue #29 separa lectura, normalización, validación,
+comparación con producción y plan de cambios. En esta fase sólo existe el
+camino de dry-run: Google Sheets y Supabase se leen, pero no se modifican, y
+`nutrition_import_runs` permanece vacío.
+
+La identidad reproducible es el SHA-256 de una representación canónica de las
+pestañas fuente. Cada comida conserva un par estable
+`legacy_import_source + legacy_import_id`; las filas anuladas se preparan como
+soft-deleted. Una hora desconocida se materializa técnicamente al mediodía de
+Córdoba, pero esa convención queda marcada como desconocida en `raw_input` y no
+adquiere semántica de hora observada.
+
+El plan opera por `(user_id, log_date)` y sólo completa columnas autorizadas.
+Nunca reemplaza una fila existente, por lo que preserva `day_logs.id`, las FKs
+de entrenamiento, peso válido y snapshots ajenos al import. Los valores
+históricos explícitos de target, gasto y contexto se preparan como snapshots;
+no se recalculan días pasados con `refresh_nutrition_day`.
+
+`Resumen diario` es un oráculo, no una fuente a importar. Una discrepancia
+fuera de tolerancia, un desacuerdo con una sesión `completed`, un peso distinto
+o un dato sin representación bloquean `APPLY_READY`. Los snapshots y reportes
+reales sólo viven en `tmp/` o `temp/`, ignorados por Git; los tests versionados
+usan únicamente fixtures sintéticos.
+
 ### Fundación y configuración pendiente
 
 La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
