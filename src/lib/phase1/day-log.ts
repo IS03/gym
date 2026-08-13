@@ -4,6 +4,8 @@ import {
   parseOptionalWeight,
   type WeightHistoryPoint,
 } from "../weight-history";
+import { isMostRecentWeightEntry } from "../weight-history";
+import { updateMyCurrentWeightKg } from "./profile";
 
 export type IsoDate = `${number}-${number}-${number}`; // YYYY-MM-DD
 
@@ -258,10 +260,31 @@ export async function listWeightHistory(limit = 366): Promise<WeightHistoryPoint
   return (data ?? []) as WeightHistoryPoint[];
 }
 
+export async function getLatestWeightHistoryEntry(): Promise<WeightHistoryPoint | null> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("day_logs")
+    .select("id, log_date, weight_kg")
+    .eq("user_id", userId)
+    .not("weight_kg", "is", null)
+    .order("log_date", { ascending: false })
+    .limit(1);
+
+  if (error) throw new Error(`Leer último peso histórico: ${error.message}`);
+  return ((data ?? [])[0] ?? null) as WeightHistoryPoint | null;
+}
+
+export type WeightHistoryMutation = {
+  entry: WeightHistoryPoint | null;
+  currentWeightKg: number | null;
+  syncedCurrentWeight: boolean;
+};
+
 export async function recordWeightForDate(input: {
   date: string;
   weightKg: number;
-}): Promise<WeightHistoryPoint> {
+}): Promise<WeightHistoryMutation> {
   assertIsoDate(input.date);
   const parsed = parseOptionalWeight(String(input.weightKg));
   if (!parsed.ok || parsed.value === null) {
@@ -280,13 +303,21 @@ export async function recordWeightForDate(input: {
     .single();
 
   if (error) throw new Error(`Guardar peso histórico: ${error.message}`);
-  return data as WeightHistoryPoint;
+  const entry = data as WeightHistoryPoint;
+  const latest = await getLatestWeightHistoryEntry();
+  const syncedCurrentWeight = isMostRecentWeightEntry(entry.log_date, latest?.log_date ?? null);
+  if (syncedCurrentWeight) await updateMyCurrentWeightKg(entry.weight_kg);
+  return {
+    entry,
+    currentWeightKg: syncedCurrentWeight ? entry.weight_kg : null,
+    syncedCurrentWeight,
+  };
 }
 
 export async function updateWeightHistoryEntry(input: {
   logDate: string;
   weightKg: number;
-}): Promise<WeightHistoryPoint> {
+}): Promise<WeightHistoryMutation> {
   assertIsoDate(input.logDate);
   const parsed = parseOptionalWeight(String(input.weightKg));
   if (!parsed.ok || parsed.value === null) {
@@ -304,11 +335,20 @@ export async function updateWeightHistoryEntry(input: {
     .single();
 
   if (error) throw new Error(`Editar peso histórico: ${error.message}`);
-  return data as WeightHistoryPoint;
+  const entry = data as WeightHistoryPoint;
+  const latest = await getLatestWeightHistoryEntry();
+  const syncedCurrentWeight = isMostRecentWeightEntry(entry.log_date, latest?.log_date ?? null);
+  if (syncedCurrentWeight) await updateMyCurrentWeightKg(entry.weight_kg);
+  return {
+    entry,
+    currentWeightKg: syncedCurrentWeight ? entry.weight_kg : null,
+    syncedCurrentWeight,
+  };
 }
 
-export async function deleteWeightHistoryEntry(logDate: string): Promise<void> {
+export async function deleteWeightHistoryEntry(logDate: string): Promise<WeightHistoryMutation> {
   assertIsoDate(logDate);
+  const latestBefore = await getLatestWeightHistoryEntry();
   const supabase = await createClient();
   const userId = await getAuthedUserId();
   const { error } = await supabase
@@ -318,4 +358,12 @@ export async function deleteWeightHistoryEntry(logDate: string): Promise<void> {
     .eq("log_date", logDate);
 
   if (error) throw new Error(`Eliminar peso histórico: ${error.message}`);
+  if (!isMostRecentWeightEntry(logDate, latestBefore?.log_date ?? null)) {
+    return { entry: null, currentWeightKg: null, syncedCurrentWeight: false };
+  }
+
+  const latestAfter = await getLatestWeightHistoryEntry();
+  const nextWeight = latestAfter?.weight_kg ?? null;
+  await updateMyCurrentWeightKg(nextWeight);
+  return { entry: null, currentWeightKg: nextWeight, syncedCurrentWeight: true };
 }

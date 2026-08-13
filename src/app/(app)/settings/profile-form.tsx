@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/lib/phase1/profile";
-import { saveProfileAction } from "./profile-actions";
-import { initialProfileSaveState } from "./profile-state";
+import {
+  initialProfileSaveState,
+  saveProfileAction,
+} from "./profile-actions";
 
 type ProfileFormProps = {
   profile: Profile | null;
@@ -71,7 +73,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
           />
         </div>
         <div className="min-w-0 space-y-1">
-          <Label htmlFor="current_weight_kg">Peso (kg)</Label>
+          <Label htmlFor="current_weight_kg">Peso actual (kg)</Label>
           <Input
             id="current_weight_kg"
             name="current_weight_kg"
@@ -83,6 +85,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             }
             placeholder="Ej: 64.0"
           />
+          <p className="text-xs text-muted-foreground">Para seguir el historial, usá Entrenar → Cuerpo.</p>
         </div>
       </div>
 

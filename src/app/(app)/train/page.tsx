@@ -4,6 +4,7 @@ import {
   ListChecks,
   ListPlus,
   Plus,
+  Scale,
   TimerReset,
 } from "lucide-react";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
@@ -43,7 +44,20 @@ const trainingLinks = [
     description: "Administrar",
     icon: ListPlus,
   },
-] as const;
+  {
+    href: "/train/body",
+    label: "Cuerpo",
+    description: "Peso y medidas",
+    icon: Scale,
+    fullWidth: true,
+  },
+] as Array<{
+  href: string;
+  label: string;
+  description: string;
+  icon: typeof ListChecks;
+  fullWidth?: boolean;
+}>;
 
 export default async function TrainPage() {
   const today = todayInCordoba();
@@ -86,11 +100,11 @@ export default async function TrainPage() {
         <section className="mt-6 space-y-3 lg:col-span-5 lg:mt-0">
           <h2 className="text-base font-semibold tracking-tight">Tu entrenamiento</h2>
           <div className="grid grid-cols-2 gap-3">
-            {trainingLinks.map(({ href, label, description, icon: Icon }) => (
+            {trainingLinks.map(({ href, label, description, icon: Icon, fullWidth }) => (
               <Link
                 key={href}
                 href={href}
-                className="surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 outline-none transition-[border-color,box-shadow,transform] duration-150 hover:border-primary/25 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+                className={`surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 outline-none transition-[border-color,box-shadow,transform] duration-150 hover:border-primary/25 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]${fullWidth ? " col-span-2" : ""}`}
               >
                 <Icon className="size-5 text-primary" aria-hidden />
                 <span>

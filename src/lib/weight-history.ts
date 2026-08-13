@@ -68,3 +68,30 @@ export function shouldRecordCurrentWeight(
 ): nextWeight is number {
   return nextWeight !== null && previousWeight !== nextWeight;
 }
+
+/**
+ * Decide si Ajustes debe crear un punto histórico. Mantiene el perfil como
+ * fuente del peso actual y evita fabricar un registro al guardar otro campo.
+ */
+export function shouldRecordProfileWeight(input: {
+  previousWeight: number | null;
+  nextWeight: number | null;
+  hasWeightHistory: boolean;
+}): input is {
+  previousWeight: number | null;
+  nextWeight: number;
+  hasWeightHistory: boolean;
+} {
+  if (input.nextWeight === null) return false;
+  return (
+    shouldRecordCurrentWeight(input.previousWeight, input.nextWeight) ||
+    (!input.hasWeightHistory && input.previousWeight !== null)
+  );
+}
+
+export function isMostRecentWeightEntry(
+  logDate: string,
+  latestLogDate: string | null,
+): boolean {
+  return latestLogDate === logDate;
+}

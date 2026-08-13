@@ -5,11 +5,7 @@ import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/tra
 import { formatTrainingMinutes } from "@/lib/phase2/training-progress-summary";
 import { getTrainingProgress } from "@/lib/phase2/training-robust";
 import { listExerciseRoutineMemberships, listExercises, listRoutines } from "@/lib/phase2/training";
-import { todayInCordoba } from "@/lib/phase2/cordoba-date";
-import { getMyProfile } from "@/lib/phase1/profile";
-import { listWeightHistory } from "@/lib/phase1/day-log";
 import type { WeeklyTrainingSummary } from "@/lib/phase2/types";
-import { WeightHistory } from "./weight-history";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +38,10 @@ function comparisonLabel(current: number, previous: number) {
 }
 
 export default async function TrainingProgressPage() {
-  const [progress, activeRoutines, exercises, profile, weightHistory] = await Promise.all([
+  const [progress, activeRoutines, exercises] = await Promise.all([
     getTrainingProgress(),
     listRoutines({ includeArchived: false }),
     listExercises({ includeArchived: false }),
-    getMyProfile(),
-    listWeightHistory(),
   ]);
   const memberships = await listExerciseRoutineMemberships(activeRoutines.map((routine) => routine.id));
   const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
@@ -79,12 +73,6 @@ export default async function TrainingProgressPage() {
           Solo cuenta sesiones finalizadas y series marcadas como hechas.
         </p>
       </div>
-
-      <WeightHistory
-        initialEntries={weightHistory}
-        currentWeightKg={profile?.current_weight_kg ?? null}
-        today={todayInCordoba()}
-      />
 
       <div className="space-y-6 lg:hidden">
       <Card className="surface-elevated">

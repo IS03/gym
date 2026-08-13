@@ -3,6 +3,8 @@ import {
   formatWeightKg,
   parseOptionalWeight,
   shouldRecordCurrentWeight,
+  shouldRecordProfileWeight,
+  isMostRecentWeightEntry,
   weightChange,
   weightHistoryForLastDays,
   type WeightHistoryPoint,
@@ -43,5 +45,18 @@ describe("historial de peso", () => {
     expect(shouldRecordCurrentWeight(65, 64.8)).toBe(true);
     expect(shouldRecordCurrentWeight(64.8, 64.8)).toBe(false);
     expect(shouldRecordCurrentWeight(64.8, null)).toBe(false);
+  });
+
+  it("corrige perfiles con peso existente pero sin historial sin inventar registros posteriores", () => {
+    expect(shouldRecordProfileWeight({ previousWeight: null, nextWeight: 65, hasWeightHistory: false })).toBe(true);
+    expect(shouldRecordProfileWeight({ previousWeight: 65, nextWeight: 65, hasWeightHistory: false })).toBe(true);
+    expect(shouldRecordProfileWeight({ previousWeight: 65, nextWeight: 65, hasWeightHistory: true })).toBe(false);
+    expect(shouldRecordProfileWeight({ previousWeight: 65, nextWeight: 64.8, hasWeightHistory: true })).toBe(true);
+  });
+
+  it("sólo considera actual al registro cronológicamente más reciente", () => {
+    expect(isMostRecentWeightEntry("2026-08-13", "2026-08-13")).toBe(true);
+    expect(isMostRecentWeightEntry("2026-08-10", "2026-08-13")).toBe(false);
+    expect(isMostRecentWeightEntry("2026-08-13", null)).toBe(false);
   });
 });
