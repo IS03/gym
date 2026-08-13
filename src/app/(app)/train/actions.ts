@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import type { MuscleGroup } from "@/lib/phase2/types";
+import type {
+  ExerciseActionExercise,
+  ExerciseActionResult,
+  ExerciseMutationInput,
+} from "@/lib/phase2/exercise-mutation";
+import { normalizeExerciseMutation } from "@/lib/phase2/exercise-mutation";
 import {
   addExistingExerciseToSession,
   addExerciseToRoutine,
@@ -63,48 +69,68 @@ function numOptional(formData: FormData, key: string): number | null | undefined
   return Number.isFinite(n) ? n : null;
 }
 
-export async function createExerciseAction(formData: FormData) {
-  const nombre = str(formData, "nombre");
-  const grupo_muscular = (str(formData, "grupo_muscular") ||
-    null) as MuscleGroup | null;
-  const series_sugeridas = num(formData, "series_sugeridas");
-  const reps_sugeridas = num(formData, "reps_sugeridas");
-  const peso_sugerido = num(formData, "peso_sugerido");
-
-  await createExercise({
-    nombre,
-    grupo_muscular,
-    series_sugeridas,
-    reps_sugeridas,
-    peso_sugerido,
-  });
-  revalidatePath("/train/exercises");
+function toExerciseActionExercise(exercise: Awaited<ReturnType<typeof createExercise>>): ExerciseActionExercise {
+  return {
+    id: exercise.id,
+    nombre: exercise.nombre,
+    grupo_muscular: exercise.grupo_muscular,
+    muscle_group_label: exercise.muscle_group_label,
+    series_sugeridas: exercise.series_sugeridas,
+    reps_sugeridas: exercise.reps_sugeridas,
+    peso_sugerido: exercise.peso_sugerido,
+    updated_at: exercise.updated_at,
+  };
 }
 
-export async function updateExerciseAction(formData: FormData) {
-  const id = str(formData, "id");
-  const nombre = str(formData, "nombre");
-  const grupo_muscular = (str(formData, "grupo_muscular") ||
-    null) as MuscleGroup | null;
-  const series_sugeridas = num(formData, "series_sugeridas");
-  const reps_sugeridas = num(formData, "reps_sugeridas");
-  const peso_sugerido = num(formData, "peso_sugerido");
-
-  await updateExercise({
-    id,
-    nombre,
-    grupo_muscular,
-    series_sugeridas,
-    reps_sugeridas,
-    peso_sugerido,
-  });
-  revalidatePath("/train/exercises");
+export async function createExerciseAction(
+  input: ExerciseMutationInput,
+): Promise<ExerciseActionResult<ExerciseActionExercise>> {
+  try {
+    const exercise = await createExercise(normalizeExerciseMutation(input));
+    revalidatePath("/train/exercises");
+    return { ok: true, data: toExerciseActionExercise(exercise) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "No se pudo crear el ejercicio.",
+    };
+  }
 }
 
-export async function archiveExerciseAction(formData: FormData) {
-  const id = str(formData, "id");
-  await archiveExercise(id);
-  revalidatePath("/train/exercises");
+export async function updateExerciseAction(
+  id: string,
+  input: ExerciseMutationInput,
+): Promise<ExerciseActionResult<ExerciseActionExercise>> {
+  try {
+    if (!id.trim()) throw new Error("Falta el ejercicio a editar.");
+    const exercise = await updateExercise({
+      id,
+      ...normalizeExerciseMutation(input),
+    });
+    revalidatePath("/train/exercises");
+    return { ok: true, data: toExerciseActionExercise(exercise) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "No se pudieron guardar los cambios.",
+    };
+  }
+}
+
+export async function archiveExerciseAction(
+  id: string,
+): Promise<ExerciseActionResult> {
+  try {
+    if (!id.trim()) throw new Error("Falta el ejercicio a archivar.");
+    await archiveExercise(id);
+    revalidatePath("/train/exercises");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "No se pudo archivar el ejercicio.",
+    };
+  }
 }
 
 export type CreateRoutineState = { error: string | null; id?: string };
