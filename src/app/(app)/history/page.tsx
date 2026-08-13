@@ -8,14 +8,35 @@ import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
 
+const gramFormatter = new Intl.NumberFormat("es-AR", {
+  maximumFractionDigits: 1,
+});
+
 function formatKcal(n: number | null | undefined) {
   if (typeof n !== "number") return "—";
   return `${n} kcal`;
 }
 
-function formatProtein(n: number | null | undefined) {
+function formatGrams(n: number | null | undefined) {
   if (typeof n !== "number") return "—";
-  return `${n.toFixed(0)} g`;
+  return `${gramFormatter.format(n)} g`;
+}
+
+function formatProteinProgress(consumed: number, target: number | null) {
+  const value = gramFormatter.format(consumed);
+  return target === null ? `${value} g` : `${value} / ${formatGrams(target)}`;
+}
+
+function formatMealMacros(meal: {
+  final_protein_g: number | null;
+  final_carbs_g: number | null;
+  final_fat_g: number | null;
+}) {
+  return [
+    `P ${formatGrams(meal.final_protein_g)}`,
+    `C ${formatGrams(meal.final_carbs_g)}`,
+    `G ${formatGrams(meal.final_fat_g)}`,
+  ].join(" · ");
 }
 
 export default async function HistoryPage({
@@ -151,6 +172,22 @@ export default async function HistoryPage({
                 : `${context.metrics.deltaVsNutritionTarget >= 0 ? "+" : ""}${context.metrics.deltaVsNutritionTarget} kcal`}
             </span>
           </div>
+          <div className="border-t pt-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Proteína</span>
+              <span className="text-sm">
+                {formatProteinProgress(dayLog.total_protein_g, context.targets.proteinG)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Carbohidratos</span>
+              <span className="text-sm">{formatGrams(dayLog.total_carbs_g)}</span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">Grasas</span>
+              <span className="text-sm">{formatGrams(dayLog.total_fat_g)}</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -169,9 +206,12 @@ export default async function HistoryPage({
                     <span className="text-sm font-medium" />
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {formatKcal(m.final_calories)} · {formatProtein(m.final_protein_g)}
+                    {formatKcal(m.final_calories)}
                   </span>
                 </div>
+                <p className="metric-number mt-1 text-xs text-muted-foreground">
+                  {formatMealMacros(m)}
+                </p>
                 {m.description ? (
                   <p className="mt-1 text-sm text-muted-foreground">{m.description}</p>
                 ) : null}

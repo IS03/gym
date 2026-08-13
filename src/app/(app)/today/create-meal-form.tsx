@@ -89,16 +89,44 @@ export function CreateMealForm({ date }: Props) {
             disabled={saving}
           />
         </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="new-meal-protein">Proteína (g)</Label>
+            <Input
+              id="new-meal-protein"
+              name="final_protein_g"
+              type="number"
+              min={0}
+              step="0.1"
+              inputMode="decimal"
+              placeholder="Ej: 30"
+              disabled={saving}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="new-meal-carbs">Carbohidratos (g)</Label>
+            <Input
+              id="new-meal-carbs"
+              name="final_carbs_g"
+              type="number"
+              min={0}
+              step="0.1"
+              inputMode="decimal"
+              placeholder="Ej: 45"
+              disabled={saving}
+            />
+          </div>
+        </div>
         <div className="space-y-1">
-          <Label htmlFor="new-meal-protein">Proteína (g)</Label>
+          <Label htmlFor="new-meal-fat">Grasas (g)</Label>
           <Input
-            id="new-meal-protein"
-            name="final_protein_g"
+            id="new-meal-fat"
+            name="final_fat_g"
             type="number"
             min={0}
             step="0.1"
-            inputMode="numeric"
-            placeholder="Ej: 30"
+            inputMode="decimal"
+            placeholder="Ej: 12"
             disabled={saving}
           />
         </div>

@@ -152,6 +152,17 @@ patrón:
 No corresponde crear otra tabla de “totales diarios” ni guardar macros
 consumidos en `profiles`.
 
+El flujo manual de Today persiste calorías, proteína, carbohidratos y grasas en
+la misma `meal_entries`, con `source_type = 'manual'` y `entry_kind = 'meal'`.
+Calorías sigue siendo obligatoria; cada macro puede quedar en `null` si no fue
+informada, mientras que `0` representa un cero conocido. Crear, editar o hacer
+soft delete dispara el agregado canónico en Postgres y revalida Today, History
+y el resumen compacto de Home.
+
+La protección de doble envío compara fecha, texto, calorías y los tres macros
+durante la ventana reciente. Conserva la diferencia entre `null` y `0`; el
+usuario puede confirmar explícitamente “Guardar igual”.
+
 ### Fundación y configuración pendiente
 
 La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
@@ -164,6 +175,7 @@ La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 
 No se cargaron los objetivos históricos ni la matriz real y no se importó el
 Google Sheet. Las cinco tablas nuevas permanecen vacías en producción.
+El catálogo `foods` aún no está conectado al formulario manual.
 
 Las columnas `target_kcal_snapshot`, `maintenance_kcal_snapshot`,
 `delta_vs_target` y `delta_vs_maintenance` conservan su semántica legacy/BMR.

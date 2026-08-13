@@ -5,6 +5,11 @@ import {
   parseOptionalWeight,
   type WeightHistoryPoint,
 } from "../weight-history";
+import {
+  nullableMealMacrosMatch,
+  optionalMealMacro,
+  requiredMealCalories,
+} from "../nutrition/meal-macros";
 
 export type IsoDate = `${number}-${number}-${number}`; // YYYY-MM-DD
 
@@ -46,8 +51,10 @@ export type CreateMealInput = {
   consumed_at?: string;
   title?: string;
   description?: string;
-  final_calories?: number;
-  final_protein_g?: number;
+  final_calories: number;
+  final_protein_g?: number | null;
+  final_carbs_g?: number | null;
+  final_fat_g?: number | null;
 };
 
 /** Alineado con public.normalize_name() (trim, espacios colapsados, mayúsculas). */
@@ -55,15 +62,6 @@ function normalizeMealText(value: string | null | undefined): string | null {
   if (value == null) return null;
   const s = value.trim().replace(/\s+/g, " ").toUpperCase();
   return s === "" ? null : s;
-}
-
-function proteinMatches(
-  a: number | null | undefined,
-  b: number | null | undefined,
-): boolean {
-  if (a == null && b == null) return true;
-  if (a == null || b == null) return false;
-  return Math.abs(Number(a) - Number(b)) < 0.0001;
 }
 
 /** Título o descripción nuevos coinciden con el registro (ya normalizado en BD). */
@@ -94,6 +92,8 @@ export async function findRecentPossibleDuplicateMeal(input: {
   description?: string;
   final_calories: number;
   final_protein_g?: number | null;
+  final_carbs_g?: number | null;
+  final_fat_g?: number | null;
 }): Promise<MealEntry | null> {
   assertIsoDate(input.date);
   const dayLog = await getOrCreateDayLog(input.date);
@@ -120,7 +120,13 @@ export async function findRecentPossibleDuplicateMeal(input: {
     const m = row as MealEntry;
     if (m.final_calories == null) continue;
     if (Math.trunc(m.final_calories) !== kcal) continue;
-    if (!proteinMatches(input.final_protein_g ?? null, m.final_protein_g)) {
+    if (!nullableMealMacrosMatch(input.final_protein_g, m.final_protein_g)) {
+      continue;
+    }
+    if (!nullableMealMacrosMatch(input.final_carbs_g, m.final_carbs_g)) {
+      continue;
+    }
+    if (!nullableMealMacrosMatch(input.final_fat_g, m.final_fat_g)) {
       continue;
     }
     if (!newMealTextMatchesExisting(t, d, m)) continue;
@@ -131,9 +137,10 @@ export async function findRecentPossibleDuplicateMeal(input: {
 
 export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
   assertIsoDate(input.date);
-  if (typeof input.final_calories !== "number" || input.final_calories <= 0) {
-    throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
-  }
+  const calories = requiredMealCalories(input.final_calories);
+  const protein = optionalMealMacro(input.final_protein_g, "Proteína");
+  const carbs = optionalMealMacro(input.final_carbs_g, "Carbohidratos");
+  const fat = optionalMealMacro(input.final_fat_g, "Grasas");
   const dayLog = await getOrCreateDayLog(input.date);
   const supabase = await createClient();
   const userId = await getAuthedUserId();
@@ -146,10 +153,12 @@ export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
       consumed_at: input.consumed_at ?? new Date().toISOString(),
       title: input.title ?? null,
       description: input.description ?? null,
-      final_calories: Math.trunc(input.final_calories),
-      final_protein_g:
-        typeof input.final_protein_g === "number" ? input.final_protein_g : null,
+      final_calories: calories,
+      final_protein_g: protein,
+      final_carbs_g: carbs,
+      final_fat_g: fat,
       source_type: "manual",
+      entry_kind: "meal",
     })
     .select("*")
     .single();
@@ -164,6 +173,8 @@ export type UpdateMealInput = {
   description?: string | null;
   final_calories?: number | null;
   final_protein_g?: number | null;
+  final_carbs_g?: number | null;
+  final_fat_g?: number | null;
 };
 
 export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
@@ -174,13 +185,14 @@ export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
   if (input.title !== undefined) patch.title = input.title;
   if (input.description !== undefined) patch.description = input.description;
   if (input.final_calories !== undefined) {
-    if (input.final_calories === null || input.final_calories <= 0) {
-      throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
-    }
-    patch.final_calories = Math.trunc(input.final_calories);
+    patch.final_calories = requiredMealCalories(input.final_calories);
   }
   if (input.final_protein_g !== undefined)
-    patch.final_protein_g = input.final_protein_g;
+    patch.final_protein_g = optionalMealMacro(input.final_protein_g, "Proteína");
+  if (input.final_carbs_g !== undefined)
+    patch.final_carbs_g = optionalMealMacro(input.final_carbs_g, "Carbohidratos");
+  if (input.final_fat_g !== undefined)
+    patch.final_fat_g = optionalMealMacro(input.final_fat_g, "Grasas");
 
   const { data, error } = await supabase
     .from("meal_entries")

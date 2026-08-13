@@ -9,14 +9,35 @@ import { softDeleteMealAction, updateMealAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+const gramFormatter = new Intl.NumberFormat("es-AR", {
+  maximumFractionDigits: 1,
+});
+
 function formatKcal(n: number | null | undefined) {
   if (typeof n !== "number") return "—";
   return `${n} kcal`;
 }
 
-function formatProtein(n: number | null | undefined) {
+function formatGrams(n: number | null | undefined) {
   if (typeof n !== "number") return "—";
-  return `${n.toFixed(0)} g`;
+  return `${gramFormatter.format(n)} g`;
+}
+
+function formatProteinProgress(consumed: number, target: number | null) {
+  const value = gramFormatter.format(consumed);
+  return target === null ? `${value} g` : `${value} / ${formatGrams(target)}`;
+}
+
+function formatMealMacros(meal: {
+  final_protein_g: number | null;
+  final_carbs_g: number | null;
+  final_fat_g: number | null;
+}) {
+  return [
+    `P ${formatGrams(meal.final_protein_g)}`,
+    `C ${formatGrams(meal.final_carbs_g)}`,
+    `G ${formatGrams(meal.final_fat_g)}`,
+  ].join(" · ");
 }
 
 export default async function TodayPage() {
@@ -50,9 +71,25 @@ export default async function TodayPage() {
               <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          <div className="flex items-baseline justify-between border-t pt-3">
-            <span className="text-sm text-muted-foreground">Proteína registrada</span>
-            <span className="metric-number text-lg font-semibold">{formatProtein(dayLog.total_protein_g)}</span>
+          <div className="grid grid-cols-3 gap-2 border-t pt-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Proteína</p>
+              <p className="metric-number mt-0.5 text-sm font-semibold">
+                {formatProteinProgress(dayLog.total_protein_g, context.targets.proteinG)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Carbos</p>
+              <p className="metric-number mt-0.5 text-sm font-semibold">
+                {formatGrams(dayLog.total_carbs_g)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Grasas</p>
+              <p className="metric-number mt-0.5 text-sm font-semibold">
+                {formatGrams(dayLog.total_fat_g)}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -80,7 +117,10 @@ export default async function TodayPage() {
                     <CardTitle className="text-base">{meal.title}</CardTitle>
                   ) : null}
                   <p className="text-xs text-muted-foreground">
-                    {formatKcal(meal.final_calories)} · {formatProtein(meal.final_protein_g)}
+                    {formatKcal(meal.final_calories)}
+                  </p>
+                  <p className="metric-number mt-1 text-xs text-muted-foreground">
+                    {formatMealMacros(meal)}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -129,9 +169,37 @@ export default async function TodayPage() {
                             type="number"
                             min={0}
                             step="0.1"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             defaultValue={
                               meal.final_protein_g === null ? "" : String(meal.final_protein_g)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`c-${meal.id}`}>Carbohidratos</Label>
+                          <Input
+                            id={`c-${meal.id}`}
+                            name="final_carbs_g"
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            inputMode="decimal"
+                            defaultValue={
+                              meal.final_carbs_g === null ? "" : String(meal.final_carbs_g)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`f-${meal.id}`}>Grasas</Label>
+                          <Input
+                            id={`f-${meal.id}`}
+                            name="final_fat_g"
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            inputMode="decimal"
+                            defaultValue={
+                              meal.final_fat_g === null ? "" : String(meal.final_fat_g)
                             }
                           />
                         </div>
