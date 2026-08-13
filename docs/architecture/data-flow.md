@@ -16,9 +16,11 @@ los tests.
 | Perfil personal | `profiles` | No aplica | `upsertMyProfile` desde Ajustes | Perfil, BMR y objetivos actuales |
 | Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual, objetivos y tendencias |
 | Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on` | acciones de Cuerpo | Últimas medidas y gráficos |
-| Objetivos nutricionales | `profiles.bmr_kcal_current`, `maintenance_kcal_current`, `target_kcal_current`, `goal_type` | columnas `*_snapshot` de `day_logs` | perfil actual; snapshot al crear el día y sincronización del día corriente | resumen y deltas diarios |
+| Objetivos nutricionales legacy | `profiles.bmr_kcal_current`, `maintenance_kcal_current`, `target_kcal_current`, `goal_type` | columnas legacy `*_snapshot` de `day_logs` | perfil actual; snapshot al crear el día y sincronización del día corriente | resumen y deltas legacy |
+| Plan nutricional versionado | `nutrition_goal_periods` (infraestructura, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | el futuro motor diario | objetivos sin reescritura histórica |
+| Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (infraestructura, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | el futuro motor diario | gasto estimado y contexto del día |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
-| Totales nutricionales | No se copian al perfil | `day_logs.total_calories_consumed` y `total_protein_g` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
+| Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Biblioteca de ejercicios | `exercises` | snapshots de sesión | acciones de Biblioteca | rutinas y nuevas sesiones |
 | Rutina planificada | `routines`, `routine_exercises`, `routine_exercise_sets` | snapshot copiado al iniciar | acciones de Rutinas | inicio y planificación futura |
 | Sesión | `workout_sessions` | la misma fila con estado `completed` o `discarded` | RPCs transaccionales de entrenamiento | historial, calendario y reportes |
@@ -132,17 +134,45 @@ Calorías y proteína de una comida no deben copiarse a `profiles`. Los totales
 diarios se mantienen desde las comidas activas mediante el trigger existente;
 no se editan como una segunda entrada manual.
 
-Cuando se incorporen carbohidratos y grasas, deben seguir el mismo patrón:
+La fundación del issue #29 ya incorporó carbohidratos y grasas con el mismo
+patrón:
 
-1. columnas de detalle en `meal_entries`;
-2. columnas agregadas en `day_logs`, actualizadas por el mismo mecanismo
-   transaccional de recálculo;
-3. objetivos actuales en perfil/configuración;
-4. objetivos históricos como snapshots de `day_logs`.
+1. `meal_entries.final_carbs_g` y `final_fat_g` en el detalle;
+2. `day_logs.total_carbs_g` y `total_fat_g` como agregados;
+3. `recalculate_day_log` serializa mutaciones del mismo día y recalcula los
+   cuatro valores desde entradas activas;
+4. los deltas nutricionales nuevos sólo se calculan cuando sus snapshots
+   específicos ya existen.
 
 No corresponde crear otra tabla de “totales diarios” ni guardar macros
-consumidos en `profiles`. La definición de targets de macros y su UX quedan
-fuera de esta pasada.
+consumidos en `profiles`.
+
+### Fundación nutricional inactiva
+
+La migración `20260813150000_nutrition_schema_foundation.sql` prepara, sin
+activar todavía el motor diario:
+
+- períodos versionados de objetivos, gasto y horario habitual;
+- campos de actividad, overrides, referencias y snapshots en `day_logs`;
+- procedencia, precisión, idempotencia e importación en `meal_entries`;
+- `nutrition_import_runs` para registrar imports aplicados reproducibles;
+- `foods` como catálogo personal con ownership estricto.
+
+No se cargaron los objetivos históricos ni la matriz real, no se importó el
+Google Sheet y no existen triggers nutricionales sobre entrenamiento en esta
+fase. La selección del período vigente y la resolución de trabajo/gym quedan
+para el motor diario de la fase siguiente.
+
+Las columnas `target_kcal_snapshot`, `maintenance_kcal_snapshot`,
+`delta_vs_target` y `delta_vs_maintenance` conservan su semántica legacy/BMR.
+Los nuevos conceptos viven en `nutrition_target_kcal_snapshot`,
+`estimated_expenditure_kcal_snapshot`, `delta_vs_nutrition_target` y
+`energy_balance_kcal`; no se reinterpretan datos anteriores.
+
+Un `legacy_daily_summary` activo no puede convivir con comidas detalladas
+activas en el mismo día. La base serializa las escrituras del día y aplica la
+regla antes de recalcular, de modo que UI, importadores e integraciones futuras
+compartan la misma protección.
 
 ## Día de producto y timestamps
 

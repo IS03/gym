@@ -4,6 +4,23 @@ Este documento resume las decisiones que quedaron consolidadas a partir de los i
 
 ## Decisiones consolidadas
 
+### Fundación nutricional aditiva — #29
+
+`day_logs` conserva IDs, peso, relaciones y snapshots legacy; sólo recibe
+columnas nuevas para contexto, referencias, macros y snapshots nutricionales.
+Los objetivos, reglas de gasto y horarios son períodos versionados por
+`(user_id, effective_from)`, sin `effective_to`.
+
+Calorías, proteína, carbohidratos y grasas consumidos se agregan desde
+`meal_entries` activas mediante una única función transaccional. Target
+nutricional y gasto estimado usan snapshots nuevos: `target_kcal_snapshot` y
+`maintenance_kcal_snapshot` no cambian todavía su semántica BMR/legacy.
+
+La infraestructura de importación e idempotencia queda creada sin importar
+datos ni cargar objetivos reales. El motor diario, la derivación de gym desde
+sesiones `completed` y el cambio definitivo del motor energético quedan para
+la fase siguiente del issue #29.
+
 ### Sesiones persistentes y únicas — #1
 
 La sesión activa dejó de inferirse únicamente por `ended_at`. El sistema incorporó estado explícito y una garantía de una sola sesión `in_progress` por usuario.
