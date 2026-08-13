@@ -37,7 +37,12 @@ OWNLEVEL es una PWA personal de seguimiento físico que centraliza entrenamiento
 - Duración, volumen, series y distribución muscular.
 - Comparación entre semanas.
 - Evolución por ejercicio.
-- Historial de peso corporal.
+
+### Cuerpo
+
+- Historial de peso corporal por fecha.
+- Peso actual sincronizado con la última medición.
+- Medidas de cintura, pecho, brazo, muslo y cadera.
 
 ### Experiencia
 
@@ -143,6 +148,7 @@ Documentos principales:
 
 - [Visión de producto](./docs/product/product-overview.md)
 - [Arquitectura de entrenamiento](./docs/architecture/training-system.md)
+- [Flujo de datos y fuentes de verdad](./docs/architecture/data-flow.md)
 - [Guía de ingeniería](./docs/development/engineering-guidelines.md)
 - [Historial de decisiones](./docs/history/technical-decisions.md)
 

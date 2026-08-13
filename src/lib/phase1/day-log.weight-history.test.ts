@@ -2,15 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
-  updateMyCurrentWeightKg: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: mocks.createClient,
-}));
-
-vi.mock("./profile", () => ({
-  updateMyCurrentWeightKg: mocks.updateMyCurrentWeightKg,
 }));
 
 import {
@@ -96,7 +91,6 @@ describe("persistencia de historial de peso", () => {
       p_log_date: "2026-08-11",
     });
     expect(builder.update).toHaveBeenCalledWith({ weight_kg: 64.8 });
-    expect(mocks.updateMyCurrentWeightKg).toHaveBeenCalledWith(64.8);
   });
 
   it("editar y eliminar sólo cambian weight_kg y siempre acotan la fila al usuario", async () => {
@@ -121,14 +115,12 @@ describe("persistencia de historial de peso", () => {
 
     const result = await updateWeightHistoryEntry({ logDate: "2026-08-10", weightKg: 64.5 });
     expect(result.syncedCurrentWeight).toBe(false);
-    expect(mocks.updateMyCurrentWeightKg).not.toHaveBeenCalled();
 
     const latestUpdateBuilder = query({ data: { id: "new", log_date: "2026-08-13", weight_kg: 64.8 }, error: null });
     const sameLatestBuilder = query({ data: [{ id: "new", log_date: "2026-08-13", weight_kg: 64.8 }], error: null });
     client.from.mockReturnValueOnce(latestUpdateBuilder).mockReturnValueOnce(sameLatestBuilder);
     const latestResult = await updateWeightHistoryEntry({ logDate: "2026-08-13", weightKg: 64.8 });
     expect(latestResult).toMatchObject({ currentWeightKg: 64.8, syncedCurrentWeight: true });
-    expect(mocks.updateMyCurrentWeightKg).toHaveBeenCalledWith(64.8);
   });
 
   it("al eliminar el último peso toma el anterior; si no queda ninguno limpia el perfil", async () => {
@@ -137,13 +129,11 @@ describe("persistencia de historial de peso", () => {
     const after = query({ data: [{ id: "old", log_date: "2026-08-10", weight_kg: 64.5 }], error: null });
     client.from.mockReturnValueOnce(before).mockReturnValueOnce(removal).mockReturnValueOnce(after);
     await expect(deleteWeightHistoryEntry("2026-08-13")).resolves.toMatchObject({ currentWeightKg: 64.5, syncedCurrentWeight: true });
-    expect(mocks.updateMyCurrentWeightKg).toHaveBeenCalledWith(64.5);
 
     const lastBefore = query({ data: [{ id: "only", log_date: "2026-08-13", weight_kg: 65.2 }], error: null });
     const lastRemoval = query({ data: null, error: null });
     const noneAfter = query({ data: [], error: null });
     client.from.mockReturnValueOnce(lastBefore).mockReturnValueOnce(lastRemoval).mockReturnValueOnce(noneAfter);
     await expect(deleteWeightHistoryEntry("2026-08-13")).resolves.toMatchObject({ currentWeightKg: null, syncedCurrentWeight: true });
-    expect(mocks.updateMyCurrentWeightKg).toHaveBeenCalledWith(null);
   });
 });

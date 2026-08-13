@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants, Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getDayLogWithMeals, listRecentDays } from "@/lib/phase1/day-log";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function HistoryPage({
   const sp = (await searchParams) ?? {};
   const date = typeof sp.date === "string" ? sp.date : null;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInCordoba();
 
   if (!date) {
     const days = await listRecentDays(14);

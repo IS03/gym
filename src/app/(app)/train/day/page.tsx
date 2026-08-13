@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { listEndedSessionsByDate, listRoutines } from "@/lib/phase2/training";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function TrainDayPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = (await searchParams) ?? {};
-  const date = typeof sp.date === "string" ? sp.date : new Date().toISOString().slice(0, 10);
+  const date = typeof sp.date === "string" ? sp.date : todayInCordoba();
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
 
   const [routines, sessions] = await Promise.all([

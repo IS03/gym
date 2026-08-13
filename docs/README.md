@@ -21,6 +21,11 @@ Define el propósito de OWNLEVEL, áreas funcionales, principios de UX y alcance
 
 ## Arquitectura
 
+### [`architecture/data-flow.md`](./architecture/data-flow.md)
+
+Define fuentes de verdad, sincronización de peso, snapshots nutricionales,
+flujo de entrenamiento, fechas e invariantes entre estado actual e historial.
+
 ### [`architecture/training-system.md`](./architecture/training-system.md)
 
 Describe el modelo de rutinas, sesiones, series, snapshots, autosave, concurrencia, finalización, historial y reportes de entrenamiento.

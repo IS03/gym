@@ -1,11 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import type { DayLog, MealEntry } from "./types";
 import {
+  isMostRecentWeightEntry,
   parseOptionalWeight,
   type WeightHistoryPoint,
 } from "../weight-history";
-import { isMostRecentWeightEntry } from "../weight-history";
-import { updateMyCurrentWeightKg } from "./profile";
 
 export type IsoDate = `${number}-${number}-${number}`; // YYYY-MM-DD
 
@@ -305,7 +304,6 @@ export async function recordWeightForDate(input: {
   const entry = data as WeightHistoryPoint;
   const latest = await getLatestWeightHistoryEntry();
   const syncedCurrentWeight = isMostRecentWeightEntry(entry.log_date, latest?.log_date ?? null);
-  if (syncedCurrentWeight) await updateMyCurrentWeightKg(entry.weight_kg);
   return {
     entry,
     currentWeightKg: syncedCurrentWeight ? entry.weight_kg : null,
@@ -337,7 +335,6 @@ export async function updateWeightHistoryEntry(input: {
   const entry = data as WeightHistoryPoint;
   const latest = await getLatestWeightHistoryEntry();
   const syncedCurrentWeight = isMostRecentWeightEntry(entry.log_date, latest?.log_date ?? null);
-  if (syncedCurrentWeight) await updateMyCurrentWeightKg(entry.weight_kg);
   return {
     entry,
     currentWeightKg: syncedCurrentWeight ? entry.weight_kg : null,
@@ -363,6 +360,5 @@ export async function deleteWeightHistoryEntry(logDate: string): Promise<WeightH
 
   const latestAfter = await getLatestWeightHistoryEntry();
   const nextWeight = latestAfter?.weight_kg ?? null;
-  await updateMyCurrentWeightKg(nextWeight);
   return { entry: null, currentWeightKg: nextWeight, syncedCurrentWeight: true };
 }

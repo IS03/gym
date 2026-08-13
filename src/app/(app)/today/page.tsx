@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { getDayLogWithMeals } from "@/lib/phase1/day-log";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { CreateMealForm } from "./create-meal-form";
 import { softDeleteMealAction, updateMealAction } from "./actions";
 
@@ -19,7 +20,7 @@ function formatProtein(n: number | null | undefined) {
 }
 
 export default async function TodayPage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInCordoba();
   const { dayLog, meals } = await getDayLogWithMeals(today);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = dayLog.target_kcal_snapshot;

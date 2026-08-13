@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getMyProfile, syncTodayNutritionSnapshots, upsertMyProfile } from "../../../lib/phase1/profile";
+import { getMyProfile, upsertMyProfile } from "../../../lib/phase1/profile";
 import { listWeightHistory, recordWeightForDate } from "../../../lib/phase1/day-log";
 import { todayInCordoba } from "../../../lib/phase2/cordoba-date";
 import {
@@ -40,6 +40,7 @@ export async function saveProfileAction(
 
   let previousWeight: number | null = null;
   let hasWeightHistory = false;
+  let shouldRecordWeight = false;
   try {
     const [profile, weightHistory] = await Promise.all([
       getMyProfile(),
@@ -47,18 +48,28 @@ export async function saveProfileAction(
     ]);
     previousWeight = profile?.current_weight_kg ?? null;
     hasWeightHistory = weightHistory.length > 0;
-    const savedProfile = await upsertMyProfile({
+    if (weight === null && hasWeightHistory) {
+      return {
+        status: "error",
+        message:
+          "El peso actual corresponde al último registro. Para quitarlo, eliminá ese registro desde Entrenar → Cuerpo.",
+      };
+    }
+
+    shouldRecordWeight = shouldRecordProfileWeight({
+      previousWeight,
+      nextWeight: weight,
+      hasWeightHistory,
+    });
+    await upsertMyProfile({
       display_name: displayName,
       birth_date: birthDate,
       sex,
       height_cm: height,
-      current_weight_kg: weight,
+      // Si hay una medición nueva, la escritura atómica del day_log pasa a ser
+      // quien sincroniza peso actual, derivados y snapshot del día.
+      current_weight_kg: shouldRecordWeight ? previousWeight : weight,
     });
-    try {
-      await syncTodayNutritionSnapshots(savedProfile);
-    } catch {
-      // El perfil es válido aunque no exista todavía un day_log de hoy.
-    }
   } catch (error) {
     return {
       status: "error",
@@ -66,11 +77,6 @@ export async function saveProfileAction(
     };
   }
 
-  const shouldRecordWeight = shouldRecordProfileWeight({
-    previousWeight,
-    nextWeight: weight,
-    hasWeightHistory,
-  });
   if (shouldRecordWeight) {
     try {
       await recordWeightForDate({
@@ -102,5 +108,5 @@ function revalidateProfilePages() {
   revalidatePath("/settings");
   revalidatePath("/today");
   revalidatePath("/history");
-  revalidatePath("/train/progress");
+  revalidatePath("/train/body");
 }

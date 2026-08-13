@@ -100,6 +100,14 @@ El feedback de éxito aparece únicamente después de que backend confirma la fi
 
 El cambio local es inmediato y la sincronización ocurre en segundo plano. Saves del mismo ejercicio se serializan; saves de ejercicios distintos no bloquean la sesión. Finalizar hace flush y no completa si quedan errores.
 
+### Fuentes de verdad y sincronizaciones — #32
+
+La primera pasada de flujo de datos dejó documentadas las fuentes canónicas de
+Perfil, Día, Cuerpo, Entrenamiento y Nutrición. El peso histórico inicia la
+sincronización del peso actual; perfil, valores derivados y snapshots del día
+de Córdoba se actualizan en la misma transacción. El detalle completo vive en
+`../architecture/data-flow.md`.
+
 ### Recordatorios de próxima sesión — #35
 
 `+ Peso`, `+ Repeticiones` y `Personalizado` son reminders de una sola vez, no cambios automáticos de targets. `apply_to_routine` es un mecanismo independiente que sí actualiza valores numéricos cuando el usuario lo solicita.
@@ -148,6 +156,7 @@ El cambio local es inmediato y la sincronización ocurre en segundo plano. Saves
 | [#27](https://github.com/IS03/gym/issues/27) | Historial/corrección/descarte de sesiones |
 | [#28](https://github.com/IS03/gym/issues/28) | Confirmación post-finalización |
 | [#30](https://github.com/IS03/gym/issues/30) | Autosave no bloqueante |
+| [#32](https://github.com/IS03/gym/issues/32) | Fuentes de verdad y flujo de datos |
 | [#35](https://github.com/IS03/gym/issues/35) | Reminders de próxima sesión |
 
 La recopilación extensa original se conserva en `../archive/issue-history-full.md` como material histórico.

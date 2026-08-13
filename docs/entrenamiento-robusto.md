@@ -99,7 +99,8 @@ las sesiones, series, duración, volumen, rutinas y ejercicios.
 - `profiles.current_weight_kg` conserva el peso actual para BMR, mantenimiento y
   objetivo de calorías. Al registrar un peso en Cuerpo, se sincroniza solo si es el
   registro cronológicamente más reciente. Corregir un peso antiguo no cambia el
-  perfil.
+  perfil. La medición, el perfil y los snapshots del día actual se sincronizan en
+  una única transacción de Postgres.
 - Al eliminar el registro de peso más reciente, el perfil toma el punto anterior;
   si ya no existe historial queda en `null`. Los snapshots de días anteriores nunca
   se reescriben.

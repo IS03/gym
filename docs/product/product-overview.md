@@ -115,8 +115,18 @@ Progreso resume hechos completados:
 - rutinas;
 - grupos musculares;
 - comparación semanal;
-- evolución individual por ejercicio;
-- peso corporal.
+- evolución individual por ejercicio.
+
+El peso y las medidas corporales viven en la sección Cuerpo y no forman parte
+del progreso de entrenamiento.
+
+### Cuerpo
+
+Cuerpo es la ubicación canónica del seguimiento corporal:
+
+- peso histórico por fecha;
+- peso actual derivado del último registro;
+- medidas corporales históricas.
 
 No se inventan contribuciones musculares indirectas ni recomendaciones de rotación si el modelo no las define explícitamente.
 
