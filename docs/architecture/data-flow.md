@@ -172,12 +172,18 @@ La protección de doble envío compara fecha, texto, calorías y los tres macros
 durante la ventana reciente. Conserva la diferencia entre `null` y `0`; el
 usuario puede confirmar explícitamente “Guardar igual”.
 
-### Importación histórica: plan previo a la escritura
+### Importación histórica reproducible
 
 El importador del issue #29 separa lectura, normalización, validación,
-comparación con producción y plan de cambios. En esta fase sólo existe el
-camino de dry-run: Google Sheets y Supabase se leen, pero no se modifican, y
-`nutrition_import_runs` permanece vacío.
+comparación con producción y plan de cambios. `nutrition:dry-run` no escribe;
+`nutrition:apply` reutiliza exactamente ese plan y exige `--apply`, target
+`production`, SHA esperado y modo explícito `rollback` o `commit`.
+
+El apply completo se ejecuta en una sola transacción PostgreSQL: crea el
+`nutrition_import_run`, materializa períodos y días, inserta detalles y ejecuta
+asserts de conteos, FKs, snapshots, peso/BMR y hashes de entrenamiento antes del
+commit. Un import run con el mismo `(user_id, source_name, source_sha256)` corta
+el proceso como `ALREADY_IMPORTED`, sin duplicar hechos.
 
 La identidad reproducible es el SHA-256 de una representación canónica de las
 pestañas fuente. Cada comida conserva un par estable
@@ -185,6 +191,11 @@ pestañas fuente. Cada comida conserva un par estable
 soft-deleted. Una hora desconocida se materializa técnicamente al mediodía de
 Córdoba, pero esa convención queda marcada como desconocida en `raw_input` y no
 adquiere semántica de hora observada.
+
+Las entradas históricas de `sheet_import` admiten `0` kcal para representar
+hechos reales como hidratación sin convertirlos en consumos positivos. El flujo
+manual continúa exigiendo calorías mayores a cero; valores negativos siguen
+rechazados para toda procedencia.
 
 El plan opera por `(user_id, log_date)` y sólo completa columnas autorizadas.
 Nunca reemplaza una fila existente, por lo que preserva `day_logs.id`, las FKs

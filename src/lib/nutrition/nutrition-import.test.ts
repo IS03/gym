@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { assertPrivateOutputPath } from "../../../scripts/nutrition-import/cli.ts";
+import { buildHistoricalImportSql, isAlreadyImported } from "../../../scripts/nutrition-import/apply.ts";
 import {
   historicalConsumedAt,
   normalizeWorkbook,
@@ -14,7 +15,7 @@ import {
   nutritionEventFingerprint,
 } from "../../../scripts/nutrition-import/plan.ts";
 import { sourceSha256 } from "../../../scripts/nutrition-import/source.ts";
-import type { CellValue, ProductionSnapshot, WorkbookSnapshot } from "../../../scripts/nutrition-import/types.ts";
+import type { CellValue, DryRunPlan, ProductionSnapshot, WorkbookSnapshot } from "../../../scripts/nutrition-import/types.ts";
 
 const BLANK_SHEETS = [
   "Dashboard", "Resumen semanal", "Rules", "Análisis semanal",
@@ -267,5 +268,72 @@ describe("nutrition import normalization", () => {
     expect(parseServing("1 paquete")).toEqual({ quantity: 1, unit: "paquete" });
     expect(() => assertPrivateOutputPath("reports/private.json", "/repo")).toThrow(/tmp\/ o temp/);
     expect(assertPrivateOutputPath("tmp/private.json", "/repo")).toBe("/repo/tmp/private.json");
+  });
+
+  it("genera un apply atómico con guards, asserts y modo rollback desde el mismo plan", () => {
+    const normalized = normalizeWorkbook(workbook());
+    const base = buildDryRunPlan(normalized, production());
+    const dayTemplate = base.dayLogs[1];
+    const days = Array.from({ length: 46 }, (_, index) => ({
+      ...dayTemplate,
+      logDate: new Date(Date.UTC(2026, 6, index + 1)).toISOString().slice(0, 10),
+      classification: index < 4 ? "MERGE_SAFE" as const : "INSERT" as const,
+      expectedFields: { ...dayTemplate.expectedFields, weight_kg: null },
+    }));
+    const detailed = normalized.meals.find((meal) => meal.entryKind === "meal")!;
+    const summary = normalized.meals.find((meal) => meal.entryKind === "legacy_daily_summary")!;
+    const meals = [
+      ...Array.from({ length: 220 }, (_, index) => ({ ...detailed, logDate: days[index % days.length].logDate, legacyImportId: `SYN-MEAL-${index}` })),
+      ...Array.from({ length: 7 }, (_, index) => ({ ...summary, logDate: days[index].logDate, legacyImportId: `SYN-SUMMARY-${index}` })),
+    ];
+    const plan: DryRunPlan = {
+      ...base,
+      dayLogs: days,
+      meals: { detailed: 220, legacySummaries: 7, active: 227, inactive: 0, inserts: 227, noOps: 0, conflicts: [], rows: meals },
+      foods: Array.from({ length: 10 }, (_, index) => ({ ...normalized.foods[0], name: `Synthetic food ${index}` })),
+      bodyMeasurements: {
+        inserts: 1, noOps: 0, skippedUndated: 0, conflicts: [],
+        rows: [{ disposition: "IMPORT" } as unknown as DryRunPlan["bodyMeasurements"]["rows"][number]],
+      },
+      nutritionEvents: {
+        inserts: 8, noOps: 0, conflicts: [],
+        rows: Array.from({ length: 8 }, () => ({} as unknown as DryRunPlan["nutritionEvents"]["rows"][number])),
+      },
+      reconciliation: { ...base.reconciliation, exactDays: 29, withinToleranceDays: 16, sourceWinsDays: 1, mismatchDays: 0 },
+      blockers: [],
+      applyReady: true,
+    };
+    const state: ProductionSnapshot = {
+      ...production(),
+      user_id: "00000000-0000-4000-8000-000000000001",
+      day_logs: days.slice(0, 4).map((day) => ({ ...production().day_logs[0], log_date: day.logDate, weight_kg: 70 })),
+      regression_counts: { profiles: 1, day_logs: 5, workout_sessions: 10, workout_session_exercises: 52, workout_sets: 146, body_measurements: 0 },
+      config_counts: { nutrition_events: 0, nutrition_goal_periods: 0, expenditure_rule_periods: 0, work_schedule_periods: 0, nutrition_import_runs: 0, foods: 0 },
+      regression_hashes: { profiles: "p", profiles_stable: "ps", workout_sessions: "s", workout_session_exercises: "e", workout_sets: "w" },
+      applied_imports: [],
+    };
+    const sql = buildHistoricalImportSql({ plan, production: state, expectedSha: plan.sourceSha256, target: "production", mode: "rollback" });
+    expect(sql).toContain("begin;");
+    expect(sql).toContain("request.jwt.claims");
+    expect(sql).toContain("BASELINE_HASH_CHANGED");
+    expect(sql).toContain("HISTORICAL_DAY_ASSERT_FAILED");
+    expect(sql).toContain("REGRESSION_HASH_ASSERT_FAILED");
+    expect(sql).toContain("rollback;");
+    expect(sql).not.toContain("commit;");
+  });
+
+  it("rechaza SHA incorrecto y reconoce un import run ya aplicado", () => {
+    const plan = buildDryRunPlan(normalizeWorkbook(workbook()), production());
+    const state = production();
+    state.user_id = "00000000-0000-4000-8000-000000000001";
+    state.applied_imports = [{ source_name: plan.sourceName, source_sha256: plan.sourceSha256, import_run_id: "synthetic" }];
+    expect(isAlreadyImported(plan, state)).toBe(true);
+    expect(() => buildHistoricalImportSql({ plan, production: state, expectedSha: "different", target: "production", mode: "commit" })).toThrow(/SHA/);
+  });
+
+  it("versiona cero calorías sólo para sheet_import", () => {
+    const migration = readFileSync("supabase/migrations/20260814023000_allow_zero_calorie_sheet_imports.sql", "utf8");
+    expect(migration).toContain("source_type = 'sheet_import' and final_calories = 0");
+    expect(migration).toContain("final_calories > 0");
   });
 });

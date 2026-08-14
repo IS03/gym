@@ -82,8 +82,8 @@ function compareExisting(existing: ExistingDay, fields: Record<string, unknown>)
   const row = existing as unknown as Record<string, unknown>;
   for (const [field, desired] of Object.entries(fields)) {
     const current = row[field];
-    if (current === null || current === undefined) fieldsToSet[field] = desired;
-    else if (sameValue(current, desired)) preservedExistingFields.push(field);
+    if (sameValue(current, desired)) preservedExistingFields.push(field);
+    else if (current === null || current === undefined) fieldsToSet[field] = desired;
     else conflicts.push(`${field}: producción=${JSON.stringify(current)}, sheet=${JSON.stringify(desired)}`);
   }
   return { fieldsToSet, preservedExistingFields, conflicts };
@@ -93,6 +93,7 @@ function buildDayPlan(
   day: NormalizedActivityDay,
   normalized: NormalizedWorkbook,
   production: ProductionSnapshot,
+  sourceAlreadyApplied: boolean,
 ): DayPlan {
   const completedCount = completedWorkouts(production, day.logDate);
   const existing = production.day_logs.find((row) => row.log_date === day.logDate);
@@ -107,12 +108,14 @@ function buildDayPlan(
       fieldsToSet: fields,
       preservedExistingFields: [],
       conflicts: [],
+      expectedFields: fields,
       nutritionGoalRef: goal.ref,
       expenditureRuleRef: expenditure.ref,
       workScheduleRef: schedule.ref,
     };
   }
-  const noteConflict = existing.notes_present === true && fields.notes !== undefined;
+  const noteConflict = !sourceAlreadyApplied && existing.notes_present === true && fields.notes !== undefined;
+  if (sourceAlreadyApplied && existing.notes_present === true) delete fields.notes;
   if (noteConflict) delete fields.notes;
   const comparison = compareExisting(existing, fields);
   if (noteConflict) comparison.conflicts.push("notes: producción ya contiene texto; no se sobrescribe ni concatena automáticamente");
@@ -122,6 +125,7 @@ function buildDayPlan(
       ? "CONFLICT"
       : Object.keys(comparison.fieldsToSet).length > 0 ? "MERGE_SAFE" : "NO_OP",
     ...comparison,
+    expectedFields: fields,
     nutritionGoalRef: goal.ref,
     expenditureRuleRef: expenditure.ref,
     workScheduleRef: schedule.ref,
@@ -305,7 +309,10 @@ export function buildDryRunPlan(
     else eventConflicts.push(`${event.legacyImportId}: mismo legacy ID sin fingerprint verificable o con contenido diferente`);
   }
 
-  const dayLogs = normalized.activityDays.map((day) => buildDayPlan(day, normalized, production));
+  const sourceAlreadyApplied = production.applied_imports?.some(
+    (run) => run.source_name === normalized.sourceName && run.source_sha256 === normalized.sourceSha256,
+  ) ?? false;
+  const dayLogs = normalized.activityDays.map((day) => buildDayPlan(day, normalized, production, sourceAlreadyApplied));
   const blockers = [
     ...anomalies.filter((item) => item.severity === "blocker").map((item) => `${item.code}: ${item.message}`),
     ...workoutConflicts.map((item) => `WORKOUT_CONFLICT: ${item}`),

@@ -225,6 +225,7 @@ export type ExistingDay = {
 };
 
 export type ProductionSnapshot = {
+  user_id?: string;
   profile: { current_weight_kg: number | null; bmr_kcal_current: number | null } | null;
   day_logs: ExistingDay[];
   workout_by_date: Array<{ log_date: string; status: string; count: number }>;
@@ -248,6 +249,12 @@ export type ProductionSnapshot = {
   }>;
   config_counts: Record<string, number>;
   regression_counts: Record<string, number>;
+  regression_hashes?: Record<string, string>;
+  applied_imports?: Array<{
+    source_name: string;
+    source_sha256: string;
+    import_run_id: string;
+  }>;
 };
 
 export type DayPlan = {
@@ -256,6 +263,7 @@ export type DayPlan = {
   fieldsToSet: Record<string, unknown>;
   preservedExistingFields: string[];
   conflicts: string[];
+  expectedFields: Record<string, unknown>;
   nutritionGoalRef: string;
   expenditureRuleRef: string;
   workScheduleRef: string;
