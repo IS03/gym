@@ -7,8 +7,9 @@ en Google Sheets. PR 5 implementa únicamente:
 snapshot de solo lectura → normalización → validación → comparación → plan → dry-run
 ```
 
-PR 6 deberá consumir el mismo plan; no debe reconstruir las decisiones durante
-la escritura.
+PR 5B cierra los gaps estructurales detectados por el primer dry-run. PR 6
+deberá consumir el mismo plan, incluido `importReport`; no debe reconstruir las
+decisiones durante la escritura.
 
 ## Privacidad
 
@@ -46,6 +47,20 @@ npm run nutrition:dry-run -- \
   se reemplaza un `day_logs` y el plan no contiene IDs de esas filas.
 - Los snapshots históricos salen de los valores explícitos del Sheet. No se
   llama a `refresh_nutrition_day` sobre el pasado.
+- Los alimentos conservan nutrición parcial: `null` es desconocido, `0` es un
+  cero conocido y al menos uno de los cuatro valores debe existir.
+- Las medidas laterales se conservan literalmente en `body_measurements`; no
+  se calculan promedios para `arm_cm` o `thigh_cm`. Una fila dudosa se prepara
+  con `quality_status=suspect`, nota y payload fuente.
+- Un hecho corporal sin fecha no se inventa: queda como `SKIP_UNDATED` dentro
+  de `importReport`, junto con su fila fuente, y no genera un `day_log`.
+- `Permitidos` se prepara en `nutrition_events`. Sus kcal son contexto del
+  evento y no se vuelven a sumar como comidas.
+- En la reconciliación, un valor no nulo de la fuente primaria frente a un
+  oráculo derivado vacío produce `SOURCE_WINS` y una advertencia. Dos valores
+  presentes que difieren fuera de tolerancia siguen bloqueando.
+- Un header vacío no es un gap: sólo bloquea un dato real, no vacío y sin una
+  representación segura.
 - `APPLY_READY=false` es el resultado correcto mientras existan discrepancias,
   conflictos o campos sin destino que provocarían pérdida.
 

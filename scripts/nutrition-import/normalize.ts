@@ -1,15 +1,15 @@
 import type {
-  BodyMeasurementReview,
   CellValue,
   DailyOracle,
   ExpenditurePeriodPlan,
   GoalPeriodPlan,
   ImportAnomaly,
   NormalizedActivityDay,
+  NormalizedBodyMeasurement,
   NormalizedFood,
   NormalizedMeal,
+  NormalizedNutritionEvent,
   NormalizedWorkbook,
-  NutritionEventReview,
   NutritionPrecision,
   WeightFact,
   WorkbookSnapshot,
@@ -73,8 +73,15 @@ function parseYesNo(value: CellValue | undefined, field: string): boolean {
 }
 
 function parseOptionalYesNo(value: CellValue | undefined): boolean | null {
-  if (text(value) === null) return null;
+  const raw = text(value)?.toLocaleLowerCase("es-AR");
+  if (raw === null || raw === undefined || raw === "no informado") return null;
   return parseYesNo(value, "Booleano");
+}
+
+function optionalNonNegative(value: CellValue | undefined, field: string): number | null {
+  const parsed = parseArgentineNumber(value);
+  if (parsed !== null && parsed < 0) throw new Error(`${field} no puede ser negativo`);
+  return parsed;
 }
 
 function mealLabel(value: CellValue | undefined): NormalizedMeal["mealLabel"] {
@@ -273,49 +280,31 @@ function normalizeFoods(workbook: WorkbookSnapshot): NormalizedFood[] {
     .filter(({ record }) => text(record["Alimento / preparación"]) !== null)
     .map(({ sourceRow, record }) => {
       const serving = parseServing(record.Porción);
-      const proteinG = parseArgentineNumber(record["Proteína (g)"]);
-      const carbsG = parseArgentineNumber(record["Carbos (g)"]);
-      const fatG = parseArgentineNumber(record["Grasas (g)"]);
+      const calories = optionalNonNegative(record.Calorías, "Calorías de alimento");
+      const proteinG = optionalNonNegative(record["Proteína (g)"], "Proteína de alimento");
+      const carbsG = optionalNonNegative(record["Carbos (g)"], "Carbohidratos de alimento");
+      const fatG = optionalNonNegative(record["Grasas (g)"], "Grasas de alimento");
       const sourceNote = text(record["Fuente / precisión"]);
       return {
         sourceRow,
         name: text(record["Alimento / preparación"])!,
         servingQuantity: serving.quantity,
         servingUnit: serving.unit,
-        calories: requiredNumber(record.Calorías, "Calorías de alimento"),
+        calories,
         proteinG,
         carbsG,
         fatG,
         sourceNote,
         precisionLevel: foodPrecision(sourceNote),
         active: parseYesNo(record.Activo, "Activo de alimento"),
-        schemaCompatible: proteinG !== null && carbsG !== null && fatG !== null,
+        hasKnownNutrition: [calories, proteinG, carbsG, fatG].some((value) => value !== null),
       };
     });
 }
 
-function measurementReview(sourceRow: number, record: Record<string, CellValue>): BodyMeasurementReview {
-  const logDate = parseArgentineDate(record.Fecha);
+function measurementReview(sourceRow: number, record: Record<string, CellValue>): NormalizedBodyMeasurement {
+  const measuredOn = parseArgentineDate(record.Fecha);
   const number = (key: string) => parseArgentineNumber(record[key]);
-  const representable: Record<string, number> = {};
-  for (const [source, target] of [["Cintura (cm)", "waist_cm"], ["Pecho (cm)", "chest_cm"], ["Cadera (cm)", "hip_cm"]] as const) {
-    const value = number(source);
-    if (value !== null) representable[target] = value;
-  }
-  const unrepresentable = Object.fromEntries([
-    ["condition", text(record.Condición)],
-    ["abdomen_cm", number("Abdomen (cm)")],
-    ["right_arm_cm", number("Brazo der. relajado")],
-    ["left_arm_cm", number("Brazo izq. relajado")],
-    ["right_thigh_cm", number("Muslo der.")],
-    ["left_thigh_cm", number("Muslo izq.")],
-    ["right_calf_cm", number("Pantorrilla der.")],
-    ["left_calf_cm", number("Pantorrilla izq.")],
-    ["front_photo", text(record["Foto frente"])],
-    ["profile_photo", text(record["Foto perfil"])],
-    ["back_photo", text(record["Foto espalda"])],
-    ["notes", text(record.Notas)],
-  ].filter(([, value]) => value !== null));
   const suspicious: string[] = [];
   const rightArm = number("Brazo der. relajado");
   const leftArm = number("Brazo izq. relajado");
@@ -326,29 +315,62 @@ function measurementReview(sourceRow: number, record: Record<string, CellValue>)
   if ([rightArm, leftArm].some((value) => value !== null && (value < 15 || value > 80))) suspicious.push("medida de brazo fuera de rango esperable");
   if ([rightCalf, leftCalf].some((value) => value !== null && (value < 20 || value > 70))) suspicious.push("medida de pantorrilla fuera de rango esperable");
   if (/revisar|posible error/i.test(text(record.Notas) ?? "")) suspicious.push("la fuente marca un posible error");
-  if (logDate === null) suspicious.push("fila sin fecha");
-  return { sourceRow, logDate, representable, unrepresentable, suspicious };
+  if (measuredOn === null) suspicious.push("fila sin fecha");
+  return {
+    sourceRow,
+    legacyImportSource: "google-sheet:medidas-progreso:v1",
+    legacyImportId: measuredOn === null ? null : `measurement:${measuredOn}`,
+    measuredOn,
+    waistCm: number("Cintura (cm)"),
+    abdomenCm: number("Abdomen (cm)"),
+    hipCm: number("Cadera (cm)"),
+    chestCm: number("Pecho (cm)"),
+    armRightCm: rightArm,
+    armLeftCm: leftArm,
+    thighRightCm: number("Muslo der."),
+    thighLeftCm: number("Muslo izq."),
+    calfRightCm: rightCalf,
+    calfLeftCm: leftCalf,
+    condition: text(record.Condición),
+    notes: text(record.Notas),
+    qualityStatus: suspicious.length > 0 ? "suspect" : "verified",
+    qualityNote: suspicious.length > 0 ? suspicious.join("; ") : null,
+    sourcePayload: { sourceSheet: "Medidas y progreso", sourceRow, originalRow: record },
+    disposition: measuredOn === null ? "SKIP_UNDATED" : "IMPORT",
+  };
 }
 
-function normalizeBody(workbook: WorkbookSnapshot): BodyMeasurementReview[] {
+function normalizeBody(workbook: WorkbookSnapshot): NormalizedBodyMeasurement[] {
   return rowsAfterHeader(workbook.sheets["Medidas y progreso"], "Fecha")
     .filter(({ values }) => values.some((value) => text(value) !== null))
     .map(({ sourceRow, record }) => measurementReview(sourceRow, record));
 }
 
-function normalizeEvents(workbook: WorkbookSnapshot): NutritionEventReview[] {
+function normalizeEvents(workbook: WorkbookSnapshot): NormalizedNutritionEvent[] {
   return rowsAfterHeader(workbook.sheets.Permitidos, "ID")
     .filter(({ record }) => text(record.ID) !== null)
-    .map(({ sourceRow, record }) => ({
-      sourceRow,
-      legacyId: text(record.ID)!,
-      logDate: parseArgentineDate(record.Fecha)!,
-      structuredFieldsWithoutDestination: [
-        "legacy event ID", "event type", "intensity", "planned status",
-        "alcohol flag", "equivalent drinks", "event calories", "origin",
-      ],
-      partiallyPreservedBy: ["meal_entries detail/source_note", "day_logs notes"],
-    }));
+    .map(({ sourceRow, record }) => {
+      const eventDate = parseArgentineDate(record.Fecha);
+      if (!eventDate) throw new Error(`Permitidos!${sourceRow}: falta Fecha`);
+      const eventType = text(record.Tipo);
+      if (!eventType) throw new Error(`Permitidos!${sourceRow}: falta Tipo`);
+      return {
+        sourceRow,
+        sourceType: "sheet_import" as const,
+        legacyImportSource: "google-sheet:permitidos:v1" as const,
+        legacyImportId: text(record.ID)!,
+        eventDate,
+        eventType,
+        intensity: text(record.Intensidad),
+        planned: parseOptionalYesNo(record.Planificado),
+        alcohol: parseOptionalYesNo(record.Alcohol),
+        drinksEquivalent: optionalNonNegative(record["Tragos eq."], "Tragos equivalentes"),
+        eventCalories: optionalNonNegative(record["kcal evento"], "Calorías del evento"),
+        context: text(record.Contexto),
+        notes: text(record.Notas),
+        origin: text(record.Origen),
+      };
+    });
 }
 
 function normalizeOracle(workbook: WorkbookSnapshot): DailyOracle[] {
@@ -376,10 +398,17 @@ function normalizeOracle(workbook: WorkbookSnapshot): DailyOracle[] {
     }));
 }
 
-function normalizeWeights(activity: NormalizedActivityDay[], body: BodyMeasurementReview[], workbook: WorkbookSnapshot, anomalies: ImportAnomaly[]): WeightFact[] {
+function normalizeWeights(activity: NormalizedActivityDay[], workbook: WorkbookSnapshot, anomalies: ImportAnomaly[]): WeightFact[] {
   const facts: WeightFact[] = [];
   for (const day of activity) {
-    if (day.weightKg !== null) facts.push({ logDate: day.logDate, weightKg: day.weightKg, sources: ["activity"], sourceRows: [day.sourceRow] });
+    if (day.weightKg !== null) facts.push({
+      logDate: day.logDate,
+      weightKg: day.weightKg,
+      sources: ["activity"],
+      sourceRows: [day.sourceRow],
+      disposition: "IMPORT",
+      sourcePayloads: [{ sourceSheet: "Actividad diaria", sourceRow: day.sourceRow }],
+    });
   }
   const bodyRows = rowsAfterHeader(workbook.sheets["Medidas y progreso"], "Fecha")
     .filter(({ values }) => values.some((value) => text(value) !== null));
@@ -391,11 +420,12 @@ function normalizeWeights(activity: NormalizedActivityDay[], body: BodyMeasureme
     if (existing && Math.abs(existing.weightKg - weightKg) <= 0.01) {
       existing.sources.push("body_measurements");
       existing.sourceRows.push(row.sourceRow);
+      existing.sourcePayloads.push({ sourceSheet: "Medidas y progreso", sourceRow: row.sourceRow, originalRow: row.record });
     } else if (existing) {
       anomalies.push({ code: "WEIGHT_SOURCE_CONFLICT", severity: "blocker", sheet: "Medidas y progreso", sourceRow: row.sourceRow, logDate, message: "Actividad diaria y Medidas tienen pesos distintos para la misma fecha." });
-      facts.push({ logDate, weightKg, sources: ["body_measurements"], sourceRows: [row.sourceRow] });
+      facts.push({ logDate, weightKg, sources: ["body_measurements"], sourceRows: [row.sourceRow], disposition: logDate === null ? "SKIP_UNDATED" : "IMPORT", sourcePayloads: [{ sourceSheet: "Medidas y progreso", sourceRow: row.sourceRow, originalRow: row.record }] });
     } else {
-      facts.push({ logDate, weightKg, sources: ["body_measurements"], sourceRows: [row.sourceRow] });
+      facts.push({ logDate, weightKg, sources: ["body_measurements"], sourceRows: [row.sourceRow], disposition: logDate === null ? "SKIP_UNDATED" : "IMPORT", sourcePayloads: [{ sourceSheet: "Medidas y progreso", sourceRow: row.sourceRow, originalRow: row.record }] });
     }
   }
   return facts;
@@ -412,16 +442,16 @@ export function normalizeWorkbook(workbook: WorkbookSnapshot): NormalizedWorkboo
   const workSchedulePeriods = normalizeSchedule(goalPeriods[0].effectiveFrom);
   const foods = normalizeFoods(workbook);
   const bodyMeasurements = normalizeBody(workbook);
-  const events = normalizeEvents(workbook);
+  const nutritionEvents = normalizeEvents(workbook);
   const dailyOracle = normalizeOracle(workbook);
-  const weights = normalizeWeights(activityDays, bodyMeasurements, workbook, anomalies);
+  const weights = normalizeWeights(activityDays, workbook, anomalies);
 
   for (const body of bodyMeasurements) {
-    if (body.logDate === null) anomalies.push({ code: "BODY_ROW_WITHOUT_DATE", severity: "blocker", sheet: "Medidas y progreso", sourceRow: body.sourceRow, logDate: null, message: "La fila corporal no tiene fecha y no puede importarse de forma determinista." });
-    if (body.suspicious.length > 0) anomalies.push({ code: "SUSPICIOUS_BODY_MEASUREMENT", severity: "blocker", sheet: "Medidas y progreso", sourceRow: body.sourceRow, logDate: body.logDate, message: body.suspicious.join("; ") });
+    if (body.measuredOn === null) anomalies.push({ code: "UNDATED_BODY_FACT_SKIPPED", severity: "warning", sheet: "Medidas y progreso", sourceRow: body.sourceRow, logDate: null, message: "La fila sin fecha se preserva en el reporte y no se prepara para importación.", sourcePayload: body.sourcePayload });
+    if (body.qualityStatus === "suspect" && body.measuredOn !== null) anomalies.push({ code: "SUSPECT_BODY_MEASUREMENT_PRESERVED", severity: "warning", sheet: "Medidas y progreso", sourceRow: body.sourceRow, logDate: body.measuredOn, message: body.qualityNote ?? "Medición sospechosa preservada.", sourcePayload: body.sourcePayload });
   }
-  for (const food of foods.filter((item) => !item.schemaCompatible)) {
-    anomalies.push({ code: "FOOD_NULL_MACROS_SCHEMA_GAP", severity: "blocker", sheet: "Alimentos habituales", sourceRow: food.sourceRow, message: "El alimento tiene macros desconocidos, pero foods exige proteína, carbohidratos y grasas NOT NULL." });
+  for (const food of foods.filter((item) => !item.hasKnownNutrition)) {
+    anomalies.push({ code: "FOOD_WITHOUT_NUTRITION", severity: "blocker", sheet: "Alimentos habituales", sourceRow: food.sourceRow, message: "El alimento no contiene ningún valor nutricional conocido." });
   }
 
   const allDates = [...activityDays.map((day) => day.logDate), ...meals.map((meal) => meal.logDate)].sort();
@@ -439,7 +469,7 @@ export function normalizeWorkbook(workbook: WorkbookSnapshot): NormalizedWorkboo
     foods,
     weights,
     bodyMeasurements,
-    events,
+    nutritionEvents,
     dailyOracle,
     anomalies,
   };

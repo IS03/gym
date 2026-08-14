@@ -1,12 +1,18 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { assertPrivateOutputPath } from "../../../scripts/nutrition-import/cli.ts";
 import {
   historicalConsumedAt,
   normalizeWorkbook,
+  optionalYesNoForTests,
   parseArgentineNumber,
   parseServing,
 } from "../../../scripts/nutrition-import/normalize.ts";
-import { buildDryRunPlan, mealFingerprint } from "../../../scripts/nutrition-import/plan.ts";
+import {
+  buildDryRunPlan,
+  mealFingerprint,
+  nutritionEventFingerprint,
+} from "../../../scripts/nutrition-import/plan.ts";
 import { sourceSha256 } from "../../../scripts/nutrition-import/source.ts";
 import type { CellValue, ProductionSnapshot, WorkbookSnapshot } from "../../../scripts/nutrition-import/types.ts";
 
@@ -146,17 +152,113 @@ describe("nutrition import normalization", () => {
     expect(plan.meals).toMatchObject({ noOps: 1, inserts: 3, conflicts: [] });
   });
 
-  it("reporta fila sin fecha, medida sospechosa, alimento incompleto y evento sin destino", () => {
+  it("preserva una medición sospechosa, omite peso sin fecha y mapea eventos sin pérdida", () => {
     const source = workbook();
-    source.sheets["Medidas y progreso"].push([null, null, "AM", 65, null, 80, null, null, 110, 30, null, null, 15, 35, null, null, null, "revisar posible error"]);
+    source.sheets["Medidas y progreso"].push(["3/7/2026", null, "AM", 65, 79, 80, 90, 95, 110, 30, null, 49, 15, 35, null, null, null, "revisar posible error"]);
+    source.sheets["Medidas y progreso"].push([null, null, null, 64]);
     source.sheets["Alimentos habituales"].push(["Incompleto sintético", "1 paquete", 50, 1, null, null, "Histórico", "Sí"]);
-    source.sheets.Permitidos.push(["SYN-EVENT-1", "2/7/2026", "Evento sintético", "Media", "Sí", "No", 0, 100, "Casa", "nota sintética", "fixture"]);
+    source.sheets.Permitidos.push(["SYN-EVENT-1", "2/7/2026", "Evento sintético", "Media", "No informado", "Sí", 3, null, "Casa", "nota sintética", "fixture"]);
     const plan = buildDryRunPlan(normalizeWorkbook(source), production());
-    expect(plan.schemaGaps).toHaveLength(3);
+    expect(plan.schemaGaps).toHaveLength(0);
     expect(plan.anomalies.map((item) => item.code)).toEqual(expect.arrayContaining([
-      "BODY_ROW_WITHOUT_DATE", "SUSPICIOUS_BODY_MEASUREMENT", "FOOD_NULL_MACROS_SCHEMA_GAP",
+      "UNDATED_BODY_FACT_SKIPPED", "SUSPECT_BODY_MEASUREMENT_PRESERVED",
     ]));
-    expect(plan.applyReady).toBe(false);
+    expect(plan.bodyMeasurements).toMatchObject({ inserts: 1, skippedUndated: 1, conflicts: [] });
+    expect(plan.bodyMeasurements.rows[0]).toMatchObject({
+      abdomenCm: 80,
+      armRightCm: 110,
+      armLeftCm: 30,
+      thighRightCm: null,
+      thighLeftCm: 49,
+      calfRightCm: 15,
+      calfLeftCm: 35,
+      condition: "AM",
+      qualityStatus: "suspect",
+      disposition: "IMPORT",
+    });
+    expect(plan.bodyMeasurements.rows[0]).not.toHaveProperty("armCm");
+    expect(plan.importReport.skippedUndatedFacts[0]).toMatchObject({
+      weightKg: 64,
+      logDate: null,
+      disposition: "SKIP_UNDATED",
+    });
+    expect(plan.nutritionEvents.rows[0]).toMatchObject({
+      planned: null,
+      alcohol: true,
+      drinksEquivalent: 3,
+      eventCalories: null,
+    });
+    expect(plan.applyReady).toBe(true);
+  });
+
+  it("acepta nutrición parcial y conserva cero distinto de null", () => {
+    const source = workbook();
+    source.sheets["Alimentos habituales"].push(
+      ["Parcial carbos", "1 unidad", 20, 1, null, null, "Fixture", "Sí"],
+      ["Parcial proteína", "1 unidad", 20, null, 4, null, "Fixture", "Sí"],
+      ["Sin calorías", "1 unidad", null, 2, 0, null, "Fixture", "Sí"],
+    );
+    const normalized = normalizeWorkbook(source);
+    expect(normalized.foods.at(-1)).toMatchObject({ calories: null, proteinG: 2, carbsG: 0, fatG: null, hasKnownNutrition: true });
+    expect(buildDryRunPlan(normalized, production()).applyReady).toBe(true);
+
+    source.sheets["Alimentos habituales"].push(["Todo desconocido", "1 unidad", null, null, null, null, "Fixture", "Sí"]);
+    const rejected = buildDryRunPlan(normalizeWorkbook(source), production());
+    expect(rejected.anomalies.map((item) => item.code)).toContain("FOOD_WITHOUT_NUTRITION");
+    expect(rejected.applyReady).toBe(false);
+  });
+
+  it("mapea Sí, No y No informado sin colapsar null a false", () => {
+    expect(optionalYesNoForTests("Sí")).toBe(true);
+    expect(optionalYesNoForTests("No")).toBe(false);
+    expect(optionalYesNoForTests("No informado")).toBeNull();
+    expect(optionalYesNoForTests(null)).toBeNull();
+  });
+
+  it("aplica SOURCE_WINS sólo cuando la fuente primaria tiene un valor y el oráculo está vacío", () => {
+    const sourceWinsSource = workbook();
+    sourceWinsSource.sheets["Registro de comidas"][1][9] = 175;
+    sourceWinsSource.sheets["Registro de comidas"][1][10] = 50;
+    const sourceWins = buildDryRunPlan(normalizeWorkbook(sourceWinsSource), production());
+    expect(sourceWins.reconciliation).toMatchObject({ sourceWinsDays: 1, mismatchDays: 0 });
+    expect(sourceWins.reconciliation.warnings[0]).toMatchObject({ code: "SOURCE_WINS", fields: ["carbs_g", "fat_g"] });
+    expect(sourceWins.applyReady).toBe(true);
+
+    const conflictSource = workbook();
+    conflictSource.sheets["Registro de comidas"][2][9] = 171;
+    const conflict = buildDryRunPlan(normalizeWorkbook(conflictSource), production());
+    expect(conflict.reconciliation.mismatchDays).toBe(1);
+    expect(conflict.applyReady).toBe(false);
+  });
+
+  it("prepara nutrition_events idempotentes", () => {
+    const source = workbook();
+    source.sheets.Permitidos.push(["SYN-EVENT-1", "2/7/2026", "Evento sintético", "Media", "Sí", "No", 0, 100, "Casa", "nota sintética", "fixture"]);
+    const normalized = normalizeWorkbook(source);
+    const state = production();
+    state.nutrition_event_keys = [{
+      legacy_import_source: normalized.nutritionEvents[0].legacyImportSource,
+      legacy_import_id: normalized.nutritionEvents[0].legacyImportId,
+      fingerprint: nutritionEventFingerprint(normalized.nutritionEvents[0]),
+    }];
+    const plan = buildDryRunPlan(normalized, state);
+    expect(plan.nutritionEvents).toMatchObject({ inserts: 0, noOps: 1, conflicts: [] });
+  });
+
+  it("versiona constraints, ownership, RLS y grants del schema de PR 5B", () => {
+    const migration = readFileSync(
+      "supabase/migrations/20260814010000_nutrition_import_blockers.sql",
+      "utf8",
+    );
+    expect(migration).toContain("foods_nutrition_at_least_one_known");
+    expect(migration).toContain("add column abdomen_cm");
+    expect(migration).toContain("add column arm_right_cm");
+    expect(migration).toContain("add column source_payload jsonb");
+    expect(migration).toContain("body_measurements_legacy_import_unique");
+    expect(migration).toContain("create table public.nutrition_events");
+    expect(migration).toContain("nutrition_events_import_run_owner_fk");
+    expect(migration).toContain("alter table public.nutrition_events enable row level security");
+    expect(migration).toContain("revoke all on table public.nutrition_events from public, anon, authenticated");
   });
 
   it("valida convenciones auxiliares y evita reportes reales fuera de directorios ignorados", () => {

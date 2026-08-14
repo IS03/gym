@@ -150,6 +150,37 @@ export function mealFingerprint(meal: NormalizedWorkbook["meals"][number]): stri
   })).digest("hex");
 }
 
+export function bodyMeasurementFingerprint(
+  measurement: NormalizedWorkbook["bodyMeasurements"][number],
+): string {
+  return createHash("sha256").update(JSON.stringify({
+    legacyImportSource: measurement.legacyImportSource,
+    legacyImportId: measurement.legacyImportId,
+    measuredOn: measurement.measuredOn,
+    waistCm: measurement.waistCm,
+    abdomenCm: measurement.abdomenCm,
+    hipCm: measurement.hipCm,
+    chestCm: measurement.chestCm,
+    armRightCm: measurement.armRightCm,
+    armLeftCm: measurement.armLeftCm,
+    thighRightCm: measurement.thighRightCm,
+    thighLeftCm: measurement.thighLeftCm,
+    calfRightCm: measurement.calfRightCm,
+    calfLeftCm: measurement.calfLeftCm,
+    condition: measurement.condition,
+    notes: measurement.notes,
+    qualityStatus: measurement.qualityStatus,
+    qualityNote: measurement.qualityNote,
+    sourcePayload: measurement.sourcePayload,
+  })).digest("hex");
+}
+
+export function nutritionEventFingerprint(
+  event: NormalizedWorkbook["nutritionEvents"][number],
+): string {
+  return createHash("sha256").update(JSON.stringify(event)).digest("hex");
+}
+
 export function buildDryRunPlan(
   normalized: NormalizedWorkbook,
   production: ProductionSnapshot,
@@ -161,6 +192,29 @@ export function buildDryRunPlan(
       code: "DUPLICATE_LEGACY_MEAL_ID",
       severity: "blocker",
       sheet: "Registro de comidas",
+      message: `El legacy ID ${id} aparece ${rows.length} veces.`,
+    });
+  }
+
+  const duplicateBodyIds = Map.groupBy(
+    normalized.bodyMeasurements.filter((measurement) => measurement.legacyImportId !== null),
+    (measurement) => measurement.legacyImportId,
+  );
+  for (const [id, rows] of duplicateBodyIds) {
+    if (rows.length > 1) anomalies.push({
+      code: "DUPLICATE_LEGACY_BODY_ID",
+      severity: "blocker",
+      sheet: "Medidas y progreso",
+      message: `El legacy ID ${id} aparece ${rows.length} veces.`,
+    });
+  }
+
+  const duplicateEventIds = Map.groupBy(normalized.nutritionEvents, (event) => event.legacyImportId);
+  for (const [id, rows] of duplicateEventIds) {
+    if (rows.length > 1) anomalies.push({
+      code: "DUPLICATE_LEGACY_EVENT_ID",
+      severity: "blocker",
+      sheet: "Permitidos",
       message: `El legacy ID ${id} aparece ${rows.length} veces.`,
     });
   }
@@ -221,14 +275,34 @@ export function buildDryRunPlan(
     oracle: normalized.dailyOracle,
   });
   const schemaGaps: string[] = [];
-  if (normalized.bodyMeasurements.some((row) => Object.keys(row.unrepresentable).length > 0)) {
-    schemaGaps.push("body_measurements no representa abdomen, laterales separados, pantorrillas, condición, fotos ni notas.");
+
+  let bodyInserts = 0;
+  let bodyNoOps = 0;
+  const bodyConflicts: string[] = [];
+  const existingBodyKeys = new Map(production.body_measurements
+    .filter((row) => row.legacy_import_source && row.legacy_import_id)
+    .map((row) => [`${row.legacy_import_source}:${row.legacy_import_id}`, row]));
+  for (const measurement of normalized.bodyMeasurements.filter((row) => row.disposition === "IMPORT")) {
+    const key = `${measurement.legacyImportSource}:${measurement.legacyImportId}`;
+    const existingByKey = existingBodyKeys.get(key);
+    const existingByDate = production.body_measurements.find((row) => row.measured_on === measurement.measuredOn);
+    if (existingByKey?.fingerprint === bodyMeasurementFingerprint(measurement)) bodyNoOps += 1;
+    else if (existingByKey) bodyConflicts.push(`${measurement.legacyImportId}: mismo legacy ID con contenido diferente`);
+    else if (existingByDate) bodyConflicts.push(`${measurement.measuredOn}: ya existe una medición sin el mismo legacy ID`);
+    else bodyInserts += 1;
   }
-  if (normalized.foods.some((food) => !food.schemaCompatible)) {
-    schemaGaps.push("foods exige los tres macros, pero la fuente contiene al menos un alimento con macros desconocidos.");
-  }
-  if (normalized.events.length > 0) {
-    schemaGaps.push("Permitidos necesita un destino estructurado (por ejemplo nutrition_events); comidas/notas no preservan todos sus campos.");
+
+  let eventInserts = 0;
+  let eventNoOps = 0;
+  const eventConflicts: string[] = [];
+  const eventKeys = new Map((production.nutrition_event_keys ?? [])
+    .map((row) => [`${row.legacy_import_source}:${row.legacy_import_id}`, row]));
+  for (const event of normalized.nutritionEvents) {
+    const key = `${event.legacyImportSource}:${event.legacyImportId}`;
+    const existing = eventKeys.get(key);
+    if (!existing) eventInserts += 1;
+    else if (existing.fingerprint === nutritionEventFingerprint(event)) eventNoOps += 1;
+    else eventConflicts.push(`${event.legacyImportId}: mismo legacy ID sin fingerprint verificable o con contenido diferente`);
   }
 
   const dayLogs = normalized.activityDays.map((day) => buildDayPlan(day, normalized, production));
@@ -237,10 +311,36 @@ export function buildDryRunPlan(
     ...workoutConflicts.map((item) => `WORKOUT_CONFLICT: ${item}`),
     ...weightConflicts.map((item) => `WEIGHT_CONFLICT: ${item}`),
     ...mealConflicts.map((item) => `MEAL_CONFLICT: ${item}`),
+    ...bodyConflicts.map((item) => `BODY_MEASUREMENT_CONFLICT: ${item}`),
+    ...eventConflicts.map((item) => `NUTRITION_EVENT_CONFLICT: ${item}`),
     ...dayLogs.filter((day) => day.classification === "CONFLICT").map((day) => `DAY_LOG_CONFLICT ${day.logDate}: ${day.conflicts.join("; ")}`),
     ...schemaGaps.map((gap) => `SCHEMA_GAP: ${gap}`),
     ...(reconciliation.mismatchDays > 0 ? [`DAILY_RECONCILIATION: ${reconciliation.mismatchDays} día(s) con diferencias significativas`] : []),
   ];
+
+  const importReport = {
+    anomalies,
+    skippedUndatedFacts: normalized.weights.filter((weight) => weight.disposition === "SKIP_UNDATED"),
+    suspectMeasurements: normalized.bodyMeasurements.filter(
+      (measurement) => measurement.disposition === "IMPORT" && measurement.qualityStatus === "suspect",
+    ),
+    sourceWinsWarnings: reconciliation.warnings,
+    reconciliation,
+    counts: {
+      dayLogs: normalized.activityDays.length,
+      meals: normalized.meals.length,
+      foods: normalized.foods.length,
+      weights: normalized.weights.length,
+      bodyMeasurements: normalized.bodyMeasurements.filter((row) => row.disposition === "IMPORT").length,
+      nutritionEvents: normalized.nutritionEvents.length,
+    },
+    decisions: [
+      "Los hechos sin fecha se preservan en report y no se importan.",
+      "Las mediciones sospechosas se preservan sin promedios, con quality_status=suspect.",
+      "Un valor nutricional primario no nulo gana ante un oráculo derivado nulo.",
+      "nutrition_events no aporta calorías a meal_entries ni a los totales diarios.",
+    ],
+  };
 
   return {
     sourceName: normalized.sourceName,
@@ -264,12 +364,24 @@ export function buildDryRunPlan(
     workSchedulePeriods: normalized.workSchedulePeriods,
     foods: normalized.foods,
     weights: { detected: normalized.weights, conflicts: weightConflicts },
-    bodyMeasurements: normalized.bodyMeasurements,
-    events: normalized.events,
+    bodyMeasurements: {
+      inserts: bodyInserts,
+      noOps: bodyNoOps,
+      skippedUndated: normalized.bodyMeasurements.filter((row) => row.disposition === "SKIP_UNDATED").length,
+      conflicts: bodyConflicts,
+      rows: normalized.bodyMeasurements,
+    },
+    nutritionEvents: {
+      inserts: eventInserts,
+      noOps: eventNoOps,
+      conflicts: eventConflicts,
+      rows: normalized.nutritionEvents,
+    },
     workoutConflicts,
     reconciliation,
     schemaGaps,
     anomalies,
+    importReport,
     blockers,
     applyReady: blockers.length === 0,
   };

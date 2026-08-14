@@ -43,7 +43,23 @@ async function main() {
       legacy_summaries: plan.meals.legacySummaries,
       inactive: plan.meals.inactive,
     },
+    foods: {
+      total: plan.foods.length,
+      partial: plan.foods.filter((food) => [food.calories, food.proteinG, food.carbsG, food.fatG].some((value) => value === null)).length,
+    },
+    body_measurements: {
+      inserts: plan.bodyMeasurements.inserts,
+      no_op: plan.bodyMeasurements.noOps,
+      skipped_undated: plan.bodyMeasurements.skippedUndated,
+      conflicts: plan.bodyMeasurements.conflicts.length,
+    },
+    nutrition_events: {
+      inserts: plan.nutritionEvents.inserts,
+      no_op: plan.nutritionEvents.noOps,
+      conflicts: plan.nutritionEvents.conflicts.length,
+    },
     reconciliation: plan.reconciliation,
+    warnings: plan.anomalies.filter((anomaly) => anomaly.severity === "warning"),
     blockers: plan.blockers,
     APPLY_READY: plan.applyReady,
     report: outputPath,

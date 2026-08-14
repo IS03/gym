@@ -16,12 +16,14 @@ los tests.
 | Perfil personal | `profiles` | No aplica | `upsertMyProfile` desde Ajustes | Perfil y fuentes antropométricas |
 | BMR | `profiles.bmr_kcal_current` | `day_logs.bmr_kcal_snapshot` | `trg_profiles_derive_bmr` | sexo, nacimiento, altura y último peso |
 | Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual y tendencias |
-| Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on` | acciones de Cuerpo | Últimas medidas y gráficos |
+| Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on`, incluidas medidas laterales y calidad de importación | acciones de Cuerpo / importador histórico | Últimas medidas y gráficos |
 | Energía legacy | `profiles.maintenance_kcal_current`, `target_kcal_current`, `goal_type` (deprecated) | `maintenance_kcal_snapshot`, `target_kcal_snapshot`, `goal_type_snapshot` | preservación histórica; sin consumidores nutricionales nuevos | deltas legacy únicamente |
 | Plan nutricional versionado | `nutrition_goal_periods` (motor activo, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | objetivos sin reescritura histórica |
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (motor activo, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | gasto estimado y contexto del día |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
+| Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; UI futura | contexto de permitidos, sin sumar consumo |
+| Catálogo personal | No aplica | `foods`, con nutrición completa o parcial | importador histórico; UI futura | referencia alimentaria, no totales diarios |
 | Biblioteca de ejercicios | `exercises` | snapshots de sesión | acciones de Biblioteca | rutinas y nuevas sesiones |
 | Rutina planificada | `routines`, `routine_exercises`, `routine_exercise_sets` | snapshot copiado al iniciar | acciones de Rutinas | inicio y planificación futura |
 | Sesión | `workout_sessions` | la misma fila con estado `completed` o `discarded` | RPCs transaccionales de entrenamiento | historial, calendario y reportes |
@@ -91,12 +93,19 @@ perfiles legados con peso pero sin historial y reconcilia el perfil con el
 
 ## Medidas corporales
 
-`body_measurements` guarda una fila por usuario y fecha, con al menos una de
-estas medidas: cintura, pecho, brazo, muslo o cadera. No se duplica una “medida
-actual” en `profiles`; la última se obtiene ordenando `measured_on`.
+`body_measurements` guarda una fila por usuario y fecha, con al menos una medida
+canónica o lateral: cintura, abdomen, pecho, brazo genérico o derecho/izquierdo,
+muslo genérico o derecho/izquierdo, pantorrilla derecha/izquierda o cadera. No
+se duplica una “medida actual” en `profiles`; la última se obtiene ordenando
+`measured_on`. Las columnas genéricas existentes conservan su semántica: el
+importador no las completa promediando lados.
 
 La unicidad `(user_id, measured_on)`, los checks y RLS sostienen la regla en la
-base.
+base. Una importación puede añadir `legacy_import_source`, `legacy_import_id`,
+`import_run_id`, `quality_status`, `quality_note` y `source_payload`. Una medida
+dudosa se conserva literalmente como `suspect`; no se corrige ni se presenta
+como validada. Un peso sin fecha no se transforma en medición ni `day_log`: se
+preserva como anomalía omitida en el reporte del import run.
 
 ## Entrenamiento
 
@@ -202,6 +211,23 @@ La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 No se cargaron los objetivos históricos ni la matriz real y no se importó el
 Google Sheet. Las cinco tablas nuevas permanecen vacías en producción.
 El catálogo `foods` aún no está conectado al formulario manual.
+
+`foods` permite que calorías o cualquiera de los tres macros sea `null`, pero
+exige al menos un valor nutricional conocido y valores no negativos. Así,
+desconocido no se degrada a cero.
+
+`nutrition_events` conserva el contexto estructurado de Permitidos —tipo,
+intensidad, planificación, alcohol, tragos equivalentes, kcal del evento,
+contexto, notas y origen— con ownership, RLS e idempotencia por legacy ID. Esas
+kcal no alimentan `meal_entries` ni `day_logs`: el consumo continúa viniendo
+exclusivamente de comidas o resúmenes heredados.
+
+El dry-run trata `Registro de comidas` como fuente primaria y `Resumen diario`
+como oráculo derivado. Cuando la fuente tiene un macro y el oráculo está vacío,
+preserva la fuente y registra `SOURCE_WINS`; si ambos tienen valores distintos
+fuera de tolerancia, bloquea. Sólo un dato real no vacío sin destino seguro se
+considera schema gap; headers completamente vacíos, como las fotos históricas
+auditadas, no crean columnas por sí solos.
 
 Las columnas `target_kcal_snapshot`, `maintenance_kcal_snapshot`,
 `delta_vs_target` y `delta_vs_maintenance` conservan su semántica legacy/BMR.

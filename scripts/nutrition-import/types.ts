@@ -96,14 +96,14 @@ export type NormalizedFood = {
   name: string;
   servingQuantity: number;
   servingUnit: string;
-  calories: number;
+  calories: number | null;
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
   sourceNote: string | null;
   precisionLevel: NutritionPrecision;
   active: boolean;
-  schemaCompatible: boolean;
+  hasKnownNutrition: boolean;
 };
 
 export type WeightFact = {
@@ -111,22 +111,48 @@ export type WeightFact = {
   weightKg: number;
   sources: Array<"activity" | "body_measurements">;
   sourceRows: number[];
+  disposition: "IMPORT" | "SKIP_UNDATED";
+  sourcePayloads: Array<Record<string, unknown>>;
 };
 
-export type BodyMeasurementReview = {
+export type NormalizedBodyMeasurement = {
   sourceRow: number;
-  logDate: string | null;
-  representable: Record<string, number>;
-  unrepresentable: Record<string, unknown>;
-  suspicious: string[];
+  legacyImportSource: "google-sheet:medidas-progreso:v1";
+  legacyImportId: string | null;
+  measuredOn: string | null;
+  waistCm: number | null;
+  abdomenCm: number | null;
+  hipCm: number | null;
+  chestCm: number | null;
+  armRightCm: number | null;
+  armLeftCm: number | null;
+  thighRightCm: number | null;
+  thighLeftCm: number | null;
+  calfRightCm: number | null;
+  calfLeftCm: number | null;
+  condition: string | null;
+  notes: string | null;
+  qualityStatus: "verified" | "suspect";
+  qualityNote: string | null;
+  sourcePayload: Record<string, unknown>;
+  disposition: "IMPORT" | "SKIP_UNDATED";
 };
 
-export type NutritionEventReview = {
+export type NormalizedNutritionEvent = {
   sourceRow: number;
-  legacyId: string;
-  logDate: string;
-  structuredFieldsWithoutDestination: string[];
-  partiallyPreservedBy: string[];
+  sourceType: "sheet_import";
+  legacyImportSource: "google-sheet:permitidos:v1";
+  legacyImportId: string;
+  eventDate: string;
+  eventType: string;
+  intensity: string | null;
+  planned: boolean | null;
+  alcohol: boolean | null;
+  drinksEquivalent: number | null;
+  eventCalories: number | null;
+  context: string | null;
+  notes: string | null;
+  origin: string | null;
 };
 
 export type DailyOracle = {
@@ -154,6 +180,7 @@ export type ImportAnomaly = {
   sourceRow?: number;
   logDate?: string | null;
   message: string;
+  sourcePayload?: Record<string, unknown>;
 };
 
 export type NormalizedWorkbook = {
@@ -169,8 +196,8 @@ export type NormalizedWorkbook = {
   workSchedulePeriods: WorkSchedulePlan[];
   foods: NormalizedFood[];
   weights: WeightFact[];
-  bodyMeasurements: BodyMeasurementReview[];
-  events: NutritionEventReview[];
+  bodyMeasurements: NormalizedBodyMeasurement[];
+  nutritionEvents: NormalizedNutritionEvent[];
   dailyOracle: DailyOracle[];
   anomalies: ImportAnomaly[];
 };
@@ -201,7 +228,17 @@ export type ProductionSnapshot = {
   profile: { current_weight_kg: number | null; bmr_kcal_current: number | null } | null;
   day_logs: ExistingDay[];
   workout_by_date: Array<{ log_date: string; status: string; count: number }>;
-  body_measurements: Array<Record<string, unknown>>;
+  body_measurements: Array<{
+    measured_on: string;
+    legacy_import_source: string | null;
+    legacy_import_id: string | null;
+    fingerprint?: string;
+  }>;
+  nutrition_event_keys?: Array<{
+    legacy_import_source: string;
+    legacy_import_id: string;
+    fingerprint?: string;
+  }>;
   meal_entries_count: number;
   legacy_keys: Array<{
     legacy_import_source: string;
@@ -227,8 +264,15 @@ export type DayPlan = {
 export type ReconciliationResult = {
   exactDays: number;
   withinToleranceDays: number;
+  sourceWinsDays: number;
   mismatchDays: number;
   mismatches: Array<{ logDate: string; fields: string[] }>;
+  warnings: Array<{
+    code: "SOURCE_WINS";
+    logDate: string;
+    fields: string[];
+    message: string;
+  }>;
   tolerances: { caloriesKcal: number; macrosG: number; liquidsL: number };
 };
 
@@ -257,12 +301,32 @@ export type DryRunPlan = {
     detected: WeightFact[];
     conflicts: string[];
   };
-  bodyMeasurements: BodyMeasurementReview[];
-  events: NutritionEventReview[];
+  bodyMeasurements: {
+    inserts: number;
+    noOps: number;
+    skippedUndated: number;
+    conflicts: string[];
+    rows: NormalizedBodyMeasurement[];
+  };
+  nutritionEvents: {
+    inserts: number;
+    noOps: number;
+    conflicts: string[];
+    rows: NormalizedNutritionEvent[];
+  };
   workoutConflicts: string[];
   reconciliation: ReconciliationResult;
   schemaGaps: string[];
   anomalies: ImportAnomaly[];
+  importReport: {
+    anomalies: ImportAnomaly[];
+    skippedUndatedFacts: WeightFact[];
+    suspectMeasurements: NormalizedBodyMeasurement[];
+    sourceWinsWarnings: ReconciliationResult["warnings"];
+    reconciliation: ReconciliationResult;
+    counts: Record<string, number>;
+    decisions: string[];
+  };
   blockers: string[];
   applyReady: boolean;
 };

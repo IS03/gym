@@ -53,22 +53,35 @@ function fieldDiffs(
   oracle: DailyOracle,
   activity: NormalizedActivityDay | undefined,
   aggregate: Aggregate,
-): { exact: string[]; tolerated: string[] } {
+): { exact: string[]; tolerated: string[]; sourceWins: string[] } {
   const exact: string[] = [];
   const tolerated: string[] = [];
+  const sourceWins: string[] = [];
   const compare = (field: string, left: number | null, right: number | null, tolerance: number) => {
     if (differs(left, right, tolerance)) exact.push(field);
     else if (left !== null && right !== null && left !== right) tolerated.push(field);
   };
+  const comparePrimaryNutrition = (
+    field: string,
+    source: number | null,
+    oracleValue: number | null,
+    tolerance: number,
+  ) => {
+    if (source !== null && oracleValue === null) {
+      sourceWins.push(field);
+      return;
+    }
+    compare(field, source, oracleValue, tolerance);
+  };
 
-  compare("calories", aggregate.calories, oracle.calories, TOLERANCES.caloriesKcal);
-  compare("protein_g", aggregate.proteinG, oracle.proteinG, TOLERANCES.macrosG);
-  compare("carbs_g", aggregate.carbsG, oracle.carbsG, TOLERANCES.macrosG);
-  compare("fat_g", aggregate.fatG, oracle.fatG, TOLERANCES.macrosG);
+  comparePrimaryNutrition("calories", aggregate.calories, oracle.calories, TOLERANCES.caloriesKcal);
+  comparePrimaryNutrition("protein_g", aggregate.proteinG, oracle.proteinG, TOLERANCES.macrosG);
+  comparePrimaryNutrition("carbs_g", aggregate.carbsG, oracle.carbsG, TOLERANCES.macrosG);
+  comparePrimaryNutrition("fat_g", aggregate.fatG, oracle.fatG, TOLERANCES.macrosG);
 
   if (!activity) {
     exact.push("missing_activity_day");
-    return { exact, tolerated };
+    return { exact, tolerated, sourceWins };
   }
   compare("water_l", activity.waterL, oracle.waterL, TOLERANCES.liquidsL);
   compare("mate_l", activity.mateL, oracle.mateL, TOLERANCES.liquidsL);
@@ -84,7 +97,7 @@ function fieldDiffs(
   );
   if (activity.work !== oracle.work) exact.push("work");
   if (activity.gym !== oracle.gym) exact.push("gym");
-  return { exact, tolerated };
+  return { exact, tolerated, sourceWins };
 }
 
 export function reconcileDaily(options: {
@@ -96,7 +109,9 @@ export function reconcileDaily(options: {
   const activityByDate = new Map(options.activityDays.map((day) => [day.logDate, day]));
   let exactDays = 0;
   let withinToleranceDays = 0;
+  let sourceWinsDays = 0;
   const mismatches: ReconciliationResult["mismatches"] = [];
+  const warnings: ReconciliationResult["warnings"] = [];
 
   for (const oracle of options.oracle) {
     let aggregate: Aggregate;
@@ -112,6 +127,14 @@ export function reconcileDaily(options: {
     const differences = fieldDiffs(oracle, activityByDate.get(oracle.logDate), aggregate);
     if (differences.exact.length > 0) {
       mismatches.push({ logDate: oracle.logDate, fields: differences.exact });
+    } else if (differences.sourceWins.length > 0) {
+      sourceWinsDays += 1;
+      warnings.push({
+        code: "SOURCE_WINS",
+        logDate: oracle.logDate,
+        fields: differences.sourceWins,
+        message: "La fuente primaria contiene valores y el oráculo derivado está vacío; se preserva la fuente primaria.",
+      });
     } else if (differences.tolerated.length > 0) {
       withinToleranceDays += 1;
     } else {
@@ -122,8 +145,10 @@ export function reconcileDaily(options: {
   return {
     exactDays,
     withinToleranceDays,
+    sourceWinsDays,
     mismatchDays: mismatches.length,
     mismatches,
+    warnings,
     tolerances: TOLERANCES,
   };
 }
