@@ -15,10 +15,19 @@ export {
 type RawMeasurementInput = {
   measuredOn: string;
   waistCm?: string | null;
+  abdomenCm?: string | null;
   chestCm?: string | null;
   armCm?: string | null;
+  armRightCm?: string | null;
+  armLeftCm?: string | null;
   thighCm?: string | null;
+  thighRightCm?: string | null;
+  thighLeftCm?: string | null;
+  calfRightCm?: string | null;
+  calfLeftCm?: string | null;
   hipCm?: string | null;
+  condition?: string | null;
+  notes?: string | null;
 };
 
 const MAX_MEASUREMENT_CM = 500;
@@ -48,12 +57,27 @@ export function parseBodyMeasurementInput(input: RawMeasurementInput): BodyMeasu
   const result: BodyMeasurementInput = {
     measuredOn: input.measuredOn,
     waistCm: parseMeasurement(input.waistCm, "Cintura"),
+    abdomenCm: parseMeasurement(input.abdomenCm, "Abdomen"),
     chestCm: parseMeasurement(input.chestCm, "Pecho"),
     armCm: parseMeasurement(input.armCm, "Brazo"),
+    armRightCm: parseMeasurement(input.armRightCm, "Brazo derecho"),
+    armLeftCm: parseMeasurement(input.armLeftCm, "Brazo izquierdo"),
     thighCm: parseMeasurement(input.thighCm, "Muslo"),
+    thighRightCm: parseMeasurement(input.thighRightCm, "Muslo derecho"),
+    thighLeftCm: parseMeasurement(input.thighLeftCm, "Muslo izquierdo"),
+    calfRightCm: parseMeasurement(input.calfRightCm, "Pantorrilla derecha"),
+    calfLeftCm: parseMeasurement(input.calfLeftCm, "Pantorrilla izquierda"),
     hipCm: parseMeasurement(input.hipCm, "Cadera"),
+    condition: input.condition?.trim() || null,
+    notes: input.notes?.trim() || null,
   };
-  if (BODY_MEASUREMENT_FIELDS.every((field) => result[field.replace("_cm", "Cm") as keyof BodyMeasurementInput] === null)) {
+  const inputKeys: Record<(typeof BODY_MEASUREMENT_FIELDS)[number], keyof BodyMeasurementInput> = {
+    waist_cm: "waistCm", abdomen_cm: "abdomenCm", chest_cm: "chestCm",
+    arm_cm: "armCm", arm_right_cm: "armRightCm", arm_left_cm: "armLeftCm",
+    thigh_cm: "thighCm", thigh_right_cm: "thighRightCm", thigh_left_cm: "thighLeftCm",
+    calf_right_cm: "calfRightCm", calf_left_cm: "calfLeftCm", hip_cm: "hipCm",
+  };
+  if (BODY_MEASUREMENT_FIELDS.every((field) => result[inputKeys[field]] === null)) {
     throw new Error("Registrá al menos una medida corporal.");
   }
   return result;
@@ -74,10 +98,19 @@ function rowPayload(input: BodyMeasurementInput) {
   return {
     measured_on: input.measuredOn,
     waist_cm: input.waistCm,
+    abdomen_cm: input.abdomenCm,
     chest_cm: input.chestCm,
     arm_cm: input.armCm,
+    arm_right_cm: input.armRightCm,
+    arm_left_cm: input.armLeftCm,
     thigh_cm: input.thighCm,
+    thigh_right_cm: input.thighRightCm,
+    thigh_left_cm: input.thighLeftCm,
+    calf_right_cm: input.calfRightCm,
+    calf_left_cm: input.calfLeftCm,
     hip_cm: input.hipCm,
+    condition: input.condition,
+    notes: input.notes,
   };
 }
 
@@ -98,9 +131,12 @@ export async function upsertBodyMeasurement(input: BodyMeasurementInput): Promis
   const { supabase, userId } = await getAuthedContext();
   const { data, error } = await supabase
     .from("body_measurements")
-    .upsert({ user_id: userId, ...rowPayload(input) }, { onConflict: "user_id,measured_on" })
+    .insert({ user_id: userId, ...rowPayload(input) })
     .select("*")
     .single();
+  if (error?.message.includes("body_measurements_user_date_unique")) {
+    throw new Error("Ya existe una medición para esa fecha. Editá la existente o elegí otra fecha.");
+  }
   if (error) throw new Error(`Guardar medidas corporales: ${error.message}`);
   return data as BodyMeasurement;
 }

@@ -146,13 +146,34 @@ export type Food = {
   description: string | null;
   serving_quantity: number;
   serving_unit: string;
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fat_g: number;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
   precision_level: NutritionPrecision | null;
   source_note: string | null;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NutritionEvent = {
+  id: string;
+  user_id: string;
+  event_date: string;
+  event_type: string;
+  intensity: string | null;
+  planned: boolean | null;
+  alcohol: boolean | null;
+  drinks_equivalent: number | null;
+  event_calories: number | null;
+  context: string | null;
+  notes: string | null;
+  origin: string | null;
+  source_type: "manual" | "sheet_import" | "chatgpt";
+  legacy_import_source: string | null;
+  legacy_import_id: string | null;
+  import_run_id: string | null;
   created_at: string;
   updated_at: string;
 };

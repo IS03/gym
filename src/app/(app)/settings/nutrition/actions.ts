@@ -1,0 +1,49 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import {
+  createExpenditurePeriod,
+  createNutritionGoalPeriod,
+  createWorkSchedulePeriod,
+  saveFood,
+  setFoodActive,
+  type FoodMutationInput,
+} from "@/lib/nutrition/product";
+
+export type SettingsActionState = { ok: boolean; error?: string };
+
+function refresh() {
+  for (const path of ["/settings", "/settings/nutrition", "/today", "/home", "/history"]) {
+    revalidatePath(path);
+  }
+}
+
+async function run(task: () => Promise<unknown>): Promise<SettingsActionState> {
+  try {
+    await task();
+    refresh();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "No se pudo guardar." };
+  }
+}
+
+export async function createGoalAction(_: SettingsActionState, formData: FormData) {
+  return run(() => createNutritionGoalPeriod(formData));
+}
+
+export async function createExpenditureAction(_: SettingsActionState, formData: FormData) {
+  return run(() => createExpenditurePeriod(formData));
+}
+
+export async function createScheduleAction(_: SettingsActionState, formData: FormData) {
+  return run(() => createWorkSchedulePeriod(formData));
+}
+
+export async function saveFoodAction(input: FoodMutationInput) {
+  return run(() => saveFood(input));
+}
+
+export async function setFoodActiveAction(input: { id: string; active: boolean }) {
+  return run(() => setFoodActive(input.id, input.active));
+}

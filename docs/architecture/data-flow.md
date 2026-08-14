@@ -18,12 +18,12 @@ los tests.
 | Peso corporal | `profiles.current_weight_kg` | `day_logs.weight_kg` | acciones de Cuerpo o cambio explícito en Ajustes | BMR actual y tendencias |
 | Medidas corporales | No hay copia de estado actual | `body_measurements` por `measured_on`, incluidas medidas laterales y calidad de importación | acciones de Cuerpo / importador histórico | Últimas medidas y gráficos |
 | Energía legacy | `profiles.maintenance_kcal_current`, `target_kcal_current`, `goal_type` (deprecated) | `maintenance_kcal_snapshot`, `target_kcal_snapshot`, `goal_type_snapshot` | preservación histórica; sin consumidores nutricionales nuevos | deltas legacy únicamente |
-| Plan nutricional versionado | `nutrition_goal_periods` (motor activo, aún sin períodos reales) | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | objetivos sin reescritura histórica |
-| Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` (motor activo, aún sin períodos reales) | IDs, fuentes y snapshots nuevos de `day_logs` | `resolve_nutrition_context` + `refresh_nutrition_day` | gasto estimado y contexto del día |
+| Plan nutricional versionado | `nutrition_goal_periods` | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | objetivos sin reescritura histórica |
+| Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` | IDs, fuentes y snapshots nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | gasto estimado y contexto del día |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
-| Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; UI futura | contexto de permitidos, sin sumar consumo |
-| Catálogo personal | No aplica | `foods`, con nutrición completa o parcial | importador histórico; UI futura | referencia alimentaria, no totales diarios |
+| Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; lectura contextual en History | contexto de permitidos, sin sumar consumo |
+| Catálogo personal | No aplica | `foods`, con nutrición completa o parcial | importador histórico + CRUD blando en Ajustes | referencia alimentaria, no totales diarios |
 | Biblioteca de ejercicios | `exercises` | snapshots de sesión | acciones de Biblioteca | rutinas y nuevas sesiones |
 | Rutina planificada | `routines`, `routine_exercises`, `routine_exercise_sets` | snapshot copiado al iniciar | acciones de Rutinas | inicio y planificación futura |
 | Sesión | `workout_sessions` | la misma fila con estado `completed` o `discarded` | RPCs transaccionales de entrenamiento | historial, calendario y reportes |
@@ -209,7 +209,7 @@ o un dato sin representación bloquean `APPLY_READY`. Los snapshots y reportes
 reales sólo viven en `tmp/` o `temp/`, ignorados por Git; los tests versionados
 usan únicamente fixtures sintéticos.
 
-### Fundación y configuración pendiente
+### Fundación, importación y configuración web
 
 La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 
@@ -219,9 +219,15 @@ La migración `20260813150000_nutrition_schema_foundation.sql` incorporó:
 - `nutrition_import_runs` para registrar imports aplicados reproducibles;
 - `foods` como catálogo personal con ownership estricto.
 
-No se cargaron los objetivos históricos ni la matriz real y no se importó el
-Google Sheet. Las cinco tablas nuevas permanecen vacías en producción.
-El catálogo `foods` aún no está conectado al formulario manual.
+El histórico validado se aplicó de forma atómica e idempotente en PR 6. Las
+filas importadas conservan import run, legacy IDs y payload de procedencia. La
+web no vuelve a ejecutar ese import: consume Supabase como única fuente.
+
+Ajustes permite crear nuevas versiones de objetivos, gasto y horario mediante
+`INSERT` con `effective_from`; nunca actualiza las versiones históricas. También
+permite crear, editar, desactivar y reactivar `foods`. El catálogo sigue sin
+autocompletar el formulario de comidas: continúa siendo una referencia
+independiente hasta una fase posterior.
 
 `foods` permite que calorías o cualquiera de los tres macros sea `null`, pero
 exige al menos un valor nutricional conocido y valores no negativos. Así,
@@ -302,7 +308,7 @@ columnas fuente; `refresh_nutrition_day` escribe columnas snapshot distintas,
 por lo que no existe recursión. Todas las rutas de totales/refresco toman
 primero el lock de `day_logs`, compatible con `recalculate_day_log`.
 
-### Read model de aplicación e History
+### Read model, escritura web e History
 
 `getNutritionDay(date, options)` en `src/lib/nutrition/` es el wrapper servidor
 tipado común a Home, Today y History. Devuelve día, comidas, contexto,
@@ -312,8 +318,20 @@ reglas en React.
 Home y Today pueden asegurar el día con `createIfMissing = true`. History usa
 `createIfMissing = false`: consultar una fecha inexistente devuelve un estado
 vacío, no crea un `day_log`, no refresca snapshots ni modifica timestamps. Los
-snapshots históricos sólo cambian por una materialización/corrección explícita
-o una importación controlada futura.
+snapshots históricos sólo cambian por una corrección explícita del mismo día.
+
+Today escribe pasos, agua y mate directamente en el `day_log`; esas columnas no
+disparan un refresh energético. Trabajo usa `work_override` con fuente y motivo,
+y volver al horario habitual limpia los tres campos. Gym manual sólo admite
+`true` cuando no hay sesión; una sesión `completed` continúa siendo autoritativa.
+El gasto excepcional usa `expenditure_override_kcal` y se presenta separado del
+objetivo nutricional.
+
+History consulta sólo las comidas activas y eventos de la fecha solicitada. Un
+`legacy_daily_summary` se identifica como resumen sin desglose, y la convención
+técnica de mediodía no se muestra como una hora observada cuando
+`raw_input.originalTimeKnown = false`. Las kcal de `nutrition_events` son sólo
+contexto y nunca vuelven a sumarse al consumo.
 
 Home, Today e History muestran `nutrition_target_kcal_snapshot` a través del
 read model. Si no hay un período configurado, el objetivo es `null`; nunca se

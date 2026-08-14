@@ -6,6 +6,7 @@ import { getNutritionDay } from "@/lib/nutrition/day";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { CreateMealForm } from "./create-meal-form";
 import { softDeleteMealAction, updateMealAction } from "./actions";
+import { DayContextEditor } from "./day-context-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,18 @@ function formatKcal(n: number | null | undefined) {
 function formatGrams(n: number | null | undefined) {
   if (typeof n !== "number") return "—";
   return `${gramFormatter.format(n)} g`;
+}
+
+function formatLiters(n: number | null | undefined) {
+  if (typeof n !== "number") return "—";
+  return `${gramFormatter.format(n)} L`;
+}
+
+function formatBalance(value: number | null) {
+  if (value === null) return "Sin gasto configurado";
+  if (value < 0) return `Déficit estimado: ${Math.abs(value)} kcal`;
+  if (value > 0) return `Superávit estimado: ${value} kcal`;
+  return "Balance estimado: 0 kcal";
 }
 
 function formatProteinProgress(consumed: number, target: number | null) {
@@ -90,6 +103,35 @@ export default async function TodayPage() {
                 {formatGrams(dayLog.total_fat_g)}
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Contexto del día</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+            <div><p className="text-xs text-muted-foreground">Gasto estimado</p><p className="font-semibold">{formatKcal(context.expenditureKcal)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Balance energético</p><p className="font-semibold">{formatBalance(context.metrics.energyBalanceKcal)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Trabajo</p><p className="font-semibold">{context.work.effective == null ? "—" : context.work.effective ? "Sí" : "No"} <span className="font-normal text-muted-foreground">· {context.work.source === "override" ? "corrección" : context.work.source === "schedule" ? "horario" : "sin regla"}</span></p></div>
+            <div><p className="text-xs text-muted-foreground">Entrenamiento</p><p className="font-semibold">{context.gym.effective ? "Sí" : "No"} <span className="font-normal text-muted-foreground">· {context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}</span></p></div>
+            <div><p className="text-xs text-muted-foreground">Agua</p><p className="font-semibold">{formatLiters(dayLog.water_l)}{context.targets.waterL == null ? "" : ` / ${formatLiters(context.targets.waterL)}`}</p></div>
+            <div><p className="text-xs text-muted-foreground">Pasos</p><p className="font-semibold">{dayLog.steps == null ? "—" : gramFormatter.format(dayLog.steps)}</p></div>
+          </div>
+          <div className="border-t pt-4">
+            <DayContextEditor
+              dayLogId={dayLog.id}
+              stepsInitial={dayLog.steps}
+              waterInitial={dayLog.water_l}
+              mateInitial={dayLog.mate_l}
+              workOverride={dayLog.work_override}
+              workReasonInitial={dayLog.work_override_reason}
+              gymReasonInitial={dayLog.gym_override_reason}
+              expenditureInitial={dayLog.expenditure_override_kcal}
+              gymSource={context.gym.source}
+            />
           </div>
         </CardContent>
       </Card>

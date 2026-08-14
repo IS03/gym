@@ -85,10 +85,19 @@ type MeasurementActionInput = {
   id?: string;
   measuredOn: string;
   waistCm?: string;
+  abdomenCm?: string;
   chestCm?: string;
   armCm?: string;
+  armRightCm?: string;
+  armLeftCm?: string;
   thighCm?: string;
+  thighRightCm?: string;
+  thighLeftCm?: string;
+  calfRightCm?: string;
+  calfLeftCm?: string;
   hipCm?: string;
+  condition?: string;
+  notes?: string;
 };
 
 export async function saveBodyMeasurementAction(

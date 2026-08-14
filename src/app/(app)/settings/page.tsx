@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
 import { ProfileForm } from "./profile-form";
-import { Mail, Palette, ShieldCheck, UserRound } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Mail, Palette, ShieldCheck, UserRound, Utensils } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,17 @@ export default async function SettingsPage() {
             <ProfileForm profile={profile} />
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="settings-nutrition">
+        <div className="flex items-center gap-2">
+          <Utensils className="size-4 text-primary" aria-hidden />
+          <h2 id="settings-nutrition" className="text-base font-semibold tracking-tight">Nutrición</h2>
+        </div>
+        <Link href="/settings/nutrition" className="flex min-h-20 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm transition-colors hover:bg-muted/45">
+          <span><span className="block text-sm font-medium">Objetivos y configuración</span><span className="mt-1 block text-xs text-muted-foreground">Objetivos versionados, gasto, horario y alimentos habituales.</span></span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
       </section>
       </div>
 

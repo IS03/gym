@@ -165,6 +165,15 @@ export default async function HomePage() {
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const calorieProgress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
+  const proteinTarget = context.targets.proteinG;
+  const energyBalance = context.metrics.energyBalanceKcal;
+  const balanceSummary = energyBalance == null
+    ? "Sin gasto configurado"
+    : energyBalance < 0
+      ? `Déficit estimado: ${number(Math.abs(energyBalance))} kcal`
+      : energyBalance > 0
+        ? `Superávit estimado: ${number(energyBalance)} kcal`
+        : "Balance estimado: 0 kcal";
   const displayName = profile?.display_name?.trim() || "vos";
   const compactProfile = getCompactProfile(profile?.display_name);
   const hasTraining = (currentWeek?.sessions ?? 0) > 0;
@@ -283,7 +292,7 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 divide-x divide-border">
               <div className="pr-3">
-                <p className="text-lg font-semibold">{number(dayLog.total_protein_g ?? 0)} g</p>
+                <p className="text-lg font-semibold">{number(dayLog.total_protein_g ?? 0)}{proteinTarget == null ? "" : ` / ${number(proteinTarget)}`} g</p>
                 <p className="text-xs text-muted-foreground">Proteína</p>
               </div>
               <div className="pl-3">
@@ -291,6 +300,7 @@ export default async function HomePage() {
                 <p className="text-xs text-muted-foreground">{meals.length === 1 ? "Comida cargada" : "Comidas cargadas"}</p>
               </div>
             </div>
+            <p className="border-t pt-3 text-xs font-medium text-muted-foreground">{balanceSummary}</p>
           </CardContent>
         </Card>
       </section>
@@ -478,7 +488,7 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 divide-x divide-border border-t pt-4">
               <div>
-                <p className="metric-number text-lg font-semibold">{number(dayLog.total_protein_g ?? 0)} g</p>
+                <p className="metric-number text-lg font-semibold">{number(dayLog.total_protein_g ?? 0)}{proteinTarget == null ? "" : ` / ${number(proteinTarget)}`} g</p>
                 <p className="text-xs text-muted-foreground">Proteína</p>
               </div>
               <div className="pl-4">
@@ -486,6 +496,7 @@ export default async function HomePage() {
                 <p className="text-xs text-muted-foreground">Comidas</p>
               </div>
             </div>
+            <p className="text-xs font-medium text-muted-foreground">{balanceSummary}</p>
             <Link href="/today" className="text-sm font-medium text-primary hover:underline">Abrir nutrición</Link>
           </CardContent>
         </Card>
