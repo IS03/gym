@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
-import { CreateMealForm } from "./create-meal-form";
 import { softDeleteMealAction, updateMealAction } from "./actions";
-import { DayContextEditor } from "./day-context-editor";
+import { DayActivityPanel } from "./day-activity-panel";
+import { MealComposer } from "./meal-composer";
 
 export const dynamic = "force-dynamic";
 
@@ -117,43 +117,26 @@ export default async function TodayPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Contexto del día</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <div><p className="text-xs text-muted-foreground">Gasto estimado</p><p className="font-semibold">{formatKcal(context.expenditureKcal)}</p></div>
-            <div><p className="text-xs text-muted-foreground">Balance energético</p><p className="font-semibold">{formatBalance(context.metrics.energyBalanceKcal)}</p></div>
-            <div><p className="text-xs text-muted-foreground">Trabajo</p><p className="font-semibold">{context.work.effective == null ? "—" : context.work.effective ? "Sí" : "No"} <span className="font-normal text-muted-foreground">· {context.work.source === "override" ? "corrección" : context.work.source === "schedule" ? "horario" : "sin regla"}</span></p></div>
-            <div><p className="text-xs text-muted-foreground">Entrenamiento</p><p className="font-semibold">{context.gym.effective ? "Sí" : "No"} <span className="font-normal text-muted-foreground">· {context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}</span></p></div>
-            <div><p className="text-xs text-muted-foreground">Agua</p><p className="font-semibold">{formatLiters(dayLog.water_l)}{context.targets.waterL == null ? "" : ` / ${formatLiters(context.targets.waterL)}`}</p></div>
-            <div><p className="text-xs text-muted-foreground">Pasos</p><p className="font-semibold">{dayLog.steps == null ? "—" : gramFormatter.format(dayLog.steps)}</p></div>
-          </div>
-          <div className="border-t pt-4">
-            <DayContextEditor
-              dayLogId={dayLog.id}
-              stepsInitial={dayLog.steps}
-              waterInitial={dayLog.water_l}
-              mateInitial={dayLog.mate_l}
-              workOverride={dayLog.work_override}
-              workReasonInitial={dayLog.work_override_reason}
-              gymReasonInitial={dayLog.gym_override_reason}
-              expenditureInitial={dayLog.expenditure_override_kcal}
-              gymSource={context.gym.source}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <MealComposer date={today} />
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Nueva comida</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CreateMealForm date={today} />
-        </CardContent>
-      </Card>
+      <DayActivityPanel
+        dayLogId={dayLog.id}
+        stepsInitial={dayLog.steps}
+        waterInitial={dayLog.water_l}
+        mateInitial={dayLog.mate_l}
+        workOverride={dayLog.work_override}
+        workReasonInitial={dayLog.work_override_reason}
+        gymReasonInitial={dayLog.gym_override_reason}
+        expenditureInitial={dayLog.expenditure_override_kcal}
+        gymSource={context.gym.source}
+        expenditureLabel={formatKcal(context.expenditureKcal)}
+        balanceLabel={formatBalance(context.metrics.energyBalanceKcal)}
+        workLabel={context.work.effective == null ? "—" : context.work.effective ? "Sí" : "No"}
+        workSourceLabel={context.work.source === "override" ? "corrección" : context.work.source === "schedule" ? "horario" : "sin regla"}
+        gymLabel={context.gym.effective ? "Sí" : "No"}
+        gymSourceLabel={context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}
+        waterTargetLabel={context.targets.waterL == null ? null : formatLiters(context.targets.waterL)}
+      />
       </aside>
 
       <div className="space-y-3 lg:col-span-8">

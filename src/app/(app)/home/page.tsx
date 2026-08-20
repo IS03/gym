@@ -71,12 +71,12 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
   return (
     <Link
       href={href}
-      className="group flex min-h-32 flex-col justify-between rounded-xl bg-card p-4 shadow-sm ring-1 ring-foreground/8 transition-[background-color,transform,box-shadow] duration-150 ease-out hover:bg-muted/60 active:scale-[0.98]"
+      className="group grid min-h-32 grid-rows-[2.25rem_1fr] rounded-xl bg-card p-4 shadow-sm ring-1 ring-foreground/8 transition-[background-color,transform,box-shadow] duration-150 ease-out hover:bg-muted/60 active:scale-[0.98]"
     >
       <span className="flex size-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
         <Icon className="size-[18px]" aria-hidden />
       </span>
-      <span className="space-y-0.5">
+      <span className="grid content-end gap-0.5 self-stretch">
         <span className="flex items-center gap-1 text-sm font-semibold">
           {title}
           <ArrowUpRight
@@ -84,7 +84,7 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
             aria-hidden
           />
         </span>
-        <span className="block text-xs leading-relaxed text-muted-foreground">
+        <span className="block min-h-10 text-xs leading-relaxed text-muted-foreground">
           {description}
         </span>
       </span>

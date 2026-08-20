@@ -396,8 +396,10 @@ export function ExerciseLibrary({
           <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
           <p className="text-sm text-muted-foreground">Tus ejercicios generales.</p>
         </div>
-        <Button type="button" onClick={openCreate} className="hidden lg:inline-flex">
-          <Plus className="size-4" aria-hidden />Nuevo ejercicio
+        <Button type="button" onClick={openCreate} size="sm" className="shrink-0 lg:h-11 lg:px-3">
+          <Plus className="size-4" aria-hidden />
+          <span className="lg:hidden">Nuevo</span>
+          <span className="hidden lg:inline">Nuevo ejercicio</span>
         </Button>
       </div>
 
@@ -540,10 +542,6 @@ export function ExerciseLibrary({
           </div>
         )}
       </section>
-
-      <Button type="button" className="h-11 w-full lg:hidden" onClick={openCreate}>
-        <Plus className="size-4" aria-hidden />Nuevo ejercicio
-      </Button>
 
       <Sheet
         open={editorOpen}

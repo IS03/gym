@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DailyActivityAutosaveQueue,
+  type DailyActivityAutosaveState,
+  type DailyActivityDraft,
+} from "@/lib/nutrition/activity-autosave";
 import {
   saveDailyActivityAction,
   saveExpenditureOverrideAction,
@@ -22,9 +27,10 @@ type Props = {
   gymReasonInitial: string | null;
   expenditureInitial: number | null;
   gymSource: "workout" | "override" | "none";
+  onActivityChange?: (draft: DailyActivityDraft) => void;
 };
 
-export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource }: Props) {
+export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, onActivityChange }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,6 +43,55 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
   const [workReason, setWorkReason] = useState(workReasonInitial ?? "Corrección manual del día");
   const [gymReason, setGymReason] = useState(gymReasonInitial ?? "Entrenamiento histórico sin sesión");
   const [expenditure, setExpenditure] = useState(expenditureInitial == null ? "" : String(expenditureInitial));
+  const [autosave, setAutosave] = useState<DailyActivityAutosaveState>({ phase: "idle", error: null });
+  const mountedRef = useRef(true);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueRef = useRef<DailyActivityAutosaveQueue | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const queue = new DailyActivityAutosaveQueue({
+      debounceMs: 650,
+      initial: {
+        steps: stepsInitial == null ? "" : String(stepsInitial),
+        waterL: waterInitial == null ? "" : String(waterInitial),
+        mateL: mateInitial == null ? "" : String(mateInitial),
+      },
+      save: async (draft) => {
+        const result = await saveDailyActivityAction({ dayLogId, ...draft });
+        if (!result.ok) throw new Error(result.error);
+      },
+      onStateChange: (state) => {
+        if (!mountedRef.current) return;
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        setAutosave(state);
+        if (state.phase === "saved") {
+          savedTimerRef.current = setTimeout(() => {
+            if (mountedRef.current) setAutosave({ phase: "idle", error: null });
+          }, 2200);
+        }
+      },
+    });
+    queueRef.current = queue;
+    return () => {
+      mountedRef.current = false;
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      queue.dispose();
+      if (queueRef.current === queue) queueRef.current = null;
+    };
+  }, [dayLogId, mateInitial, stepsInitial, waterInitial]);
+
+  function changeActivity(next: DailyActivityDraft) {
+    setSteps(next.steps);
+    setWater(next.waterL);
+    setMate(next.mateL);
+    onActivityChange?.(next);
+    queueRef.current?.change(next);
+  }
+
+  function activityDraft(overrides: Partial<DailyActivityDraft> = {}): DailyActivityDraft {
+    return { steps, waterL: water, mateL: mate, ...overrides };
+  }
 
   function submit(task: () => Promise<{ ok: true } | { ok: false; error: string }>) {
     setNotice(null);
@@ -52,21 +107,30 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
       <div className="grid grid-cols-3 gap-2">
         <div className="space-y-1">
           <Label htmlFor="daily-steps">Pasos</Label>
-          <Input id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => setSteps(e.target.value)} placeholder="—" />
+          <Input id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
         <div className="space-y-1">
           <Label htmlFor="daily-water">Agua (L)</Label>
-          <Input id="daily-water" inputMode="decimal" value={water} onChange={(e) => setWater(e.target.value)} placeholder="—" />
+          <Input id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
         <div className="space-y-1">
           <Label htmlFor="daily-mate">Mate (L)</Label>
-          <Input id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => setMate(e.target.value)} placeholder="—" />
+          <Input id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
       </div>
-      <Button type="button" variant="outline" className="h-10 w-full" disabled={pending}
-        onClick={() => submit(() => saveDailyActivityAction({ dayLogId, steps, waterL: water, mateL: mate }))}>
-        Guardar actividad e hidratación
-      </Button>
+      <p
+        className={`min-h-5 text-xs ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+        role="status"
+        aria-live="polite"
+      >
+        {autosave.phase === "scheduled" || autosave.phase === "saving"
+          ? "Guardando…"
+          : autosave.phase === "saved"
+            ? "Guardado"
+            : autosave.phase === "error"
+              ? autosave.error
+              : null}
+      </p>
 
       <details className="rounded-xl border px-3 py-2">
         <summary className="cursor-pointer text-sm font-medium">Correcciones del día</summary>

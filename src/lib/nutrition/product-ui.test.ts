@@ -8,6 +8,7 @@ import { parseFoodInput, parseOptionalNumber, parseRequiredNumber } from "./prod
 
 const source = (path: string) => readFileSync(path, "utf8");
 const today = source("src/app/(app)/today/page.tsx");
+const todayActivity = source("src/app/(app)/today/day-activity-panel.tsx");
 const todayEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const product = source("src/lib/nutrition/product.ts");
 const settings = source("src/app/(app)/settings/nutrition/nutrition-settings-forms.tsx");
@@ -34,9 +35,9 @@ describe("PR 7 — experiencia nutricional", () => {
 
   it("Today separa objetivo, gasto, balance y fuentes de trabajo/gym", () => {
     expect(today).toContain("context.targets.calories");
-    expect(today).toContain("Balance energético");
+    expect(todayActivity).toContain("Balance energético");
     expect(today).toContain("Déficit estimado");
-    expect(today).toContain("Gasto estimado");
+    expect(todayActivity).toContain("Gasto estimado");
     expect(today).not.toContain("dayLog.target_kcal_snapshot");
     expect(todayEditor).toContain("Usar horario habitual");
     expect(todayEditor).toContain("Registrar que entrené sin sesión");

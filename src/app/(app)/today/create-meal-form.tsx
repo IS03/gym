@@ -12,6 +12,7 @@ import {
 
 type Props = {
   date: string;
+  onSuccess?: () => void;
 };
 
 function buildFormData(
@@ -23,7 +24,7 @@ function buildFormData(
   return fd;
 }
 
-export function CreateMealForm({ date }: Props) {
+export function CreateMealForm({ date, onSuccess }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [saving, setSaving] = useState(false);
@@ -33,7 +34,7 @@ export function CreateMealForm({ date }: Props) {
     <>
       <form
         ref={formRef}
-        className="space-y-3"
+        className="min-w-0 space-y-3 overflow-x-hidden"
         onSubmit={async (e) => {
           e.preventDefault();
           const el = formRef.current;
@@ -58,13 +59,14 @@ export function CreateMealForm({ date }: Props) {
               return;
             }
             el.reset();
+            onSuccess?.();
             router.refresh();
           } finally {
             setSaving(false);
           }
         }}
       >
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1 overflow-hidden">
           <Label htmlFor="new-meal-date">Fecha</Label>
           <Input
             id="new-meal-date"
@@ -73,6 +75,7 @@ export function CreateMealForm({ date }: Props) {
             required
             defaultValue={date}
             disabled={saving}
+            className="block min-w-0 max-w-full [inline-size:100%] [min-inline-size:0]"
           />
         </div>
         <div className="space-y-1">
@@ -148,7 +151,7 @@ export function CreateMealForm({ date }: Props) {
             disabled={saving}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div>
           <Button className="h-11 w-full" type="submit" disabled={saving}>
             {saving ? "Guardando…" : "Agregar comida"}
           </Button>
@@ -157,7 +160,7 @@ export function CreateMealForm({ date }: Props) {
 
       {showDup ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-4 sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="dup-meal-title"
@@ -203,6 +206,7 @@ export function CreateMealForm({ date }: Props) {
                     if (result.ok) {
                       setShowDup(false);
                       el.reset();
+                      onSuccess?.();
                       router.refresh();
                     } else if (result.ok === false) {
                       setShowDup(true);
