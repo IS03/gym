@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, buildMonthGrid, formatMonthLabel } from "./training-calendar";
+import { addMonths, buildMonthGrid, formatMonthLabel, trainingCalendarHref } from "./training-calendar";
 
 describe("calendario de entrenamiento", () => {
   it("arma sólo las semanas necesarias y empieza en lunes", () => {
@@ -9,6 +9,12 @@ describe("calendario de entrenamiento", () => {
     expect(days[0]).toEqual({ date: "2026-07-27", inMonth: false });
     expect(days.at(-1)).toEqual({ date: "2026-09-06", inMonth: false });
     expect(days.filter((day) => day.inMonth)).toHaveLength(31);
+  });
+
+  it("preserva y limpia el filtro de rutina al navegar", () => {
+    expect(trainingCalendarHref(addMonths("2026-08", -1), "push-id")).toBe("/train/calendar?month=2026-07&routine_id=push-id");
+    expect(trainingCalendarHref(addMonths("2026-08", 1), "push-id")).toBe("/train/calendar?month=2026-09&routine_id=push-id");
+    expect(trainingCalendarHref("2026-08", null)).toBe("/train/calendar?month=2026-08");
   });
 
   it("no agrega una sexta fila cuando el mes cabe en cinco", () => {

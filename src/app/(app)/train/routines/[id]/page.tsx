@@ -4,7 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { listExercises } from "@/lib/phase2/training";
 import { getRoutineTemplate } from "@/lib/phase2/training-robust";
-import { RoutineExerciseAddForm } from "./routine-exercise-manager";
+import { RoutineExerciseAddDialog } from "./routine-exercise-manager";
 import { RoutineTemplateEditor } from "./routine-template-editor";
 import { RoutineRestoreButton } from "../routine-restore-button";
 
@@ -23,6 +23,11 @@ export default async function RoutineDetailPage({
   const editorKey = template.exercises
     .map((exercise) => `${exercise.id}:${exercise.updated_at}`)
     .join(",");
+  const exercises = allExercises.map((exercise) => ({
+    id: exercise.id,
+    nombre: exercise.nombre,
+    grupo_muscular: exercise.grupo_muscular,
+  }));
 
   return (
     <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
@@ -60,46 +65,46 @@ export default async function RoutineDetailPage({
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Agregar ejercicio</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RoutineExerciseAddForm
-            routineId={id}
-            exercises={allExercises.map((e) => ({
-              id: e.id,
-              nombre: e.nombre,
-              grupo_muscular: e.grupo_muscular,
-            }))}
-          />
-        </CardContent>
-      </Card>
-
       <section className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">Objetivos</h2>
-        <RoutineTemplateEditor
-          key={editorKey}
-          routineId={id}
-          items={template.exercises}
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Ejercicios</h2>
+          {template.exercises.length > 0 ? (
+            <RoutineExerciseAddDialog routineId={id} exercises={exercises} />
+          ) : null}
+        </div>
+        {template.exercises.length > 0 ? (
+          <RoutineTemplateEditor
+            key={editorKey}
+            routineId={id}
+            items={template.exercises}
+          />
+        ) : (
+          <Card className="surface-elevated">
+            <CardContent className="space-y-4 py-6">
+              <p className="text-sm text-muted-foreground">
+                Esta rutina todavía no tiene ejercicios.
+              </p>
+              <RoutineExerciseAddDialog routineId={id} exercises={exercises} fullWidth />
+            </CardContent>
+          </Card>
+        )}
       </section>
 
       {template.routine.is_active ? (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Iniciar sesión desde rutina</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Card className="surface-elevated">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <CardTitle className="text-base">Iniciar sesión desde rutina</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ejercicios disponibles en tu biblioteca: {allExercises.length}
+              </p>
+            </div>
             <Link
               href={`/train/session/new?routine_id=${id}`}
-              className={cn(buttonVariants(), "h-11 w-full")}
+              className={cn(buttonVariants(), "h-11")}
             >
               Iniciar sesión
             </Link>
-            <p className="text-xs text-muted-foreground">
-              Ejercicios disponibles en tu biblioteca: {allExercises.length}
-            </p>
           </CardContent>
         </Card>
       ) : null}

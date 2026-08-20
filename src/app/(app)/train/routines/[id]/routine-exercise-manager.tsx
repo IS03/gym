@@ -1,8 +1,10 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
 import { addExerciseToRoutineAction } from "../../actions";
 import {
   filterExercisesByMuscleGroup,
@@ -21,11 +23,13 @@ export function RoutineExerciseAddForm(props: {
     nombre: string;
     grupo_muscular: MuscleGroup | null;
   }>;
+  onSuccess?: () => void;
 }) {
   const [state, formAction, pending] = useActionState(
     async (_prev: State, formData: FormData): Promise<State> => {
       try {
         await addExerciseToRoutineAction(formData);
+        props.onSuccess?.();
         return { error: null };
       } catch (e) {
         return { error: e instanceof Error ? e.message : "Error inesperado." };
@@ -91,5 +95,46 @@ export function RoutineExerciseAddForm(props: {
         {pending ? "Agregando..." : "Agregar ejercicio"}
       </Button>
     </form>
+  );
+}
+
+export function RoutineExerciseAddDialog(props: {
+  routineId: string;
+  exercises: Array<{
+    id: string;
+    nombre: string;
+    grupo_muscular: MuscleGroup | null;
+  }>;
+  fullWidth?: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        type="button"
+        className={props.fullWidth ? "h-11 w-full" : "h-10"}
+        onClick={() => setOpen(true)}
+      >
+        + Agregar ejercicio
+      </Button>
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Agregar ejercicio"
+        description="Sumalo a la rutina y configurá sus objetivos cuando lo necesites."
+        closeLabel="Cerrar agregar ejercicio"
+      >
+        <RoutineExerciseAddForm
+          routineId={props.routineId}
+          exercises={props.exercises}
+          onSuccess={() => {
+            setOpen(false);
+            router.refresh();
+          }}
+        />
+      </ResponsiveDialog>
+    </>
   );
 }

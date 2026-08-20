@@ -54,3 +54,9 @@ export function formatMonthLabel(month: `${number}-${number}`): string {
 
   return value.charAt(0).toLocaleUpperCase("es-AR") + value.slice(1);
 }
+
+export function trainingCalendarHref(month: `${number}-${number}`, routineId?: string | null) {
+  const params = new URLSearchParams({ month });
+  if (routineId) params.set("routine_id", routineId);
+  return `/train/calendar?${params.toString()}`;
+}
