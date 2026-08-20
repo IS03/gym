@@ -1,7 +1,16 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
+export function bypassesSessionProxy(pathname: string) {
+  return pathname === "/api/integrations/chatgpt"
+    || pathname.startsWith("/api/integrations/chatgpt/");
+}
+
 export async function proxy(request: NextRequest) {
+  if (bypassesSessionProxy(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   return updateSession(request);
 }
 

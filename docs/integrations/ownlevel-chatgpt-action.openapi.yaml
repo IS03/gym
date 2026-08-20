@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Registra comidas estructuradas en la cuenta OWNLEVEL vinculada a la clave.
 servers:
-  - url: https://ownlevel.fit
+  - url: https://www.ownlevel.fit
 paths:
   /api/integrations/chatgpt/meals:
     post:
