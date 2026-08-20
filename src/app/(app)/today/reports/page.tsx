@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getNutritionReport } from "@/lib/nutrition/reports";
-import type { NutritionReportDay, NutritionReportPreset } from "@/lib/nutrition/reports-core";
+import type { NutritionReportPreset } from "@/lib/nutrition/reports-core";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-charts";
+import { NutritionReportDailyBreakdown } from "@/components/nutrition/nutrition-report-daily-breakdown";
+import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +27,6 @@ function formatValue(value: number | null, unit: string, integer = false) {
   return `${integer ? integerFormatter.format(value) : numberFormatter.format(value)} ${unit}`;
 }
 
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T12:00:00Z`));
-}
-
 function targetDeviationLabel(value: number | null) {
   if (value === null) return "Sin días comparables";
   const rounded = Math.round(value);
@@ -48,67 +41,6 @@ function energyBalanceLabel(value: number | null) {
   if (rounded < 0) return `Déficit estimado: ${Math.abs(rounded)} kcal`;
   if (rounded > 0) return `Superávit estimado: ${rounded} kcal`;
   return "Balance estimado: 0 kcal";
-}
-
-function dailyBalanceLabel(value: number | null) {
-  if (value === null) return null;
-  const rounded = Math.round(value);
-  if (rounded < 0) return `Déficit ${Math.abs(rounded)} kcal`;
-  if (rounded > 0) return `Superávit ${rounded} kcal`;
-  return "Balance 0 kcal";
-}
-
-function DailyRow({ day }: { day: NutritionReportDay }) {
-  const balance = dailyBalanceLabel(day.energyBalanceKcal);
-  return (
-    <Link href={`/history?date=${day.date}`} className="group block outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <Card size="sm" className="surface-elevated transition-[transform,background-color] duration-150 group-hover:bg-muted/35 group-active:scale-[0.995]">
-        <CardContent className="space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold capitalize">{formatDate(day.date)}</p>
-                {day.isToday ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">En curso</span> : null}
-                {day.imported ? <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">Histórico</span> : null}
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">{day.date}</p>
-            </div>
-            <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </div>
-
-          {!day.hasNutrition ? (
-            <p className="rounded-lg bg-muted/45 px-3 py-2 text-sm text-muted-foreground">Sin registro nutricional</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              <div>
-                <p className="text-[11px] text-muted-foreground">Calorías</p>
-                <p className="metric-number font-semibold">
-                  {formatValue(day.calories, "kcal", true)}
-                  {day.targetCalories === null ? "" : ` / ${integerFormatter.format(day.targetCalories)}`}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground">Proteína</p>
-                <p className="metric-number font-semibold">
-                  {formatValue(day.proteinG, "g")}
-                  {day.targetProteinG === null ? "" : ` / ${numberFormatter.format(day.targetProteinG)}`}
-                </p>
-              </div>
-              {day.expenditureKcal !== null ? <div><p className="text-[11px] text-muted-foreground">Gasto estimado</p><p className="font-medium">{formatValue(day.expenditureKcal, "kcal", true)}</p></div> : null}
-              {balance ? <div><p className="text-[11px] text-muted-foreground">Balance energético</p><p className="font-medium">{balance}</p></div> : null}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-x-3 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
-            {day.hasCompletedWorkout ? <span>Entrenamiento: Sí</span> : day.gymEffective ? <span>Gym: Sí · corrección</span> : day.dayLogId ? <span>Entrenamiento: No</span> : null}
-            {day.workEffective !== null ? <span>Trabajo: {day.workEffective ? "Sí" : "No"}</span> : null}
-            {day.steps !== null ? <span>{integerFormatter.format(day.steps)} pasos</span> : null}
-            {day.waterL !== null ? <span>{numberFormatter.format(day.waterL)} L agua</span> : null}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
 }
 
 export default async function NutritionReportsPage({
@@ -133,7 +65,7 @@ export default async function NutritionReportsPage({
         </Link>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Reportes de nutrición</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{range.start} al {range.end} · sólo lectura</p>
+          <p className="mt-1 text-sm text-muted-foreground">Solo lectura</p>
         </div>
       </header>
 
@@ -153,11 +85,12 @@ export default async function NutritionReportsPage({
               </Link>
             ))}
           </div>
-          <form action="/today/reports" className="grid grid-cols-2 gap-2 border-t pt-4 sm:grid-cols-[1fr_1fr_auto]">
+          <p className="text-sm font-medium text-foreground">{formatNutritionReportRange(range.start, range.end)}</p>
+          <form action="/today/reports" className="grid min-w-0 grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
             <input type="hidden" name="period" value="custom" />
-            <label className="space-y-1 text-xs text-muted-foreground">Desde<input className="h-10 w-full rounded-md border bg-background px-2 text-sm text-foreground" type="date" name="from" defaultValue={range.preset === "custom" ? range.start : ""} max={today} required /></label>
-            <label className="space-y-1 text-xs text-muted-foreground">Hasta<input className="h-10 w-full rounded-md border bg-background px-2 text-sm text-foreground" type="date" name="to" defaultValue={range.preset === "custom" ? range.end : today} required /></label>
-            <Button type="submit" variant="outline" className="col-span-2 h-10 sm:col-span-1 sm:self-end">Aplicar</Button>
+            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Desde<input className="h-10 w-full min-w-0 max-w-full rounded-md border bg-background px-2 text-sm text-foreground [inline-size:100%] [min-inline-size:0]" type="date" name="from" defaultValue={range.preset === "custom" ? range.start : ""} max={today} required /></label>
+            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Hasta<input className="h-10 w-full min-w-0 max-w-full rounded-md border bg-background px-2 text-sm text-foreground [inline-size:100%] [min-inline-size:0]" type="date" name="to" defaultValue={range.preset === "custom" ? range.end : today} max={today} required /></label>
+            <Button type="submit" variant="outline" className="h-10 sm:col-span-2 lg:col-span-1 lg:self-end">Aplicar</Button>
           </form>
           <p className="text-xs text-muted-foreground">Período personalizado: máximo 366 días. Las fechas futuras se excluyen.</p>
           {range.error ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
@@ -192,8 +125,12 @@ export default async function NutritionReportsPage({
         <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Macros</p>
-            <div><p className="text-xs text-muted-foreground">Proteína promedio / objetivo</p><p className="metric-number font-semibold">{formatValue(summary.protein.averageConsumed, "g")} / {formatValue(summary.protein.averageTarget, "g")}</p><p className="text-xs text-muted-foreground">{summary.protein.hitDays} de {summary.protein.comparableDays} días alcanzaron el objetivo</p></div>
-            <div className="grid grid-cols-2 gap-3"><div><p className="text-xs text-muted-foreground">Carbos promedio</p><p className="metric-number font-semibold">{formatValue(summary.carbs.averageConsumed, "g")}</p></div><div><p className="text-xs text-muted-foreground">Grasas promedio</p><p className="metric-number font-semibold">{formatValue(summary.fat.averageConsumed, "g")}</p></div></div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="min-w-0"><p className="text-xs text-muted-foreground">Proteína</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.protein.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">/ {formatValue(summary.protein.averageTarget, "g")}</p></div>
+              <div className="min-w-0"><p className="text-xs text-muted-foreground">Carbos</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.carbs.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">promedio</p></div>
+              <div className="min-w-0"><p className="text-xs text-muted-foreground">Grasas</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.fat.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">promedio</p></div>
+            </div>
+            <p className="text-xs text-muted-foreground">{summary.protein.comparableDays > 0 ? `${summary.protein.hitDays} de ${summary.protein.comparableDays} días alcanzaron el objetivo de proteína.` : "No hay días comparables para el objetivo de proteína."}</p>
           </section>
           <section className="space-y-3 border-t pt-4 sm:border-t-0 sm:border-l sm:pl-5 sm:pt-0">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Hidratación</p>
@@ -210,14 +147,7 @@ export default async function NutritionReportsPage({
 
       <NutritionReportCharts days={days} />
 
-      <section className="space-y-3" aria-labelledby="daily-breakdown-title">
-        <div className="flex items-end justify-between gap-3">
-          <div><h2 id="daily-breakdown-title" className="text-lg font-semibold tracking-tight">Desglose diario</h2><p className="text-xs text-muted-foreground">{summary.completedRegisteredDays} días terminados con nutrición · {summary.registeredDays} registrados en total{summary.currentDayRegistered ? " · hoy en curso" : ""}</p></div>
-        </div>
-        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-          {days.map((day) => <DailyRow key={day.date} day={day} />)}
-        </div>
-      </section>
+      <NutritionReportDailyBreakdown days={days} summary={summary} />
     </div>
   );
 }
