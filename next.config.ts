@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
+if (
+  process.env.VERCEL === "1" &&
+  !process.env.SUPABASE_SECRET_KEY &&
+  !process.env.SUPABASE_SERVICE_ROLE_KEY
+) {
+  throw new Error("Falta la credencial server-only de Supabase para la API privada.");
+}
+
 const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",

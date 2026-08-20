@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: OWNLEVEL Nutrition
+  version: 1.0.0
+  description: Registra comidas estructuradas en la cuenta OWNLEVEL vinculada a la clave.
+servers:
+  - url: https://ownlevel.fit
+paths:
+  /api/integrations/chatgpt/meals:
+    post:
+      operationId: logMeal
+      summary: Registrar una comida en OWNLEVEL
+      description: >-
+        Registra una comida en la fecha indicada. Omití un macro cuando no pueda
+        estimarse: null significa desconocido y 0 significa conocido y realmente cero.
+        No inventes valores. Conservá la misma idempotency_key al reintentar una acción.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealInput'
+      responses:
+        '200':
+          description: Comida creada o retry idempotente resuelto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealSuccess'
+        '400':
+          description: Payload inválido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Clave ausente, inválida o revocada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: >-
+            Posible duplicado humano. Confirmá con el usuario y repetí con una nueva
+            idempotency_key y force_duplicate=true sólo si realmente fue otra comida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: OWNLEVEL token
+  schemas:
+    MealInput:
+      type: object
+      additionalProperties: false
+      required: [title, calories, idempotency_key]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Fecha lógica en Córdoba. Si se omite, OWNLEVEL usa hoy en America/Argentina/Cordoba.
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 2000
+        calories:
+          type: integer
+          minimum: 1
+        protein_g:
+          type: [number, 'null']
+          minimum: 0
+        carbs_g:
+          type: [number, 'null']
+          minimum: 0
+        fat_g:
+          type: [number, 'null']
+          minimum: 0
+        idempotency_key:
+          type: string
+          maxLength: 200
+          description: Identificador único y estable para este intento lógico.
+        force_duplicate:
+          type: boolean
+          default: false
+    MealSuccess:
+      type: object
+      required: [ok, created, idempotent_replay, meal, day]
+      properties:
+        ok: { type: boolean, const: true }
+        created: { type: boolean }
+        idempotent_replay: { type: boolean }
+        meal:
+          type: object
+          additionalProperties: false
+          required: [id, date, title, calories, protein_g, carbs_g, fat_g]
+          properties:
+            id: { type: string, format: uuid }
+            date: { type: string, format: date }
+            title: { type: [string, 'null'] }
+            calories: { type: integer }
+            protein_g: { type: [number, 'null'] }
+            carbs_g: { type: [number, 'null'] }
+            fat_g: { type: [number, 'null'] }
+        day:
+          type: object
+          additionalProperties: false
+          required: [total_calories, total_protein_g, total_carbs_g, total_fat_g, target_calories, target_protein_g]
+          properties:
+            total_calories: { type: integer }
+            total_protein_g: { type: number }
+            total_carbs_g: { type: number }
+            total_fat_g: { type: number }
+            target_calories: { type: [integer, 'null'] }
+            target_protein_g: { type: [number, 'null'] }
+    Error:
+      type: object
+      required: [ok, error, message]
+      properties:
+        ok: { type: boolean, const: false }
+        error:
+          type: string
+          enum: [invalid_request, invalid_token, possible_duplicate, internal_error]
+        message: { type: string }
