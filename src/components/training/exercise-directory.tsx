@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   filterExerciseDirectory,
   sortExerciseDirectory,
+  summarizeLatestExercisePerformance,
   type ExerciseDirectoryEntry,
 } from "@/lib/phase2/exercise-insights";
 import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
@@ -40,9 +41,15 @@ function number(value: number) {
   return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(value);
 }
 
-function lastSetLabel(item: ExerciseDirectoryEntry) {
-  const set = item.lastSets.find((value) => value.actual_reps !== null || value.actual_weight_kg !== null);
-  return set ? `${set.actual_reps ?? "—"} × ${set.actual_weight_kg ?? "—"} kg` : null;
+function latestPerformanceLabel(item: ExerciseDirectoryEntry) {
+  const summary = summarizeLatestExercisePerformance(item.lastSets);
+  if (summary.completedSets === 0) return null;
+  if (summary.singleSet) {
+    if (summary.singleSet.reps !== null && summary.singleSet.weightKg !== null) return `${summary.singleSet.reps} × ${summary.singleSet.weightKg} kg`;
+    if (summary.singleSet.weightKg !== null) return `hasta ${number(summary.singleSet.weightKg)} kg`;
+    if (summary.singleSet.reps !== null) return `${summary.singleSet.reps} reps`;
+  }
+  return `${summary.completedSets} ${summary.completedSets === 1 ? "serie" : "series"}${summary.maxWeightKg === null ? "" : ` · hasta ${number(summary.maxWeightKg)} kg`}`;
 }
 
 function FilterFields({
@@ -165,17 +172,21 @@ export function ExerciseDirectory({
       ) : (
         <div className={mode === "history" ? "space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0" : "space-y-2"}>
           {visible.map((item) => {
-            const last = lastSetLabel(item);
+            const latestPerformance = latestPerformanceLabel(item);
             return (
               <Link key={item.id} href={`/train/history/${item.id}?from=${mode}`} className="surface-elevated group block rounded-2xl border bg-card px-4 py-3 outline-none transition-[transform,background-color] duration-150 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] motion-reduce:transition-none">
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{item.name}</p><ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden /></div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{item.muscleLabel ?? item.muscleGroup ?? "Sin grupo"} · {item.lastDate ? `última ${formatDate(item.lastDate)}` : "sin registros"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{item.muscleLabel ?? item.muscleGroup ?? "Sin grupo"}</p>
                     {mode === "progress" ? <>
-                      <p className="mt-2 text-xs text-muted-foreground"><span className="metric-number font-medium text-foreground">{item.bestWeightKg === null ? "—" : `${number(item.bestWeightKg)} kg`}</span> mejor · {item.sessions} {item.sessions === 1 ? "sesión" : "sesiones"} · <span className="metric-number">{number(item.totalVolumeKg)} kg</span></p>
-                      {(last || item.lastDecision) && <p className="mt-1 text-xs text-muted-foreground">{last ? `Últimas: ${last}` : "Sin series registradas"}{item.lastDecision ? ` · Próxima: ${ADJUSTMENT_LABELS[item.lastDecision]}` : ""}</p>}
-                    </> : <div className="mt-2 flex gap-3 text-[11px] text-muted-foreground">{last ? <span className="metric-number text-primary">Último: {last}</span> : <span>Sin registros</span>}<span>Mejor: {item.bestWeightKg === null ? "—" : `${number(item.bestWeightKg)} kg`}</span></div>}
+                      <p className="mt-2 text-xs text-muted-foreground">Último · {formatDate(item.lastDate)}</p>
+                      <p className="metric-number mt-0.5 text-sm font-medium text-foreground">{latestPerformance ?? "Sin series realizadas"}</p>
+                      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border/70 pt-3 text-xs">
+                        <div><dt className="text-muted-foreground">Mejor peso</dt><dd className="metric-number mt-0.5 font-medium">{item.bestWeightKg === null ? "—" : `${number(item.bestWeightKg)} kg`}</dd></div>
+                        <div><dt className="text-muted-foreground">Próxima sesión</dt><dd className="mt-0.5 font-medium">{item.lastDecision ? ADJUSTMENT_LABELS[item.lastDecision] : "Sin decisión"}</dd></div>
+                      </dl>
+                    </> : <div className="mt-2 flex gap-3 text-[11px] text-muted-foreground">{latestPerformance ? <span className="metric-number text-primary">Último: {latestPerformance}</span> : <span>Sin registros</span>}<span>Mejor: {item.bestWeightKg === null ? "—" : `${number(item.bestWeightKg)} kg`}</span></div>}
                   </div>
                 </div>
               </Link>

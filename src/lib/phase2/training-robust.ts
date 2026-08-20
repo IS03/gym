@@ -861,7 +861,7 @@ export async function getTrainingProgress(): Promise<{
     if (!latest) continue;
 
     const allSets = dated.flatMap(
-      ({ exercise }) => setsByExercise.get(exercise.id) ?? [],
+      ({ exercise }) => (setsByExercise.get(exercise.id) ?? []).filter((set) => set.is_completed),
     );
     let bestWeightKg: number | null = null;
     for (const set of allSets) {

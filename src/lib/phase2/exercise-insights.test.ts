@@ -5,6 +5,7 @@ import {
   buildExerciseReportPoints,
   exerciseSessionVolume,
   filterExerciseDirectory,
+  summarizeLatestExercisePerformance,
 } from "./exercise-insights";
 import type { ExerciseDirectoryEntry, ExerciseReportSet } from "./exercise-insights";
 
@@ -40,5 +41,16 @@ describe("exercise report metrics", () => {
     ]);
     expect(points.map((point) => point.sessionId)).toEqual(["old", "new"]);
     expect(points.map((point) => point.bestWeightKg)).toEqual([20, 25]);
+  });
+  it("summarizes the latest performance without treating the first of varied sets as representative", () => {
+    expect(summarizeLatestExercisePerformance([
+      set({ actual_reps: 10, actual_weight_kg: 20, is_completed: true }),
+      set({ id: "second", actual_reps: 6, actual_weight_kg: 30, is_completed: true }),
+      set({ id: "draft", actual_reps: 99, actual_weight_kg: 99, is_completed: false }),
+    ])).toEqual({ completedSets: 2, maxWeightKg: 30, singleSet: null });
+    expect(summarizeLatestExercisePerformance([
+      set({ actual_reps: 12, actual_weight_kg: 25, is_completed: true }),
+    ])).toEqual({ completedSets: 1, maxWeightKg: 25, singleSet: { reps: 12, weightKg: 25 } });
+    expect(summarizeLatestExercisePerformance([set({ is_completed: false })])).toMatchObject({ completedSets: 0, maxWeightKg: null, singleSet: null });
   });
 });

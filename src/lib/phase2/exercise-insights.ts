@@ -20,7 +20,7 @@ export type ExerciseDirectoryEntry = {
   bestWeightKg: number | null;
   totalVolumeKg: number;
   lastDecision: TrainingAdjustment | null;
-  lastSets: Array<Pick<WorkoutSet, "actual_reps" | "actual_weight_kg">>;
+  lastSets: Array<Pick<WorkoutSet, "actual_reps" | "actual_weight_kg" | "is_completed">>;
   routineIds: string[];
 };
 
@@ -112,6 +112,25 @@ export function exerciseSessionVolume(sets: readonly ExerciseReportSet[]): numbe
     (total, set) => total + (finiteNumber(set.actual_reps) ?? 0) * (finiteNumber(set.actual_weight_kg) ?? 0),
     0,
   );
+}
+
+export function summarizeLatestExercisePerformance(
+  sets: ReadonlyArray<Pick<WorkoutSet, "actual_reps" | "actual_weight_kg" | "is_completed">>,
+) {
+  const completed = sets.filter((set) => set.is_completed);
+  const maxWeightKg = completed
+    .map((set) => finiteNumber(set.actual_weight_kg))
+    .filter((weight): weight is number => weight !== null)
+    .reduce<number | null>((best, weight) => best === null || weight > best ? weight : best, null);
+  const onlySet = completed.length === 1 ? completed[0] : null;
+  return {
+    completedSets: completed.length,
+    maxWeightKg,
+    singleSet: onlySet ? {
+      reps: finiteNumber(onlySet.actual_reps),
+      weightKg: finiteNumber(onlySet.actual_weight_kg),
+    } : null,
+  };
 }
 
 export function buildExerciseReportPoints(
