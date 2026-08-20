@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   CalendarDays,
   ChartNoAxesCombined,
   Dumbbell,
@@ -34,7 +35,9 @@ const groups = [
   {
     label: "Análisis",
     links: [
-      { href: "/train/progress", label: "Progreso", icon: ChartNoAxesCombined, exact: false },
+      { href: "/progress", label: "Progreso", icon: ChartNoAxesCombined, exact: false },
+      { href: "/train/progress", label: "Entrenamiento", icon: Dumbbell, exact: false },
+      { href: "/train/body", label: "Cuerpo", icon: Activity, exact: false },
       { href: "/history", label: "Historial diario", icon: History, exact: false },
     ],
   },

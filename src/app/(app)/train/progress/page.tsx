@@ -68,7 +68,7 @@ export default async function TrainingProgressPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso</h1>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso de entrenamiento</h1>
         <p className="text-sm text-muted-foreground">
           Solo cuenta sesiones finalizadas y series marcadas como hechas.
         </p>

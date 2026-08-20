@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type AuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
   aggregateNutritionReport,
   buildNutritionReportDays,
@@ -21,9 +21,10 @@ async function getAuthedContext() {
 export async function getNutritionReport(
   input: { period?: string; from?: string; to?: string },
   today: string,
+  context?: AuthenticatedRequestContext,
 ) {
   const range = resolveNutritionReportRange(input, today);
-  const { supabase, userId } = await getAuthedContext();
+  const { supabase, userId } = context ?? await getAuthedContext();
   const { data: rawDays, error: daysError } = await supabase
     .from("day_logs")
     .select(`

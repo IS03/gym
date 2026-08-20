@@ -396,10 +396,10 @@ export default async function HomePage() {
             description="Mirá tu constancia semanal."
           />
           <QuickAccess
-            href="/train/history"
+            href="/progress"
             icon={ChartNoAxesCombined}
-            title="Historial"
-            description="Consultá tus ejercicios."
+            title="Progreso"
+            description="Nutrición, entrenamiento y cuerpo."
           />
         </div>
       </section>
@@ -568,7 +568,7 @@ export default async function HomePage() {
           <QuickAccess href="/today" icon={Utensils} title="Nutrición" description="Cargá comidas y revisá tu día." />
           <QuickAccess href="/train/routines" icon={ListChecks} title="Rutinas" description="Organizá y editá tu plan." />
           <QuickAccess href="/train/calendar" icon={CalendarDays} title="Calendario" description="Mirá tu constancia mensual." />
-          <QuickAccess href="/train/history" icon={ChartNoAxesCombined} title="Historial" description="Compará registros por ejercicio." />
+          <QuickAccess href="/progress" icon={ChartNoAxesCombined} title="Progreso" description="Nutrición, entrenamiento y cuerpo." />
         </div>
       </section>
     </div>

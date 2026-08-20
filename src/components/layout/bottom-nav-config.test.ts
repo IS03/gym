@@ -10,7 +10,7 @@ describe("bottomNavItems", () => {
       { id: "home", href: "/home", label: "Inicio" },
       { id: "train", href: "/train", label: "Entrenar" },
       { id: "nutrition", href: "/today", label: "Nutrición" },
-      { id: "history", href: "/history", label: "Historial" },
+      { id: "progress", href: "/progress", label: "Progreso" },
     ]);
     expect(bottomNavItems.map(({ label }) => label)).not.toContain("Ajustes");
   });
@@ -25,13 +25,13 @@ describe("getActiveBottomNavIndex", () => {
     ["/today", 2],
     ["/today/meal", 2],
     ["/today/reports", 2],
-    ["/history", 3],
-    ["/history/2026-08-11", 3],
+    ["/progress", 3],
+    ["/progress/nutrition", 3],
   ])("selecciona la sección correcta para %s", (pathname, expected) => {
     expect(getActiveBottomNavIndex(pathname)).toBe(expected);
   });
 
-  it.each(["/settings", "/settings/profile", "/", "/unknown"])(
+  it.each(["/settings", "/settings/profile", "/history", "/", "/unknown"])(
     "no fuerza una pestaña para %s",
     (pathname) => {
       expect(getActiveBottomNavIndex(pathname)).toBe(-1);

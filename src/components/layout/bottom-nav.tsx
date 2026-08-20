@@ -15,7 +15,7 @@ const icons: Record<BottomNavItemId, React.ComponentType<{ className?: string }>
   home: House,
   train: Dumbbell,
   nutrition: Utensils,
-  history: LineChart,
+  progress: LineChart,
 };
 
 export function BottomNav() {

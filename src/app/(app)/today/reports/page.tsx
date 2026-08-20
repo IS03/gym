@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { getNutritionReport } from "@/lib/nutrition/reports";
 import type { NutritionReportDay, NutritionReportPreset } from "@/lib/nutrition/reports-core";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-charts";
 
 export const dynamic = "force-dynamic";
 
@@ -206,6 +207,8 @@ export default async function NutritionReportsPage({
           </section>
         </CardContent>
       </Card>
+
+      <NutritionReportCharts days={days} />
 
       <section className="space-y-3" aria-labelledby="daily-breakdown-title">
         <div className="flex items-end justify-between gap-3">
