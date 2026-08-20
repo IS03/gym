@@ -3,7 +3,6 @@ import { ThemeSettings } from "./theme-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
-import { ProfileForm } from "./profile-form";
 import Link from "next/link";
 import { ChevronRight, Mail, Palette, ShieldCheck, UserRound, Utensils } from "lucide-react";
 
@@ -33,37 +32,21 @@ export default async function SettingsPage() {
             Perfil
           </h2>
         </div>
-        <Card>
-          <CardContent className="flex items-center gap-3 pt-4">
+        <Link href="/settings/profile" className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <Card className="transition-colors hover:bg-muted/45">
+          <CardContent className="flex min-h-20 items-center gap-3 pt-4">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground">
               {initial}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{displayName}</p>
               <p className="truncate text-sm text-muted-foreground">{user.email ?? "—"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Datos personales y referencia física</p>
             </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </CardContent>
         </Card>
-      </section>
-
-      <section className="space-y-3" aria-labelledby="settings-personal-data">
-        <div className="flex items-center gap-2">
-          <UserRound className="size-4 text-primary" aria-hidden />
-          <h2 id="settings-personal-data" className="text-base font-semibold tracking-tight">
-            Datos personales
-          </h2>
-        </div>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Información y referencia física</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Se usa para personalizar el seguimiento nutricional.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ProfileForm profile={profile} />
-          </CardContent>
-        </Card>
+        </Link>
       </section>
 
       <section className="space-y-3" aria-labelledby="settings-nutrition">
@@ -83,7 +66,7 @@ export default async function SettingsPage() {
         <div className="flex items-center gap-2">
           <Palette className="size-4 text-primary" aria-hidden />
           <h2 id="settings-app-data" className="text-base font-semibold tracking-tight">
-            Datos de la app
+            Apariencia
           </h2>
         </div>
         <Card>

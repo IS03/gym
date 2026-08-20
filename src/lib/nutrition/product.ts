@@ -160,6 +160,67 @@ export async function listNutritionConfiguration() {
   };
 }
 
+async function listPeriods<T>(table: "nutrition_goal_periods" | "expenditure_rule_periods" | "work_schedule_periods"): Promise<T[]> {
+  const { supabase, userId } = await authed();
+  const { data, error } = await supabase
+    .from(table)
+    .select("*")
+    .eq("user_id", userId)
+    .order("effective_from", { ascending: false });
+  if (error) throw new Error(`Leer configuración nutricional: ${error.message}`);
+  return (data ?? []) as T[];
+}
+
+export function listNutritionGoalPeriods() {
+  return listPeriods<NutritionGoalPeriod>("nutrition_goal_periods");
+}
+
+export function listExpenditureRulePeriods() {
+  return listPeriods<ExpenditureRulePeriod>("expenditure_rule_periods");
+}
+
+export function listWorkSchedulePeriods() {
+  return listPeriods<WorkSchedulePeriod>("work_schedule_periods");
+}
+
+export async function listFoods() {
+  const { supabase, userId } = await authed();
+  const { data, error } = await supabase
+    .from("foods")
+    .select("id,user_id,name,description,serving_quantity,serving_unit,calories,protein_g,carbs_g,fat_g,precision_level,source_note,is_active,created_at,updated_at")
+    .eq("user_id", userId)
+    .order("is_active", { ascending: false })
+    .order("name");
+  if (error) throw new Error(`Leer alimentos: ${error.message}`);
+  return (data ?? []) as Food[];
+}
+
+/** A compact, request-scoped read for the nutrition settings hub. */
+export async function getNutritionConfigurationHub(today: string): Promise<{
+  goal: NutritionGoalPeriod | null;
+  expenditure: ExpenditureRulePeriod | null;
+  schedule: WorkSchedulePeriod | null;
+  activeFoodCount: number;
+}> {
+  assertDate(today);
+  const { supabase, userId } = await authed();
+  const [goal, expenditure, schedule, foods] = await Promise.all([
+    supabase.from("nutrition_goal_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("expenditure_rule_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("work_schedule_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("foods").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_active", true),
+  ]);
+  for (const result of [goal, expenditure, schedule, foods]) {
+    if (result.error) throw new Error(`Leer configuración nutricional: ${result.error.message}`);
+  }
+  return {
+    goal: (goal.data ?? null) as NutritionGoalPeriod | null,
+    expenditure: (expenditure.data ?? null) as ExpenditureRulePeriod | null,
+    schedule: (schedule.data ?? null) as WorkSchedulePeriod | null,
+    activeFoodCount: foods.count ?? 0,
+  };
+}
+
 export async function createNutritionGoalPeriod(formData: FormData) {
   const { supabase, userId } = await authed();
   const effectiveFrom = String(formData.get("effective_from") ?? "");

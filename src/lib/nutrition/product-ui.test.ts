@@ -12,6 +12,13 @@ const todayActivity = source("src/app/(app)/today/day-activity-panel.tsx");
 const todayEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const product = source("src/lib/nutrition/product.ts");
 const settings = source("src/app/(app)/settings/nutrition/nutrition-settings-forms.tsx");
+const settingsRoot = source("src/app/(app)/settings/nutrition/page.tsx");
+const settingsProfile = source("src/app/(app)/settings/page.tsx");
+const profilePage = source("src/app/(app)/settings/profile/page.tsx");
+const profileForm = source("src/app/(app)/settings/profile-form.tsx");
+const goalSettings = source("src/app/(app)/settings/nutrition/goals/page.tsx");
+const foodsPage = source("src/app/(app)/settings/nutrition/foods/page.tsx");
+const integrationsPage = source("src/app/(app)/settings/nutrition/integrations/page.tsx");
 const history = source("src/app/(app)/history/page.tsx");
 const foods = source("src/app/(app)/settings/nutrition/foods-catalog.tsx");
 const body = source("src/components/body/body-measurements.tsx");
@@ -62,6 +69,20 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(product).toContain('.from("work_schedule_periods").insert');
     expect(product).toContain("Ya existe una versión para esa fecha");
     expect(product).not.toContain('.from("nutrition_goal_periods").update');
+  });
+
+  it("separa perfil, hub de nutrición y pantallas especializadas", () => {
+    expect(settingsProfile).not.toContain("<ProfileForm");
+    expect(settingsProfile).toContain('href="/settings/profile"');
+    expect(profilePage).toContain("<ProfileForm");
+    expect(profileForm).not.toContain("Para seguir el historial");
+    expect(settingsRoot).toContain("getNutritionConfigurationHub");
+    expect(settingsRoot).not.toContain("FoodsCatalog");
+    expect(settingsRoot).not.toContain("listIntegrationApiTokens");
+    expect(goalSettings).toContain("Objetivo actual");
+    expect(goalSettings).toContain("Próximos cambios");
+    expect(foodsPage).toContain("<FoodsCatalog");
+    expect(integrationsPage).toContain("<ChatgptIntegration");
   });
 
   it("History conserva modo read-only y distingue summaries, hora y eventos", () => {

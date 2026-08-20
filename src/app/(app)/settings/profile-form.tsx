@@ -83,7 +83,6 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             }
             placeholder="Ej: 64.0"
           />
-          <p className="text-xs text-muted-foreground">Para seguir el historial, usá Entrenar → Cuerpo.</p>
         </div>
       </div>
 

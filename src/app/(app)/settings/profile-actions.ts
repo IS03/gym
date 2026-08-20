@@ -106,6 +106,7 @@ export async function saveProfileAction(
 
 function revalidateProfilePages() {
   revalidatePath("/settings");
+  revalidatePath("/settings/profile");
   revalidatePath("/today");
   revalidatePath("/history");
   revalidatePath("/train/body");

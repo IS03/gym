@@ -17,7 +17,7 @@ import {
 export type SettingsActionState = { ok: boolean; error?: string };
 
 function refresh() {
-  for (const path of ["/settings", "/settings/nutrition", "/today", "/home", "/history"]) {
+  for (const path of ["/settings", "/settings/nutrition", "/settings/nutrition/goals", "/settings/nutrition/expenditure", "/settings/nutrition/schedule", "/settings/nutrition/foods", "/settings/nutrition/integrations", "/today", "/home", "/history"]) {
     revalidatePath(path);
   }
 }
@@ -56,6 +56,7 @@ export async function createChatgptKeyAction() {
   try {
     const result = await createIntegrationApiToken();
     revalidatePath("/settings/nutrition");
+    revalidatePath("/settings/nutrition/integrations");
     return { ok: true as const, ...result };
   } catch (error) {
     return {
