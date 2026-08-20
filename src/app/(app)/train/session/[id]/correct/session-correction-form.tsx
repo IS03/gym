@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { LocalizedDecimalInput } from "@/components/ui/localized-decimal-input";
 import { Label } from "@/components/ui/label";
 import { nullableNumberFromInput } from "@/lib/phase2/training-validation";
 import { formatSessionDate } from "@/lib/phase2/session-history";
@@ -36,7 +37,7 @@ function initialState(detail: WorkoutSessionDetail): CorrectionState {
 }
 
 function numericInput(label: string, value: number | null, onChange: (value: number | null) => void, max: number, step = "1") {
-  return <label className="space-y-1"><span className="text-xs font-medium text-muted-foreground">{label}</span><Input type="number" min={0} max={max} step={step} inputMode={step === "1" ? "numeric" : "decimal"} value={value ?? ""} onChange={(event) => onChange(nullableNumberFromInput(event.target.value))} /></label>;
+  return <label className="space-y-1"><span className="text-xs font-medium text-muted-foreground">{label}</span>{step === "1" ? <Input type="number" min={0} max={max} step={step} inputMode="numeric" value={value ?? ""} onChange={(event) => onChange(nullableNumberFromInput(event.target.value))} /> : <LocalizedDecimalInput min={0} max={max} value={value} onValueChange={onChange} />}</label>;
 }
 
 export function SessionCorrectionForm({ detail }: { detail: WorkoutSessionDetail }) {

@@ -7,6 +7,7 @@ import type {
   TrainingAdjustment,
   WorkoutExercisePayload,
 } from "./types";
+import { parseLocalizedDecimal } from "../localized-decimal";
 
 const ADJUSTMENTS = new Set<TrainingAdjustment>([
   "maintain",
@@ -20,10 +21,17 @@ function assertFiniteInRange(
   label: string,
   min: number,
   max: number,
+  maxFractionDigits?: number,
 ) {
   if (value === null) return;
   if (!Number.isFinite(value) || value < min || value > max) {
     throw new Error(`${label} debe estar entre ${min} y ${max}.`);
+  }
+  if (maxFractionDigits !== undefined) {
+    const scaled = value * 10 ** maxFractionDigits;
+    if (Math.abs(scaled - Math.round(scaled)) > 1e-8) {
+      throw new Error(`${label} admite hasta ${maxFractionDigits} decimales.`);
+    }
   }
 }
 
@@ -67,7 +75,7 @@ export function validateRoutineSets(sets: EditableRoutineSet[]) {
   sets.forEach((set, index) => {
     const number = index + 1;
     assertIntegerInRange(set.target_reps, `Repeticiones de serie ${number}`, 0, 1000);
-    assertFiniteInRange(set.target_weight_kg, `Peso de serie ${number}`, 0, 9999.99);
+    assertFiniteInRange(set.target_weight_kg, `Peso de serie ${number}`, 0, 9999.99, 2);
     assertIntegerInRange(set.target_rir, `RIR de serie ${number}`, 0, 10);
   });
 }
@@ -77,10 +85,10 @@ export function validateWorkoutSets(sets: EditableWorkoutSet[]) {
   sets.forEach((set, index) => {
     const number = index + 1;
     assertIntegerInRange(set.target_reps, `Objetivo de serie ${number}`, 0, 1000);
-    assertFiniteInRange(set.target_weight_kg, `Peso objetivo de serie ${number}`, 0, 9999.99);
+    assertFiniteInRange(set.target_weight_kg, `Peso objetivo de serie ${number}`, 0, 9999.99, 2);
     assertIntegerInRange(set.target_rir, `RIR objetivo de serie ${number}`, 0, 10);
     assertIntegerInRange(set.actual_reps, `Repeticiones de serie ${number}`, 0, 1000);
-    assertFiniteInRange(set.actual_weight_kg, `Peso real de serie ${number}`, 0, 9999.99);
+    assertFiniteInRange(set.actual_weight_kg, `Peso real de serie ${number}`, 0, 9999.99, 2);
 
     if (set.is_completed && set.actual_reps === null) {
       throw new Error(`Completá las repeticiones de la serie ${number}.`);
@@ -119,14 +127,15 @@ export function validateSessionMetadata(metadata: SessionMetadataInput) {
   assertIntegerInRange(metadata.energy_level, "Energía", 1, 5);
   assertIntegerInRange(metadata.performance_level, "Rendimiento", 1, 5);
   assertIntegerInRange(metadata.pain_level, "Dolor", 0, 10);
-  assertFiniteInRange(metadata.treadmill_minutes, "Minutos de cinta", 0, 1440);
-  assertFiniteInRange(metadata.treadmill_distance_km, "Distancia de cinta", 0, 1000);
-  assertFiniteInRange(metadata.treadmill_speed_kmh, "Velocidad de cinta", 0, 100);
+  assertFiniteInRange(metadata.treadmill_minutes, "Minutos de cinta", 0, 1440, 2);
+  assertFiniteInRange(metadata.treadmill_distance_km, "Distancia de cinta", 0, 1000, 2);
+  assertFiniteInRange(metadata.treadmill_speed_kmh, "Velocidad de cinta", 0, 100, 2);
   assertFiniteInRange(
     metadata.treadmill_incline_percent,
     "Inclinación de cinta",
     0,
     100,
+    2,
   );
 }
 
@@ -145,16 +154,13 @@ export function validateCompletedSessionCorrection(input: CompletedSessionCorrec
     for (const set of exercise.sets) {
       if (!set.id.trim()) throw new Error("Una de las series a corregir no es válida.");
       assertIntegerInRange(set.actual_reps, "Repeticiones realizadas", 0, 1000);
-      assertFiniteInRange(set.actual_weight_kg, "Peso realizado", 0, 9999.99);
+      assertFiniteInRange(set.actual_weight_kg, "Peso realizado", 0, 9999.99, 2);
     }
   }
 }
 
 export function nullableNumberFromInput(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Number(trimmed.replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseLocalizedDecimal(value);
 }
 
 export function payloadsEqual<T>(left: T, right: T): boolean {

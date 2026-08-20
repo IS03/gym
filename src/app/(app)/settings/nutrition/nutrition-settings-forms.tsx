@@ -28,7 +28,8 @@ function useCloseAfterSave(state: SettingsActionState, onSuccess: () => void) {
 }
 
 function Field({ name, label, value, step = "1" }: { name: string; label: string; value?: number; step?: string }) {
-  return <div className="min-w-0 space-y-1"><Label htmlFor={name}>{label}</Label><Input id={name} name={name} type="number" min={0} step={step} required defaultValue={value} /></div>;
+  const decimal = step !== "1";
+  return <div className="min-w-0 space-y-1"><Label htmlFor={name}>{label}</Label><Input id={name} name={name} type={decimal ? "text" : "number"} min={0} step={decimal ? undefined : step} inputMode={decimal ? "decimal" : "numeric"} pattern={decimal ? "[0-9]*[.,]?[0-9]*" : undefined} required defaultValue={value} /></div>;
 }
 
 function VersionDialog({ buttonLabel, title, description, children }: { buttonLabel: string; title: string; description: string; children: (close: () => void) => React.ReactNode }) {

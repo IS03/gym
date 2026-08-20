@@ -211,10 +211,10 @@ export default async function TodayPage() {
                           <Input
                             id={`p-${meal.id}`}
                             name="final_protein_g"
-                            type="number"
+                            type="text"
                             min={0}
-                            step="0.1"
                             inputMode="decimal"
+                            pattern="[0-9]*[.,]?[0-9]*"
                             defaultValue={
                               meal.final_protein_g === null ? "" : String(meal.final_protein_g)
                             }
@@ -225,10 +225,10 @@ export default async function TodayPage() {
                           <Input
                             id={`c-${meal.id}`}
                             name="final_carbs_g"
-                            type="number"
+                            type="text"
                             min={0}
-                            step="0.1"
                             inputMode="decimal"
+                            pattern="[0-9]*[.,]?[0-9]*"
                             defaultValue={
                               meal.final_carbs_g === null ? "" : String(meal.final_carbs_g)
                             }
@@ -239,10 +239,10 @@ export default async function TodayPage() {
                           <Input
                             id={`f-${meal.id}`}
                             name="final_fat_g"
-                            type="number"
+                            type="text"
                             min={0}
-                            step="0.1"
                             inputMode="decimal"
+                            pattern="[0-9]*[.,]?[0-9]*"
                             defaultValue={
                               meal.final_fat_g === null ? "" : String(meal.final_fat_g)
                             }

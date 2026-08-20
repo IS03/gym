@@ -56,7 +56,10 @@ describe("validación de entrenamiento", () => {
 
   it("acepta coma decimal en entradas móviles", () => {
     expect(nullableNumberFromInput("12,5")).toBe(12.5);
+    expect(nullableNumberFromInput("12.5")).toBe(12.5);
     expect(nullableNumberFromInput("")).toBeNull();
+    expect(nullableNumberFromInput("12,5,2")).toBeNull();
+    expect(nullableNumberFromInput("1e3")).toBeNull();
   });
 
   it("rechaza un descanso mínimo mayor al máximo", () => {
@@ -89,5 +92,11 @@ describe("validación de entrenamiento", () => {
     expect(() => validateCompletedSessionCorrection(input)).not.toThrow();
     input.exercises[0].sets[0].actual_reps = 10.5;
     expect(() => validateCompletedSessionCorrection(input)).toThrow("entero");
+  });
+
+  it("rechaza pesos con más de dos decimales", () => {
+    const value = payload();
+    value.sets[0].actual_weight_kg = 12.345;
+    expect(() => validateWorkoutExercisePayload(value)).toThrow("hasta 2 decimales");
   });
 });

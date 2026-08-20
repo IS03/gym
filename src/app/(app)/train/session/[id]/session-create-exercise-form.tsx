@@ -76,10 +76,10 @@ export function SessionCreateExerciseForm(props: {
           />
           <Input
             name="peso_sugerido"
-            type="number"
+            type="text"
             min={0}
-            step="0.5"
             inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
             placeholder="Peso"
           />
           <Input

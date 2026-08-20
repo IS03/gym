@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { MuscleGroup } from "@/lib/phase2/types";
+import { parseLocalizedDecimal } from "@/lib/localized-decimal";
 import type {
   ExerciseActionExercise,
   ExerciseActionResult,
@@ -56,8 +57,9 @@ function str(formData: FormData, key: string) {
 function num(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
   if (!raw) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  const parsed = parseLocalizedDecimal(raw);
+  if (parsed === null) throw new Error(`${key} debe ser un número decimal válido.`);
+  return parsed;
 }
 
 function numOptional(formData: FormData, key: string): number | null | undefined {
@@ -65,8 +67,9 @@ function numOptional(formData: FormData, key: string): number | null | undefined
   if (v === null) return undefined; // key ausente: no tocar en DB
   const raw = String(v).trim();
   if (!raw) return null; // key presente pero vacío: borrar valor
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : null;
+  const parsed = parseLocalizedDecimal(raw);
+  if (parsed === null) throw new Error(`${key} debe ser un número decimal válido.`);
+  return parsed;
 }
 
 function toExerciseActionExercise(exercise: Awaited<ReturnType<typeof createExercise>>): ExerciseActionExercise {

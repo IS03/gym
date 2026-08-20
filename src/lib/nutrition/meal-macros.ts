@@ -1,8 +1,10 @@
+import { parseLocalizedDecimal } from "../localized-decimal";
+
 export const MEAL_MACRO_MATCH_TOLERANCE = 0.01;
 
 function numberFromInput(value: unknown, field: string): number {
-  const parsed = typeof value === "number" ? value : Number(String(value).trim());
-  if (!Number.isFinite(parsed)) {
+  const parsed = parseLocalizedDecimal(value);
+  if (parsed === null || !Number.isFinite(parsed)) {
     throw new Error(`${field} debe ser un número válido.`);
   }
   return parsed;
@@ -16,7 +18,10 @@ export function requiredMealCalories(value: unknown): number {
   if (parsed <= 0) {
     throw new Error("Las calorías son obligatorias y deben ser mayores a 0.");
   }
-  return Math.trunc(parsed);
+  if (!Number.isInteger(parsed)) {
+    throw new Error("Las calorías deben ser un número entero.");
+  }
+  return parsed;
 }
 
 export function optionalMealMacro(

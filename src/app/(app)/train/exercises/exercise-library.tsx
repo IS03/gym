@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseLocalizedDecimal } from "@/lib/localized-decimal";
 import {
   exerciseLibrarySummary,
   filterExerciseLibrary,
@@ -86,10 +87,10 @@ function formFromExercise(exercise: ExerciseLibraryItem): FormValues {
 }
 
 function numberOrNull(raw: string, label: string): number | null {
-  const value = raw.trim().replace(",", ".");
+  const value = raw.trim();
   if (!value) return null;
-  const number = Number(value);
-  if (!Number.isFinite(number) || number < 0) {
+  const number = parseLocalizedDecimal(value);
+  if (number === null || number < 0) {
     throw new Error(`${label} debe ser un número igual o mayor a cero.`);
   }
   return number;
@@ -216,10 +217,10 @@ function ExerciseForm({
             onChange={(event) =>
               onChange({ ...values, peso_sugerido: event.target.value })
             }
-            type="number"
+            type="text"
             min={0}
-            step="0.5"
             inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
             placeholder="Peso"
             aria-label="Peso sugerido en kg"
             disabled={pending}

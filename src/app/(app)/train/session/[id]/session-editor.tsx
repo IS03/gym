@@ -7,6 +7,7 @@ import { ArrowUpRight, Check, ChevronDown, Clock3, Minus, Plus, Search, X } from
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { LocalizedDecimalInput } from "@/components/ui/localized-decimal-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
@@ -206,20 +207,17 @@ function SetRow({
         </span>
       </div>
       <div className="min-w-0 space-y-0.5">
-        <Input
+        <LocalizedDecimalInput
           aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
           className="metric-number h-10 px-1 text-center text-base font-semibold"
-          type="number"
           min={0}
           max={9999.99}
-          step="0.5"
-          inputMode="decimal"
           readOnly={readOnly}
-          value={set.actual_weight_kg ?? ""}
-          onChange={(event) =>
+          value={set.actual_weight_kg}
+          onValueChange={(value) =>
             onChange((current) => ({
               ...current,
-              actual_weight_kg: nullableNumberFromInput(event.target.value),
+              actual_weight_kg: value,
             }))
           }
         />
@@ -321,6 +319,17 @@ function metadataInput(
   onChange: (next: number | null) => void,
   props: { min: number; max: number; step?: number | string; label: string },
 ) {
+  if (props.step && props.step !== 1) {
+    return (
+      <LocalizedDecimalInput
+        aria-label={props.label}
+        min={props.min}
+        max={props.max}
+        value={value}
+        onValueChange={onChange}
+      />
+    );
+  }
   return (
     <Input
       aria-label={props.label}
@@ -328,7 +337,7 @@ function metadataInput(
       min={props.min}
       max={props.max}
       step={props.step ?? 1}
-      inputMode={props.step && props.step !== 1 ? "decimal" : "numeric"}
+      inputMode="numeric"
       value={value ?? ""}
       onChange={(event) => onChange(nullableNumberFromInput(event.target.value))}
     />

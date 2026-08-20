@@ -15,8 +15,12 @@ describe("manual meal macro validation", () => {
     expect(nullableMealMacrosMatch(null, 0)).toBe(false);
   });
 
-  it("accepts complete macros and truncates required calories", () => {
-    expect(requiredMealCalories("620.9")).toBe(620);
+  it("accepts comma or point macros and keeps required calories whole", () => {
+    expect(requiredMealCalories("620")).toBe(620);
+    expect(optionalMealMacro("49,9", "Proteína")).toBe(49.9);
+    expect(optionalMealMacro("49.9", "Proteína")).toBe(49.9);
+    expect(optionalMealMacro("69,3", "Carbohidratos")).toBe(69.3);
+    expect(optionalMealMacro("9,0", "Grasas")).toBe(9);
     expect(optionalMealMacro("45.5", "Proteína")).toBe(45.5);
     expect(optionalMealMacro("72", "Carbohidratos")).toBe(72);
     expect(optionalMealMacro("14", "Grasas")).toBe(14);
@@ -34,6 +38,13 @@ describe("manual meal macro validation", () => {
 
   it.each([null, "", 0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
     "rejects invalid required calories: %s",
+    (value) => {
+      expect(() => requiredMealCalories(value)).toThrow();
+    },
+  );
+
+  it.each(["567.5", "567,5", "12,5,2", "1.234,56", "1e3"])(
+    "rejects non-integer or ambiguous calories: %s",
     (value) => {
       expect(() => requiredMealCalories(value)).toThrow();
     },

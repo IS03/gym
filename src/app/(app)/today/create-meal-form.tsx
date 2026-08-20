@@ -107,10 +107,10 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             <Input
               id="new-meal-protein"
               name="final_protein_g"
-              type="number"
+              type="text"
               min={0}
-              step="0.1"
               inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
               placeholder="Ej: 30"
               disabled={saving}
             />
@@ -120,10 +120,10 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             <Input
               id="new-meal-carbs"
               name="final_carbs_g"
-              type="number"
+              type="text"
               min={0}
-              step="0.1"
               inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
               placeholder="Ej: 45"
               disabled={saving}
             />
@@ -134,10 +134,10 @@ export function CreateMealForm({ date, onSuccess }: Props) {
           <Input
             id="new-meal-fat"
             name="final_fat_g"
-            type="number"
+            type="text"
             min={0}
-            step="0.1"
             inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
             placeholder="Ej: 12"
             disabled={saving}
           />

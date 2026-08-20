@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { parseLocalizedDecimal } from "../localized-decimal";
 import type {
   DayLog,
   ExpenditureRulePeriod,
@@ -28,9 +29,11 @@ export function parseRequiredNumber(
   label: string,
   options: { integer?: boolean; min?: number; max?: number } = {},
 ) {
-  const raw = String(value ?? "").trim().replace(",", ".");
-  const parsed = Number(raw);
-  if (!raw || !Number.isFinite(parsed)) throw new Error(`${label} debe ser un número válido.`);
+  const raw = String(value ?? "").trim();
+  const unsigned = raw.startsWith("-") ? raw.slice(1) : raw;
+  const decimal = parseLocalizedDecimal(unsigned);
+  const parsed = raw.startsWith("-") && decimal !== null ? -decimal : decimal;
+  if (!raw || parsed === null || !Number.isFinite(parsed)) throw new Error(`${label} debe ser un número válido.`);
   if (options.integer && !Number.isInteger(parsed)) throw new Error(`${label} debe ser entero.`);
   if (options.min !== undefined && parsed < options.min) throw new Error(`${label} debe ser al menos ${options.min}.`);
   if (options.max !== undefined && parsed > options.max) throw new Error(`${label} no puede superar ${options.max}.`);
