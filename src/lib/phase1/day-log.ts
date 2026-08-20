@@ -1,4 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 import type { DayLog, MealEntry } from "./types";
 import {
   isMostRecentWeightEntry,
@@ -30,10 +33,13 @@ async function getAuthedUserId() {
   return user.id;
 }
 
-export async function getOrCreateDayLog(date: string): Promise<DayLog> {
+export async function getOrCreateDayLog(
+  date: string,
+  context?: AuthenticatedRequestContext,
+): Promise<DayLog> {
   assertIsoDate(date);
-  const supabase = await createClient();
-  await getAuthedUserId();
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
 
   const { data, error } = await supabase.rpc("get_or_create_day_log", {
     p_log_date: date,

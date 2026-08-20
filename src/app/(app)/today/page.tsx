@@ -7,6 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { CreateMealForm } from "./create-meal-form";
 import { softDeleteMealAction, updateMealAction } from "./actions";
 import { DayContextEditor } from "./day-context-editor";
@@ -58,7 +59,8 @@ function formatMealMacros(meal: {
 
 export default async function TodayPage() {
   const today = todayInCordoba();
-  const { dayLog, meals, context } = await getNutritionDay(today);
+  const auth = await requireAuthenticatedRequestContext();
+  const { dayLog, meals, context } = await getNutritionDay(today, undefined, auth);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;

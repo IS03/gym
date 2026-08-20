@@ -2,9 +2,14 @@ import "server-only";
 
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import { createClient } from "@/lib/supabase/server";
+import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
-import { buildWeeklyTrainingSummaries } from "./training-progress-summary";
+import {
+  addUtcDays,
+  buildWeeklyTrainingSummaries,
+  mondayOfIsoDate,
+} from "./training-progress-summary";
 import { daysBetweenIsoDates } from "./session-history";
 import { resolveWorkoutSessionLookup } from "./training-session-lookup";
 import {
@@ -620,6 +625,127 @@ type CompletedTrainingData = {
   sets: WorkoutSet[];
   dateByDayLog: Map<string, string>;
 };
+
+export type HomeTrainingSnapshot = {
+  weeks: WeeklyTrainingSummary[];
+  currentWeek: WeeklyTrainingSummary;
+  todaySessions: CompletedSessionSummary[];
+};
+
+type HomeTrainingSessionRow = WorkoutSession & {
+  day_log?: { log_date: string } | Array<{ log_date: string }> | null;
+  exercises?: Array<WorkoutSessionExercise & { sets: WorkoutSet[] }>;
+};
+
+function summarizeCompletedSessions(
+  data: CompletedTrainingData,
+  logDate: string,
+): CompletedSessionSummary[] {
+  const exercisesBySession = new Map<string, WorkoutSessionExercise[]>();
+  const sessionIdByExercise = new Map<string, string>();
+  for (const exercise of data.sessionExercises) {
+    const items = exercisesBySession.get(exercise.workout_session_id) ?? [];
+    items.push(exercise);
+    exercisesBySession.set(exercise.workout_session_id, items);
+    sessionIdByExercise.set(exercise.id, exercise.workout_session_id);
+  }
+
+  const completedSetsBySession = new Map<string, number>();
+  for (const set of data.sets) {
+    if (!set.is_completed) continue;
+    const sessionId = sessionIdByExercise.get(set.workout_session_exercise_id);
+    if (sessionId) {
+      completedSetsBySession.set(
+        sessionId,
+        (completedSetsBySession.get(sessionId) ?? 0) + 1,
+      );
+    }
+  }
+
+  return data.sessions.flatMap((session): CompletedSessionSummary[] => {
+    if (data.dateByDayLog.get(session.day_log_id) !== logDate || !session.ended_at) {
+      return [];
+    }
+    const exercises = exercisesBySession.get(session.id) ?? [];
+    const completedExercises = exercises.filter((exercise) => exercise.is_completed);
+    return [{
+      id: session.id,
+      routineId: session.routine_id,
+      routineName: sessionDisplayName(session),
+      logDate,
+      startedAt: session.started_at,
+      endedAt: session.ended_at,
+      durationMilliseconds: sessionDurationMilliseconds(session),
+      exercisesCompleted: completedExercises.length,
+      completedSets: completedSetsBySession.get(session.id) ?? 0,
+      muscleGroups: [...new Set(completedExercises
+        .map((exercise) => exercise.muscle_group_label_snapshot ?? exercise.grupo_muscular_snapshot)
+        .filter((group): group is string => Boolean(group)))],
+    }];
+  }).slice(0, 20);
+}
+
+export function buildHomeTrainingSnapshot(
+  source: CompletedTrainingData,
+  today: string,
+): HomeTrainingSnapshot {
+  const weeks = buildWeeklyTrainingSummaries(source, today).slice(0, 8);
+  return {
+    weeks,
+    currentWeek: weeks[0],
+    todaySessions: summarizeCompletedSessions(source, today),
+  };
+}
+
+/**
+ * Read model acotado para Home: una sola consulta trae exclusivamente las
+ * sesiones completed de las ocho semanas visibles con sus ejercicios y sets.
+ * No sustituye el historial completo usado por /train/progress.
+ */
+export async function getHomeTrainingSnapshot(
+  today: string,
+  context: AuthenticatedRequestContext,
+): Promise<HomeTrainingSnapshot> {
+  const weekStart = mondayOfIsoDate(today);
+  const weekEnd = addUtcDays(weekStart, 6);
+  const historyStart = addUtcDays(weekStart, -49);
+  const { data: rawRows, error } = await context.supabase
+    .from("workout_sessions")
+    .select(
+      "*, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(*, sets:workout_sets(*))",
+    )
+    .eq("user_id", context.userId)
+    .eq("status", "completed")
+    .not("ended_at", "is", null)
+    .gte("day_logs.log_date", historyStart)
+    .lte("day_logs.log_date", weekEnd)
+    .order("ended_at", { ascending: false });
+  if (error) throw new Error(`Leer resumen semanal de Home: ${error.message}`);
+
+  const sessions: WorkoutSession[] = [];
+  const sessionExercises: WorkoutSessionExercise[] = [];
+  const sets: WorkoutSet[] = [];
+  const dateByDayLog = new Map<string, string>();
+
+  for (const row of (rawRows ?? []) as HomeTrainingSessionRow[]) {
+    const day = firstRelation(row.day_log);
+    if (!day) continue;
+    const session = { ...row };
+    const exercises = session.exercises;
+    delete session.day_log;
+    delete session.exercises;
+    sessions.push(session as WorkoutSession);
+    dateByDayLog.set(session.day_log_id, day.log_date);
+    for (const exerciseRow of exercises ?? []) {
+      const { sets: exerciseSets, ...exercise } = exerciseRow;
+      sessionExercises.push(exercise as WorkoutSessionExercise);
+      sets.push(...(exerciseSets ?? []));
+    }
+  }
+
+  const source = { sessions, sessionExercises, sets, dateByDayLog };
+  return buildHomeTrainingSnapshot(source, today);
+}
 
 async function loadCompletedTrainingData(): Promise<CompletedTrainingData> {
   const { supabase, userId } = await getAuthedContext();

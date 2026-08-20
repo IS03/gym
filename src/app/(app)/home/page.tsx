@@ -29,7 +29,8 @@ import {
   listWorkoutStartRoutines,
 } from "@/lib/phase2/training";
 import { addUtcDays, formatTrainingMinutes, mondayOfIsoDate } from "@/lib/phase2/training-progress-summary";
-import { getTrainingProgress, listCompletedSessionHistory, todayInCordoba } from "@/lib/phase2/training-robust";
+import { getHomeTrainingSnapshot, todayInCordoba } from "@/lib/phase2/training-robust";
+import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { formatWorkoutDuration, formatWorkoutTimeRange } from "../train/session/[id]/session-editor-helpers";
 import type { CompletedSessionSummary } from "@/lib/phase2/types";
 
@@ -152,16 +153,16 @@ function TodayCompletedSessions({ sessions }: { sessions: CompletedSessionSummar
 
 export default async function HomePage() {
   const today = todayInCordoba();
-  const [profile, todayData, inProgress, trainingProgress, workoutStartRoutines, todaySessions] = await Promise.all([
-    getMyProfile(),
-    getNutritionDay(today),
-    getInProgressSessionForUser(),
-    getTrainingProgress(),
-    listWorkoutStartRoutines(),
-    listCompletedSessionHistory({ logDate: today, limit: 20 }),
+  const auth = await requireAuthenticatedRequestContext();
+  const [profile, todayData, inProgress, training, workoutStartRoutines] = await Promise.all([
+    getMyProfile(auth),
+    getNutritionDay(today, undefined, auth),
+    getInProgressSessionForUser(auth),
+    getHomeTrainingSnapshot(today, auth),
+    listWorkoutStartRoutines(auth),
   ]);
   const { dayLog, meals, context } = todayData;
-  const currentWeek = trainingProgress.weeks[0];
+  const { currentWeek, todaySessions } = training;
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const calorieProgress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
@@ -533,7 +534,7 @@ export default async function HomePage() {
               </div>
               <Link href="/train/progress" className="text-sm font-medium text-primary hover:underline">Ver detalle</Link>
             </div>
-            <WeeklyVolumeChart weeks={trainingProgress.weeks} />
+            <WeeklyVolumeChart weeks={training.weeks} />
           </CardContent>
         </Card>
 

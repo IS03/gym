@@ -2,7 +2,11 @@ import "server-only";
 
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import type { DayLog, MealEntry } from "@/lib/phase1/types";
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  requireAuthenticatedRequestContext,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 import type {
   ExistingNutritionDay,
   NutritionContext,
@@ -91,8 +95,11 @@ function contextFromSnapshot(dayLog: DayLog): NutritionContext {
   };
 }
 
-async function listActiveMeals(dayLogId: string): Promise<MealEntry[]> {
-  const { supabase } = await getAuthedContext();
+async function listActiveMeals(
+  dayLogId: string,
+  context: AuthenticatedRequestContext,
+): Promise<MealEntry[]> {
+  const { supabase } = context;
   const { data, error } = await supabase
     .from("meal_entries")
     .select("*")
@@ -107,23 +114,27 @@ async function listActiveMeals(dayLogId: string): Promise<MealEntry[]> {
 export async function getNutritionDay(
   date: string,
   options?: { createIfMissing?: true },
+  context?: AuthenticatedRequestContext,
 ): Promise<ExistingNutritionDay>;
 export async function getNutritionDay(
   date: string,
   options: { createIfMissing: false },
+  context?: AuthenticatedRequestContext,
 ): Promise<NutritionDayReadModel>;
 export async function getNutritionDay(
   date: string,
   options: { createIfMissing?: boolean } = {},
+  context?: AuthenticatedRequestContext,
 ): Promise<NutritionDayReadModel> {
   assertIsoDate(date);
+  const auth = context ?? await requireAuthenticatedRequestContext();
   const createIfMissing = options.createIfMissing ?? true;
   let dayLog: DayLog | null;
 
   if (createIfMissing) {
-    dayLog = await getOrCreateDayLog(date);
+    dayLog = await getOrCreateDayLog(date, auth);
   } else {
-    const { supabase, userId } = await getAuthedContext();
+    const { supabase, userId } = auth;
     const { data, error } = await supabase
       .from("day_logs")
       .select("*")
@@ -142,7 +153,7 @@ export async function getNutritionDay(
   return {
     date,
     dayLog,
-    meals: await listActiveMeals(dayLog.id),
+    meals: await listActiveMeals(dayLog.id, auth),
     context: contextFromSnapshot(dayLog),
   };
 }

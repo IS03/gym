@@ -64,7 +64,7 @@ describe("motor diario nutricional", () => {
   it("hace que History lea sin crear ni refrescar", () => {
     expect(historyPage).toContain("createIfMissing: false");
     expect(wrapper).toMatch(
-      /if \(createIfMissing\)[\s\S]*getOrCreateDayLog\(date\)[\s\S]*else[\s\S]*\.from\("day_logs"\)/,
+      /if \(createIfMissing\)[\s\S]*getOrCreateDayLog\(date(?:, auth)?\)[\s\S]*else[\s\S]*\.from\("day_logs"\)/,
     );
     expect(historyPage).not.toContain("getOrCreateDayLog");
     expect(historyPage).not.toContain("refresh_nutrition_day");

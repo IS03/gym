@@ -1,4 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  requireAuthenticatedRequestContext,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 
 export type Sex = "male" | "female" | "other";
 
@@ -30,13 +34,18 @@ export async function getAuthedUser() {
   return user;
 }
 
-export async function getMyProfile(): Promise<Profile | null> {
-  const user = await getAuthedUser();
-  return getProfileForUser(user.id);
+export async function getMyProfile(
+  context?: AuthenticatedRequestContext,
+): Promise<Profile | null> {
+  const auth = context ?? await requireAuthenticatedRequestContext();
+  return getProfileForUser(auth.userId, auth);
 }
 
-export async function getProfileForUser(userId: string): Promise<Profile | null> {
-  const supabase = await createClient();
+export async function getProfileForUser(
+  userId: string,
+  context?: AuthenticatedRequestContext,
+): Promise<Profile | null> {
+  const supabase = context?.supabase ?? await createClient();
 
   const { data, error } = await supabase
     .from("profiles")

@@ -87,6 +87,15 @@ export async function updateSession(request: NextRequest) {
     return redirectResponse;
   }
 
+  if (claimsData?.claims?.sub && request.nextUrl.pathname === "/login") {
+    const homeUrl = request.nextUrl.clone();
+    homeUrl.pathname = "/home";
+    homeUrl.search = "";
+    const redirectResponse = NextResponse.redirect(homeUrl);
+    copyAuthResponse(supabaseResponse, redirectResponse);
+    return redirectResponse;
+  }
+
   if (claimsError && isInvalidAuthSessionError(claimsError)) {
     clearAuthCookies(request, supabaseResponse);
   }

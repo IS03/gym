@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import {
   buildRoutineOverviews,
@@ -56,6 +57,10 @@ type EndedSessionQueryRow = WorkoutSession & {
   routine: { nombre: string | null } | Array<{ nombre: string | null }> | null;
 };
 
+type InProgressSessionQueryRow = WorkoutSession & {
+  day_log?: { log_date: string } | Array<{ log_date: string }> | null;
+};
+
 type RoutineExerciseQueryRow = RoutineExercise & {
   exercise: Pick<Exercise, "id" | "nombre" | "grupo_muscular">;
 };
@@ -86,29 +91,30 @@ async function requireSessionInProgress(sessionId: string): Promise<void> {
   }
 }
 
-export async function getInProgressSessionForUser(): Promise<{
+export async function getInProgressSessionForUser(
+  context?: AuthenticatedRequestContext,
+): Promise<{
   session: WorkoutSession;
   log_date: string;
 } | null> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
-  const { data: session, error: sErr } = await supabase
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
+  const { data: rawSession, error: sErr } = await supabase
     .from("workout_sessions")
-    .select("*")
+    .select("*, day_log:day_logs(log_date)")
     .eq("user_id", userId)
     .eq("status", "in_progress")
     .maybeSingle();
   if (sErr) throw new Error(`Buscar sesión en curso: ${sErr.message}`);
-  if (!session) return null;
-  const { data: dayLog, error: dErr } = await supabase
-    .from("day_logs")
-    .select("log_date")
-    .eq("id", (session as WorkoutSession).day_log_id)
-    .single();
-  if (dErr) throw new Error(`Leer día de la sesión: ${dErr.message}`);
+  if (!rawSession) return null;
+  const row = rawSession as InProgressSessionQueryRow;
+  const dayLog = firstRelation(row.day_log);
+  if (!dayLog) throw new Error("Leer día de la sesión: relación ausente.");
+  const session = { ...row };
+  delete session.day_log;
   return {
     session: session as WorkoutSession,
-    log_date: String((dayLog as { log_date: string }).log_date),
+    log_date: dayLog.log_date,
   };
 }
 
@@ -351,11 +357,12 @@ export async function archiveExercise(id: string): Promise<void> {
   await updateExercise({ id, is_active: false });
 }
 
-export async function listRoutines(params?: {
-  includeArchived?: boolean;
-}): Promise<Routine[]> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+export async function listRoutines(
+  params?: { includeArchived?: boolean },
+  context?: AuthenticatedRequestContext,
+): Promise<Routine[]> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   let q = supabase
     .from("routines")
@@ -401,11 +408,12 @@ export async function listExerciseRoutineMemberships(
 
 export async function listRoutineOverviews(
   routineIds: string[],
+  context?: AuthenticatedRequestContext,
 ): Promise<Map<string, RoutineOverview>> {
   if (routineIds.length === 0) return buildRoutineOverviews([], []);
 
-  const supabase = await createClient();
-  await getAuthedUserId();
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
   const { data, error } = await supabase
     .from("routine_exercises")
     .select(
@@ -419,9 +427,14 @@ export async function listRoutineOverviews(
   return buildRoutineOverviews(routineIds, (data ?? []) as RoutineOverviewSourceRow[]);
 }
 
-export async function listWorkoutStartRoutines(): Promise<WorkoutStartRoutine[]> {
-  const routines = await listRoutines({ includeArchived: false });
-  const overviews = await listRoutineOverviews(routines.map((routine) => routine.id));
+export async function listWorkoutStartRoutines(
+  context?: AuthenticatedRequestContext,
+): Promise<WorkoutStartRoutine[]> {
+  const routines = await listRoutines({ includeArchived: false }, context);
+  const overviews = await listRoutineOverviews(
+    routines.map((routine) => routine.id),
+    context,
+  );
 
   return routines.map((routine) => {
     const overview = overviews.get(routine.id);
