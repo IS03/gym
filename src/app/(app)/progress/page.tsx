@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   Activity,
   Apple,
@@ -12,7 +13,7 @@ import { getNutritionReport } from "@/lib/nutrition/reports";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { formatTrainingMinutes } from "@/lib/phase2/training-progress-summary";
 import { getHomeTrainingSnapshot, todayInCordoba } from "@/lib/phase2/training-robust";
-import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
+import { getVerifiedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,8 @@ function ProgressLink({ href, icon: Icon, title, description }: ProgressLinkProp
 
 export default async function ProgressPage() {
   const today = todayInCordoba();
-  const auth = await requireAuthenticatedRequestContext();
+  const auth = await getVerifiedRequestContext();
+  if (!auth) redirect("/login");
   const [nutrition, training, profile] = await Promise.all([
     getNutritionReport({ period: "7" }, today, auth),
     getHomeTrainingSnapshot(today, auth),
