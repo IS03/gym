@@ -1,297 +1,65 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ArrowLeft, ChevronRight, Dumbbell, Scale } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { buttonVariants, Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { listRecentDays } from "@/lib/phase1/day-log";
-import { getNutritionDay } from "@/lib/nutrition/day";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { BODY_MEASUREMENT_FIELDS, type BodyMeasurement } from "@/lib/body-measurements";
+import { getDailyHistoryDetail, listDailyHistoryDays } from "@/lib/history/daily-history";
+import { getVerifiedRequestContext } from "@/lib/supabase/server";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
-import { listNutritionEvents } from "@/lib/nutrition/product";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+// El loader de detalle usa getNutritionDay({ createIfMissing: false }): History es read-only.
 
-const gramFormatter = new Intl.NumberFormat("es-AR", {
-  maximumFractionDigits: 1,
-});
+const number = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+const integer = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const bodyLabels: Record<(typeof BODY_MEASUREMENT_FIELDS)[number], string> = {
+  waist_cm: "Cintura", abdomen_cm: "Abdomen", chest_cm: "Pecho", arm_cm: "Brazo", arm_right_cm: "Brazo der.", arm_left_cm: "Brazo izq.", thigh_cm: "Muslo", thigh_right_cm: "Muslo der.", thigh_left_cm: "Muslo izq.", calf_right_cm: "Pantorrilla der.", calf_left_cm: "Pantorrilla izq.", hip_cm: "Cadera",
+};
 
-function formatKcal(n: number | null | undefined) {
-  if (typeof n !== "number") return "—";
-  return `${n} kcal`;
+function validDate(value: string | null): value is string { return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value); }
+function adjacentDate(date: string, amount: number) { const value = new Date(`${date}T12:00:00Z`); value.setUTCDate(value.getUTCDate() + amount); return value.toISOString().slice(0, 10); }
+function formatKcal(value: number | null | undefined) { return typeof value === "number" ? `${integer.format(value)} kcal` : "—"; }
+function formatGrams(value: number | null | undefined) { return typeof value === "number" ? `${number.format(value)} g` : "—"; }
+function formatLiters(value: number | null | undefined) { return typeof value === "number" ? `${number.format(value)} L` : "—"; }
+function formatDuration(milliseconds: number | null) { if (milliseconds === null) return null; const minutes = Math.round(milliseconds / 60_000); const hours = Math.floor(minutes / 60); return hours ? `${hours} h${minutes % 60 ? ` ${minutes % 60} min` : ""}` : `${minutes} min`; }
+function formatDate(value: string) { return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`)); }
+function energyBalanceLabel(value: number | null) { if (value === null) return "—"; if (value < 0) return `Déficit estimado: ${integer.format(Math.abs(value))} kcal`; if (value > 0) return `Superávit estimado: ${integer.format(value)} kcal`; return "Balance estimado: 0 kcal"; }
+function originalTimeKnown(rawInput: string | null) { if (!rawInput) return true; try { return (JSON.parse(rawInput) as { originalTimeKnown?: boolean }).originalTimeKnown !== false; } catch { return true; } }
+
+function DatePicker({ value, today }: { value: string; today: string }) { return <form action="/history" className="flex gap-2"><input type="date" name="date" defaultValue={value} max={today} className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" /><Button className="h-11" type="submit" variant="outline">Cambiar fecha</Button></form>; }
+
+function BodySection({ measurement }: { measurement: BodyMeasurement }) {
+  const values = BODY_MEASUREMENT_FIELDS.flatMap((field) => measurement[field] === null ? [] : [{ field, value: measurement[field] }]);
+  return <section className="space-y-3" aria-labelledby="body-title"><div className="flex items-center gap-2"><Scale className="size-4 text-primary" aria-hidden /><h2 id="body-title" className="text-base font-semibold tracking-tight">Cuerpo</h2></div><Card className="surface-elevated"><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">{values.map(({ field, value }) => <div key={field}><p className="text-xs text-muted-foreground">{bodyLabels[field]}</p><p className="metric-number font-semibold">{number.format(value)} cm</p></div>)}</div>{measurement.condition ? <div className="border-t pt-3"><p className="text-xs text-muted-foreground">Condición</p><p className="text-sm">{measurement.condition}</p></div> : null}{measurement.notes ? <div><p className="text-xs text-muted-foreground">Nota</p><p className="text-sm text-muted-foreground">{measurement.notes}</p></div> : null}{measurement.quality_status === "suspect" ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">Medición a revisar{measurement.quality_note ? `: ${measurement.quality_note}` : "."}</p> : null}{measurement.legacy_import_source ? <p className="text-xs text-muted-foreground">Histórico importado · {measurement.legacy_import_source}</p> : null}</CardContent></Card></section>;
 }
 
-function formatGrams(n: number | null | undefined) {
-  if (typeof n !== "number") return "—";
-  return `${gramFormatter.format(n)} g`;
-}
-
-function formatProteinProgress(consumed: number, target: number | null) {
-  const value = gramFormatter.format(consumed);
-  return target === null ? `${value} g` : `${value} / ${formatGrams(target)}`;
-}
-
-function formatMealMacros(meal: {
-  final_protein_g: number | null;
-  final_carbs_g: number | null;
-  final_fat_g: number | null;
-}) {
-  return [
-    `P ${formatGrams(meal.final_protein_g)}`,
-    `C ${formatGrams(meal.final_carbs_g)}`,
-    `G ${formatGrams(meal.final_fat_g)}`,
-  ].join(" · ");
-}
-
-function formatLiters(n: number | null | undefined) {
-  if (typeof n !== "number") return "—";
-  return `${gramFormatter.format(n)} L`;
-}
-
-function balanceLabel(value: number | null) {
-  if (value === null) return "—";
-  if (value < 0) return `Déficit estimado: ${Math.abs(value)} kcal`;
-  if (value > 0) return `Superávit estimado: ${value} kcal`;
-  return "Balance estimado: 0 kcal";
-}
-
-function adjacentDate(date: string, amount: number) {
-  const value = new Date(`${date}T12:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + amount);
-  return value.toISOString().slice(0, 10);
-}
-
-function originalTimeKnown(rawInput: string | null) {
-  if (!rawInput) return true;
-  try { return (JSON.parse(rawInput) as { originalTimeKnown?: boolean }).originalTimeKnown !== false; }
-  catch { return true; }
-}
-
-export default async function HistoryPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function HistoryPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = (await searchParams) ?? {};
-  const date = typeof sp.date === "string" ? sp.date : null;
-
+  const requestedDate = typeof sp.date === "string" ? sp.date : null;
   const today = todayInCordoba();
+  const auth = await getVerifiedRequestContext();
+  if (!auth) redirect("/login");
 
-  if (!date) {
-    const days = await listRecentDays(60);
-    return (
-      <div className="space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
-          <p className="text-sm text-muted-foreground">
-            Elegí una fecha para ver el resumen y sus comidas.
-          </p>
-        </div>
-
-        <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
-        <Card className="lg:order-2 lg:col-span-4 lg:sticky lg:top-8">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Ir a una fecha</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <form action="/history" className="flex gap-2">
-              <input
-                type="date"
-                name="date"
-                defaultValue={today}
-                className="h-11 flex-1 rounded-md border bg-background px-3 text-sm"
-              />
-              <Button className="h-11" type="submit">
-                Ver
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-3 lg:order-1 lg:col-span-8">
-          <h2 className="text-base font-semibold tracking-tight">Últimos días</h2>
-          {days.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay días todavía.</p>
-          ) : (
-            <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-              {days.map((d) => (
-                <Link
-                  key={d.id}
-                  href={`/history?date=${d.log_date}`}
-                  className="block rounded-md border bg-background px-4 py-3"
-                >
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-sm font-medium">{d.log_date}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatKcal(d.total_calories_consumed)}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-        </div>
-      </div>
-    );
+  if (!requestedDate) {
+    const days = await listDailyHistoryDays({ today, context: auth, limit: 60 });
+    return <div className="space-y-6"><header className="space-y-3"><Link href="/progress" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link><div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1><p className="mt-1 text-sm text-muted-foreground">Qué pasó cada día en nutrición, actividad, entrenamiento y cuerpo.</p></div></header><div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0"><Card className="lg:order-2 lg:col-span-4 lg:sticky lg:top-8"><CardHeader className="pb-3"><CardTitle className="text-base">Ir a una fecha</CardTitle></CardHeader><CardContent><DatePicker value={today} today={today} /></CardContent></Card><section className="space-y-3 lg:order-1 lg:col-span-8" aria-labelledby="recent-days-title"><h2 id="recent-days-title" className="text-base font-semibold tracking-tight">Últimos días</h2>{days.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay información registrada.</p> : <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">{days.map((day) => { const hasNutrition = Boolean(day.dayLog && (day.dayLog.total_calories_consumed > 0 || day.dayLog.total_protein_g > 0)); return <Link key={day.date} href={`/history?date=${day.date}`} className="group block rounded-xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/8 outline-none transition-[background-color,transform] hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold capitalize">{formatDate(day.date)}</p><div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">{hasNutrition ? <span>{formatKcal(day.dayLog?.total_calories_consumed)}{day.dayLog?.targetKcal == null ? "" : ` / ${integer.format(day.dayLog.targetKcal)}`}</span> : null}{hasNutrition && day.dayLog?.total_protein_g ? <span>{formatGrams(day.dayLog.total_protein_g)} proteína</span> : null}{day.workoutNames.length ? <span>Entrenamiento · {day.workoutNames.join(", ")}</span> : null}{day.dayLog?.steps !== null && day.dayLog?.steps !== undefined ? <span>{integer.format(day.dayLog.steps)} pasos</span> : null}{day.dayLog?.weight_kg !== null && day.dayLog?.weight_kg !== undefined ? <span>{number.format(day.dayLog.weight_kg)} kg</span> : null}{day.measurement ? <span>Medidas</span> : null}</div></div><ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden /></div></Link>; })}</div>}</section></div></div>;
   }
 
-  const [nutritionDay, events] = await Promise.all([
-    getNutritionDay(date, { createIfMissing: false }),
-    listNutritionEvents(date),
-  ]);
-  const { dayLog, meals, context } = nutritionDay;
+  if (!validDate(requestedDate) || requestedDate > today) redirect("/history");
+  const { nutrition, sessions, measurement, events } = await getDailyHistoryDetail(requestedDate, auth);
+  const { dayLog, context } = nutrition;
+  const hasNutrition = nutrition.meals.some((meal) => meal.entry_kind === "meal" || meal.entry_kind === "legacy_daily_summary");
+  const hasAnything = Boolean(dayLog || sessions.length || measurement || events.length);
+  const summary = [dayLog && hasNutrition ? { label: "Calorías", value: `${formatKcal(dayLog.total_calories_consumed)}${context?.targets.calories == null ? "" : ` / ${integer.format(context.targets.calories)}`}` } : null, dayLog && hasNutrition ? { label: "Proteína", value: `${formatGrams(dayLog.total_protein_g)}${context?.targets.proteinG == null ? "" : ` / ${formatGrams(context.targets.proteinG)}`}` } : null, sessions.length ? { label: "Entrenamiento", value: sessions.map((session) => session.name).join(", ") } : null, dayLog?.steps !== null && dayLog?.steps !== undefined ? { label: "Pasos", value: integer.format(dayLog.steps) } : null].filter((value): value is { label: string; value: string } => value !== null);
 
-  if (!dayLog) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
-          <p className="text-sm text-muted-foreground">{date}</p>
-        </div>
-        <Card>
-          <CardContent className="space-y-4 py-6">
-            <p className="text-sm text-muted-foreground">
-              No existe un registro para esa fecha.
-            </p>
-            <form action="/history" className="flex gap-2">
-              <input
-                type="date"
-                name="date"
-                defaultValue={date}
-                className="h-11 flex-1 rounded-md border bg-background px-3 text-sm"
-              />
-              <Button className="h-11" type="submit" variant="outline">
-                Cambiar fecha
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>
-        <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
-      </div>
-
-      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
-      <Card className="lg:col-span-4 lg:sticky lg:top-8">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Resumen del día</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Consumidas</span>
-            <span className="text-lg font-semibold">
-              {formatKcal(dayLog.total_calories_consumed)}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Target</span>
-            <span className="text-sm">{formatKcal(context.targets.calories)}</span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted-foreground">Delta</span>
-            <span className="text-sm">
-              {context.metrics.deltaVsNutritionTarget === null
-                ? "—"
-                : `${context.metrics.deltaVsNutritionTarget >= 0 ? "+" : ""}${context.metrics.deltaVsNutritionTarget} kcal`}
-            </span>
-          </div>
-          <div className="border-t pt-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-muted-foreground">Proteína</span>
-              <span className="text-sm">
-                {formatProteinProgress(dayLog.total_protein_g, context.targets.proteinG)}
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-sm text-muted-foreground">Carbohidratos</span>
-              <span className="text-sm">{formatGrams(dayLog.total_carbs_g)}</span>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-sm text-muted-foreground">Grasas</span>
-              <span className="text-sm">{formatGrams(dayLog.total_fat_g)}</span>
-            </div>
-          </div>
-          <div className="space-y-2 border-t pt-2">
-            <div className="flex items-baseline justify-between"><span className="text-sm text-muted-foreground">Gasto estimado</span><span className="text-sm">{formatKcal(context.expenditureKcal)}</span></div>
-            <div className="flex items-baseline justify-between gap-4"><span className="text-sm text-muted-foreground">Balance energético</span><span className="text-right text-sm">{balanceLabel(context.metrics.energyBalanceKcal)}</span></div>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-2 text-sm">
-            <div><span className="text-muted-foreground">Agua</span><p>{formatLiters(dayLog.water_l)}{context.targets.waterL == null ? "" : ` / ${formatLiters(context.targets.waterL)}`}</p></div>
-            <div><span className="text-muted-foreground">Mate</span><p>{formatLiters(dayLog.mate_l)}</p></div>
-            <div><span className="text-muted-foreground">Pasos</span><p>{dayLog.steps == null ? "—" : gramFormatter.format(dayLog.steps)}</p></div>
-            <div><span className="text-muted-foreground">Peso</span><p>{dayLog.weight_kg == null ? "—" : `${gramFormatter.format(dayLog.weight_kg)} kg`}</p></div>
-            <div><span className="text-muted-foreground">Trabajo</span><p>{context.work.effective == null ? "—" : context.work.effective ? "Sí" : "No"}</p></div>
-            <div><span className="text-muted-foreground">Gym</span><p>{context.gym.effective ? "Sí" : "No"}</p></div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-3 lg:col-span-8">
-        <h2 className="text-base font-semibold tracking-tight">Comidas</h2>
-        {meals.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay comidas activas ese día.</p>
-        ) : (
-          <div className="space-y-2">
-            {meals.map((m) => {
-              const legacySummary = m.entry_kind === "legacy_daily_summary";
-              return (
-              <div key={m.id} className="rounded-md border bg-background px-4 py-3">
-                <div className="flex items-baseline justify-between">
-                  {legacySummary ? (
-                    <span className="text-sm font-medium">Resumen diario histórico</span>
-                  ) : m.title ? (
-                    <span className="text-sm font-medium">{m.title}</span>
-                  ) : (
-                    <span className="text-sm font-medium" />
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    {formatKcal(m.final_calories)}
-                  </span>
-                </div>
-                <p className="metric-number mt-1 text-xs text-muted-foreground">
-                  {formatMealMacros(m)}
-                </p>
-                {legacySummary ? <p className="mt-1 text-xs text-muted-foreground">Sin desglose de comidas disponible.</p> : null}
-                {!legacySummary && !originalTimeKnown(m.raw_input) ? <p className="mt-1 text-xs text-muted-foreground">Horario no informado.</p> : null}
-                {m.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{m.description}</p>
-                ) : null}
-              </div>
-            );})}
-          </div>
-        )}
-
-        {events.length > 0 ? <section className="space-y-2 pt-3" aria-labelledby="events-title"><h2 id="events-title" className="text-base font-semibold">Eventos / permitidos</h2>{events.map((event) => <Card key={event.id}><CardContent className="space-y-1 pt-4"><div className="flex items-baseline justify-between gap-3"><p className="text-sm font-medium">{event.event_type}</p>{event.intensity ? <span className="text-xs text-muted-foreground">{event.intensity}</span> : null}</div><p className="text-xs text-muted-foreground">Planificado: {event.planned == null ? "No informado" : event.planned ? "Sí" : "No"} · Alcohol: {event.alcohol == null ? "No informado" : event.alcohol ? "Sí" : "No"}{event.drinks_equivalent == null ? "" : ` · ${gramFormatter.format(event.drinks_equivalent)} tragos eq.`}</p>{event.context ? <p className="text-sm text-muted-foreground">{event.context}</p> : null}{event.notes ? <p className="text-sm text-muted-foreground">{event.notes}</p> : null}{event.event_calories == null ? null : <p className="text-xs text-muted-foreground">{event.event_calories} kcal estimadas del evento · sólo contexto</p>}</CardContent></Card>)}</section> : null}
-      </div>
-      </div>
-
-      <div className="space-y-2 lg:ml-auto lg:w-[420px]">
-        <div className="grid grid-cols-2 gap-2">
-          <Link href={`/history?date=${adjacentDate(dayLog.log_date, -1)}`} className={cn(buttonVariants({ variant: "outline" }), "h-11")}>Día anterior</Link>
-          <Link href={`/history?date=${adjacentDate(dayLog.log_date, 1)}`} className={cn(buttonVariants({ variant: "outline" }), "h-11")}>Día siguiente</Link>
-        </div>
-        <form action="/history" className="flex gap-2">
-          <input
-            type="date"
-            name="date"
-            defaultValue={dayLog.log_date}
-            className="h-11 flex-1 rounded-md border bg-background px-3 text-sm"
-          />
-          <Button className="h-11" type="submit" variant="outline">
-            Cambiar fecha
-          </Button>
-        </form>
-        <Link
-          href="/today"
-          className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
-        >
-          Volver a Hoy
-        </Link>
-      </div>
-    </div>
-  );
+  return <div className="space-y-6 pb-2"><header className="space-y-3"><Link href="/progress" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial diario</h1>{requestedDate === today ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">En curso</span> : null}</div><p className="text-sm text-muted-foreground capitalize">{formatDate(requestedDate)} · {requestedDate}</p></header>{!hasAnything ? <Card><CardContent className="space-y-4 py-6"><p className="text-sm text-muted-foreground">No hay registros para esta fecha.</p><DatePicker value={requestedDate} today={today} /></CardContent></Card> : <>{summary.length ? <section aria-labelledby="summary-title"><Card className="surface-elevated"><CardHeader className="pb-1"><CardTitle id="summary-title">Resumen del día</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">{summary.map((item) => <div key={item.label}><p className="text-xs text-muted-foreground">{item.label}</p><p className="metric-number mt-1 font-semibold">{item.value}</p></div>)}</CardContent></Card></section> : null}
+    {dayLog && context && hasNutrition ? <section className="space-y-3" aria-labelledby="nutrition-title"><h2 id="nutrition-title" className="text-base font-semibold tracking-tight">Nutrición</h2><Card className="surface-elevated"><CardContent className="grid gap-4 sm:grid-cols-2"><div className="space-y-3"><div><p className="text-xs text-muted-foreground">Consumidas / objetivo</p><p className="metric-number text-xl font-semibold">{formatKcal(dayLog.total_calories_consumed)}{context.targets.calories === null ? "" : ` / ${integer.format(context.targets.calories)}`}</p></div><div className="grid grid-cols-3 gap-3 border-t pt-3"><div><p className="text-xs text-muted-foreground">Proteína</p><p className="metric-number font-semibold">{formatGrams(dayLog.total_protein_g)}</p></div><div><p className="text-xs text-muted-foreground">Carbos</p><p className="metric-number font-semibold">{formatGrams(dayLog.total_carbs_g)}</p></div><div><p className="text-xs text-muted-foreground">Grasas</p><p className="metric-number font-semibold">{formatGrams(dayLog.total_fat_g)}</p></div></div></div><div className="space-y-3 border-t pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0"><div><p className="text-xs text-muted-foreground">Desviación vs objetivo</p><p className="font-semibold">{context.metrics.deltaVsNutritionTarget === null ? "—" : `${context.metrics.deltaVsNutritionTarget >= 0 ? "+" : ""}${integer.format(context.metrics.deltaVsNutritionTarget)} kcal`}</p></div><div><p className="text-xs text-muted-foreground">Gasto estimado</p><p className="metric-number font-semibold">{formatKcal(context.expenditureKcal)}</p></div><div><p className="text-xs text-muted-foreground">Balance energético</p><p className="font-semibold">{energyBalanceLabel(context.metrics.energyBalanceKcal)}</p></div></div></CardContent></Card><div className="space-y-2"><h3 className="text-sm font-semibold">Comidas</h3>{nutrition.meals.map((meal) => { const legacy = meal.entry_kind === "legacy_daily_summary"; return <Card key={meal.id} size="sm"><CardContent className="space-y-1"><div className="flex items-baseline justify-between gap-3"><p className="font-medium">{legacy ? "Resumen diario histórico" : meal.title || "Comida"}</p><p className="metric-number text-xs text-muted-foreground">{formatKcal(meal.final_calories)}</p></div><p className="metric-number text-xs text-muted-foreground">P {formatGrams(meal.final_protein_g)} · C {formatGrams(meal.final_carbs_g)} · G {formatGrams(meal.final_fat_g)}</p>{legacy ? <p className="text-xs text-muted-foreground">Sin desglose de comidas disponible.</p> : null}{!legacy && !originalTimeKnown(meal.raw_input) ? <p className="text-xs text-muted-foreground">Horario no informado.</p> : null}{meal.description ? <p className="text-sm text-muted-foreground">{meal.description}</p> : null}</CardContent></Card>; })}</div></section> : null}
+    {dayLog && context && [dayLog.steps, dayLog.water_l, dayLog.mate_l, context.work.effective, context.gym.effective].some((value) => value !== null && value !== false) ? <section className="space-y-3" aria-labelledby="activity-title"><h2 id="activity-title" className="text-base font-semibold tracking-tight">Actividad</h2><Card className="surface-elevated"><CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">{dayLog.steps !== null ? <div><p className="text-xs text-muted-foreground">Pasos</p><p className="metric-number font-semibold">{integer.format(dayLog.steps)}</p></div> : null}{dayLog.water_l !== null ? <div><p className="text-xs text-muted-foreground">Agua</p><p className="metric-number font-semibold">{formatLiters(dayLog.water_l)}{context.targets.waterL === null ? "" : ` / ${formatLiters(context.targets.waterL)}`}</p></div> : null}{dayLog.mate_l !== null ? <div><p className="text-xs text-muted-foreground">Mate</p><p className="metric-number font-semibold">{formatLiters(dayLog.mate_l)}</p></div> : null}{context.work.effective !== null ? <div><p className="text-xs text-muted-foreground">Trabajo</p><p className="font-semibold">{context.work.effective ? "Sí" : "No"}</p></div> : null}{context.gym.effective ? <div><p className="text-xs text-muted-foreground">Gym</p><p className="font-semibold">Sí{context.gym.source === "override" ? " · corrección manual" : ""}</p></div> : null}</CardContent></Card></section> : null}
+    {sessions.length ? <section className="space-y-3" aria-labelledby="training-title"><div className="flex items-center gap-2"><Dumbbell className="size-4 text-primary" aria-hidden /><h2 id="training-title" className="text-base font-semibold tracking-tight">Entrenamiento</h2></div><div className="space-y-2">{sessions.map((session) => <Card key={session.id} className="surface-elevated"><CardContent className="space-y-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{session.name}</p><p className="mt-1 text-xs text-muted-foreground">{[formatDuration(session.durationMilliseconds), `${session.completedSets} ${session.completedSets === 1 ? "serie" : "series"}`, `${session.completedExercises} ${session.completedExercises === 1 ? "ejercicio" : "ejercicios"}`, session.volumeKg > 0 ? `${integer.format(session.volumeKg)} kg volumen` : null].filter(Boolean).join(" · ")}</p></div><ChevronRight className="size-4 text-muted-foreground" aria-hidden /></div><Link href={`/train/session/${session.id}`} className="text-sm font-medium text-primary hover:underline">Ver sesión</Link></CardContent></Card>)}</div></section> : null}
+    {(dayLog?.weight_kg !== null && dayLog?.weight_kg !== undefined) || measurement ? <section className="space-y-3">{dayLog?.weight_kg !== null && dayLog?.weight_kg !== undefined ? <Card className="surface-elevated"><CardContent className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Peso histórico</p><p className="metric-number text-xl font-semibold">{number.format(dayLog.weight_kg)} kg</p></div><Scale className="size-5 text-primary" aria-hidden /></CardContent></Card> : null}{measurement ? <BodySection measurement={measurement} /> : null}</section> : null}
+     {events.length ? <section className="space-y-3" aria-labelledby="events-title"><h2 id="events-title" className="text-base font-semibold tracking-tight">Eventos / permitidos · sólo contexto</h2>{events.map((event) => <Card key={event.id} size="sm"><CardContent className="space-y-1"><div className="flex items-baseline justify-between gap-3"><p className="font-medium">{event.event_type}</p>{event.intensity ? <span className="text-xs text-muted-foreground">{event.intensity}</span> : null}</div><p className="text-xs text-muted-foreground">Planificado: {event.planned == null ? "No informado" : event.planned ? "Sí" : "No"} · Alcohol: {event.alcohol == null ? "No informado" : event.alcohol ? "Sí" : "No"}</p>{event.context ? <p className="text-sm text-muted-foreground">{event.context}</p> : null}{event.notes ? <p className="text-sm text-muted-foreground">{event.notes}</p> : null}</CardContent></Card>)}</section> : null}</>}
+    <nav className="space-y-2 pt-1" aria-label="Navegación por fecha"><div className="grid grid-cols-2 gap-2"><Link href={`/history?date=${adjacentDate(requestedDate, -1)}`} className={cn(buttonVariants({ variant: "outline" }), "h-11")}>Día anterior</Link>{requestedDate < today ? <Link href={`/history?date=${adjacentDate(requestedDate, 1)}`} className={cn(buttonVariants({ variant: "outline" }), "h-11")}>Día siguiente</Link> : <span className={cn(buttonVariants({ variant: "outline" }), "h-11 cursor-not-allowed opacity-50")}>Día siguiente</span>}</div><DatePicker value={requestedDate} today={today} /></nav>
+  </div>;
 }
