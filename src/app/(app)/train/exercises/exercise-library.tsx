@@ -35,6 +35,9 @@ type FormValues = {
   series_sugeridas: string;
   reps_sugeridas: string;
   peso_sugerido: string;
+  rir_sugerido: string;
+  descanso_min_sugerido_segundos: string;
+  descanso_max_sugerido_segundos: string;
 };
 
 const GROUP_FILTER_OPTIONS: ReadonlyArray<{
@@ -53,6 +56,9 @@ function emptyForm(): FormValues {
     series_sugeridas: "",
     reps_sugeridas: "",
     peso_sugerido: "",
+    rir_sugerido: "",
+    descanso_min_sugerido_segundos: "",
+    descanso_max_sugerido_segundos: "",
   };
 }
 
@@ -66,6 +72,16 @@ function formFromExercise(exercise: ExerciseLibraryItem): FormValues {
       exercise.reps_sugeridas === null ? "" : String(exercise.reps_sugeridas),
     peso_sugerido:
       exercise.peso_sugerido === null ? "" : String(exercise.peso_sugerido),
+    rir_sugerido:
+      exercise.rir_sugerido === null ? "" : String(exercise.rir_sugerido),
+    descanso_min_sugerido_segundos:
+      exercise.descanso_min_sugerido_segundos === null
+        ? ""
+        : String(exercise.descanso_min_sugerido_segundos),
+    descanso_max_sugerido_segundos:
+      exercise.descanso_max_sugerido_segundos === null
+        ? ""
+        : String(exercise.descanso_max_sugerido_segundos),
   };
 }
 
@@ -86,6 +102,15 @@ function mutationFromForm(values: FormValues): ExerciseMutationInput {
     series_sugeridas: numberOrNull(values.series_sugeridas, "Series sugeridas"),
     reps_sugeridas: numberOrNull(values.reps_sugeridas, "Repeticiones sugeridas"),
     peso_sugerido: numberOrNull(values.peso_sugerido, "Peso sugerido"),
+    rir_sugerido: numberOrNull(values.rir_sugerido, "RIR sugerido"),
+    descanso_min_sugerido_segundos: numberOrNull(
+      values.descanso_min_sugerido_segundos,
+      "Descanso mínimo sugerido",
+    ),
+    descanso_max_sugerido_segundos: numberOrNull(
+      values.descanso_max_sugerido_segundos,
+      "Descanso máximo sugerido",
+    ),
   };
 }
 
@@ -159,7 +184,7 @@ function ExerciseForm({
       </label>
       <fieldset className="space-y-1.5">
         <legend className="text-sm font-medium">Valores sugeridos</legend>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Input
             value={values.series_sugeridas}
             onChange={(event) =>
@@ -197,6 +222,54 @@ function ExerciseForm({
             inputMode="decimal"
             placeholder="Peso"
             aria-label="Peso sugerido en kg"
+            disabled={pending}
+          />
+          <Input
+            value={values.rir_sugerido}
+            onChange={(event) =>
+              onChange({ ...values, rir_sugerido: event.target.value })
+            }
+            type="number"
+            min={0}
+            max={10}
+            step={1}
+            inputMode="numeric"
+            placeholder="RIR"
+            aria-label="RIR sugerido"
+            disabled={pending}
+          />
+          <Input
+            value={values.descanso_min_sugerido_segundos}
+            onChange={(event) =>
+              onChange({
+                ...values,
+                descanso_min_sugerido_segundos: event.target.value,
+              })
+            }
+            type="number"
+            min={0}
+            max={3600}
+            step={1}
+            inputMode="numeric"
+            placeholder="Desc. mín."
+            aria-label="Descanso mínimo sugerido en segundos"
+            disabled={pending}
+          />
+          <Input
+            value={values.descanso_max_sugerido_segundos}
+            onChange={(event) =>
+              onChange({
+                ...values,
+                descanso_max_sugerido_segundos: event.target.value,
+              })
+            }
+            type="number"
+            min={0}
+            max={3600}
+            step={1}
+            inputMode="numeric"
+            placeholder="Desc. máx."
+            aria-label="Descanso máximo sugerido en segundos"
             disabled={pending}
           />
         </div>

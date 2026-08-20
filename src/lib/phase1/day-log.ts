@@ -169,6 +169,7 @@ export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
 
 export type UpdateMealInput = {
   id: string;
+  date?: string;
   title?: string | null;
   description?: string | null;
   final_calories?: number | null;
@@ -182,6 +183,11 @@ export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
   const userId = await getAuthedUserId();
 
   const patch: Record<string, unknown> = {};
+  if (input.date !== undefined) {
+    assertIsoDate(input.date);
+    const destinationDay = await getOrCreateDayLog(input.date);
+    patch.day_log_id = destinationDay.id;
+  }
   if (input.title !== undefined) patch.title = input.title;
   if (input.description !== undefined) patch.description = input.description;
   if (input.final_calories !== undefined) {

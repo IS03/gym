@@ -26,6 +26,9 @@ export type Exercise = {
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
+  rir_sugerido: number | null;
+  descanso_min_sugerido_segundos: number | null;
+  descanso_max_sugerido_segundos: number | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;

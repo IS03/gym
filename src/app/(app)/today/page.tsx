@@ -180,6 +180,16 @@ export default async function TodayPage() {
                     <form action={updateMealAction} className="mt-3 space-y-3">
                       <input type="hidden" name="id" value={meal.id} />
                       <div className="space-y-1">
+                        <Label htmlFor={`date-${meal.id}`}>Fecha</Label>
+                        <Input
+                          id={`date-${meal.id}`}
+                          name="date"
+                          type="date"
+                          required
+                          defaultValue={dayLog.log_date}
+                        />
+                      </div>
+                      <div className="space-y-1">
                         <Label htmlFor={`t-${meal.id}`}>Título</Label>
                         <Input
                           id={`t-${meal.id}`}

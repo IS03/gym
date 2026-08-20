@@ -12,6 +12,9 @@ export type ExerciseLibraryItem = Pick<
   | "series_sugeridas"
   | "reps_sugeridas"
   | "peso_sugerido"
+  | "rir_sugerido"
+  | "descanso_min_sugerido_segundos"
+  | "descanso_max_sugerido_segundos"
   | "updated_at"
 >;
 
@@ -52,6 +55,19 @@ export function exerciseSuggestedValuesLabel(exercise: ExerciseLibraryItem): str
 
   if (exercise.peso_sugerido !== null && exercise.peso_sugerido > 0) {
     values.push(`${formatNumber(exercise.peso_sugerido)} kg`);
+  }
+
+  if (exercise.rir_sugerido !== null) {
+    values.push(`RIR ${formatNumber(exercise.rir_sugerido)}`);
+  }
+
+  if (
+    exercise.descanso_min_sugerido_segundos !== null &&
+    exercise.descanso_max_sugerido_segundos !== null
+  ) {
+    const minimum = exercise.descanso_min_sugerido_segundos;
+    const maximum = exercise.descanso_max_sugerido_segundos;
+    values.push(minimum === maximum ? `${minimum} s` : `${minimum}–${maximum} s`);
   }
 
   return values.length > 0 ? values.join(" · ") : null;

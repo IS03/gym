@@ -9,12 +9,18 @@ describe("normalizeExerciseMutation", () => {
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
+      rir_sugerido: 2,
+      descanso_min_sugerido_segundos: 120,
+      descanso_max_sugerido_segundos: 180,
     })).toEqual({
       nombre: "Press banca",
       grupo_muscular: "pecho",
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
+      rir_sugerido: 2,
+      descanso_min_sugerido_segundos: 120,
+      descanso_max_sugerido_segundos: 180,
     });
   });
 
@@ -25,6 +31,9 @@ describe("normalizeExerciseMutation", () => {
       series_sugeridas: null,
       reps_sugeridas: null,
       peso_sugerido: null,
+      rir_sugerido: null,
+      descanso_min_sugerido_segundos: null,
+      descanso_max_sugerido_segundos: null,
     })).toMatchObject({ nombre: "Cinta", grupo_muscular: null });
   });
 
@@ -32,5 +41,8 @@ describe("normalizeExerciseMutation", () => {
     expect(() => normalizeExerciseMutation({ nombre: "", grupo_muscular: null })).toThrow("Nombre es obligatorio");
     expect(() => normalizeExerciseMutation({ nombre: "Press", grupo_muscular: "cuello" })).toThrow("Grupo muscular inválido");
     expect(() => normalizeExerciseMutation({ nombre: "Press", grupo_muscular: "pecho", series_sugeridas: -1 })).toThrow("Series sugeridas");
+    expect(() => normalizeExerciseMutation({ nombre: "Press", rir_sugerido: 11 })).toThrow("RIR sugerido");
+    expect(() => normalizeExerciseMutation({ nombre: "Press", descanso_min_sugerido_segundos: 120 })).toThrow("ambos descansos");
+    expect(() => normalizeExerciseMutation({ nombre: "Press", descanso_min_sugerido_segundos: 180, descanso_max_sugerido_segundos: 120 })).toThrow("no puede superar");
   });
 });

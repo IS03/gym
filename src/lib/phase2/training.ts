@@ -260,6 +260,9 @@ export async function createExercise(input: {
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
+  rir_sugerido: number | null;
+  descanso_min_sugerido_segundos: number | null;
+  descanso_max_sugerido_segundos: number | null;
 }): Promise<Exercise> {
   assertNonEmpty(input.nombre, "Nombre");
   const supabase = await createClient();
@@ -274,6 +277,9 @@ export async function createExercise(input: {
       series_sugeridas: input.series_sugeridas,
       reps_sugeridas: input.reps_sugeridas,
       peso_sugerido: input.peso_sugerido,
+      rir_sugerido: input.rir_sugerido,
+      descanso_min_sugerido_segundos: input.descanso_min_sugerido_segundos,
+      descanso_max_sugerido_segundos: input.descanso_max_sugerido_segundos,
       is_active: true,
     })
     .select("*")
@@ -296,6 +302,9 @@ export async function updateExercise(input: {
   series_sugeridas?: number | null;
   reps_sugeridas?: number | null;
   peso_sugerido?: number | null;
+  rir_sugerido?: number | null;
+  descanso_min_sugerido_segundos?: number | null;
+  descanso_max_sugerido_segundos?: number | null;
   is_active?: boolean;
 }): Promise<Exercise> {
   const supabase = await createClient();
@@ -311,6 +320,13 @@ export async function updateExercise(input: {
   if (input.series_sugeridas !== undefined) patch.series_sugeridas = input.series_sugeridas;
   if (input.reps_sugeridas !== undefined) patch.reps_sugeridas = input.reps_sugeridas;
   if (input.peso_sugerido !== undefined) patch.peso_sugerido = input.peso_sugerido;
+  if (input.rir_sugerido !== undefined) patch.rir_sugerido = input.rir_sugerido;
+  if (input.descanso_min_sugerido_segundos !== undefined) {
+    patch.descanso_min_sugerido_segundos = input.descanso_min_sugerido_segundos;
+  }
+  if (input.descanso_max_sugerido_segundos !== undefined) {
+    patch.descanso_max_sugerido_segundos = input.descanso_max_sugerido_segundos;
+  }
   if (input.is_active !== undefined) patch.is_active = input.is_active;
 
   const { data, error } = await supabase
@@ -773,30 +789,27 @@ export async function finishSession(sessionId: string): Promise<WorkoutSession> 
 export async function addExistingExerciseToSession(input: {
   sessionId: string;
   exerciseId: string;
+  sourceType?: "extra" | "manual_new";
 }): Promise<WorkoutSessionExercise> {
   const supabase = await createClient();
   const userId = await getAuthedUserId();
-  await requireSessionInProgress(input.sessionId);
-
-  const { data: exercise, error: exErr } = await supabase
-    .from("exercises")
-    .select("id, nombre, grupo_muscular")
-    .eq("id", input.exerciseId)
-    .eq("user_id", userId)
-    .single();
-  if (exErr) throw new Error(`Leer exercise: ${exErr.message}`);
+  const { data: appendedId, error: appendError } = await supabase.rpc(
+    "append_workout_exercise",
+    {
+      p_session_id: input.sessionId,
+      p_exercise_id: input.exerciseId,
+      p_source_type: input.sourceType ?? "extra",
+    },
+  );
+  if (appendError) throw new Error(`Agregar ejercicio a sesión: ${appendError.message}`);
 
   const { data, error } = await supabase
     .from("workout_session_exercises")
-    .insert({
-      workout_session_id: input.sessionId,
-      exercise_id: exercise.id,
-      nombre_snapshot: exercise.nombre,
-      grupo_muscular_snapshot: exercise.grupo_muscular,
-    })
     .select("*")
+    .eq("id", appendedId)
+    .eq("user_id", userId)
     .single();
-  if (error) throw new Error(`Agregar ejercicio a sesión: ${error.message}`);
+  if (error) throw new Error(`Leer ejercicio agregado: ${error.message}`);
   return data as WorkoutSessionExercise;
 }
 
@@ -807,6 +820,9 @@ export async function createExerciseFromSession(input: {
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
+  rir_sugerido: number | null;
+  descanso_min_sugerido_segundos: number | null;
+  descanso_max_sugerido_segundos: number | null;
 }): Promise<{
   exercise: Exercise;
   sessionExercise: WorkoutSessionExercise;
@@ -835,11 +851,15 @@ export async function createExerciseFromSession(input: {
     series_sugeridas: input.series_sugeridas,
     reps_sugeridas: input.reps_sugeridas,
     peso_sugerido: input.peso_sugerido,
+    rir_sugerido: input.rir_sugerido,
+    descanso_min_sugerido_segundos: input.descanso_min_sugerido_segundos,
+    descanso_max_sugerido_segundos: input.descanso_max_sugerido_segundos,
   });
 
   const sessionExercise = await addExistingExerciseToSession({
     sessionId: input.sessionId,
     exerciseId: exercise.id,
+    sourceType: "manual_new",
   });
 
   return { exercise, sessionExercise };

@@ -962,12 +962,13 @@ export function SessionEditor({
 
       {!readOnly && exercisePickerOpen ? (
         <div
-              className="fixed inset-0 z-[60] flex items-end bg-black/45 px-2 pt-12 backdrop-blur-[2px]"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="extra-exercise-title"
-            >
-              <div className="max-h-[min(46rem,calc(100dvh-env(safe-area-inset-top)))] w-full rounded-t-[1.7rem] border border-border bg-card px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-200">
+          className="fixed inset-0 z-[60] flex items-end justify-center overflow-hidden bg-black/45 px-2 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-[2px] lg:items-center lg:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="extra-exercise-title"
+        >
+          <div className="flex max-h-[calc(100dvh-max(0.75rem,env(safe-area-inset-top)))] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.7rem] border border-border bg-card shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-200 lg:max-h-[min(90dvh,46rem)] lg:rounded-[1.7rem]">
+            <div className="shrink-0 px-4 pt-4">
                 <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
@@ -988,6 +989,8 @@ export function SessionEditor({
                     <X aria-hidden />
                   </Button>
                 </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
                   <Input
@@ -1060,7 +1063,8 @@ export function SessionEditor({
                     />
                   </div>
                 </details>
-              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 

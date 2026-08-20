@@ -17,6 +17,9 @@ function exercise(
     series_sugeridas: null,
     reps_sugeridas: null,
     peso_sugerido: null,
+    rir_sugerido: null,
+    descanso_min_sugerido_segundos: null,
+    descanso_max_sugerido_segundos: null,
     updated_at: "2026-08-13T00:00:00.000Z",
     ...overrides,
   };
@@ -57,6 +60,9 @@ describe("exerciseLibrarySummary", () => {
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
-    }))).toBe("Pecho · 3×10 · 80 kg");
+      rir_sugerido: 2,
+      descanso_min_sugerido_segundos: 120,
+      descanso_max_sugerido_segundos: 180,
+    }))).toBe("Pecho · 3×10 · 80 kg · RIR 2 · 120–180 s");
   });
 });

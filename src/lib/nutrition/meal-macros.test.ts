@@ -105,4 +105,15 @@ describe("manual meal application wiring", () => {
     expect(actionSource).toContain('revalidatePath("/home")');
     expect(actionSource.match(/revalidateMealPages\(\)/g)?.length).toBe(4);
   });
+
+  it("usa la fecha elegida para crear, detectar duplicados y mover la misma comida", () => {
+    expect(createFormSource).toContain('name="date"');
+    expect(createFormSource).toContain("defaultValue={date}");
+    expect(createFormSource).not.toContain('fd.set("date", date)');
+    expect(actionSource).toContain('formData.get("date")');
+    expect(todaySource).toContain('name="date"');
+    expect(dayLogSource).toContain("patch.day_log_id = destinationDay.id");
+    expect(dayLogSource).not.toContain("delete().eq(\"id\", input.id)");
+    expect(dayLogSource).not.toContain("legacy_import_source =");
+  });
 });

@@ -16,11 +16,9 @@ type Props = {
 
 function buildFormData(
   el: HTMLFormElement,
-  date: string,
   forceDuplicate: boolean,
 ): FormData {
   const fd = new FormData(el);
-  fd.set("date", date);
   fd.set("force_duplicate", forceDuplicate ? "1" : "0");
   return fd;
 }
@@ -48,7 +46,7 @@ export function CreateMealForm({ date }: Props) {
 
           setSaving(true);
           try {
-            const fd = buildFormData(el, date, false);
+            const fd = buildFormData(el, false);
             const { duplicate } = await checkRecentDuplicateMealAction(fd);
             if (duplicate) {
               setShowDup(true);
@@ -66,6 +64,17 @@ export function CreateMealForm({ date }: Props) {
           }
         }}
       >
+        <div className="space-y-1">
+          <Label htmlFor="new-meal-date">Fecha</Label>
+          <Input
+            id="new-meal-date"
+            name="date"
+            type="date"
+            required
+            defaultValue={date}
+            disabled={saving}
+          />
+        </div>
         <div className="space-y-1">
           <Label htmlFor="new-meal-title">Título</Label>
           <Input
@@ -189,7 +198,7 @@ export function CreateMealForm({ date }: Props) {
                   }
                   setSaving(true);
                   try {
-                    const fd = buildFormData(el, date, true);
+                    const fd = buildFormData(el, true);
                     const result = await createMealAction(fd);
                     if (result.ok) {
                       setShowDup(false);

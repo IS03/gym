@@ -78,6 +78,9 @@ function toExerciseActionExercise(exercise: Awaited<ReturnType<typeof createExer
     series_sugeridas: exercise.series_sugeridas,
     reps_sugeridas: exercise.reps_sugeridas,
     peso_sugerido: exercise.peso_sugerido,
+    rir_sugerido: exercise.rir_sugerido,
+    descanso_min_sugerido_segundos: exercise.descanso_min_sugerido_segundos,
+    descanso_max_sugerido_segundos: exercise.descanso_max_sugerido_segundos,
     updated_at: exercise.updated_at,
   };
 }
@@ -287,15 +290,27 @@ export async function createExerciseFromSessionAction(formData: FormData) {
   const series_sugeridas = num(formData, "series_sugeridas");
   const reps_sugeridas = num(formData, "reps_sugeridas");
   const peso_sugerido = num(formData, "peso_sugerido");
+  const rir_sugerido = num(formData, "rir_sugerido");
+  const descanso_min_sugerido_segundos = num(
+    formData,
+    "descanso_min_sugerido_segundos",
+  );
+  const descanso_max_sugerido_segundos = num(
+    formData,
+    "descanso_max_sugerido_segundos",
+  );
 
-  await createExerciseFromSession({
-    sessionId,
+  const exercise = normalizeExerciseMutation({
     nombre,
     grupo_muscular,
     series_sugeridas,
     reps_sugeridas,
     peso_sugerido,
+    rir_sugerido,
+    descanso_min_sugerido_segundos,
+    descanso_max_sugerido_segundos,
   });
+  await createExerciseFromSession({ sessionId, ...exercise });
   revalidatePath(`/train/session/${sessionId}`);
   revalidatePath("/train/exercises");
 }

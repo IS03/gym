@@ -57,7 +57,7 @@ export function SessionCreateExerciseForm(props: {
       </div>
       <div className="space-y-1">
         <Label>Valores sugeridos</Label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <Input
             name="series_sugeridas"
             type="number"
@@ -82,6 +82,36 @@ export function SessionCreateExerciseForm(props: {
             inputMode="decimal"
             placeholder="Peso"
           />
+          <Input
+            name="rir_sugerido"
+            type="number"
+            min={0}
+            max={10}
+            step={1}
+            inputMode="numeric"
+            placeholder="RIR"
+            aria-label="RIR sugerido"
+          />
+          <Input
+            name="descanso_min_sugerido_segundos"
+            type="number"
+            min={0}
+            max={3600}
+            step={1}
+            inputMode="numeric"
+            placeholder="Desc. mín."
+            aria-label="Descanso mínimo sugerido en segundos"
+          />
+          <Input
+            name="descanso_max_sugerido_segundos"
+            type="number"
+            min={0}
+            max={3600}
+            step={1}
+            inputMode="numeric"
+            placeholder="Desc. máx."
+            aria-label="Descanso máximo sugerido en segundos"
+          />
         </div>
       </div>
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -91,4 +121,3 @@ export function SessionCreateExerciseForm(props: {
     </form>
   );
 }
-

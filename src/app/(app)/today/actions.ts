@@ -91,6 +91,7 @@ export async function createMealAction(
 
 export async function updateMealAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
+  const date = String(formData.get("date") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const calories = requiredMealCalories(formData.get("final_calories"));
@@ -100,6 +101,7 @@ export async function updateMealAction(formData: FormData) {
 
   await updateMeal({
     id,
+    date,
     title: title ? title : null,
     description: description ? description : null,
     final_calories: calories,
