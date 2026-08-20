@@ -8,6 +8,7 @@ import {
   parseBearerToken,
   parseChatgptMealInput,
 } from "./chatgpt-contract";
+import type { IntegrationAuthEvent } from "./chatgpt-tokens";
 
 export const CHATGPT_MEAL_MAX_BODY_BYTES = 16_384;
 
@@ -16,6 +17,7 @@ export class PossibleDuplicateError extends Error {}
 export type ChatgptMealDependencies = {
   authenticate: (rawToken: string) => Promise<{ userId: string } | null>;
   persist: (userId: string, meal: ChatgptMealInput) => Promise<ChatgptMealSuccess>;
+  auditAuth?: (event: IntegrationAuthEvent) => void;
   now?: () => Date;
 };
 
@@ -41,6 +43,11 @@ export async function handleChatgptMealRequest(
 
   const rawToken = parseBearerToken(request.authorization);
   if (!rawToken) {
+    dependencies.auditAuth?.(
+      request.authorization?.trim()
+        ? "malformed_bearer"
+        : "missing_authorization",
+    );
     return {
       status: 401,
       body: { ok: false, error: "invalid_token", message: "Token inválido." },

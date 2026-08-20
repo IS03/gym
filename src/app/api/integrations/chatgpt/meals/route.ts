@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authenticateIntegrationToken } from "@/lib/integrations/chatgpt-tokens";
+import {
+  authenticateIntegrationToken,
+  logIntegrationAuthEvent,
+} from "@/lib/integrations/chatgpt-tokens";
 import {
   CHATGPT_MEAL_MAX_BODY_BYTES,
   handleChatgptMealRequest,
@@ -55,6 +58,7 @@ export async function POST(request: NextRequest) {
     {
       authenticate: authenticateIntegrationToken,
       persist: persistChatgptMeal,
+      auditAuth: logIntegrationAuthEvent,
     },
   );
   return NextResponse.json(result.body, { status: result.status });

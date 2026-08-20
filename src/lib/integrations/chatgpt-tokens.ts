@@ -4,6 +4,17 @@ import { createHash, randomBytes } from "node:crypto";
 import { createClient } from "../supabase/server";
 import { createAdminClient } from "../supabase/admin";
 
+export type IntegrationAuthEvent =
+  | "missing_authorization"
+  | "malformed_bearer"
+  | "invalid_token_shape"
+  | "token_hash_not_found"
+  | "token_authenticated";
+
+export function logIntegrationAuthEvent(event: IntegrationAuthEvent) {
+  console.info(`[ownlevel-chatgpt-auth] ${event}`);
+}
+
 export type IntegrationApiToken = {
   id: string;
   token_prefix: string;
@@ -77,7 +88,10 @@ export async function revokeIntegrationApiToken(id: string): Promise<void> {
 }
 
 export async function authenticateIntegrationToken(rawToken: string) {
-  if (!rawToken.startsWith("ownlevel_") || rawToken.length < 40) return null;
+  if (!/^ownlevel_[A-Za-z0-9_-]{43}$/.test(rawToken)) {
+    logIntegrationAuthEvent("invalid_token_shape");
+    return null;
+  }
   const admin = createAdminClient();
   const tokenHash = hashIntegrationToken(rawToken);
   const { data, error } = await admin
@@ -89,9 +103,15 @@ export async function authenticateIntegrationToken(rawToken: string) {
     .maybeSingle();
   // Permite comprobar credenciales administrativas en un preview previo a la
   // migración. En producción la tabla existe; cualquier otro fallo es interno.
-  if (error?.code === "PGRST205") return null;
+  if (error?.code === "PGRST205") {
+    logIntegrationAuthEvent("token_hash_not_found");
+    return null;
+  }
   if (error) throw new Error("No se pudo autenticar la integración.");
-  if (!data) return null;
+  if (!data) {
+    logIntegrationAuthEvent("token_hash_not_found");
+    return null;
+  }
 
   const { error: usageError } = await admin
     .from("integration_api_tokens")
@@ -100,5 +120,6 @@ export async function authenticateIntegrationToken(rawToken: string) {
     .is("revoked_at", null);
   if (usageError) throw new Error("No se pudo registrar el uso de la integración.");
 
+  logIntegrationAuthEvent("token_authenticated");
   return { userId: String(data.user_id), tokenId: String(data.id) };
 }

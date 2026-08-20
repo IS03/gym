@@ -98,7 +98,7 @@ function optionalText(value: unknown, label: string, maxLength: number) {
 
 export function parseBearerToken(authorization: string | null): string | null {
   if (!authorization) return null;
-  const match = /^Bearer ([^\s]+)$/.exec(authorization);
+  const match = /^Bearer[ \t]+([^\s]+)$/i.exec(authorization.trim());
   return match?.[1] ?? null;
 }
 

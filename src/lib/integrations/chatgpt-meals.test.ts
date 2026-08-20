@@ -10,8 +10,14 @@ import {
   PossibleDuplicateError,
   type ChatgptMealDependencies,
 } from "./chatgpt-meals";
-import { parseChatgptMealInput } from "./chatgpt-contract";
-import { hashIntegrationToken, newIntegrationToken } from "./chatgpt-tokens";
+import { parseBearerToken, parseChatgptMealInput } from "./chatgpt-contract";
+import {
+  authenticateIntegrationToken,
+  hashIntegrationToken,
+  newIntegrationToken,
+} from "./chatgpt-tokens";
+
+const validToken = `ownlevel_${"a".repeat(43)}`;
 
 const validBody = {
   date: "2026-08-20",
@@ -60,6 +66,56 @@ function request(body: unknown = validBody, authorization: string | null = "Bear
 }
 
 describe("ChatGPT private meal contract", () => {
+  it("acepta Bearer case-insensitive, OWS exterior y múltiples espacios", () => {
+    expect(parseBearerToken(`Bearer ${validToken}`)).toBe(validToken);
+    expect(parseBearerToken(`bearer ${validToken}`)).toBe(validToken);
+    expect(parseBearerToken(`BEARER ${validToken}`)).toBe(validToken);
+    expect(parseBearerToken(`Bearer    ${validToken}`)).toBe(validToken);
+    expect(parseBearerToken(` \t bearer\t${validToken} \t`)).toBe(validToken);
+  });
+
+  it("rechaza credential vacía, whitespace interno y Authorization ausente", () => {
+    expect(parseBearerToken("Bearer    ")).toBeNull();
+    expect(parseBearerToken(`Bearer ${validToken} extra`)).toBeNull();
+    expect(parseBearerToken(null)).toBeNull();
+  });
+
+  it("envía cada Bearer válido al autenticador sin alterar la credential", async () => {
+    for (const header of [
+      `Bearer ${validToken}`,
+      `bearer ${validToken}`,
+      `BEARER    ${validToken}`,
+      ` \tBearer\t${validToken}\t `,
+    ]) {
+      const authenticate = vi.fn(async () => ({ userId: "token-owner" }));
+      expect(
+        (await handleChatgptMealRequest(request(validBody, header), deps({ authenticate }))).status,
+      ).toBe(200);
+      expect(authenticate).toHaveBeenCalledWith(validToken);
+    }
+  });
+
+  it("clasifica fallos previos al lookup sin registrar credenciales", async () => {
+    const auditAuth = vi.fn();
+    const authenticate = vi.fn(async () => ({ userId: "token-owner" }));
+    await handleChatgptMealRequest(request(validBody, null), deps({ auditAuth, authenticate }));
+    await handleChatgptMealRequest(request(validBody, "Bearer   "), deps({ auditAuth, authenticate }));
+    expect(auditAuth.mock.calls).toEqual([
+      ["missing_authorization"],
+      ["malformed_bearer"],
+    ]);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+
+  it("rechaza formas de token ajenas a OWNLEVEL antes del lookup", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    await expect(authenticateIntegrationToken("arbitrary-token")).resolves.toBeNull();
+    expect(info).toHaveBeenCalledWith(
+      "[ownlevel-chatgpt-auth] invalid_token_shape",
+    );
+    info.mockRestore();
+  });
+
   it("rechaza Authorization ausente, inválida o revocada", async () => {
     expect((await handleChatgptMealRequest(request(validBody, null), deps())).status).toBe(401);
     expect((await handleChatgptMealRequest(request(validBody, "Basic abc"), deps())).status).toBe(401);
