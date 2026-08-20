@@ -24,6 +24,7 @@ describe("getActiveBottomNavIndex", () => {
     ["/train/history", 1],
     ["/today", 2],
     ["/today/meal", 2],
+    ["/today/reports", 2],
     ["/history", 3],
     ["/history/2026-08-11", 3],
   ])("selecciona la sección correcta para %s", (pathname, expected) => {

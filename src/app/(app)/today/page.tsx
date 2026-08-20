@@ -1,7 +1,10 @@
+import Link from "next/link";
+import { ChartNoAxesCombined } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { CreateMealForm } from "./create-meal-form";
@@ -63,9 +66,14 @@ export default async function TodayPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Nutrición de hoy</h1>
-        <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Nutrición de hoy</h1>
+          <p className="text-sm text-muted-foreground">{dayLog.log_date}</p>
+        </div>
+        <Link href="/today/reports" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
+          <ChartNoAxesCombined className="size-4" aria-hidden /> Reportes
+        </Link>
       </div>
 
       <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
