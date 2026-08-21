@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ExpenditureRulePeriod, NutritionGoalPeriod, WorkSchedulePeriod } from "@/lib/phase1/types";
@@ -50,7 +51,7 @@ function GoalForm({ current, today, onSuccess }: { current: NutritionGoalPeriod 
   const [state, action, pending] = useActionState(createGoalAction, initial);
   useCloseAfterSave(state, onSuccess);
   return <form action={action} className="space-y-4">
-    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="goal-name">Nombre</Label><Input id="goal-name" name="name" required defaultValue={current?.name ?? ""} placeholder="Ej: Recomposición suave" /></div><div className="min-w-0 space-y-1"><Label htmlFor="goal-date">Vigente desde</Label><Input id="goal-date" name="effective_from" type="date" required defaultValue={today} className="[min-inline-size:0]" /></div></div>
+    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="goal-name">Nombre</Label><Input id="goal-name" name="name" required defaultValue={current?.name ?? ""} placeholder="Ej: Recomposición suave" /></div><div className="min-w-0 space-y-1"><Label htmlFor="goal-date">Vigente desde</Label><DateInput id="goal-date" name="effective_from" required defaultValue={today} /></div></div>
     <div><p className="mb-2 text-sm font-medium">Calorías</p><div className="grid grid-cols-2 gap-3"><Field name="calories_no_gym" label="Sin gym" value={current?.calories_no_gym} /><Field name="calories_gym" label="Con gym" value={current?.calories_gym} /></div></div>
     <div><p className="mb-2 text-sm font-medium">Proteína (g)</p><div className="grid grid-cols-2 gap-3"><Field name="protein_no_gym_g" label="Sin gym" step="0.1" value={current?.protein_no_gym_g} /><Field name="protein_gym_g" label="Con gym" step="0.1" value={current?.protein_gym_g} /></div></div>
     <div><p className="mb-2 text-sm font-medium">Agua (L)</p><div className="grid grid-cols-2 gap-3"><Field name="water_no_gym_l" label="Sin gym" step="0.1" value={current?.water_no_gym_l} /><Field name="water_gym_l" label="Con gym" step="0.1" value={current?.water_gym_l} /></div></div>
@@ -67,7 +68,7 @@ function ExpenditureForm({ current, today, onSuccess }: { current: ExpenditureRu
   const [state, action, pending] = useActionState(createExpenditureAction, initial);
   useCloseAfterSave(state, onSuccess);
   return <form action={action} className="space-y-4">
-    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="expense-name">Nombre</Label><Input id="expense-name" name="name" required defaultValue={current?.name ?? ""} /></div><div className="min-w-0 space-y-1"><Label htmlFor="expense-date">Vigente desde</Label><Input id="expense-date" name="effective_from" type="date" required defaultValue={today} className="[min-inline-size:0]" /></div></div>
+    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="expense-name">Nombre</Label><Input id="expense-name" name="name" required defaultValue={current?.name ?? ""} /></div><div className="min-w-0 space-y-1"><Label htmlFor="expense-date">Vigente desde</Label><DateInput id="expense-date" name="effective_from" required defaultValue={today} /></div></div>
     <div className="grid grid-cols-2 gap-3"><Field name="work_gym_kcal" label="Trabajo + gym" value={current?.work_gym_kcal} /><Field name="work_no_gym_kcal" label="Trabajo + sin gym" value={current?.work_no_gym_kcal} /><Field name="no_work_gym_kcal" label="Sin trabajo + gym" value={current?.no_work_gym_kcal} /><Field name="no_work_no_gym_kcal" label="Sin trabajo + sin gym" value={current?.no_work_no_gym_kcal} /></div>
     <StateMessage state={state} />
     <Button className="h-11 w-full" disabled={pending}>{pending ? "Guardando…" : "Guardar nuevo gasto"}</Button>
@@ -82,7 +83,7 @@ function ScheduleForm({ current, today, onSuccess }: { current: WorkSchedulePeri
   const [state, action, pending] = useActionState(createScheduleAction, initial);
   useCloseAfterSave(state, onSuccess);
   return <form action={action} className="space-y-4">
-    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="schedule-name">Nombre</Label><Input id="schedule-name" name="name" required defaultValue={current?.name ?? ""} /></div><div className="min-w-0 space-y-1"><Label htmlFor="schedule-date">Vigente desde</Label><Input id="schedule-date" name="effective_from" type="date" required defaultValue={today} className="[min-inline-size:0]" /></div></div>
+    <div className="grid grid-cols-2 gap-3"><div className="min-w-0 space-y-1"><Label htmlFor="schedule-name">Nombre</Label><Input id="schedule-name" name="name" required defaultValue={current?.name ?? ""} /></div><div className="min-w-0 space-y-1"><Label htmlFor="schedule-date">Vigente desde</Label><DateInput id="schedule-date" name="effective_from" required defaultValue={today} /></div></div>
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{days.map(([key, label]) => <label key={key} className="flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm"><input type="checkbox" name={key} defaultChecked={current?.[key] ?? false} className="size-4 accent-primary" />{label}</label>)}</div>
     <StateMessage state={state} />
     <Button className="h-11 w-full" disabled={pending}>{pending ? "Guardando…" : "Guardar nuevo horario"}</Button>

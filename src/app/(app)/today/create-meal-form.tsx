@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -68,10 +69,9 @@ export function CreateMealForm({ date, onSuccess }: Props) {
       >
         <div className="min-w-0 space-y-1 overflow-hidden">
           <Label htmlFor="new-meal-date">Fecha</Label>
-          <Input
+          <DateInput
             id="new-meal-date"
             name="date"
-            type="date"
             required
             defaultValue={date}
             disabled={saving}

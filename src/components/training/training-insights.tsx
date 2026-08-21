@@ -81,10 +81,10 @@ export function WeeklyTrainingChart({ weeks, className }: { weeks: WeeklyTrainin
 
   return (
     <section className={cn("space-y-4", className)} aria-labelledby="weekly-training-chart-title">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         <div><h2 id="weekly-training-chart-title" className="text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted-foreground">Últimas {visibleWeeks.length} {visibleWeeks.length === 1 ? "semana" : "semanas"}.</p></div>
-        <div className="grid grid-cols-2 gap-1 rounded-lg border p-1 sm:flex" aria-label="Métrica de evolución semanal">
-          {WEEKLY_CHART_METRICS.map((option) => <Button key={option.value} type="button" size="sm" variant={metric === option.value ? "secondary" : "ghost"} aria-pressed={metric === option.value} onClick={() => setMetric(option.value)}>{option.label}</Button>)}
+        <div className="grid w-full grid-cols-2 gap-1 rounded-lg border p-1 lg:grid-cols-4" aria-label="Métrica de evolución semanal">
+          {WEEKLY_CHART_METRICS.map((option) => <Button key={option.value} type="button" size="sm" className="h-9 w-full min-w-0 px-2 text-[13px] sm:text-sm" variant={metric === option.value ? "secondary" : "ghost"} aria-pressed={metric === option.value} onClick={() => setMetric(option.value)}>{option.label}</Button>)}
         </div>
       </div>
       <p className="sr-only">{summary}</p>

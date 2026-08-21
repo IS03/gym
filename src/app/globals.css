@@ -401,6 +401,26 @@
   }
 }
 
+/* Preserve the native iOS picker while preventing WebKit date values from widening their field. */
+.ownlevel-date-input {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  text-align: left;
+}
+
+.ownlevel-date-input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+.ownlevel-date-input::-webkit-datetime-edit {
+  padding: 0;
+  text-align: left;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

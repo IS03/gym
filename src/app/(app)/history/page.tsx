@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, ChevronRight, Dumbbell, Scale } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { BODY_MEASUREMENT_FIELDS, type BodyMeasurement } from "@/lib/body-measurements";
 import { getDailyHistoryDetail, listDailyHistoryDays } from "@/lib/history/daily-history";
 import { getVerifiedRequestContext } from "@/lib/supabase/server";
@@ -28,7 +29,7 @@ function formatDate(value: string) { return new Intl.DateTimeFormat("es-AR", { w
 function energyBalanceLabel(value: number | null) { if (value === null) return "—"; if (value < 0) return `Déficit estimado: ${integer.format(Math.abs(value))} kcal`; if (value > 0) return `Superávit estimado: ${integer.format(value)} kcal`; return "Balance estimado: 0 kcal"; }
 function originalTimeKnown(rawInput: string | null) { if (!rawInput) return true; try { return (JSON.parse(rawInput) as { originalTimeKnown?: boolean }).originalTimeKnown !== false; } catch { return true; } }
 
-function DatePicker({ value, today }: { value: string; today: string }) { return <form action="/history" className="flex gap-2"><input type="date" name="date" defaultValue={value} max={today} className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" /><Button className="h-11" type="submit" variant="outline">Cambiar fecha</Button></form>; }
+function DatePicker({ value, today }: { value: string; today: string }) { return <form action="/history" className="flex min-w-0 gap-2"><DateInput name="date" defaultValue={value} max={today} className="flex-1" /><Button className="h-11" type="submit" variant="outline">Cambiar fecha</Button></form>; }
 
 function BodySection({ measurement }: { measurement: BodyMeasurement }) {
   const values = BODY_MEASUREMENT_FIELDS.flatMap((field) => measurement[field] === null ? [] : [{ field, value: measurement[field] }]);

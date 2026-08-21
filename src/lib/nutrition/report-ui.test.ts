@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = (path: string) => readFileSync(path, "utf8");
 const reportsPage = source("src/app/(app)/today/reports/page.tsx");
 const breakdown = source("src/components/nutrition/nutrition-report-daily-breakdown.tsx");
+const dateInput = source("src/components/ui/date-input.tsx");
 
 describe("PR 10.7 — jerarquía de reportes", () => {
   it("deja el rango temporal en la card de período y no en el encabezado", () => {
@@ -12,11 +13,17 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(reportsPage).not.toContain("{range.start} al {range.end}");
   });
 
-  it("mantiene el personalizado vertical en mobile y acota los date inputs", () => {
+  it("mantiene el personalizado vertical en mobile y usa el date input compartido", () => {
     expect(reportsPage).toContain("grid-cols-1");
     expect(reportsPage).toContain("sm:grid-cols-2");
-    expect(reportsPage).toContain("min-w-0 max-w-full");
-    expect(reportsPage).toContain("[min-inline-size:0]");
+    expect(reportsPage).toContain("<DateInput");
+    expect(dateInput).toContain('type="date"');
+  });
+
+  it("siempre muestra el rango efectivo en el formulario personalizado", () => {
+    expect(reportsPage).toContain('defaultValue={range.start}');
+    expect(reportsPage).toContain('defaultValue={range.end}');
+    expect(reportsPage).not.toContain('range.preset === "custom" ? range.start : ""');
   });
 
   it("presenta proteína, carbos y grasas en la misma grilla", () => {

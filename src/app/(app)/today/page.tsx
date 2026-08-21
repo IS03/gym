@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChartNoAxesCombined } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -174,10 +175,9 @@ export default async function TodayPage() {
                       <input type="hidden" name="id" value={meal.id} />
                       <div className="space-y-1">
                         <Label htmlFor={`date-${meal.id}`}>Fecha</Label>
-                        <Input
+                        <DateInput
                           id={`date-${meal.id}`}
                           name="date"
-                          type="date"
                           required
                           defaultValue={dayLog.log_date}
                         />

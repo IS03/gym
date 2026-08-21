@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { getNutritionReport } from "@/lib/nutrition/reports";
 import type { NutritionReportPreset } from "@/lib/nutrition/reports-core";
@@ -88,9 +89,9 @@ export default async function NutritionReportsPage({
           <p className="text-sm font-medium text-foreground">{formatNutritionReportRange(range.start, range.end)}</p>
           <form action="/today/reports" className="grid min-w-0 grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
             <input type="hidden" name="period" value="custom" />
-            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Desde<input className="h-10 w-full min-w-0 max-w-full rounded-md border bg-background px-2 text-sm text-foreground [inline-size:100%] [min-inline-size:0]" type="date" name="from" defaultValue={range.preset === "custom" ? range.start : ""} max={today} required /></label>
-            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Hasta<input className="h-10 w-full min-w-0 max-w-full rounded-md border bg-background px-2 text-sm text-foreground [inline-size:100%] [min-inline-size:0]" type="date" name="to" defaultValue={range.preset === "custom" ? range.end : today} max={today} required /></label>
-            <Button type="submit" variant="outline" className="h-10 sm:col-span-2 lg:col-span-1 lg:self-end">Aplicar</Button>
+            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Desde<DateInput name="from" defaultValue={range.start} max={today} required /></label>
+            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Hasta<DateInput name="to" defaultValue={range.end} max={today} required /></label>
+            <Button type="submit" variant="outline" className="h-11 sm:col-span-2 lg:col-span-1 lg:self-end">Aplicar</Button>
           </form>
           <p className="text-xs text-muted-foreground">Período personalizado: máximo 366 días. Las fechas futuras se excluyen.</p>
           {range.error ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
