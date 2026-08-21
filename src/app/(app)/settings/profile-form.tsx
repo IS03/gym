@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
-import { DateInput } from "@/components/ui/date-input";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/lib/phase1/profile";
@@ -34,7 +34,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="min-w-0 space-y-1">
           <Label htmlFor="birth_date">Nacimiento</Label>
-          <DateInput
+          <DateField
             id="birth_date"
             name="birth_date"
             className="w-full min-w-0 max-w-full"

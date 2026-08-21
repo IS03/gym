@@ -5,6 +5,7 @@ import {
   completedWorkoutDayLogIds,
   nutritionMealCoverage,
   resolveNutritionReportRange,
+  subtractCalendarMonthsClamped,
   type NutritionReportDayLogFact,
   type NutritionReportMealFact,
   type NutritionReportWorkoutFact,
@@ -66,7 +67,7 @@ function workout(
 describe("nutrition report ranges", () => {
   it.each([
     ["7", "2026-08-14"],
-    ["14", "2026-08-07"],
+    ["15", "2026-08-06"],
     ["30", "2026-07-22"],
   ])("resuelve %s días con extremos inclusivos", (period, start) => {
     expect(resolveNutritionReportRange({ period }, today)).toEqual({
@@ -77,13 +78,25 @@ describe("nutrition report ranges", () => {
     });
   });
 
-  it("resuelve este mes usando la fecha lógica de Córdoba recibida", () => {
-    expect(resolveNutritionReportRange({ period: "month" }, today)).toEqual({
-      preset: "month",
-      start: "2026-08-01",
-      end: today,
-      error: null,
-    });
+  it("resuelve ventanas de calendario de tres meses y un año", () => {
+    expect(resolveNutritionReportRange({ period: "3m" }, "2026-08-21")).toMatchObject({ preset: "3m", start: "2026-05-22", end: "2026-08-21" });
+    expect(resolveNutritionReportRange({ period: "1y" }, "2026-08-21")).toMatchObject({ preset: "1y", start: "2025-08-22", end: "2026-08-21" });
+  });
+
+  it("mantiene los extremos inclusivos pedidos para los seis presets", () => {
+    const exampleToday = "2026-08-21";
+    expect(resolveNutritionReportRange({ period: "7" }, exampleToday)).toMatchObject({ start: "2026-08-15", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "15" }, exampleToday)).toMatchObject({ start: "2026-08-07", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "30" }, exampleToday)).toMatchObject({ start: "2026-07-23", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "3m" }, exampleToday)).toMatchObject({ start: "2026-05-22", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "1y" }, exampleToday)).toMatchObject({ start: "2025-08-22", end: exampleToday });
+  });
+
+  it("clampa meses de calendario al final válido, incluso en febrero bisiesto", () => {
+    expect(subtractCalendarMonthsClamped("2026-03-31", 3)).toBe("2025-12-31");
+    expect(subtractCalendarMonthsClamped("2026-05-31", 3)).toBe("2026-02-28");
+    expect(subtractCalendarMonthsClamped("2028-02-29", 12)).toBe("2027-02-28");
+    expect(resolveNutritionReportRange({ period: "3m" }, "2026-05-31").start).toBe("2026-03-01");
   });
 
   it("acepta personalizado, recorta futuro y protege el máximo", () => {
@@ -94,6 +107,11 @@ describe("nutrition report ranges", () => {
       error: null,
     });
     expect(resolveNutritionReportRange({ period: "custom", from: "2025-01-01", to: today }, today).error).toContain("366");
+  });
+
+  it("vuelve de forma segura a siete días ante presets inválidos", () => {
+    expect(resolveNutritionReportRange({ period: "14" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
+    expect(resolveNutritionReportRange({ period: "month" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
   });
 });
 

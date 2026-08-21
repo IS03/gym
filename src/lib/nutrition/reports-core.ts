@@ -2,7 +2,7 @@ import type { MealEntryKind } from "@/lib/phase1/types";
 
 export const NUTRITION_REPORT_MAX_DAYS = 366;
 
-export type NutritionReportPreset = "7" | "14" | "30" | "month" | "custom";
+export type NutritionReportPreset = "7" | "15" | "30" | "3m" | "1y" | "custom";
 
 export type NutritionReportRange = {
   preset: NutritionReportPreset;
@@ -127,6 +127,20 @@ export function addIsoDays(date: string, amount: number) {
   return parsed.toISOString().slice(0, 10);
 }
 
+/** Subtracts calendar months from an ISO logical date, clamping to the target month's last day. */
+export function subtractCalendarMonthsClamped(date: string, months: number) {
+  if (!validIsoDate(date) || !Number.isInteger(months) || months < 0) {
+    throw new Error("Meses de calendario inválidos.");
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const targetMonthIndex = year * 12 + (month - 1) - months;
+  const targetYear = Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12 + 1;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+  const targetDay = Math.min(day, lastDay);
+  return `${targetYear.toString().padStart(4, "0")}-${targetMonth.toString().padStart(2, "0")}-${targetDay.toString().padStart(2, "0")}`;
+}
+
 function inclusiveDays(start: string, end: string) {
   return Math.floor(
     (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime())
@@ -145,7 +159,7 @@ export function resolveNutritionReportRange(
   if (!validIsoDate(today)) throw new Error("Fecha lógica de Córdoba inválida.");
   const period = input.period ?? "7";
 
-  if (period === "7" || period === "14" || period === "30") {
+  if (period === "7" || period === "15" || period === "30") {
     return {
       preset: period,
       start: addIsoDays(today, -(Number(period) - 1)),
@@ -154,8 +168,14 @@ export function resolveNutritionReportRange(
     };
   }
 
-  if (period === "month") {
-    return { preset: "month", start: `${today.slice(0, 7)}-01`, end: today, error: null };
+  if (period === "3m" || period === "1y") {
+    const months = period === "3m" ? 3 : 12;
+    return {
+      preset: period,
+      start: addIsoDays(subtractCalendarMonthsClamped(today, months), 1),
+      end: today,
+      error: null,
+    };
   }
 
   if (period !== "custom") return fallbackRange(today);

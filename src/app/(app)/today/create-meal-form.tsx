@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DateInput } from "@/components/ui/date-input";
+import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -69,13 +69,13 @@ export function CreateMealForm({ date, onSuccess }: Props) {
       >
         <div className="min-w-0 space-y-1 overflow-hidden">
           <Label htmlFor="new-meal-date">Fecha</Label>
-          <DateInput
+          <DateField
             id="new-meal-date"
             name="date"
             required
             defaultValue={date}
             disabled={saving}
-            className="block min-w-0 max-w-full [inline-size:100%] [min-inline-size:0]"
+            className="min-w-0 max-w-full [min-inline-size:0]"
           />
         </div>
         <div className="space-y-1">

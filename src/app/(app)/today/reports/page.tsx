@@ -1,27 +1,17 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DateInput } from "@/components/ui/date-input";
-import { cn } from "@/lib/utils";
 import { getNutritionReport } from "@/lib/nutrition/reports";
-import type { NutritionReportPreset } from "@/lib/nutrition/reports-core";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-charts";
 import { NutritionReportDailyBreakdown } from "@/components/nutrition/nutrition-report-daily-breakdown";
+import { NutritionReportPeriodSelector } from "@/components/nutrition/nutrition-report-period-selector";
 import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
 
 export const dynamic = "force-dynamic";
 
 const numberFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
 const integerFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
-
-const filters: Array<{ period: Exclude<NutritionReportPreset, "custom">; label: string }> = [
-  { period: "7", label: "7 días" },
-  { period: "14", label: "14 días" },
-  { period: "30", label: "30 días" },
-  { period: "month", label: "Este mes" },
-];
 
 function formatValue(value: number | null, unit: string, integer = false) {
   if (value === null) return "—";
@@ -72,28 +62,13 @@ export default async function NutritionReportsPage({
 
       <Card>
         <CardContent className="space-y-4 pt-1">
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {filters.map((filter) => (
-              <Link
-                key={filter.period}
-                href={`/today/reports?period=${filter.period}`}
-                className={cn(
-                  buttonVariants({ variant: range.preset === filter.period ? "default" : "outline", size: "sm" }),
-                  "shrink-0 rounded-full",
-                )}
-              >
-                {filter.label}
-              </Link>
-            ))}
-          </div>
-          <p className="text-sm font-medium text-foreground">{formatNutritionReportRange(range.start, range.end)}</p>
-          <form action="/today/reports" className="grid min-w-0 grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <input type="hidden" name="period" value="custom" />
-            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Desde<DateInput name="from" defaultValue={range.start} max={today} required /></label>
-            <label className="min-w-0 space-y-1 text-xs text-muted-foreground">Hasta<DateInput name="to" defaultValue={range.end} max={today} required /></label>
-            <Button type="submit" variant="outline" className="h-11 sm:col-span-2 lg:col-span-1 lg:self-end">Aplicar</Button>
-          </form>
-          <p className="text-xs text-muted-foreground">Período personalizado: máximo 366 días. Las fechas futuras se excluyen.</p>
+          <NutritionReportPeriodSelector
+            preset={range.preset}
+            start={range.start}
+            end={range.end}
+            today={today}
+            rangeLabel={formatNutritionReportRange(range.start, range.end)}
+          />
           {range.error ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
         </CardContent>
       </Card>

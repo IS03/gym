@@ -5,7 +5,7 @@ import { AlertTriangle, Pencil, Plus, Ruler, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DateInput } from "@/components/ui/date-input";
+import { DateField as DateInput } from "@/components/ui/date-field";
 import { BODY_MEASUREMENT_FIELDS, type BodyMeasurement, type BodyMeasurementField } from "@/lib/body-measurement-types";
 import { deleteBodyMeasurementAction, saveBodyMeasurementAction } from "@/app/(app)/train/body/actions";
 

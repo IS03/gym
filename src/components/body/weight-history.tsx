@@ -5,7 +5,7 @@ import { Pencil, Plus, Scale, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DateInput } from "@/components/ui/date-input";
+import { DateField as DateInput } from "@/components/ui/date-field";
 import {
   formatWeightKg,
   weightChange,
