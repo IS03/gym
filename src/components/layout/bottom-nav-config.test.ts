@@ -27,11 +27,15 @@ describe("getActiveBottomNavIndex", () => {
     ["/today/reports", 2],
     ["/progress", 3],
     ["/progress/nutrition", 3],
+    ["/calendar", 3],
+    ["/calendar/month", 3],
+    ["/history", 3],
+    ["/history/day", 3],
   ])("selecciona la sección correcta para %s", (pathname, expected) => {
     expect(getActiveBottomNavIndex(pathname)).toBe(expected);
   });
 
-  it.each(["/settings", "/settings/profile", "/history", "/", "/unknown"])(
+  it.each(["/settings", "/settings/profile", "/", "/unknown"])(
     "no fuerza una pestaña para %s",
     (pathname) => {
       expect(getActiveBottomNavIndex(pathname)).toBe(-1);

@@ -8,7 +8,7 @@ export const bottomNavItems = [
 export type BottomNavItemId = (typeof bottomNavItems)[number]["id"];
 
 export function isBottomNavItemActive(pathname: string, href: string) {
-  if (href === "/progress") return pathname === href || pathname.startsWith("/progress/");
+  if (href === "/progress") return pathname === href || pathname.startsWith("/progress/") || pathname === "/calendar" || pathname.startsWith("/calendar/") || pathname === "/history" || pathname.startsWith("/history/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

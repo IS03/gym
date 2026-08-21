@@ -29,13 +29,13 @@ const groups = [
     label: "Planificación",
     links: [
       { href: "/train/routines", label: "Rutinas", icon: ListChecks, exact: false },
-      { href: "/train/calendar", label: "Calendario", icon: CalendarDays, exact: false },
     ],
   },
   {
     label: "Análisis",
     links: [
       { href: "/progress", label: "Progreso", icon: ChartNoAxesCombined, exact: false },
+      { href: "/calendar", label: "Calendario", icon: CalendarDays, exact: false },
       { href: "/train/progress", label: "Entrenamiento", icon: Dumbbell, exact: false },
       { href: "/train/body", label: "Cuerpo", icon: Activity, exact: false },
       { href: "/history", label: "Historial diario", icon: History, exact: false },

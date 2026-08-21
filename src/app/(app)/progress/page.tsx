@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   Apple,
+  CalendarDays,
   ChevronRight,
   Dumbbell,
   History,
@@ -113,7 +114,10 @@ export default async function ProgressPage() {
 
       <section aria-labelledby="progress-more-title" className="space-y-3">
         <h2 id="progress-more-title" className="text-lg font-semibold tracking-tight">Más</h2>
-        <ProgressLink href="/history" icon={History} title="Historial diario" description="Revisá el detalle de una fecha" />
+        <div className="grid gap-2 lg:grid-cols-2">
+          <ProgressLink href="/calendar" icon={CalendarDays} title="Calendario" description="Revisá nutrición, actividad, entrenamiento y cuerpo por día" />
+          <ProgressLink href="/history" icon={History} title="Historial diario" description="Revisá el detalle de una fecha" />
+        </div>
       </section>
     </div>
   );
