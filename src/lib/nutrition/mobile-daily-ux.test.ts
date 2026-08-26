@@ -15,8 +15,22 @@ describe("PR 9.6 — UX diaria mobile", () => {
   it("alinea todos los accesos rápidos mediante el componente común", () => {
     const quickAccess = home.slice(home.indexOf("function QuickAccess"), home.indexOf("function plural"));
     expect(quickAccess).toContain("grid-rows-[2.25rem_1fr]");
-    expect(quickAccess).toContain("content-end");
+    expect(quickAccess).toContain("pt-2.5");
+    expect(quickAccess).toContain("mt-1.5");
+    expect(quickAccess).toContain("text-[11px]");
+    expect(quickAccess).toContain("sm:text-xs");
     expect(quickAccess).not.toContain("Nutrición");
+  });
+
+  it("conserva los cuatro accesos, sus destinos y su contenido", () => {
+    const quickAccess = home.slice(home.indexOf("function QuickAccess"), home.indexOf("function plural"));
+
+    expect(quickAccess).toContain("<Icon");
+    expect(quickAccess).toContain("{title}");
+    expect(quickAccess).toContain("{description}");
+    for (const href of ["/today", "/train/routines", "/train/calendar", "/progress"]) {
+      expect(home).toContain(`href=\"${href}\"`);
+    }
   });
 
   it("ofrece el mismo flujo de creación de ejercicios desde el encabezado", () => {
@@ -45,6 +59,14 @@ describe("PR 9.6 — UX diaria mobile", () => {
     expect(responsiveDialog).toContain("100dvh");
     expect(responsiveDialog).toContain("env(safe-area-inset-bottom)");
     expect(responsiveDialog).toContain("overflow-y-auto overscroll-contain");
+  });
+
+  it("deja espacio para los rings de foco de los campos de comida", () => {
+    const mealFormTag = mealForm.slice(mealForm.indexOf("<form"), mealForm.indexOf(">", mealForm.indexOf("<form")));
+    const dateFieldWrapper = mealForm.slice(mealForm.indexOf('<div className="min-w-0 space-y-1">'), mealForm.indexOf("</div>", mealForm.indexOf('<div className="min-w-0 space-y-1">')));
+
+    expect(mealFormTag).not.toContain("overflow-x-hidden");
+    expect(dateFieldWrapper).not.toContain("overflow-hidden");
   });
 
   it("autoguarda sólo pasos, agua y mate; las correcciones siguen explícitas", () => {

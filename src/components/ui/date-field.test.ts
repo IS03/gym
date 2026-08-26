@@ -42,6 +42,13 @@ describe("DateField", () => {
     expect(globals).not.toContain("ownlevel-date-input");
   });
 
+  it("mantiene indicadores de foco visibles para campos individuales y de fecha", () => {
+    expect(input).toContain("focus-visible:ring-3");
+    expect(input).toContain("focus-visible:ring-ring/50");
+    expect(dateField).toContain("focus-within:ring-3");
+    expect(dateField).toContain("focus-within:ring-ring/50");
+  });
+
   it("usa la misma primitiva en todos los formularios de fecha reales", () => {
     for (const consumer of dateConsumers) {
       expect(consumer).toContain("date-field");

@@ -35,7 +35,7 @@ export function CreateMealForm({ date, onSuccess }: Props) {
     <>
       <form
         ref={formRef}
-        className="min-w-0 space-y-3 overflow-x-hidden"
+        className="min-w-0 space-y-3"
         onSubmit={async (e) => {
           e.preventDefault();
           const el = formRef.current;
@@ -67,7 +67,7 @@ export function CreateMealForm({ date, onSuccess }: Props) {
           }
         }}
       >
-        <div className="min-w-0 space-y-1 overflow-hidden">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="new-meal-date">Fecha</Label>
           <DateField
             id="new-meal-date"

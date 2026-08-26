@@ -76,7 +76,7 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
       <span className="flex size-9 items-center justify-center rounded-lg bg-primary/12 text-primary">
         <Icon className="size-[18px]" aria-hidden />
       </span>
-      <span className="grid content-end gap-0.5 self-stretch">
+      <span className="flex min-w-0 flex-col self-stretch pt-2.5">
         <span className="flex items-center gap-1 text-sm font-semibold">
           {title}
           <ArrowUpRight
@@ -84,7 +84,7 @@ function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps)
             aria-hidden
           />
         </span>
-        <span className="block min-h-10 text-xs leading-relaxed text-muted-foreground">
+        <span className="mt-1.5 block text-[11px] leading-[1.35] text-muted-foreground sm:text-xs">
           {description}
         </span>
       </span>
