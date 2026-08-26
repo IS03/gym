@@ -1,4 +1,4 @@
-import { MUSCLE_GROUP_OPTIONS } from "./muscle-groups";
+import { muscleGroupLabel } from "./muscle-groups";
 import type { Exercise, MuscleGroup } from "./types";
 
 export type ExerciseLibraryFilter = "all" | "none" | MuscleGroup;
@@ -9,6 +9,8 @@ export type ExerciseLibraryItem = Pick<
   | "nombre"
   | "grupo_muscular"
   | "muscle_group_label"
+  | "implement"
+  | "weight_mode"
   | "series_sugeridas"
   | "reps_sugeridas"
   | "peso_sugerido"
@@ -18,20 +20,36 @@ export type ExerciseLibraryItem = Pick<
   | "updated_at"
 >;
 
-const GROUP_LABELS = new Map(
-  MUSCLE_GROUP_OPTIONS.map((option) => [option.value, option.label]),
-);
-
 export function isMuscleGroup(value: string): value is MuscleGroup {
-  return MUSCLE_GROUP_OPTIONS.some((option) => option.value === value);
+  return muscleGroupLabel(value as MuscleGroup) !== null;
 }
 
-export function exerciseGroupLabel(exercise: ExerciseLibraryItem): string {
+type ExerciseIdentityFields = {
+  grupo_muscular: MuscleGroup | null;
+  muscle_group_label?: string | null;
+  implement?: string | null;
+  weight_mode?: string | null;
+};
+
+function nonEmptyText(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized || null;
+}
+
+export function exerciseGroupLabel(exercise: ExerciseIdentityFields): string {
   return (
-    exercise.muscle_group_label ??
-    (exercise.grupo_muscular ? GROUP_LABELS.get(exercise.grupo_muscular) : null) ??
+    nonEmptyText(exercise.muscle_group_label) ??
+    muscleGroupLabel(exercise.grupo_muscular) ??
     "Sin grupo"
   );
+}
+
+export function exerciseIdentityLabel(exercise: ExerciseIdentityFields): string {
+  return [
+    exerciseGroupLabel(exercise),
+    nonEmptyText(exercise.implement),
+    nonEmptyText(exercise.weight_mode),
+  ].filter((part): part is string => Boolean(part)).join(" · ");
 }
 
 function formatNumber(value: number): string {
@@ -74,10 +92,7 @@ export function exerciseSuggestedValuesLabel(exercise: ExerciseLibraryItem): str
 }
 
 export function exerciseLibrarySummary(exercise: ExerciseLibraryItem): string {
-  const values = exerciseSuggestedValuesLabel(exercise);
-  return values
-    ? `${exerciseGroupLabel(exercise)} · ${values}`
-    : exerciseGroupLabel(exercise);
+  return exerciseIdentityLabel(exercise);
 }
 
 export function filterExerciseLibrary(

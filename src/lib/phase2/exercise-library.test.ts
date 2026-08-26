@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  exerciseGroupLabel,
   exerciseLibrarySummary,
   filterExerciseLibrary,
   type ExerciseLibraryItem,
@@ -14,6 +15,8 @@ function exercise(
     nombre: id,
     grupo_muscular: null,
     muscle_group_label: null,
+    implement: null,
+    weight_mode: null,
     series_sugeridas: null,
     reps_sugeridas: null,
     peso_sugerido: null,
@@ -53,16 +56,28 @@ describe("filterExerciseLibrary", () => {
 });
 
 describe("exerciseLibrarySummary", () => {
-  it("muestra solamente valores útiles y no rompe ejercicios cardio", () => {
+  it("prioriza la identidad del ejercicio sobre valores sugeridos", () => {
     expect(exerciseLibrarySummary(exercise("CINTA", { grupo_muscular: "cardio" }))).toBe("Cardio");
     expect(exerciseLibrarySummary(exercise("Press", {
       grupo_muscular: "pecho",
+      muscle_group_label: "Pectoral superior",
+      implement: "Mancuernas",
+      weight_mode: "Por mancuerna",
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
       rir_sugerido: 2,
       descanso_min_sugerido_segundos: 120,
       descanso_max_sugerido_segundos: 180,
-    }))).toBe("Pecho · 3×10 · 80 kg · RIR 2 · 120–180 s");
+    }))).toBe("Pectoral superior · Mancuernas · Por mancuerna");
+  });
+
+  it("usa el label canónico cuando falta el detalle específico", () => {
+    expect(exerciseGroupLabel(exercise("REMO", { grupo_muscular: "espalda" }))).toBe("Espalda");
+    expect(exerciseGroupLabel(exercise("POSTERIORES", {
+      grupo_muscular: "hombros",
+      muscle_group_label: "Deltoides posteriores",
+    }))).toBe("Deltoides posteriores");
+    expect(exerciseLibrarySummary(exercise("REMO", { grupo_muscular: "espalda" }))).toBe("Espalda");
   });
 });

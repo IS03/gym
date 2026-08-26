@@ -6,6 +6,9 @@ describe("normalizeExerciseMutation", () => {
     expect(normalizeExerciseMutation({
       nombre: "  Press banca  ",
       grupo_muscular: "pecho",
+      muscle_group_label: "  Pectoral mayor  ",
+      implement: "  Barra  ",
+      weight_mode: "  Total con barra  ",
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
@@ -15,6 +18,9 @@ describe("normalizeExerciseMutation", () => {
     })).toEqual({
       nombre: "Press banca",
       grupo_muscular: "pecho",
+      muscle_group_label: "Pectoral mayor",
+      implement: "Barra",
+      weight_mode: "Total con barra",
       series_sugeridas: 3,
       reps_sugeridas: 10,
       peso_sugerido: 80,
@@ -28,13 +34,22 @@ describe("normalizeExerciseMutation", () => {
     expect(normalizeExerciseMutation({
       nombre: "Cinta",
       grupo_muscular: null,
+      muscle_group_label: "",
+      implement: "  ",
+      weight_mode: null,
       series_sugeridas: null,
       reps_sugeridas: null,
       peso_sugerido: null,
       rir_sugerido: null,
       descanso_min_sugerido_segundos: null,
       descanso_max_sugerido_segundos: null,
-    })).toMatchObject({ nombre: "Cinta", grupo_muscular: null });
+    })).toMatchObject({
+      nombre: "Cinta",
+      grupo_muscular: null,
+      muscle_group_label: null,
+      implement: null,
+      weight_mode: null,
+    });
   });
 
   it("rechaza nombre, grupo y valores inválidos antes de tocar la base", () => {

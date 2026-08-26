@@ -16,6 +16,7 @@ import {
 import { nullableNumberFromInput, payloadsEqual } from "@/lib/phase2/training-validation";
 import { formatRestRange } from "@/lib/phase2/training-display";
 import { summarizeRoutineExerciseTarget } from "@/lib/phase2/routine-template-summary";
+import { exerciseIdentityLabel } from "@/lib/phase2/exercise-library";
 import type { RoutineExercisePayload, RoutineExerciseTemplate, TrainingAdjustment } from "@/lib/phase2/types";
 
 const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
@@ -128,7 +129,7 @@ export function RoutineTemplateEditor({ routineId, items }: { routineId: string;
       const dirty = dirtyIds.has(item.id);
       const isOpen = openById[item.id] ?? false;
       const summary = summarizeRoutineExerciseTarget(payload);
-      const group = item.exercise.muscle_group_label ?? item.exercise.grupo_muscular ?? "Sin grupo";
+      const group = exerciseIdentityLabel(item.exercise);
       const contentId = `routine-target-${item.id}`;
       return <Card key={item.id} className="surface-elevated overflow-hidden">
         <CardHeader className="p-0">

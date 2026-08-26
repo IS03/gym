@@ -4,6 +4,10 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  EXERCISE_IMPLEMENT_SUGGESTIONS,
+  EXERCISE_WEIGHT_MODE_SUGGESTIONS,
+} from "@/lib/phase2/exercise-mutation";
 import { createExerciseFromSessionAction } from "../../actions";
 
 type State = { error: string | null };
@@ -99,7 +103,7 @@ export function SessionCreateExerciseForm(props: {
             max={3600}
             step={1}
             inputMode="numeric"
-            placeholder="Desc. mín."
+            placeholder="Desc. mín. (s)"
             aria-label="Descanso mínimo sugerido en segundos"
           />
           <Input
@@ -109,11 +113,35 @@ export function SessionCreateExerciseForm(props: {
             max={3600}
             step={1}
             inputMode="numeric"
-            placeholder="Desc. máx."
+            placeholder="Desc. máx. (s)"
             aria-label="Descanso máximo sugerido en segundos"
           />
         </div>
+        <p className="text-xs text-muted-foreground">Segundos totales.</p>
       </div>
+      <fieldset className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-3">
+        <legend className="px-1 text-sm font-medium">Detalles</legend>
+        <div className="space-y-1">
+          <Label htmlFor="muscle_group_label" className="text-xs text-muted-foreground">Detalle muscular</Label>
+          <Input id="muscle_group_label" name="muscle_group_label" placeholder="Ej: Deltoides posteriores" maxLength={120} />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="implement" className="text-xs text-muted-foreground">Implemento</Label>
+            <Input id="implement" name="implement" placeholder="Ej: Polea" list="session-exercise-implement-suggestions" maxLength={120} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="weight_mode" className="text-xs text-muted-foreground">Registro de carga</Label>
+            <Input id="weight_mode" name="weight_mode" placeholder="Ej: Peso total" list="session-exercise-weight-mode-suggestions" maxLength={120} />
+          </div>
+        </div>
+        <datalist id="session-exercise-implement-suggestions">
+          {EXERCISE_IMPLEMENT_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
+        </datalist>
+        <datalist id="session-exercise-weight-mode-suggestions">
+          {EXERCISE_WEIGHT_MODE_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
+        </datalist>
+      </fieldset>
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
       <Button className="h-11 w-full" type="submit" disabled={pending}>
         {pending ? "Creando..." : "Crear y agregar"}

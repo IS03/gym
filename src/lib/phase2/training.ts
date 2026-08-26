@@ -263,6 +263,9 @@ export async function listEndedSessionsByDate(input: {
 export async function createExercise(input: {
   nombre: string;
   grupo_muscular: MuscleGroup | null;
+  muscle_group_label: string | null;
+  implement: string | null;
+  weight_mode: string | null;
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
@@ -280,6 +283,9 @@ export async function createExercise(input: {
       user_id: userId,
       nombre: input.nombre.trim(),
       grupo_muscular: input.grupo_muscular,
+      muscle_group_label: input.muscle_group_label,
+      implement: input.implement,
+      weight_mode: input.weight_mode,
       series_sugeridas: input.series_sugeridas,
       reps_sugeridas: input.reps_sugeridas,
       peso_sugerido: input.peso_sugerido,
@@ -305,6 +311,9 @@ export async function updateExercise(input: {
   id: string;
   nombre?: string;
   grupo_muscular?: MuscleGroup | null;
+  muscle_group_label?: string | null;
+  implement?: string | null;
+  weight_mode?: string | null;
   series_sugeridas?: number | null;
   reps_sugeridas?: number | null;
   peso_sugerido?: number | null;
@@ -323,6 +332,10 @@ export async function updateExercise(input: {
   }
   if (input.grupo_muscular !== undefined)
     patch.grupo_muscular = input.grupo_muscular;
+  if (input.muscle_group_label !== undefined)
+    patch.muscle_group_label = input.muscle_group_label;
+  if (input.implement !== undefined) patch.implement = input.implement;
+  if (input.weight_mode !== undefined) patch.weight_mode = input.weight_mode;
   if (input.series_sugeridas !== undefined) patch.series_sugeridas = input.series_sugeridas;
   if (input.reps_sugeridas !== undefined) patch.reps_sugeridas = input.reps_sugeridas;
   if (input.peso_sugerido !== undefined) patch.peso_sugerido = input.peso_sugerido;
@@ -830,6 +843,9 @@ export async function createExerciseFromSession(input: {
   sessionId: string;
   nombre: string;
   grupo_muscular: MuscleGroup | null;
+  muscle_group_label: string | null;
+  implement: string | null;
+  weight_mode: string | null;
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
@@ -861,6 +877,9 @@ export async function createExerciseFromSession(input: {
   const exercise = await createExercise({
     nombre: nombreNorm,
     grupo_muscular: input.grupo_muscular,
+    muscle_group_label: input.muscle_group_label,
+    implement: input.implement,
+    weight_mode: input.weight_mode,
     series_sugeridas: input.series_sugeridas,
     reps_sugeridas: input.reps_sugeridas,
     peso_sugerido: input.peso_sugerido,

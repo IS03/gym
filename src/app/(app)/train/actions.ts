@@ -84,6 +84,8 @@ function toExerciseActionExercise(exercise: Awaited<ReturnType<typeof createExer
     nombre: exercise.nombre,
     grupo_muscular: exercise.grupo_muscular,
     muscle_group_label: exercise.muscle_group_label,
+    implement: exercise.implement,
+    weight_mode: exercise.weight_mode,
     series_sugeridas: exercise.series_sugeridas,
     reps_sugeridas: exercise.reps_sugeridas,
     peso_sugerido: exercise.peso_sugerido,
@@ -296,6 +298,9 @@ export async function createExerciseFromSessionAction(formData: FormData) {
   const nombre = str(formData, "nombre");
   const grupo_muscular = (str(formData, "grupo_muscular") ||
     null) as MuscleGroup | null;
+  const muscle_group_label = str(formData, "muscle_group_label");
+  const implement = str(formData, "implement");
+  const weight_mode = str(formData, "weight_mode");
   const series_sugeridas = num(formData, "series_sugeridas");
   const reps_sugeridas = num(formData, "reps_sugeridas");
   const peso_sugerido = num(formData, "peso_sugerido");
@@ -312,6 +317,9 @@ export async function createExerciseFromSessionAction(formData: FormData) {
   const exercise = normalizeExerciseMutation({
     nombre,
     grupo_muscular,
+    muscle_group_label,
+    implement,
+    weight_mode,
     series_sugeridas,
     reps_sugeridas,
     peso_sugerido,

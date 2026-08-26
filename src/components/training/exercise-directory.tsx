@@ -13,6 +13,7 @@ import {
   type ExerciseDirectoryEntry,
 } from "@/lib/phase2/exercise-insights";
 import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
+import { exerciseGroupLabel } from "@/lib/phase2/exercise-library";
 import type { MuscleGroup } from "@/lib/phase2/types";
 
 const ADJUSTMENT_LABELS = {
@@ -178,7 +179,12 @@ export function ExerciseDirectory({
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{item.name}</p><ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden /></div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{item.muscleLabel ?? item.muscleGroup ?? "Sin grupo"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {exerciseGroupLabel({
+                        grupo_muscular: item.muscleGroup,
+                        muscle_group_label: item.muscleLabel,
+                      })}
+                    </p>
                     {mode === "progress" ? <>
                       <p className="mt-2 text-xs text-muted-foreground">Último · {formatDate(item.lastDate)}</p>
                       <p className="metric-number mt-0.5 text-sm font-medium text-foreground">{latestPerformance ?? "Sin series realizadas"}</p>

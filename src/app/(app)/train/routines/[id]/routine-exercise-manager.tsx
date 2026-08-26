@@ -12,6 +12,7 @@ import {
   type MuscleGroupFilter,
 } from "@/lib/phase2/muscle-groups";
 import type { MuscleGroup } from "@/lib/phase2/types";
+import { exerciseIdentityLabel } from "@/lib/phase2/exercise-library";
 
 type State = { error: string | null };
 const initialState: State = { error: null };
@@ -22,6 +23,9 @@ export function RoutineExerciseAddForm(props: {
     id: string;
     nombre: string;
     grupo_muscular: MuscleGroup | null;
+    muscle_group_label: string | null;
+    implement: string | null;
+    weight_mode: string | null;
   }>;
   onSuccess?: () => void;
 }) {
@@ -83,7 +87,7 @@ export function RoutineExerciseAddForm(props: {
           ) : null}
           {filteredExercises.map((ex) => (
             <option key={ex.id} value={ex.id}>
-              {ex.nombre}
+              {ex.nombre} — {exerciseIdentityLabel(ex)}
             </option>
           ))}
         </select>
@@ -104,6 +108,9 @@ export function RoutineExerciseAddDialog(props: {
     id: string;
     nombre: string;
     grupo_muscular: MuscleGroup | null;
+    muscle_group_label: string | null;
+    implement: string | null;
+    weight_mode: string | null;
   }>;
   fullWidth?: boolean;
 }) {

@@ -16,6 +16,7 @@ import {
   type MuscleGroupFilter,
 } from "@/lib/phase2/muscle-groups";
 import { formatRestRange } from "@/lib/phase2/training-display";
+import { exerciseIdentityLabel } from "@/lib/phase2/exercise-library";
 import { formatSessionDate } from "@/lib/phase2/session-history";
 import {
   appendWorkoutExerciseAction,
@@ -359,6 +360,9 @@ export function SessionEditor({
     id: string;
     nombre: string;
     grupo_muscular: MuscleGroup | null;
+    muscle_group_label: string | null;
+    implement: string | null;
+    weight_mode: string | null;
   }>;
 }) {
   const router = useRouter();
@@ -1132,8 +1136,10 @@ export function SessionEditor({
                         )}
                         onClick={() => setSelectedExerciseId(exercise.id)}
                       >
-                        <span className="font-medium">{exercise.nombre}</span>
-                        <span className="text-xs opacity-70">{exercise.grupo_muscular ?? ""}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{exercise.nombre}</span>
+                          <span className="block truncate text-xs opacity-70">{exerciseIdentityLabel(exercise)}</span>
+                        </span>
                       </button>
                     ))
                   )}
@@ -1197,15 +1203,12 @@ export function SessionEditor({
                 )
               : null;
             const exerciseContentId = `session-exercise-${exercise.id}`;
-            const exerciseMeta = [
-              exercise.muscle_group_label_snapshot ??
-                exercise.grupo_muscular_snapshot ??
-                "Sin grupo",
-              exercise.implement_snapshot,
-              exercise.weight_mode_snapshot,
-            ]
-              .filter(Boolean)
-              .join(" · ");
+            const exerciseMeta = exerciseIdentityLabel({
+              grupo_muscular: exercise.grupo_muscular_snapshot,
+              muscle_group_label: exercise.muscle_group_label_snapshot,
+              implement: exercise.implement_snapshot,
+              weight_mode: exercise.weight_mode_snapshot,
+            });
             return (
               <Card
                 key={exercise.id}

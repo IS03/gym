@@ -4,6 +4,9 @@ import type { MuscleGroup } from "./types";
 export type ExerciseMutationInput = {
   nombre: string;
   grupo_muscular: MuscleGroup | null;
+  muscle_group_label: string | null;
+  implement: string | null;
+  weight_mode: string | null;
   series_sugeridas: number | null;
   reps_sugeridas: number | null;
   peso_sugerido: number | null;
@@ -14,13 +17,31 @@ export type ExerciseMutationInput = {
 
 export type ExerciseActionExercise = ExerciseMutationInput & {
   id: string;
-  muscle_group_label: string | null;
   updated_at: string;
 };
 
 export type ExerciseActionResult<T = undefined> =
   | { ok: true; data: T }
   | { ok: false; error: string };
+
+export const EXERCISE_IMPLEMENT_SUGGESTIONS = [
+  "Máquina",
+  "Mancuernas",
+  "Polea",
+  "Polea con barra",
+  "Barra",
+  "Peso corporal",
+] as const;
+
+export const EXERCISE_WEIGHT_MODE_SUGGESTIONS = [
+  "Peso total",
+  "Por mancuerna",
+  "Por brazo",
+  "Total con barra",
+  "Peso corporal",
+  "Lingotes (no kg)",
+  "Tiempo (segundos)",
+] as const;
 
 function numberFromExerciseInput(value: unknown, label: string): number | null {
   if (value === null || value === undefined) return null;
@@ -41,6 +62,21 @@ function integerInRangeFromExerciseInput(
     throw new Error(`${label} debe ser un entero entre ${min} y ${max}.`);
   }
   return number;
+}
+
+function optionalTextFromExerciseInput(
+  value: unknown,
+  label: string,
+  maxLength = 120,
+): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") throw new Error(`${label} debe ser texto.`);
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.length > maxLength) {
+    throw new Error(`${label} no puede superar ${maxLength} caracteres.`);
+  }
+  return normalized;
 }
 
 export function normalizeExerciseMutation(input: unknown): ExerciseMutationInput {
@@ -88,6 +124,12 @@ export function normalizeExerciseMutation(input: unknown): ExerciseMutationInput
   return {
     nombre,
     grupo_muscular,
+    muscle_group_label: optionalTextFromExerciseInput(
+      values?.muscle_group_label,
+      "Detalle muscular",
+    ),
+    implement: optionalTextFromExerciseInput(values?.implement, "Implemento"),
+    weight_mode: optionalTextFromExerciseInput(values?.weight_mode, "Registro de carga"),
     series_sugeridas: numberFromExerciseInput(
       values?.series_sugeridas,
       "Series sugeridas",

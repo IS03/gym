@@ -14,7 +14,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { parseLocalizedDecimal } from "@/lib/localized-decimal";
 import {
   exerciseLibrarySummary,
   filterExerciseLibrary,
@@ -23,23 +22,22 @@ import {
 } from "@/lib/phase2/exercise-library";
 import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
 import type { MuscleGroup } from "@/lib/phase2/types";
-import type { ExerciseMutationInput } from "@/lib/phase2/exercise-mutation";
+import {
+  EXERCISE_IMPLEMENT_SUGGESTIONS,
+  EXERCISE_WEIGHT_MODE_SUGGESTIONS,
+  type ExerciseMutationInput,
+} from "@/lib/phase2/exercise-mutation";
+import {
+  emptyForm,
+  formFromExercise,
+  mutationFromForm,
+  type ExerciseFormValues as FormValues,
+} from "@/lib/phase2/exercise-form";
 import {
   archiveExerciseAction,
   createExerciseAction,
   updateExerciseAction,
 } from "../actions";
-
-type FormValues = {
-  nombre: string;
-  grupo_muscular: MuscleGroup | "";
-  series_sugeridas: string;
-  reps_sugeridas: string;
-  peso_sugerido: string;
-  rir_sugerido: string;
-  descanso_min_sugerido_segundos: string;
-  descanso_max_sugerido_segundos: string;
-};
 
 const GROUP_FILTER_OPTIONS: ReadonlyArray<{
   value: ExerciseLibraryFilter;
@@ -49,71 +47,6 @@ const GROUP_FILTER_OPTIONS: ReadonlyArray<{
   { value: "none", label: "Sin grupo" },
   ...MUSCLE_GROUP_OPTIONS,
 ];
-
-function emptyForm(): FormValues {
-  return {
-    nombre: "",
-    grupo_muscular: "",
-    series_sugeridas: "",
-    reps_sugeridas: "",
-    peso_sugerido: "",
-    rir_sugerido: "",
-    descanso_min_sugerido_segundos: "",
-    descanso_max_sugerido_segundos: "",
-  };
-}
-
-function formFromExercise(exercise: ExerciseLibraryItem): FormValues {
-  return {
-    nombre: exercise.nombre,
-    grupo_muscular: exercise.grupo_muscular ?? "",
-    series_sugeridas:
-      exercise.series_sugeridas === null ? "" : String(exercise.series_sugeridas),
-    reps_sugeridas:
-      exercise.reps_sugeridas === null ? "" : String(exercise.reps_sugeridas),
-    peso_sugerido:
-      exercise.peso_sugerido === null ? "" : String(exercise.peso_sugerido),
-    rir_sugerido:
-      exercise.rir_sugerido === null ? "" : String(exercise.rir_sugerido),
-    descanso_min_sugerido_segundos:
-      exercise.descanso_min_sugerido_segundos === null
-        ? ""
-        : String(exercise.descanso_min_sugerido_segundos),
-    descanso_max_sugerido_segundos:
-      exercise.descanso_max_sugerido_segundos === null
-        ? ""
-        : String(exercise.descanso_max_sugerido_segundos),
-  };
-}
-
-function numberOrNull(raw: string, label: string): number | null {
-  const value = raw.trim();
-  if (!value) return null;
-  const number = parseLocalizedDecimal(value);
-  if (number === null || number < 0) {
-    throw new Error(`${label} debe ser un número igual o mayor a cero.`);
-  }
-  return number;
-}
-
-function mutationFromForm(values: FormValues): ExerciseMutationInput {
-  return {
-    nombre: values.nombre,
-    grupo_muscular: values.grupo_muscular || null,
-    series_sugeridas: numberOrNull(values.series_sugeridas, "Series sugeridas"),
-    reps_sugeridas: numberOrNull(values.reps_sugeridas, "Repeticiones sugeridas"),
-    peso_sugerido: numberOrNull(values.peso_sugerido, "Peso sugerido"),
-    rir_sugerido: numberOrNull(values.rir_sugerido, "RIR sugerido"),
-    descanso_min_sugerido_segundos: numberOrNull(
-      values.descanso_min_sugerido_segundos,
-      "Descanso mínimo sugerido",
-    ),
-    descanso_max_sugerido_segundos: numberOrNull(
-      values.descanso_max_sugerido_segundos,
-      "Descanso máximo sugerido",
-    ),
-  };
-}
 
 function Sheet({
   children,
@@ -252,7 +185,7 @@ function ExerciseForm({
             max={3600}
             step={1}
             inputMode="numeric"
-            placeholder="Desc. mín."
+            placeholder="Desc. mín. (s)"
             aria-label="Descanso mínimo sugerido en segundos"
             disabled={pending}
           />
@@ -269,11 +202,55 @@ function ExerciseForm({
             max={3600}
             step={1}
             inputMode="numeric"
-            placeholder="Desc. máx."
+            placeholder="Desc. máx. (s)"
             aria-label="Descanso máximo sugerido en segundos"
             disabled={pending}
           />
         </div>
+        <p className="text-xs text-muted-foreground">Segundos totales.</p>
+      </fieldset>
+      <fieldset className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-3">
+        <legend className="px-1 text-sm font-medium">Detalles</legend>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Detalle muscular</span>
+          <Input
+            value={values.muscle_group_label}
+            onChange={(event) => onChange({ ...values, muscle_group_label: event.target.value })}
+            placeholder="Ej: Deltoides posteriores"
+            maxLength={120}
+            disabled={pending}
+          />
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Implemento</span>
+            <Input
+              value={values.implement}
+              onChange={(event) => onChange({ ...values, implement: event.target.value })}
+              placeholder="Ej: Polea"
+              list="exercise-implement-suggestions"
+              maxLength={120}
+              disabled={pending}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Registro de carga</span>
+            <Input
+              value={values.weight_mode}
+              onChange={(event) => onChange({ ...values, weight_mode: event.target.value })}
+              placeholder="Ej: Peso total"
+              list="exercise-weight-mode-suggestions"
+              maxLength={120}
+              disabled={pending}
+            />
+          </label>
+        </div>
+        <datalist id="exercise-implement-suggestions">
+          {EXERCISE_IMPLEMENT_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
+        </datalist>
+        <datalist id="exercise-weight-mode-suggestions">
+          {EXERCISE_WEIGHT_MODE_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
+        </datalist>
       </fieldset>
       <Button className="h-11 w-full" type="submit" disabled={pending}>
         {pending ? (submitLabel === "Crear ejercicio" ? "Creando…" : "Guardando…") : submitLabel}

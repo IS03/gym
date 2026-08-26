@@ -29,6 +29,9 @@ export default async function SessionPage({
           id: exercise.id,
           nombre: exercise.nombre,
           grupo_muscular: exercise.grupo_muscular,
+          muscle_group_label: exercise.muscle_group_label,
+          implement: exercise.implement,
+          weight_mode: exercise.weight_mode,
         }))}
       />
     </div>

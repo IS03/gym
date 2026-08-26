@@ -16,6 +16,10 @@ export const MUSCLE_GROUP_OPTIONS: ReadonlyArray<{
 
 export type MuscleGroupFilter = "all" | MuscleGroup;
 
+export function muscleGroupLabel(group: MuscleGroup | null | undefined): string | null {
+  return MUSCLE_GROUP_OPTIONS.find((option) => option.value === group)?.label ?? null;
+}
+
 export function filterExercisesByMuscleGroup<T extends { grupo_muscular: MuscleGroup | null }>(
   exercises: readonly T[],
   filter: MuscleGroupFilter,
