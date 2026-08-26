@@ -21,6 +21,7 @@ import {
   appendWorkoutExerciseAction,
   cancelWorkoutSessionAction,
   finishWorkoutSessionAction,
+  getWorkoutExerciseSyncStateAction,
   removeSessionExerciseAction,
   saveWorkoutExerciseAction,
 } from "../../actions";
@@ -40,7 +41,11 @@ import {
   nullableNumberFromInput,
   payloadsEqual,
 } from "@/lib/phase2/training-validation";
-import { ExerciseAutosaveQueue } from "@/lib/phase2/exercise-autosave";
+import {
+  ExerciseAutosaveError,
+  ExerciseAutosaveQueue,
+} from "@/lib/phase2/exercise-autosave";
+import type { ExerciseAutosaveErrorCategory } from "@/lib/phase2/exercise-autosave";
 import type {
   SessionMetadataInput,
   MuscleGroup,
@@ -79,6 +84,7 @@ type ExerciseStatus = {
   pending: boolean;
   saved: boolean;
   error: string | null;
+  errorCategory?: ExerciseAutosaveErrorCategory | null;
 };
 
 type RestTimerState = {
@@ -399,6 +405,8 @@ export function SessionEditor({
   const [overrides, setOverrides] = useState<Record<string, WorkoutExercisePayload>>({});
   const [statuses, setStatuses] = useState<Record<string, ExerciseStatus>>({});
   const mountedRef = useRef(true);
+  const editingFencedRef = useRef(false);
+  const removingExerciseIdsRef = useRef(new Set<string>());
   const serverPayloadsRef = useRef(initialPayloads);
   const serverVersionsRef = useRef(initialVersions);
   const latestPayloadsRef = useRef(initialPayloads);
@@ -425,6 +433,16 @@ export function SessionEditor({
           expectedUpdatedAt,
           payload,
         });
+        if (!result.ok) {
+          throw new ExerciseAutosaveError(result.errorCategory, result.error);
+        }
+        return result.data;
+      },
+      loadServerState: async (exerciseId) => {
+        const result = await getWorkoutExerciseSyncStateAction({
+          sessionId: detail.session.id,
+          sessionExerciseId: exerciseId,
+        });
         if (!result.ok) throw new Error(result.error);
         return result.data;
       },
@@ -436,8 +454,32 @@ export function SessionEditor({
             pending: state.phase === "saving",
             saved: state.phase === "saved",
             error: state.error,
+            errorCategory: state.errorCategory,
           },
         }));
+      },
+      onServerState: (exerciseId, state) => {
+        if (state.status !== "active") {
+          if (mountedRef.current) {
+            setGlobalError(
+              state.status === "session_closed"
+                ? "La sesión ya fue finalizada en otra pestaña."
+                : "Este ejercicio ya no está en la sesión.",
+            );
+          }
+          return;
+        }
+        serverPayloadsRef.current = {
+          ...serverPayloadsRef.current,
+          [exerciseId]: state.payload,
+        };
+        serverVersionsRef.current = {
+          ...serverVersionsRef.current,
+          [exerciseId]: state.updatedAt,
+        };
+        if (!mountedRef.current) return;
+        setServerPayloads((current) => ({ ...current, [exerciseId]: state.payload }));
+        setServerVersions((current) => ({ ...current, [exerciseId]: state.updatedAt }));
       },
       onSaved: (
         exerciseId,
@@ -689,6 +731,11 @@ export function SessionEditor({
     updater: (current: WorkoutExercisePayload) => WorkoutExercisePayload,
     options?: { immediate?: boolean },
   ) {
+    if (
+      editingFencedRef.current ||
+      removingExerciseIdsRef.current.has(exerciseId) ||
+      readOnly
+    ) return;
     const next = updater(latestPayloadsRef.current[exerciseId]);
     latestPayloadsRef.current = { ...latestPayloadsRef.current, [exerciseId]: next };
     setOverrides((current) => ({ ...current, [exerciseId]: next }));
@@ -720,6 +767,7 @@ export function SessionEditor({
   function updateMetadata(
     updater: (current: SessionMetadataInput) => SessionMetadataInput,
   ) {
+    if (editingFencedRef.current || readOnly) return;
     const next = updater(metadata);
     setMetadataOverride(next);
     const saved = writeDraft(metadataKey, {
@@ -732,13 +780,21 @@ export function SessionEditor({
   }
 
   async function discardExerciseDraft(exerciseId: string) {
-    await autosaveRef.current?.discardLocal(
-      exerciseId,
-      serverPayloadsRef.current[exerciseId],
-    );
+    const autosave = autosaveRef.current;
+    if (!autosave) return;
+    let state: Awaited<ReturnType<typeof autosave.discardLocal>>;
+    try {
+      state = await autosave.discardLocal(exerciseId);
+    } catch {
+      return;
+    }
+    if (state.status !== "active") {
+      router.refresh();
+      return;
+    }
     latestPayloadsRef.current = {
       ...latestPayloadsRef.current,
-      [exerciseId]: serverPayloadsRef.current[exerciseId],
+      [exerciseId]: state.payload,
     };
     setOverrides((current) => {
       const next = { ...current };
@@ -747,13 +803,20 @@ export function SessionEditor({
     });
     setStatuses((current) => ({
       ...current,
-      [exerciseId]: { pending: false, saved: false, error: null },
+      [exerciseId]: {
+        pending: false,
+        saved: false,
+        error: null,
+        errorCategory: null,
+      },
     }));
     removeDraft(workoutDraftKey(detail.session.id, exerciseId));
   }
 
-  function retryExercise(exerciseId: string) {
-    void autosaveRef.current?.retry(exerciseId);
+  async function retryExercise(exerciseId: string) {
+    await autosaveRef.current?.retry(exerciseId);
+    const category = autosaveRef.current?.getErrorCategory(exerciseId);
+    if (category === "session_closed" || category === "removed") router.refresh();
   }
 
   function toggleExercise(exerciseId: string) {
@@ -780,6 +843,7 @@ export function SessionEditor({
 
   async function removeExercise(exerciseId: string, name: string) {
     if (!window.confirm(`¿Quitar ${name} de esta sesión?`)) return;
+    removingExerciseIdsRef.current.add(exerciseId);
     await autosaveRef.current?.pauseAndWait(exerciseId);
     setStatuses((current) => ({
       ...current,
@@ -794,6 +858,7 @@ export function SessionEditor({
       removeDraft(workoutDraftKey(detail.session.id, exerciseId));
       router.refresh();
     } catch (error) {
+      removingExerciseIdsRef.current.delete(exerciseId);
       autosaveRef.current?.resume(exerciseId);
       setStatuses((current) => ({
         ...current,
@@ -811,10 +876,12 @@ export function SessionEditor({
       setGlobalError("Marcá al menos una serie antes de finalizar.");
       return;
     }
+    editingFencedRef.current = true;
     setGlobalPending(true);
     setFinishStage("saving");
     setGlobalError(null);
-    const failedExerciseIds = await autosaveRef.current?.flushAll(exerciseIds) ?? [];
+    const failedExerciseIds =
+      (await autosaveRef.current?.fenceAndFlushAll(exerciseIds)) ?? [];
     if (failedExerciseIds.length > 0) {
       const names = failedExerciseIds.map(
         (exerciseId) =>
@@ -823,9 +890,18 @@ export function SessionEditor({
       );
       setGlobalPending(false);
       setFinishStage(null);
+      editingFencedRef.current = false;
+      autosaveRef.current?.releaseFence();
+      const sessionUnavailable = failedExerciseIds.some((exerciseId) => {
+        const category = autosaveRef.current?.getErrorCategory(exerciseId);
+        return category === "session_closed" || category === "removed";
+      });
       setGlobalError(
-        `No pudimos finalizar todavía. No se pudo guardar: ${names.join(", ")}. Reintentá cuando tengas conexión.`,
+        sessionUnavailable
+          ? "La sesión ya fue finalizada o modificada en otra pestaña. Actualizando…"
+          : `No pudimos finalizar todavía. No se pudo guardar: ${names.join(", ")}. Reintentá cuando tengas conexión.`,
       );
+      if (sessionUnavailable) router.refresh();
       return;
     }
 
@@ -837,7 +913,14 @@ export function SessionEditor({
     setGlobalPending(false);
     if (!result.ok) {
       setFinishStage(null);
-      setGlobalError(result.error);
+      editingFencedRef.current = false;
+      autosaveRef.current?.releaseFence();
+      if (result.error.toLocaleLowerCase("es").includes("ya finaliz")) {
+        setGlobalError("La sesión ya fue finalizada en otra pestaña. Actualizando…");
+        router.refresh();
+      } else {
+        setGlobalError(result.error);
+      }
       return;
     }
     try {
@@ -1377,15 +1460,31 @@ export function SessionEditor({
                         ) : null}
                       </div>
                       {status?.error ? (
-                        <Button
-                          className="shrink-0"
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => retryExercise(exercise.id)}
-                        >
-                          Reintentar
-                        </Button>
+                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                          {status.errorCategory === "conflict" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void discardExerciseDraft(exercise.id)}
+                            >
+                              Usar versión guardada
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void retryExercise(exercise.id)}
+                          >
+                            {status.errorCategory === "conflict"
+                              ? "Comprobar cambios"
+                              : status.errorCategory === "session_closed" ||
+                                  status.errorCategory === "removed"
+                                ? "Actualizar"
+                                : "Reintentar"}
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}

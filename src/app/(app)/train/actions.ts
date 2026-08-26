@@ -32,12 +32,18 @@ import {
   correctCompletedWorkoutSession,
   discardCompletedWorkoutSession,
   finishWorkoutSession,
+  getWorkoutExerciseSyncState,
   importInitialTrainingPlan,
   moveRoutineExerciseTarget,
   saveRoutineExerciseTarget,
   saveWorkoutExercise,
   startWorkoutSession,
   todayInCordoba,
+  workoutSaveErrorCategory,
+} from "@/lib/phase2/training-robust";
+import type {
+  WorkoutExerciseSyncState,
+  WorkoutSaveErrorCategory,
 } from "@/lib/phase2/training-robust";
 import {
   toWorkoutStartActiveSession,
@@ -425,12 +431,42 @@ export async function saveWorkoutExerciseAction(input: {
   sessionExerciseId: string;
   expectedUpdatedAt: string;
   payload: WorkoutExercisePayload;
-}): Promise<TrainingActionResult<{ updatedAt: string }>> {
+}): Promise<
+  | { ok: true; data: { updatedAt: string } }
+  | { ok: false; error: string; errorCategory: WorkoutSaveErrorCategory }
+> {
+  const startedAt = Date.now();
   try {
     const updatedAt = await saveWorkoutExercise(input);
+    const durationMs = Date.now() - startedAt;
+    if (durationMs >= 2_000) {
+      console.warn("[workout-exercise-save] slow", {
+        operation: "save_workout_exercise",
+        durationMs,
+        sessionExerciseId: input.sessionExerciseId,
+      });
+    }
     // Background autosave reconciles this exercise in the client. Structural
     // changes and finalization still revalidate the session explicitly.
     return { ok: true, data: { updatedAt } };
+  } catch (error) {
+    const errorCategory = workoutSaveErrorCategory(error);
+    console.error("[workout-exercise-save] failed", {
+      operation: "save_workout_exercise",
+      durationMs: Date.now() - startedAt,
+      errorCategory,
+      sessionExerciseId: input.sessionExerciseId,
+    });
+    return { ok: false, error: actionError(error), errorCategory };
+  }
+}
+
+export async function getWorkoutExerciseSyncStateAction(input: {
+  sessionId: string;
+  sessionExerciseId: string;
+}): Promise<TrainingActionResult<WorkoutExerciseSyncState>> {
+  try {
+    return { ok: true, data: await getWorkoutExerciseSyncState(input) };
   } catch (error) {
     return { ok: false, error: actionError(error) };
   }

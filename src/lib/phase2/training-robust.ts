@@ -96,6 +96,71 @@ function throwRpcError(label: string, value: unknown): never {
   throw new Error(`${label}: ${message ?? "error inesperado."}`);
 }
 
+export type WorkoutSaveErrorCategory =
+  | "transient"
+  | "conflict"
+  | "timeout"
+  | "session_closed"
+  | "validation";
+
+export class WorkoutSaveError extends Error {
+  constructor(
+    public readonly category: WorkoutSaveErrorCategory,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WorkoutSaveError";
+  }
+}
+
+export function workoutSaveErrorCategory(error: unknown): WorkoutSaveErrorCategory {
+  return error instanceof WorkoutSaveError ? error.category : "transient";
+}
+
+function throwWorkoutSaveRpcError(value: unknown): never {
+  const { code, message } = errorLike(value);
+  const normalized = message?.toLocaleLowerCase("es") ?? "";
+  if (code === "40001") {
+    throw new WorkoutSaveError(
+      "conflict",
+      "Este ejercicio cambió en otra pestaña. Estamos comprobando la versión guardada.",
+    );
+  }
+  if (
+    code === "55P03" ||
+    code === "57014" ||
+    normalized.includes("lock timeout") ||
+    normalized.includes("statement timeout") ||
+    normalized.includes("aborted") ||
+    normalized.includes("timed out")
+  ) {
+    throw new WorkoutSaveError(
+      "timeout",
+      "El guardado demoró demasiado. Tus cambios siguen acá; reintentá.",
+    );
+  }
+  if (
+    normalized.includes("sesión ya finalizó") ||
+    normalized.includes("sesion ya finalizo") ||
+    normalized.includes("sesión ya fue finalizada")
+  ) {
+    throw new WorkoutSaveError(
+      "session_closed",
+      "La sesión ya fue finalizada. Actualizá para ver el estado guardado.",
+    );
+  }
+  if (code === "P0001" || code === "22P02" || code === "23514") {
+    throw new WorkoutSaveError(
+      "validation",
+      message ?? "Los datos del ejercicio no son válidos.",
+    );
+  }
+  throw new WorkoutSaveError(
+    "transient",
+    "No se pudo guardar. Revisá la conexión y reintentá.",
+  );
+}
+
 export { todayInCordoba } from "./cordoba-date";
 
 export async function getInitialPlanStatus(): Promise<{
@@ -308,19 +373,100 @@ export async function getWorkoutSessionDetail(
   };
 }
 
+export type WorkoutExerciseSyncState =
+  | { status: "active"; payload: WorkoutExercisePayload; updatedAt: string }
+  | { status: "session_closed" }
+  | { status: "removed" };
+
+function syncPayloadFromExercise(
+  exercise: WorkoutSessionExerciseDetail,
+): WorkoutExercisePayload {
+  const sets = [...exercise.sets]
+    .sort((left, right) => left.set_number - right.set_number)
+    .map((set) => ({
+      set_number: set.set_number,
+      target_reps: set.target_reps,
+      target_weight_kg: set.target_weight_kg,
+      target_rir: set.target_rir,
+      actual_reps: set.actual_reps,
+      actual_weight_kg: set.actual_weight_kg,
+      is_completed: set.is_completed,
+      notes: set.notes,
+    }));
+  return {
+    is_completed: sets.some((set) => set.is_completed),
+    decision: exercise.decision,
+    decision_note: exercise.decision_note ?? "",
+    apply_to_routine: exercise.routine_exercise_id
+      ? exercise.apply_to_routine
+      : false,
+    notes: exercise.notes ?? "",
+    sets,
+  };
+}
+
+export async function getWorkoutExerciseSyncState(input: {
+  sessionId: string;
+  sessionExerciseId: string;
+}): Promise<WorkoutExerciseSyncState> {
+  const { supabase, userId } = await getAuthedContext();
+  const { data: session, error: sessionError } = await supabase
+    .from("workout_sessions")
+    .select("status")
+    .eq("id", input.sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (sessionError) {
+    throw new Error(`Comprobar sesión: ${sessionError.message}`);
+  }
+  if (!session) return { status: "removed" };
+  if ((session as { status: string }).status !== "in_progress") {
+    return { status: "session_closed" };
+  }
+
+  const { data, error } = await supabase
+    .from("workout_session_exercises")
+    .select("*, sets:workout_sets(*)")
+    .eq("id", input.sessionExerciseId)
+    .eq("workout_session_id", input.sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Comprobar ejercicio: ${error.message}`);
+  if (!data) return { status: "removed" };
+
+  const exercise = data as RawSessionExercise;
+  return {
+    status: "active",
+    payload: syncPayloadFromExercise({
+      ...exercise,
+      sets: exercise.sets ?? [],
+    }),
+    updatedAt: exercise.updated_at,
+  };
+}
+
 export async function saveWorkoutExercise(input: {
   sessionExerciseId: string;
   expectedUpdatedAt: string;
   payload: WorkoutExercisePayload;
 }): Promise<string> {
-  validateWorkoutExercisePayload(input.payload);
+  try {
+    validateWorkoutExercisePayload(input.payload);
+  } catch (error) {
+    throw new WorkoutSaveError(
+      "validation",
+      error instanceof Error ? error.message : "Los datos del ejercicio no son válidos.",
+    );
+  }
   const { supabase } = await getAuthedContext();
-  const { data, error } = await supabase.rpc("save_workout_exercise", {
-    p_session_exercise_id: input.sessionExerciseId,
-    p_expected_updated_at: input.expectedUpdatedAt,
-    p_payload: input.payload,
-  });
-  if (error) throwRpcError("Guardar ejercicio", error);
+  const { data, error } = await supabase
+    .rpc("save_workout_exercise", {
+      p_session_exercise_id: input.sessionExerciseId,
+      p_expected_updated_at: input.expectedUpdatedAt,
+      p_payload: input.payload,
+    })
+    .abortSignal(AbortSignal.timeout(12_000));
+  if (error) throwWorkoutSaveRpcError(error);
   if (typeof data !== "string") {
     throw new Error("Guardar ejercicio: respuesta inválida de la base.");
   }
