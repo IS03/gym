@@ -14,12 +14,15 @@ describe("PR 11.4 — gráficos autoexplicativos", () => {
     expect(nutrition).toContain("chartTickIndexes");
     expect(nutrition).toContain("ChartDetail");
     expect(nutrition).toContain("déficit estimado");
+    expect(nutrition).toContain("dateHitBounds");
+    expect(nutrition).toContain('height={HEIGHT} fill="transparent"');
   });
   it("etiqueta el promedio semanal y permite seleccionar una semana", () => {
     expect(training).toContain("completedWeeklyAverage");
     expect(training).toContain("Promedio ·");
     expect(training).toContain("semana completa");
     expect(training).toContain("aria-pressed");
+    expect(training).toContain("weeklyPlotOffset");
   });
   it("no deja la evolución por ejercicio dependiente sólo de title SVG", () => {
     expect(exercise).toContain("ChartDetail");

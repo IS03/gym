@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { chartDomain, chartY } from "../chart-core";
 import {
   formatWeeklyMetric,
   sortedProgressEntries,
   visibleProgressEntries,
   completedWeeklyAverage,
   weeklyBarScale,
+  weeklyBarGeometry,
   weeklyMetricTitle,
   weeklyMetricValue,
 } from "./training-progress-insights";
@@ -36,6 +38,15 @@ describe("training progress insights", () => {
   it("averages only completed visible weeks and skips the current one", () => {
     expect(completedWeeklyAverage([week({ volumeKg: 10 }), week({ volumeKg: 30 }), week({ volumeKg: 999 })], "volume")).toEqual({ value: 20, weeks: 2 });
     expect(completedWeeklyAverage([week()], "volume")).toBeNull();
+  });
+
+  it("uses the exact same plot coordinate for a bar value and its Y reference", () => {
+    const domain = chartDomain([10, 30], true);
+    const plotHeight = 128;
+    const geometry = weeklyBarGeometry(20, domain);
+    const barTop = (1 - geometry.bottom - geometry.height) * plotHeight;
+    const referenceY = chartY(20, domain, plotHeight, 0, 0);
+    expect(barTop).toBeCloseTo(referenceY);
   });
 
   it("orders distributions and reveals only the top four until expanded", () => {

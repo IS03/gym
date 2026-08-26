@@ -11,8 +11,10 @@ import {
   sortedProgressEntries,
   visibleProgressEntries,
   weeklyBarScale,
+  weeklyBarGeometry,
   weeklyMetricTitle,
   weeklyMetricValue,
+  weeklyPlotOffset,
   type ProgressEntry,
   type WeeklyChartMetric,
 } from "@/lib/phase2/training-progress-insights";
@@ -73,11 +75,11 @@ function ProgressiveEntries({ entries, kind }: { entries: ProgressEntry[]; kind:
 }
 
 export function WeeklyTrainingChart({ weeks, className }: { weeks: WeeklyTrainingSummary[]; className?: string }) {
+  const plotHeight = 128;
   const [metric, setMetric] = useState<WeeklyChartMetric>("volume");
   const [selected, setSelected] = useState<number | null>(null);
   const visibleWeeks = useMemo(() => weeks.slice(0, 8).reverse(), [weeks]);
   const values = visibleWeeks.map((week) => weeklyMetricValue(week, metric));
-  const maximum = Math.max(...values, 0);
   const title = weeklyMetricTitle(metric);
   const average = completedWeeklyAverage(visibleWeeks, metric);
   const unit = weeklyUnit(metric);
@@ -100,19 +102,14 @@ export function WeeklyTrainingChart({ weeks, className }: { weeks: WeeklyTrainin
       </div>
       <p className="sr-only">{summary}</p>
       <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-2" role="img" aria-label={summary}>
-        <div className="flex h-52 flex-col justify-between pb-7 text-right text-[10px] text-muted-foreground" aria-hidden>{chartYAxisTicks(domain, 4).map((value) => <span key={value}>{formatChartValue(value, unit)}</span>)}</div>
-        <div className="relative flex h-52 items-end gap-1.5 sm:gap-3">
-          {average ? <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/55" style={{ bottom: `${weeklyBarScale(average.value, maximum)}%` }} /> : null}
-          {visibleWeeks.map((week, index) => {
-          const value = values[index];
-          const height = weeklyBarScale(value, maximum);
-          const isCurrent = index === visibleWeeks.length - 1;
-          return <button key={week.weekStart} type="button" className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSelected(index)} aria-pressed={selectedIndex === index} aria-label={`${weekLabel(week)}${isCurrent ? ", en curso" : ""}. ${title}: ${formatWeeklyMetric(value, metric)}.`}>
-            <span className="metric-number min-h-4 truncate text-center text-[10px] font-medium text-muted-foreground sm:text-[11px]">{value > 0 ? formatWeeklyMetric(value, metric) : "—"}</span>
-            <div className={cn("flex h-32 items-end overflow-hidden rounded-lg bg-muted/55", selectedIndex === index && "ring-2 ring-ring ring-offset-1")}><div className={cn("w-full rounded-lg transition-[height,background-color] duration-200", isCurrent ? "bg-primary" : "bg-primary/50")} style={{ height: `${height}%` }} /></div>
-            <div className="text-center"><p className={cn("text-[10px] sm:text-[11px]", isCurrent ? "font-semibold text-foreground" : "text-muted-foreground")}>{isCurrent ? "Actual" : shortWeekLabel(week.weekStart)}</p>{isCurrent && <p className="text-[10px] text-muted-foreground">En curso</p>}</div>
-          </button>;
-        })}</div>
+        <div className="mt-5 flex h-32 flex-col justify-between text-right text-[10px] text-muted-foreground" aria-hidden>{chartYAxisTicks(domain, 4).map((value) => <span key={value}>{formatChartValue(value, unit)}</span>)}</div>
+        <div className="min-w-0"><div className="flex h-5 items-end gap-1.5 sm:gap-3">{visibleWeeks.map((week, index) => <span key={week.weekStart} className="metric-number min-w-0 flex-1 truncate text-center text-[10px] font-medium text-muted-foreground sm:text-[11px]">{values[index]! > 0 ? formatWeeklyMetric(values[index]!, metric) : "—"}</span>)}</div><div className="relative" style={{ height: plotHeight }}>
+          {average ? <div className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-foreground/55" style={{ top: `${weeklyPlotOffset(average.value, domain) * 100}%` }} /> : null}
+          <div className="flex h-32 items-end gap-1.5 sm:gap-3">{visibleWeeks.map((week, index) => {
+            const value = values[index]!; const isCurrent = index === visibleWeeks.length - 1; const geometry = weeklyBarGeometry(value, domain);
+            return <button key={week.weekStart} type="button" className={cn("relative h-32 min-w-0 flex-1 overflow-hidden rounded-lg bg-muted/55 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", selectedIndex === index && "ring-2 ring-ring ring-offset-1")} onClick={() => setSelected(index)} aria-pressed={selectedIndex === index} aria-label={`${weekLabel(week)}${isCurrent ? ", en curso" : ""}. ${title}: ${formatWeeklyMetric(value, metric)}.`}><div className={cn("absolute inset-x-0 rounded-lg transition-[height,background-color] duration-200", isCurrent ? "bg-primary" : "bg-primary/50")} style={{ bottom: `${geometry.bottom * 100}%`, height: `${geometry.height * 100}%` }} /></button>;
+          })}</div>
+        </div><div className="mt-1 flex gap-1.5 sm:gap-3">{visibleWeeks.map((week, index) => { const isCurrent = index === visibleWeeks.length - 1; return <div key={week.weekStart} className="min-w-0 flex-1 text-center"><p className={cn("text-[10px] sm:text-[11px]", isCurrent ? "font-semibold text-foreground" : "text-muted-foreground")}>{isCurrent ? "Actual" : shortWeekLabel(week.weekStart)}</p>{isCurrent && <p className="text-[10px] text-muted-foreground">En curso</p>}</div>; })}</div></div>
       </div>
       {average ? <p className="text-xs text-muted-foreground">Promedio · {formatWeeklyMetric(average.value, metric)} · {average.weeks} {average.weeks === 1 ? "semana completa" : "semanas completas"}</p> : <p className="text-xs text-muted-foreground">El promedio aparece cuando haya semanas completas anteriores.</p>}
       <ChartDetail title={`${weekLabel(visibleWeeks[selectedIndex]!)}${selectedIndex === visibleWeeks.length - 1 ? " · En curso" : ""}`} items={[{ label: WEEKLY_CHART_METRICS.find((option) => option.value === metric)?.label ?? title, value: formatWeeklyMetric(values[selectedIndex]!, metric) }]} />

@@ -1,4 +1,5 @@
 import { formatTrainingMinutes } from "./training-progress-summary";
+import { chartY, type ChartDomain } from "../chart-core";
 import type { WeeklyTrainingSummary } from "./types";
 
 export type WeeklyChartMetric = "volume" | "sets" | "sessions" | "minutes";
@@ -40,6 +41,15 @@ export function formatWeeklyMetric(value: number, metric: WeeklyChartMetric): st
 export function weeklyBarScale(value: number, maximum: number): number {
   if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(maximum) || maximum <= 0) return 0;
   return Math.min(100, (value / maximum) * 100);
+}
+
+export function weeklyPlotOffset(value: number, domain: ChartDomain): number {
+  return chartY(value, domain, 1, 0, 0);
+}
+
+export function weeklyBarGeometry(value: number, domain: ChartDomain) {
+  const baseline = weeklyPlotOffset(0, domain);
+  return { bottom: 1 - baseline, height: Math.max(0, baseline - weeklyPlotOffset(value, domain)) };
 }
 
 /** The last visible week is the current in-progress calendar week. */
