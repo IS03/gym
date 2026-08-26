@@ -81,6 +81,15 @@ No derivar fechas lógicas del día mediante UTC si puede cambiar el día local.
 - Mantener migraciones pequeñas, auditables y reversibles cuando sea posible.
 - Revisar constraints, índices y políticas existentes antes de agregar duplicados.
 
+### Resiliencia ante JWT recién emitidos
+
+Los clientes de Data API clasifican exclusivamente `HTTP 401` + `PGRST303` +
+`JWT issued at future` en `/rest/v1/` como un rechazo transitorio y realizan
+tres retries cortos y acotados. Este caso no representa una sesión inválida: no
+se limpian cookies, no se fuerza login y no se refresca nuevamente el JWT. La
+causa raíz del desfase de reloj/validación continúa siendo responsabilidad del
+proveedor.
+
 ## Historial y snapshots
 
 No reconstruir datos históricos desde plantillas actuales cuando la sesión ya contiene snapshots.

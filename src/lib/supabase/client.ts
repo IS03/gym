@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { createResilientSupabaseFetch } from "./resilient-fetch";
 
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,5 +11,9 @@ export function createClient() {
     );
   }
 
-  return createBrowserClient(url, anonKey);
+  return createBrowserClient(url, anonKey, {
+    global: {
+      fetch: createResilientSupabaseFetch(),
+    },
+  });
 }

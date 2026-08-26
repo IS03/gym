@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 const home = readFileSync("src/app/(app)/home/page.tsx", "utf8");
 const today = readFileSync("src/app/(app)/today/page.tsx", "utf8");
 const server = readFileSync("src/lib/supabase/server.ts", "utf8");
+const browser = readFileSync("src/lib/supabase/client.ts", "utf8");
+const middleware = readFileSync("src/lib/supabase/middleware.ts", "utf8");
 
 describe("request-scoped authenticated reads", () => {
   it("shares one verified context across Home loaders and uses its bounded training read model", () => {
@@ -23,5 +25,12 @@ describe("request-scoped authenticated reads", () => {
     expect(server).toContain("export const getVerifiedRequestContext = cache(");
     expect(server).toContain("supabase.auth.getClaims()");
     expect(server).not.toContain("unstable_cache");
+  });
+
+  it("installs the Data API transport retry without changing middleware auth", () => {
+    expect(server).toContain("fetch: createResilientSupabaseFetch()");
+    expect(browser).toContain("fetch: createResilientSupabaseFetch()");
+    expect(middleware).not.toContain("createResilientSupabaseFetch");
+    expect(middleware).toContain("supabase.auth.getClaims()");
   });
 });
