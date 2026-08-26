@@ -126,6 +126,17 @@ rutina actual
 La rutina y la sesión son entidades distintas. Cambiar `exercises` o una rutina
 no reescribe `workout_session_exercises` ni `workout_sets` ya creados.
 
+La nota de `routine_exercises` se copia a `routine_note_snapshot` y `notes` al
+iniciar. La primera queda inmutable; `notes` es el snapshot editable de la
+sesión. Sólo una finalización correcta sincroniza de vuelta la nota cuando
+`notes IS DISTINCT FROM routine_note_snapshot`. Una nota no modificada no pisa
+ediciones concurrentes de la rutina, y correcciones históricas nunca propagan.
+
+`decision` y `apply_to_routine` siguen siendo fuentes independientes:
+`maintain` es neutral, `custom` existe sólo por compatibilidad histórica y
+`apply_to_routine` controla exclusivamente la actualización de targets con
+series completadas.
+
 El autosave permite paralelismo entre ejercicios y serializa revisiones del
 mismo ejercicio. `updated_at` actúa como control optimista; una versión vieja
 recibe conflicto y no pisa una nueva. Finalizar exige que todos los cambios

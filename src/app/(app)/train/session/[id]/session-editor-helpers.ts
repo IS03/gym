@@ -7,6 +7,19 @@ import type {
   WorkoutSessionExerciseClient,
 } from "@/lib/phase2/types";
 
+export type SelectableTrainingDecision = Extract<
+  WorkoutSessionExerciseClient["decision"],
+  "increase_weight" | "increase_reps"
+>;
+
+export function toggleTrainingDecision(
+  current: WorkoutSessionExerciseClient["decision"],
+  clicked: SelectableTrainingDecision | "maintain",
+): WorkoutSessionExerciseClient["decision"] {
+  if (clicked === "maintain") return "maintain";
+  return current === clicked ? "maintain" : clicked;
+}
+
 export function workoutPayloadFromDetail(
   exercise: WorkoutSessionExerciseClient,
 ): WorkoutExercisePayload {

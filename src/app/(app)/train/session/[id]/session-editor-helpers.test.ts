@@ -11,6 +11,7 @@ import {
   renumberWorkoutPayload,
   sessionHasCardioExercise,
   sessionMetadataFromSession,
+  toggleTrainingDecision,
 } from "./session-editor-helpers";
 import type { WorkoutExercisePayload, WorkoutSessionClient } from "@/lib/phase2/types";
 
@@ -47,6 +48,20 @@ function payload(): WorkoutExercisePayload {
 }
 
 describe("borrador de sesión", () => {
+  it.each([
+    ["maintain", "increase_weight", "increase_weight"],
+    ["increase_weight", "increase_weight", "maintain"],
+    ["maintain", "increase_reps", "increase_reps"],
+    ["increase_reps", "increase_reps", "maintain"],
+    ["increase_weight", "increase_reps", "increase_reps"],
+    ["increase_reps", "increase_weight", "increase_weight"],
+    ["custom", "increase_weight", "increase_weight"],
+    ["custom", "increase_reps", "increase_reps"],
+    ["custom", "maintain", "maintain"],
+  ] as const)("cambia %s con %s a %s", (current, clicked, expected) => {
+    expect(toggleTrainingDecision(current, clicked)).toBe(expected);
+  });
+
   it("muestra sólo el recordatorio heredado y no reutiliza la decisión nueva", () => {
     expect(nextSessionReminder("increase_weight", null)).toBe("Subir peso");
     expect(nextSessionReminder("increase_reps", null)).toBe("Subir repeticiones");

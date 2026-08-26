@@ -51,6 +51,7 @@ function exercise(overrides: Partial<WorkoutSessionExercise> = {}): WorkoutSessi
     decision: "maintain",
     decision_note: null,
     apply_to_routine: false,
+    routine_note_snapshot: null,
     notes: null,
     series_reales: null,
     reps_reales: null,

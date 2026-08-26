@@ -54,6 +54,13 @@ describe("validación de entrenamiento", () => {
     expect(() => validateWorkoutExercisePayload(value)).not.toThrow();
   });
 
+  it("sigue aceptando custom histórico con nota", () => {
+    const value = payload();
+    value.decision = "custom";
+    value.decision_note = "Recordatorio legado";
+    expect(() => validateWorkoutExercisePayload(value)).not.toThrow();
+  });
+
   it("acepta coma decimal en entradas móviles", () => {
     expect(nullableNumberFromInput("12,5")).toBe(12.5);
     expect(nullableNumberFromInput("12.5")).toBe(12.5);

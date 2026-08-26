@@ -50,7 +50,6 @@ import type { ExerciseAutosaveErrorCategory } from "@/lib/phase2/exercise-autosa
 import type {
   SessionMetadataInput,
   MuscleGroup,
-  TrainingAdjustment,
   EditableWorkoutSet,
   WorkoutExercisePayload,
   WorkoutSessionClientDetail,
@@ -68,17 +67,20 @@ import {
   renumberWorkoutPayload,
   sessionHasCardioExercise,
   sessionMetadataFromSession,
+  toggleTrainingDecision,
   workoutPayloadFromDetail,
+  type SelectableTrainingDecision,
 } from "./session-editor-helpers";
 import { SessionCreateExerciseForm } from "./session-create-exercise-form";
 import { CompletedSessionActions } from "./completed-session-actions";
 import { WorkoutFinishedDialog } from "./workout-finished-dialog";
 
-const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
-  { value: "maintain", label: "Mantener" },
+const NEXT_SESSION_DECISIONS: Array<{
+  value: SelectableTrainingDecision;
+  label: string;
+}> = [
   { value: "increase_weight", label: "+ Peso" },
   { value: "increase_reps", label: "+ Repeticiones" },
-  { value: "custom", label: "Personalizado" },
 ];
 
 type ExerciseStatus = {
@@ -1496,17 +1498,17 @@ export function SessionEditor({
                     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
                       <span className="flex min-w-0 items-center gap-2">
                         <span>Progresión y próxima vez</span>
-                        {payload.notes || payload.decision === "custom" || payload.apply_to_routine ? (
-                          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene configuración adicional" />
+                        {payload.decision !== "maintain" || payload.apply_to_routine ? (
+                          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene acción futura configurada" />
                         ) : null}
                       </span>
                       <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
                     </summary>
                     <div className="space-y-4 border-t border-border/60 p-3">
                       <div className="space-y-2">
-                        <Label>¿Qué hacer la próxima sesión?</Label>
+                        <Label>Próxima vez</Label>
                         <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
-                          {ADJUSTMENTS.map((adjustment) => (
+                          {NEXT_SESSION_DECISIONS.map((adjustment) => (
                             <Button
                               key={adjustment.value}
                               type="button"
@@ -1519,13 +1521,13 @@ export function SessionEditor({
                                   exercise.id,
                                   (current) => ({
                                     ...current,
-                                    decision: adjustment.value,
-                                    decision_note:
-                                      adjustment.value === "custom" ? current.decision_note : "",
+                                    decision: toggleTrainingDecision(
+                                      current.decision,
+                                      adjustment.value,
+                                    ),
+                                    decision_note: "",
                                   }),
-                                  adjustment.value === "custom"
-                                    ? undefined
-                                    : { immediate: true },
+                                  { immediate: true },
                                 )
                               }
                             >
@@ -1539,26 +1541,37 @@ export function SessionEditor({
                       </div>
 
                       {payload.decision === "custom" ? (
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`decision-note-${exercise.id}`}>
-                            Recordatorio para la próxima vez
-                          </Label>
-                          <textarea
-                            id={`decision-note-${exercise.id}`}
-                            className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
-                            value={payload.decision_note}
+                        <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                          <div>
+                            <p className="text-xs font-medium text-primary">
+                              Recordatorio anterior
+                            </p>
+                            <p className="mt-1 break-words text-sm">
+                              {payload.decision_note}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
                             disabled={interactionLocked}
-                            placeholder="Ejemplo: probar 37,5 kg solo en la primera serie"
-                            onChange={(event) =>
-                              updateExercise(exercise.id, (current) => ({
-                                ...current,
-                                decision_note: event.target.value,
-                              }))
+                            onClick={() =>
+                              updateExercise(
+                                exercise.id,
+                                (current) => ({
+                                  ...current,
+                                  decision: toggleTrainingDecision(
+                                    current.decision,
+                                    "maintain",
+                                  ),
+                                  decision_note: "",
+                                }),
+                                { immediate: true },
+                              )
                             }
-                          />
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            Se mostrará una sola vez al volver a abrir esta rutina.
-                          </p>
+                          >
+                            Quitar
+                          </Button>
                         </div>
                       ) : null}
 
@@ -1582,7 +1595,7 @@ export function SessionEditor({
                           />
                           <span>
                             <span className="block font-medium">
-                              Usar lo realizado como próximo objetivo
+                              Guardar lo realizado como nuevo objetivo
                             </span>
                             <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                               Se aplica al finalizar y solo toma las series completadas.
@@ -1593,7 +1606,9 @@ export function SessionEditor({
 
                       <div className="space-y-1.5">
                         <Label htmlFor={`exercise-notes-${exercise.id}`}>
-                          Nota del ejercicio
+                          {exercise.routine_exercise_id
+                            ? "Nota para próximas sesiones"
+                            : "Nota del ejercicio en esta sesión"}
                         </Label>
                         <textarea
                           id={`exercise-notes-${exercise.id}`}
@@ -1815,7 +1830,7 @@ export function SessionEditor({
               ? "Guardando los últimos cambios antes de cerrar la sesión…"
               : finishStage === "finishing"
                 ? "Todos los ejercicios están sincronizados. Cerrando la sesión…"
-              : "Solo se actualiza la rutina donde activaste “Usar lo realizado como próximo objetivo”."}
+              : "Solo se actualiza la rutina donde activaste “Guardar lo realizado como nuevo objetivo”."}
           </p>
           <div aria-live="polite">
             {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}

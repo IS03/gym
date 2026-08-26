@@ -122,6 +122,7 @@ export type WorkoutSessionExercise = {
   decision: TrainingAdjustment;
   decision_note: string | null;
   apply_to_routine: boolean;
+  routine_note_snapshot: string | null;
   notes: string | null;
   series_reales: number | null;
   reps_reales: number | null;

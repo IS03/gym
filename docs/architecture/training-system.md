@@ -151,7 +151,9 @@ increase_reps
 custom
 ```
 
-`increase_weight`, `increase_reps` y `custom` no modifican automáticamente números. Son recordatorios para la próxima vez.
+`maintain` es el estado neutral y se representa en la UI sin ningún botón seleccionado. `increase_weight` e `increase_reps` son las únicas decisiones nuevas disponibles. `custom` se conserva sólo para leer drafts, recordatorios y snapshots históricos; la UI normal no crea nuevos valores `custom`.
+
+`increase_weight`, `increase_reps` y los `custom` históricos no modifican automáticamente números. Son recordatorios para la próxima vez.
 
 El recordatorio heredado vive en el snapshot de la sesión; la nueva decisión comienza en `maintain`.
 
@@ -172,6 +174,14 @@ apply_to_routine
 ```
 
 Pueden utilizarse juntos o por separado.
+
+### Nota persistente por rutina
+
+`routine_exercises.notes` pertenece a la combinación ejercicio + rutina. Al iniciar desde una rutina, `routine_note_snapshot` y `workout_session_exercises.notes` reciben la nota vigente. El snapshot inicial no es editable.
+
+Sólo `finish_workout_session` compara la nota confirmada de la sesión con `routine_note_snapshot`. Si hubo un cambio explícito, la edición de la sesión actualiza `routine_exercises.notes`; si no cambió, la rutina no se reescribe y una edición concurrente externa se conserva. Autosave, cancelación, descarte y corrección histórica no propagan notas.
+
+`workout_session_exercises.notes` permanece como snapshot histórico editable de esa sesión. Cambiar posteriormente la nota de rutina nunca reescribe sesiones anteriores.
 
 ## Corrección de sesiones completadas
 
