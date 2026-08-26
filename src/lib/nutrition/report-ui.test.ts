@@ -5,6 +5,7 @@ const source = (path: string) => readFileSync(path, "utf8");
 const reportsPage = source("src/app/(app)/today/reports/page.tsx");
 const breakdown = source("src/components/nutrition/nutrition-report-daily-breakdown.tsx");
 const periodSelector = source("src/components/nutrition/nutrition-report-period-selector.tsx");
+const rangePicker = source("src/components/ui/date-range-picker.tsx");
 
 describe("PR 10.7 — jerarquía de reportes", () => {
   it("deja el rango temporal en la card de período y no en el encabezado", () => {
@@ -18,7 +19,8 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(periodSelector).toContain("grid-cols-3");
     expect(periodSelector).toContain("lg:grid-cols-6");
     expect(periodSelector).toContain("ResponsiveDialog");
-    expect(periodSelector).toContain("<DateField");
+    expect(periodSelector).toContain("<DateRangePicker");
+    expect(periodSelector).not.toContain("<DateField");
   });
 
   it("muestra seis opciones nuevas, el rango actual y no deja el formulario visible", () => {
@@ -33,8 +35,14 @@ describe("PR 10.7 — jerarquía de reportes", () => {
   });
 
   it("inicializa el personalizado desde el rango efectivo y conserva el contrato URL", () => {
-    expect(periodSelector).toContain('defaultValue={start}');
-    expect(periodSelector).toContain('defaultValue={end}');
+    expect(periodSelector).toContain('useState<DateRangeValue>({ start, end })');
+    expect(periodSelector).toContain('value={customRange}');
+    expect(periodSelector).toContain('NUTRITION_REPORT_MAX_DAYS');
+    expect(periodSelector).toContain('disabled={!customRange.start || !customRange.end}');
+    expect(periodSelector).toContain('action="/today/reports"');
+    expect(periodSelector).toContain('name="period" value="custom"');
+    expect(rangePicker).toContain('name={fromName}');
+    expect(rangePicker).toContain('name={toName}');
     expect(periodSelector).toContain('name="period" value="custom"');
   });
 

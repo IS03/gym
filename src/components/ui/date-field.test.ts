@@ -10,7 +10,6 @@ const globals = source("src/app/globals.css");
 const dateConsumers = [
   "src/app/(app)/today/create-meal-form.tsx",
   "src/app/(app)/today/page.tsx",
-  "src/components/nutrition/nutrition-report-period-selector.tsx",
   "src/app/(app)/history/page.tsx",
   "src/app/(app)/settings/profile-form.tsx",
   "src/app/(app)/settings/nutrition/nutrition-settings-forms.tsx",

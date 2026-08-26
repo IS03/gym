@@ -5,8 +5,9 @@ import { useState } from "react";
 
 import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { DateField } from "@/components/ui/date-field";
-import type { NutritionReportPreset } from "@/lib/nutrition/reports-core";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRangeValue } from "@/lib/calendar/date-range";
+import { NUTRITION_REPORT_MAX_DAYS, type NutritionReportPreset } from "@/lib/nutrition/reports-core";
 import { cn } from "@/lib/utils";
 
 const presets: Array<{ period: Exclude<NutritionReportPreset, "custom">; label: string }> = [
@@ -27,6 +28,7 @@ type Props = {
 
 export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel }: Props) {
   const [customOpen, setCustomOpen] = useState(false);
+  const [customRange, setCustomRange] = useState<DateRangeValue>({ start, end });
 
   return (
     <>
@@ -64,16 +66,14 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
       >
         <form action="/today/reports" className="space-y-4" onSubmit={() => setCustomOpen(false)}>
           <input type="hidden" name="period" value="custom" />
-          <label className="block min-w-0 space-y-1 text-sm font-medium">
-            Desde
-            <DateField name="from" defaultValue={start} max={today} required />
-          </label>
-          <label className="block min-w-0 space-y-1 text-sm font-medium">
-            Hasta
-            <DateField name="to" defaultValue={end} max={today} required />
-          </label>
+          <DateRangePicker
+            value={customRange}
+            onChange={setCustomRange}
+            today={today}
+            maxDays={NUTRITION_REPORT_MAX_DAYS}
+          />
           <p className="text-xs text-muted-foreground">Máximo 366 días. Las fechas futuras se excluyen.</p>
-          <Button type="submit" className="h-11 w-full">Aplicar período</Button>
+          <Button type="submit" className="h-11 w-full" disabled={!customRange.start || !customRange.end}>Aplicar período</Button>
         </form>
       </ResponsiveDialog>
     </>
