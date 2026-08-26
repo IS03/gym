@@ -5,7 +5,9 @@ import { AlertTriangle, Pencil, Plus, Ruler, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChartDetail } from "@/components/ui/chart-detail";
 import { DateField } from "@/components/ui/date-field";
+import { chartDomain, chartTickIndexes, chartX, chartY, chartYAxisTicks, formatChartValue, lineSegments } from "@/lib/chart-core";
 import { BODY_MEASUREMENT_FIELDS, type BodyMeasurement, type BodyMeasurementField } from "@/lib/body-measurement-types";
 import { deleteBodyMeasurementAction, saveBodyMeasurementAction } from "@/app/(app)/train/body/actions";
 
@@ -32,14 +34,13 @@ function Sheet({ children, open, onOpenChange }: { children: ReactNode; open: bo
 }
 
 function MeasurementChart({ entries, field }: { entries: BodyMeasurement[]; field: BodyMeasurementField }) {
+  const [selected, setSelected] = useState(-1);
   const points = entries.filter((entry) => entry[field] !== null);
   if (!points.length) return <p className="py-8 text-center text-sm text-muted-foreground">Todavía no hay registros de {labels[field].toLowerCase()}.</p>;
-  const width=360,height=156,left=42,right=10,top=12,bottom=30;
-  const values=points.map((entry)=>entry[field] as number), min=Math.min(...values), max=Math.max(...values), pad=Math.max((max-min)*.18,.5), minY=Math.max(0,min-pad), maxY=max+pad;
-  const usableWidth=width-left-right,usableHeight=height-top-bottom;
-  const x=(i:number)=>left+(points.length===1?usableWidth/2:i/(points.length-1)*usableWidth), y=(v:number)=>top+(maxY-v)/(maxY-minY)*usableHeight;
-  const path=points.map((entry,index)=>`${index?"L":"M"} ${x(index)} ${y(entry[field] as number)}`).join(" ");
-  return <svg className="h-auto w-full text-primary" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Evolución de ${labels[field]}`}><line x1={left} x2={width-right} y1={y(maxY)} y2={y(maxY)} stroke="currentColor" strokeOpacity=".14"/><line x1={left} x2={width-right} y1={y(minY)} y2={y(minY)} stroke="currentColor" strokeOpacity=".14"/>{points.length>1?<path d={path} fill="none" stroke="currentColor" strokeWidth="2.25"/>:null}{points.map((entry,index)=><circle key={entry.id} cx={x(index)} cy={y(entry[field] as number)} r="3.75" className="fill-card stroke-primary" strokeWidth="2"/> )}</svg>;
+  const width = 360; const height = 164; const left = 50; const right = 12; const top = 12; const bottom = 30;
+  const values = points.map((entry) => entry[field] as number); const domain = chartDomain(values); const coordinates = lineSegments(values, domain, width, height, left, right, top, bottom)[0] ?? [];
+  const selectedIndex = selected < 0 ? points.length - 1 : Math.min(selected, points.length - 1);
+  return <div className="space-y-2"><p className="text-xs text-muted-foreground">Fecha · {labels[field]} (cm)</p><svg className="h-auto w-full text-primary" viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`Evolución de ${labels[field]}. Eje horizontal: fecha. Eje vertical: centímetros.`}>{chartYAxisTicks(domain, 4).map((value) => { const y = chartY(value, domain, height, top, bottom); return <g key={value}><line x1={left} x2={width - right} y1={y} y2={y} stroke="currentColor" strokeOpacity=".14" /><text x={left - 7} y={y + 3.5} textAnchor="end" className="fill-muted-foreground text-[10px]">{formatChartValue(value, "cm")}</text></g>; })}{coordinates.length > 1 ? <polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="2.25" /> : null}{coordinates.map(({ index, x, y }) => { const point = points[index]!; const value = values[index]!; return <g key={point.id}><circle cx={x} cy={y} r="11" fill="transparent" role="button" tabIndex={0} aria-label={`${formatDate(point.measured_on)}. ${labels[field]}: ${formatChartValue(value, "cm")}.`} onClick={() => setSelected(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(index); } }} /><circle cx={x} cy={y} r={selectedIndex === index ? 5 : 3.75} className="fill-card stroke-primary" strokeWidth="2" pointerEvents="none" /></g>; })}</svg><div className="relative h-4 text-[10px] text-muted-foreground" aria-hidden>{chartTickIndexes(points.length, 3).map((index) => <span key={points[index]!.id} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${(chartX(index, points.length, width, left, right) / width) * 100}%` }}>{formatDate(points[index]!.measured_on).replace(/\s\d{4}$/, "")}</span>)}</div><ChartDetail title={formatDate(points[selectedIndex]!.measured_on)} items={[{ label: labels[field], value: formatChartValue(values[selectedIndex]!, "cm") }]} /></div>;
 }
 
 export function BodyMeasurements({ initialEntries, today }: { initialEntries: BodyMeasurement[]; today: string }) {

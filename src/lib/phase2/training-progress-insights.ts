@@ -42,6 +42,15 @@ export function weeklyBarScale(value: number, maximum: number): number {
   return Math.min(100, (value / maximum) * 100);
 }
 
+/** The last visible week is the current in-progress calendar week. */
+export function completedWeeklyAverage(weeks: readonly WeeklyTrainingSummary[], metric: WeeklyChartMetric): { value: number; weeks: number } | null {
+  const completed = weeks.slice(0, -1);
+  if (completed.length === 0) return null;
+  const values = completed.map((week) => weeklyMetricValue(week, metric)).filter(Number.isFinite);
+  if (values.length === 0) return null;
+  return { value: values.reduce((total, value) => total + value, 0) / values.length, weeks: values.length };
+}
+
 export function sortedProgressEntries(values: Record<string, number>): ProgressEntry[] {
   return Object.entries(values).sort(
     ([leftName, leftValue], [rightName, rightValue]) =>

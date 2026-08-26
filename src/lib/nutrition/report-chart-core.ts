@@ -19,17 +19,18 @@ export function chartDomain(values: Array<number | null | undefined>, includeZer
   return { min: min - padding, max: max + padding };
 }
 
-export function chartX(index: number, count: number, width: number, padding = 18) {
-  if (count <= 1) return width / 2;
-  return padding + (index / (count - 1)) * (width - padding * 2);
+export function chartX(index: number, count: number, width: number, padding = 18, right = padding) {
+  const usable = width - padding - right;
+  if (count <= 1) return padding + usable / 2;
+  return padding + (index / (count - 1)) * usable;
 }
 
-export function chartY(value: number, domain: ChartDomain, height: number, padding = 16) {
+export function chartY(value: number, domain: ChartDomain, height: number, padding = 16, bottom = padding) {
   const ratio = (value - domain.min) / (domain.max - domain.min);
-  return height - padding - ratio * (height - padding * 2);
+  return height - bottom - ratio * (height - padding - bottom);
 }
 
-export function lineSegments(values: Array<number | null | undefined>, domain: ChartDomain, width: number, height: number) {
+export function lineSegments(values: Array<number | null | undefined>, domain: ChartDomain, width: number, height: number, left = 18, right = left, top = 16, bottom = top) {
   const segments: ChartCoordinate[][] = [];
   let active: ChartCoordinate[] = [];
   for (let index = 0; index < values.length; index += 1) {
@@ -39,7 +40,7 @@ export function lineSegments(values: Array<number | null | undefined>, domain: C
       active = [];
       continue;
     }
-    active.push({ index, x: chartX(index, values.length, width), y: chartY(value, domain, height) });
+    active.push({ index, x: chartX(index, values.length, width, left, right), y: chartY(value, domain, height, top, bottom) });
   }
   if (active.length > 0) segments.push(active);
   return segments;

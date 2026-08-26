@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ChartDetail } from "@/components/ui/chart-detail";
+import { chartDomain, chartYAxisTicks, formatChartValue, type ChartUnit } from "@/lib/chart-core";
 import {
   WEEKLY_CHART_METRICS,
+  completedWeeklyAverage,
   formatWeeklyMetric,
   sortedProgressEntries,
   visibleProgressEntries,
@@ -25,6 +28,9 @@ function shortWeekLabel(value: string) {
     .format(new Date(`${value}T12:00:00Z`))
     .replace(".", "");
 }
+
+function weekLabel(week: WeeklyTrainingSummary) { return `${shortWeekLabel(week.weekStart)}–${shortWeekLabel(week.weekEnd)}`; }
+function weeklyUnit(metric: WeeklyChartMetric): ChartUnit { return metric === "volume" ? "kg" : metric === "sets" ? "series" : metric === "sessions" ? "sesiones" : "min"; }
 
 function ProgressiveEntries({ entries, kind }: { entries: ProgressEntry[]; kind: "muscles" | "routines" }) {
   const [expanded, setExpanded] = useState(false);
@@ -68,38 +74,48 @@ function ProgressiveEntries({ entries, kind }: { entries: ProgressEntry[]; kind:
 
 export function WeeklyTrainingChart({ weeks, className }: { weeks: WeeklyTrainingSummary[]; className?: string }) {
   const [metric, setMetric] = useState<WeeklyChartMetric>("volume");
+  const [selected, setSelected] = useState<number | null>(null);
   const visibleWeeks = useMemo(() => weeks.slice(0, 8).reverse(), [weeks]);
   const values = visibleWeeks.map((week) => weeklyMetricValue(week, metric));
   const maximum = Math.max(...values, 0);
   const title = weeklyMetricTitle(metric);
+  const average = completedWeeklyAverage(visibleWeeks, metric);
+  const unit = weeklyUnit(metric);
+  const domain = chartDomain([...values, average?.value ?? null], true);
+  const selectedIndex = selected ?? visibleWeeks.length - 1;
 
   if (visibleWeeks.length === 0) {
     return <div className={cn("flex min-h-52 items-center justify-center rounded-xl border border-dashed px-6 text-center", className)}><p className="max-w-xs text-sm text-muted-foreground">Necesitamos algunas sesiones para mostrar tu evolución.</p></div>;
   }
 
-  const summary = `${title}. ${visibleWeeks.map((week, index) => `${index === visibleWeeks.length - 1 ? "Actual" : shortWeekLabel(week.weekStart)}: ${formatWeeklyMetric(values[index], metric)}`).join(". ")}.`;
+  const summary = `${title}. Eje horizontal: semana. Eje vertical: ${unit}. ${visibleWeeks.map((week, index) => `${index === visibleWeeks.length - 1 ? "Actual" : shortWeekLabel(week.weekStart)}: ${formatWeeklyMetric(values[index], metric)}`).join(". ")}.`;
 
   return (
     <section className={cn("space-y-4", className)} aria-labelledby="weekly-training-chart-title">
       <div className="space-y-3">
-        <div><h2 id="weekly-training-chart-title" className="text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted-foreground">Últimas {visibleWeeks.length} {visibleWeeks.length === 1 ? "semana" : "semanas"}.</p></div>
+        <div><h2 id="weekly-training-chart-title" className="text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted-foreground">Semana · {unit} · últimas {visibleWeeks.length} {visibleWeeks.length === 1 ? "semana" : "semanas"}.</p></div>
         <div className="grid w-full grid-cols-2 gap-1 rounded-lg border p-1 lg:grid-cols-4" aria-label="Métrica de evolución semanal">
           {WEEKLY_CHART_METRICS.map((option) => <Button key={option.value} type="button" size="sm" className="h-9 w-full min-w-0 px-2 text-[13px] sm:text-sm" variant={metric === option.value ? "secondary" : "ghost"} aria-pressed={metric === option.value} onClick={() => setMetric(option.value)}>{option.label}</Button>)}
         </div>
       </div>
       <p className="sr-only">{summary}</p>
-      <div className="flex h-52 items-end gap-1.5 sm:gap-3" role="img" aria-label={summary}>
-        {visibleWeeks.map((week, index) => {
+      <div className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-2" role="img" aria-label={summary}>
+        <div className="flex h-52 flex-col justify-between pb-7 text-right text-[10px] text-muted-foreground" aria-hidden>{chartYAxisTicks(domain, 4).map((value) => <span key={value}>{formatChartValue(value, unit)}</span>)}</div>
+        <div className="relative flex h-52 items-end gap-1.5 sm:gap-3">
+          {average ? <div className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/55" style={{ bottom: `${weeklyBarScale(average.value, maximum)}%` }} /> : null}
+          {visibleWeeks.map((week, index) => {
           const value = values[index];
           const height = weeklyBarScale(value, maximum);
           const isCurrent = index === visibleWeeks.length - 1;
-          return <div key={week.weekStart} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5">
+          return <button key={week.weekStart} type="button" className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSelected(index)} aria-pressed={selectedIndex === index} aria-label={`${weekLabel(week)}${isCurrent ? ", en curso" : ""}. ${title}: ${formatWeeklyMetric(value, metric)}.`}>
             <span className="metric-number min-h-4 truncate text-center text-[10px] font-medium text-muted-foreground sm:text-[11px]">{value > 0 ? formatWeeklyMetric(value, metric) : "—"}</span>
-            <div className="flex h-32 items-end overflow-hidden rounded-lg bg-muted/55"><div className={cn("w-full rounded-lg transition-[height,background-color] duration-200", isCurrent ? "bg-primary" : "bg-primary/50")} style={{ height: `${height}%` }} /></div>
+            <div className={cn("flex h-32 items-end overflow-hidden rounded-lg bg-muted/55", selectedIndex === index && "ring-2 ring-ring ring-offset-1")}><div className={cn("w-full rounded-lg transition-[height,background-color] duration-200", isCurrent ? "bg-primary" : "bg-primary/50")} style={{ height: `${height}%` }} /></div>
             <div className="text-center"><p className={cn("text-[10px] sm:text-[11px]", isCurrent ? "font-semibold text-foreground" : "text-muted-foreground")}>{isCurrent ? "Actual" : shortWeekLabel(week.weekStart)}</p>{isCurrent && <p className="text-[10px] text-muted-foreground">En curso</p>}</div>
-          </div>;
-        })}
+          </button>;
+        })}</div>
       </div>
+      {average ? <p className="text-xs text-muted-foreground">Promedio · {formatWeeklyMetric(average.value, metric)} · {average.weeks} {average.weeks === 1 ? "semana completa" : "semanas completas"}</p> : <p className="text-xs text-muted-foreground">El promedio aparece cuando haya semanas completas anteriores.</p>}
+      <ChartDetail title={`${weekLabel(visibleWeeks[selectedIndex]!)}${selectedIndex === visibleWeeks.length - 1 ? " · En curso" : ""}`} items={[{ label: WEEKLY_CHART_METRICS.find((option) => option.value === metric)?.label ?? title, value: formatWeeklyMetric(values[selectedIndex]!, metric) }]} />
     </section>
   );
 }

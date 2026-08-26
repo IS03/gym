@@ -3,6 +3,7 @@ import {
   formatWeeklyMetric,
   sortedProgressEntries,
   visibleProgressEntries,
+  completedWeeklyAverage,
   weeklyBarScale,
   weeklyMetricTitle,
   weeklyMetricValue,
@@ -30,6 +31,11 @@ describe("training progress insights", () => {
     expect(weeklyBarScale(4, 4)).toBe(100);
     expect(weeklyBarScale(2, 4)).toBe(50);
     expect(weeklyBarScale(2, 0)).toBe(0);
+  });
+
+  it("averages only completed visible weeks and skips the current one", () => {
+    expect(completedWeeklyAverage([week({ volumeKg: 10 }), week({ volumeKg: 30 }), week({ volumeKg: 999 })], "volume")).toEqual({ value: 20, weeks: 2 });
+    expect(completedWeeklyAverage([week()], "volume")).toBeNull();
   });
 
   it("orders distributions and reveals only the top four until expanded", () => {

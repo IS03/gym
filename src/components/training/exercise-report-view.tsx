@@ -5,6 +5,8 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChartDetail } from "@/components/ui/chart-detail";
+import { chartDomain, chartTickIndexes, chartX, chartY, chartYAxisTicks, formatChartValue, lineSegments, type ChartUnit } from "@/lib/chart-core";
 import {
   buildExerciseReportPoints,
   completedExerciseSets,
@@ -23,18 +25,16 @@ function date(value: string, year = true) { return new Intl.DateTimeFormat("es-A
 function metricValue(point: ExerciseReportPoint, metric: ChartMetric) { return metric === "weight" ? point.bestWeightKg : metric === "reps" ? point.bestReps : point.volumeKg; }
 function metricLabel(metric: ChartMetric) { return metric === "weight" ? "Peso" : metric === "reps" ? "Reps" : "Volumen"; }
 function metricDisplay(value: number | null, metric: ChartMetric) { return metric === "weight" ? number(value, " kg") : metric === "volume" ? number(value, " kg") : number(value); }
+function chartUnit(metric: ChartMetric): ChartUnit { return metric === "weight" || metric === "volume" ? "kg" : "reps"; }
 
 function EvolutionChart({ points, metric }: { points: ExerciseReportPoint[]; metric: ChartMetric }) {
+  const [selected, setSelected] = useState(0);
   const visible = points.filter((point) => metricValue(point, metric) !== null);
   if (visible.length === 0) return <div className="flex h-48 items-center justify-center rounded-xl border border-dashed px-5 text-center text-sm text-muted-foreground">No hay datos de {metricLabel(metric).toLocaleLowerCase("es-AR")} para este período.</div>;
-  const values = visible.map((point) => metricValue(point, metric) ?? 0);
-  const min = Math.min(...values), max = Math.max(...values), span = Math.max(max - min, 1);
-  const coordinates = visible.map((point, index) => {
-    const value = metricValue(point, metric) ?? 0;
-    return { point, value, x: visible.length === 1 ? 50 : 6 + (index / (visible.length - 1)) * 88, y: 86 - ((value - min) / span) * 68 };
-  });
-  const summary = `Evolución de ${metricLabel(metric).toLocaleLowerCase("es-AR")} en ${visible.length} sesiones. Primera: ${metricDisplay(values[0], metric)}. Última: ${metricDisplay(values.at(-1) ?? null, metric)}. Máxima: ${metricDisplay(max, metric)}.`;
-  return <div className="space-y-2"><p className="sr-only">{summary}</p><svg viewBox="0 0 100 100" role="img" aria-label={summary} className="h-48 w-full overflow-visible lg:h-64"><line x1="6" y1="86" x2="94" y2="86" className="stroke-border" strokeWidth="0.6" /><polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />{coordinates.map(({ point, value, x, y }) => <g key={point.sessionId}><circle cx={x} cy={y} r="2.8" className="fill-primary stroke-background" strokeWidth="1.4"><title>{`${date(point.logDate, false)} · ${metricDisplay(value, metric)}`}</title></circle></g>)}</svg><div className="flex justify-between text-[11px] text-muted-foreground"><span>{date(visible[0].logDate, false)}</span><span>{date(visible.at(-1)?.logDate ?? visible[0].logDate, false)}</span></div></div>;
+  const values = visible.map((point) => metricValue(point, metric)!); const unit = chartUnit(metric); const domain = chartDomain(values); const selectedIndex = Math.min(selected, visible.length - 1);
+  const coordinates = lineSegments(values, domain, 320, 160, 46, 12, 12, 28)[0] ?? [];
+  const maximum = Math.max(...values); const summary = `Evolución de ${metricLabel(metric).toLocaleLowerCase("es-AR")}. Eje horizontal: fecha. Eje vertical: ${unit}. Primera: ${metricDisplay(values[0]!, metric)}. Última: ${metricDisplay(values.at(-1) ?? null, metric)}. Máxima: ${metricDisplay(maximum, metric)}.`;
+  return <div className="space-y-2"><p className="text-xs text-muted-foreground">Fecha · {unit}</p><p className="sr-only">{summary}</p><svg viewBox="0 0 320 160" role="group" aria-label={summary} className="h-48 w-full overflow-visible lg:h-64">{chartYAxisTicks(domain, 4).map((value) => { const y = chartY(value, domain, 160, 12, 28); return <g key={value}><line x1="46" x2="308" y1={y} y2={y} className="stroke-border" strokeDasharray="2 3"/><text x="40" y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">{formatChartValue(value, unit)}</text></g>; })}<polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />{coordinates.map(({ index, x, y }) => <g key={visible[index]!.sessionId}><circle cx={x} cy={y} r="10" fill="transparent" role="button" tabIndex={0} aria-label={`${date(visible[index]!.logDate)}. ${metricLabel(metric)}: ${metricDisplay(values[index]!, metric)}.`} onClick={() => setSelected(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(index); } }} /><circle cx={x} cy={y} r={selectedIndex === index ? 4.5 : 3} className="fill-primary stroke-background" strokeWidth="1.4" pointerEvents="none" /></g>)}</svg><div className="relative h-4 text-[10px] text-muted-foreground" aria-hidden>{chartTickIndexes(visible.length).map((index) => <span key={visible[index]!.sessionId} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${(chartX(index, visible.length, 320, 46, 12) / 320) * 100}%` }}>{date(visible[index]!.logDate, false)}</span>)}</div><ChartDetail title={date(visible[selectedIndex]!.logDate)} items={[{ label: metric === "reps" ? "Repeticiones" : metricLabel(metric), value: metricDisplay(values[selectedIndex]!, metric) }]} /></div>;
 }
 
 function ReportSessions({ sessions }: { sessions: ExerciseReportSession[] }) {

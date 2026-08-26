@@ -5,7 +5,9 @@ import { Pencil, Plus, Scale, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChartDetail } from "@/components/ui/chart-detail";
 import { DateField } from "@/components/ui/date-field";
+import { chartDomain, chartTickIndexes, chartX, chartY, chartYAxisTicks, formatChartValue, lineSegments } from "@/lib/chart-core";
 import {
   formatWeightKg,
   weightChange,
@@ -31,24 +33,11 @@ function formatDate(value: string, options?: Intl.DateTimeFormatOptions) {
 }
 
 function WeightTrendChart({ entries }: { entries: WeightHistoryPoint[] }) {
+  const [selected, setSelected] = useState(-1);
   if (entries.length === 0) return null;
-  const width = 360; const height = 164; const left = 45; const right = 12; const top = 12; const bottom = 30;
-  const values = entries.map((entry) => entry.weight_kg);
-  const minimum = Math.min(...values); const maximum = Math.max(...values);
-  const padding = Math.max((maximum - minimum) * 0.18, 0.25);
-  const minY = Math.max(0, minimum - padding); const maxY = maximum + padding;
-  const usableWidth = width - left - right; const usableHeight = height - top - bottom;
-  const xFor = (index: number) => left + (entries.length === 1 ? usableWidth / 2 : (index / (entries.length - 1)) * usableWidth);
-  const yFor = (value: number) => top + ((maxY - value) / (maxY - minY)) * usableHeight;
-  const path = entries.map((entry, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(entry.weight_kg)}`).join(" ");
-  const labelIndexes = [...new Set([0, Math.floor((entries.length - 1) / 2), entries.length - 1])];
-  const gridValues = [maxY, (maxY + minY) / 2, minY];
-  return <div className="overflow-hidden" role="img" aria-label="Evolución del peso corporal"><svg className="h-auto w-full text-primary" viewBox={`0 0 ${width} ${height}`}>
-    {gridValues.map((value) => <g key={value}><line x1={left} x2={width - right} y1={yFor(value)} y2={yFor(value)} stroke="currentColor" strokeOpacity="0.14" /><text x={left - 7} y={yFor(value) + 3.5} textAnchor="end" className="fill-muted-foreground text-[10px]">{formatWeightKg(value)}</text></g>)}
-    {entries.length > 1 ? <path d={path} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" /> : null}
-    {entries.map((entry, index) => <circle key={entry.id} cx={xFor(index)} cy={yFor(entry.weight_kg)} r="3.75" className="fill-card stroke-primary" strokeWidth="2" />)}
-    {labelIndexes.map((index) => <text key={index} x={xFor(index)} y={height - 8} textAnchor="middle" className="fill-muted-foreground text-[10px]">{formatDate(entries[index]!.log_date, { day: "numeric", month: "short" })}</text>)}
-  </svg></div>;
+  const width = 360; const height = 164; const left = 50; const right = 12; const top = 12; const bottom = 30;
+  const values = entries.map((entry) => entry.weight_kg); const domain = chartDomain(values); const coordinates = lineSegments(values, domain, width, height, left, right, top, bottom)[0] ?? []; const selectedIndex = selected < 0 ? entries.length - 1 : Math.min(selected, entries.length - 1);
+  return <div className="space-y-2 overflow-hidden"><p className="text-xs text-muted-foreground">Fecha · Peso (kg)</p><svg className="h-auto w-full text-primary" viewBox={`0 0 ${width} ${height}`} role="group" aria-label="Evolución del peso corporal. Eje horizontal: fecha. Eje vertical: kilogramos.">{chartYAxisTicks(domain, 4).map((value) => { const y = chartY(value, domain, height, top, bottom); return <g key={value}><line x1={left} x2={width - right} y1={y} y2={y} stroke="currentColor" strokeOpacity="0.14" /><text x={left - 7} y={y + 3.5} textAnchor="end" className="fill-muted-foreground text-[10px]">{formatChartValue(value, "kg")}</text></g>; })}{coordinates.length > 1 ? <polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" /> : null}{coordinates.map(({ index, x, y }) => <g key={entries[index]!.id}><circle cx={x} cy={y} r="11" fill="transparent" role="button" tabIndex={0} aria-label={`${formatDate(entries[index]!.log_date)}. Peso: ${formatChartValue(values[index]!, "kg")}.`} onClick={() => setSelected(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(index); } }} /><circle cx={x} cy={y} r={selectedIndex === index ? 5 : 3.75} className="fill-card stroke-primary" strokeWidth="2" pointerEvents="none" /></g>)}</svg><div className="relative h-4 text-[10px] text-muted-foreground" aria-hidden>{chartTickIndexes(entries.length, 3).map((index) => <span key={entries[index]!.id} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${(chartX(index, entries.length, width, left, right) / width) * 100}%` }}>{formatDate(entries[index]!.log_date, { day: "numeric", month: "short" })}</span>)}</div><ChartDetail title={formatDate(entries[selectedIndex]!.log_date)} items={[{ label: "Peso", value: formatChartValue(values[selectedIndex]!, "kg") }]} /></div>;
 }
 
 function Sheet({ children, open, onOpenChange }: { children: React.ReactNode; open: boolean; onOpenChange: (open: boolean) => void }) {
