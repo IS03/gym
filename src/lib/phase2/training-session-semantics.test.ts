@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = (path: string) => readFileSync(path, "utf8");
 const editor = source("src/app/(app)/train/session/[id]/session-editor.tsx");
 const migration = source(
-  "supabase/migrations/20260826160000_training_session_semantics_and_routine_notes.sql",
+  "supabase/migrations/20260826204057_training_session_semantics_and_routine_notes.sql",
 );
 const historicalCorrection = source(
   "supabase/migrations/20260811203000_session_history_corrections.sql",
