@@ -33,6 +33,22 @@ export function hasFutureExerciseAction(
   return decision !== "maintain" || applyToRoutine;
 }
 
+export type CompactAutosaveStatus = "idle" | "saved" | "saving" | "dirty" | "error";
+
+/** Normal autosave phases share a header slot; only failures open recovery UI. */
+export function compactAutosaveStatus(input: {
+  saved: boolean;
+  saving: boolean;
+  dirty: boolean;
+  error: string | null;
+}): CompactAutosaveStatus {
+  if (input.error) return "error";
+  if (input.saving) return "saving";
+  if (input.dirty) return "dirty";
+  if (input.saved) return "saved";
+  return "idle";
+}
+
 export function workoutPayloadFromDetail(
   exercise: WorkoutSessionExerciseClient,
 ): WorkoutExercisePayload {

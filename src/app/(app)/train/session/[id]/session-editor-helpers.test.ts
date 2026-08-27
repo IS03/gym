@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   completedExerciseSummary,
+  compactAutosaveStatus,
   calculateScrollCompensation,
   completionStats,
   hasFutureExerciseAction,
@@ -62,6 +63,24 @@ describe("borrador de sesión", () => {
     expect(hasFutureExerciseAction("increase_reps", false)).toBe(true);
     expect(hasFutureExerciseAction("custom", false)).toBe(true);
     expect(hasFutureExerciseAction("maintain", true)).toBe(true);
+  });
+
+  it("resume autosave normal en un único slot y reserva expansión para errores", () => {
+    expect(compactAutosaveStatus({ saved: true, saving: false, dirty: false, error: null })).toBe(
+      "saved",
+    );
+    expect(compactAutosaveStatus({ saved: false, saving: true, dirty: true, error: null })).toBe(
+      "saving",
+    );
+    expect(compactAutosaveStatus({ saved: false, saving: false, dirty: true, error: null })).toBe(
+      "dirty",
+    );
+    expect(compactAutosaveStatus({ saved: false, saving: false, dirty: false, error: "timeout" })).toBe(
+      "error",
+    );
+    expect(compactAutosaveStatus({ saved: false, saving: false, dirty: false, error: null })).toBe(
+      "idle",
+    );
   });
 
   it.each([

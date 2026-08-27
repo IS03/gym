@@ -11,7 +11,18 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Check, ChevronDown, Clock3, Info, Minus, Plus, Search, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Clock3,
+  Info,
+  LoaderCircle,
+  Minus,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -66,6 +77,7 @@ import type {
 import {
   completedExerciseSummary,
   calculateScrollCompensation,
+  compactAutosaveStatus,
   completionStats,
   exerciseCompletion,
   initialExpandedExerciseId,
@@ -441,6 +453,7 @@ export function SessionEditor({
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroupFilter>("all");
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [editingNoteExerciseId, setEditingNoteExerciseId] = useState<string | null>(null);
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const autosaveRef = useRef<ExerciseAutosaveQueue<WorkoutExercisePayload> | null>(null);
@@ -870,6 +883,7 @@ export function SessionEditor({
       pendingScrollAnchorRef.current = null;
     }
     if (previouslyExpanded) void autosaveRef.current?.flush(previouslyExpanded);
+    setEditingNoteExerciseId(null);
     setExpandedExerciseId((current) => (current === exerciseId ? null : exerciseId));
   }
 
@@ -1258,6 +1272,23 @@ export function SessionEditor({
               weight_mode: exercise.weight_mode_snapshot,
             });
             const quickNote = payload.notes.trim();
+            const autosaveVisualStatus = compactAutosaveStatus({
+              saved: Boolean(status?.saved),
+              saving: Boolean(status?.pending),
+              dirty,
+              error: status?.error ?? null,
+            });
+            const autosaveStatusLabel = {
+              idle: "Sin cambios pendientes",
+              saved: "Guardado",
+              saving: "Guardando cambios",
+              dirty: "Cambios pendientes",
+              error: "Error al guardar",
+            }[autosaveVisualStatus];
+            const noteLabel = exercise.routine_exercise_id
+              ? "Nota para próximas sesiones"
+              : "Nota del ejercicio en esta sesión";
+            const noteEditorOpen = editingNoteExerciseId === exercise.id;
             return (
               <div
                 key={exercise.id}
@@ -1310,16 +1341,6 @@ export function SessionEditor({
                           ? completedSummary
                           : exerciseMeta}
                       </p>
-                      {status?.pending ? (
-                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-primary">
-                          <span className="size-1.5 rounded-full bg-current" aria-hidden />
-                          Guardando…
-                        </p>
-                      ) : status?.error ? (
-                        <p className="mt-0.5 text-[11px] font-medium text-destructive">
-                          Sin sincronizar
-                        </p>
-                      ) : null}
                       {receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
                           <ArrowUpRight className="size-3 shrink-0" aria-hidden />
@@ -1341,14 +1362,30 @@ export function SessionEditor({
                     >
                       {completion.completedSets}/{completion.totalSets}
                     </span>
-                    {status?.saved && !dirty && !status.pending && !status.error ? (
-                      <span
-                        className="flex size-5 shrink-0 items-center justify-center text-emerald-700 dark:text-emerald-300"
-                        aria-label="Guardado"
-                      >
+                    <span
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center",
+                        autosaveVisualStatus === "saved" &&
+                          "text-emerald-700 dark:text-emerald-300",
+                        autosaveVisualStatus === "saving" && "text-primary",
+                        autosaveVisualStatus === "dirty" &&
+                          "text-amber-700 dark:text-amber-300",
+                        autosaveVisualStatus === "error" && "text-destructive",
+                      )}
+                      role="status"
+                      aria-live="polite"
+                      aria-label={autosaveStatusLabel}
+                    >
+                      {autosaveVisualStatus === "saved" ? (
                         <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
-                      </span>
-                    ) : null}
+                      ) : autosaveVisualStatus === "saving" ? (
+                        <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : autosaveVisualStatus === "dirty" ? (
+                        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                      ) : autosaveVisualStatus === "error" ? (
+                        <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                      ) : null}
+                    </span>
                     <ChevronDown
                       className={cn(
                         "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
@@ -1500,67 +1537,42 @@ export function SessionEditor({
                     </Button>
                   ) : null}
 
-                  {!readOnly && (dirty || status?.pending || status?.error) ? (
+                  {!readOnly && status?.error ? (
                     <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-3">
                       <div className="min-w-0" aria-live="polite">
-                        <p
-                          className={cn(
-                            "flex items-center gap-1.5 text-xs font-medium",
-                            status?.error
-                              ? "text-destructive"
-                              : status?.pending
-                                ? "text-primary"
-                                : dirty
-                                  ? "text-muted-foreground"
-                                  : "text-emerald-700 dark:text-emerald-300",
-                          )}
-                        >
-                          {dirty || status?.pending || status?.error ? (
-                            <span className="size-1.5 rounded-full bg-current" aria-hidden />
-                          ) : (
-                            <Check className="size-3.5" strokeWidth={2.5} aria-hidden />
-                          )}
-                          {status?.error
-                            ? "No se pudo guardar"
-                            : status?.pending
-                            ? "Guardando…"
-                            : dirty
-                              ? "Cambios locales"
-                              : "Guardado"}
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
+                          <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                          No se pudo guardar
                         </p>
-                        {status?.error ? (
-                          <p className="mt-1 text-xs leading-snug text-destructive">
-                            {status.error}
-                          </p>
-                        ) : null}
+                        <p className="mt-1 text-xs leading-snug text-destructive">
+                          {status.error}
+                        </p>
                       </div>
-                      {status?.error ? (
-                        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                          {status.errorCategory === "conflict" ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void discardExerciseDraft(exercise.id)}
-                            >
-                              Usar versión guardada
-                            </Button>
-                          ) : null}
+                      <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                        {status.errorCategory === "conflict" ? (
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
-                            onClick={() => void retryExercise(exercise.id)}
+                            variant="ghost"
+                            onClick={() => void discardExerciseDraft(exercise.id)}
                           >
-                            {status.errorCategory === "conflict"
-                              ? "Comprobar cambios"
-                              : status.errorCategory === "session_closed" ||
-                                  status.errorCategory === "removed"
-                                ? "Actualizar"
-                                : "Reintentar"}
+                            Usar versión guardada
                           </Button>
-                        </div>
-                      ) : null}
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void retryExercise(exercise.id)}
+                        >
+                          {status.errorCategory === "conflict"
+                            ? "Comprobar cambios"
+                            : status.errorCategory === "session_closed" ||
+                                status.errorCategory === "removed"
+                              ? "Actualizar"
+                              : "Reintentar"}
+                        </Button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -1606,7 +1618,7 @@ export function SessionEditor({
                           ))}
                         </div>
                         <p className="text-xs leading-relaxed text-muted-foreground">
-                          Es un recordatorio; no modifica objetivos reales.
+                          Recordatorio para tu próxima sesión.
                         </p>
                       </div>
 
@@ -1646,10 +1658,17 @@ export function SessionEditor({
                       ) : null}
 
                       {exercise.routine_exercise_id ? (
-                        <label className="flex items-start gap-2.5 text-sm">
+                        <label
+                          className={cn(
+                            "flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-within:ring-3 focus-within:ring-ring/50",
+                            payload.apply_to_routine
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-border/75 bg-background/35 hover:bg-muted/35",
+                          )}
+                        >
                           <input
                             type="checkbox"
-                            className="mt-0.5 size-4 shrink-0"
+                            className="sr-only"
                             checked={payload.apply_to_routine}
                             disabled={interactionLocked}
                             onChange={(event) =>
@@ -1663,37 +1682,78 @@ export function SessionEditor({
                               )
                             }
                           />
+                          <span
+                            className={cn(
+                              "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border",
+                              payload.apply_to_routine
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input bg-background",
+                            )}
+                            aria-hidden
+                          >
+                            {payload.apply_to_routine ? (
+                              <Check className="size-3.5" strokeWidth={3} />
+                            ) : null}
+                          </span>
                           <span className="min-w-0">
                             <span className="block font-medium">
-                              Guardar lo realizado como nuevo objetivo
+                              Usar lo realizado hoy como nuevo objetivo
                             </span>
                             <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                              Se aplica al finalizar y solo toma las series completadas.
+                              Al finalizar, sólo toma las series completadas.
                             </span>
                           </span>
                         </label>
                       ) : null}
 
-                      <div className="space-y-1.5 pt-0.5">
-                        <Label htmlFor={`exercise-notes-${exercise.id}`}>
-                          {exercise.routine_exercise_id
-                            ? "Nota para próximas sesiones"
-                            : "Nota del ejercicio en esta sesión"}
-                        </Label>
-                        <textarea
-                          id={`exercise-notes-${exercise.id}`}
-                          aria-label={`Nota para ${exercise.nombre_snapshot}`}
-                          className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
-                          value={payload.notes}
-                          disabled={interactionLocked}
-                          placeholder="Opcional"
-                          onChange={(event) =>
-                            updateExercise(exercise.id, (current) => ({
-                              ...current,
-                              notes: event.target.value,
-                            }))
-                          }
-                        />
+                      <div className="space-y-2 pt-0.5">
+                        <div className="flex min-h-8 items-center justify-between gap-3">
+                          {noteEditorOpen ? (
+                            <Label htmlFor={`exercise-notes-${exercise.id}`}>{noteLabel}</Label>
+                          ) : (
+                            <p className="text-sm font-medium">{noteLabel}</p>
+                          )}
+                          {!readOnly ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={interactionLocked}
+                              aria-expanded={noteEditorOpen}
+                              aria-controls={`exercise-notes-${exercise.id}`}
+                              onClick={() =>
+                                setEditingNoteExerciseId(noteEditorOpen ? null : exercise.id)
+                              }
+                            >
+                              {noteEditorOpen ? "Listo" : quickNote ? "Editar" : "Agregar"}
+                            </Button>
+                          ) : null}
+                        </div>
+                        {noteEditorOpen ? (
+                          <textarea
+                            id={`exercise-notes-${exercise.id}`}
+                            aria-label={`Nota para ${exercise.nombre_snapshot}`}
+                            className="min-h-20 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                            value={payload.notes}
+                            disabled={interactionLocked}
+                            placeholder="Opcional"
+                            onChange={(event) =>
+                              updateExercise(exercise.id, (current) => ({
+                                ...current,
+                                notes: event.target.value,
+                              }))
+                            }
+                          />
+                        ) : (
+                          <p
+                            className={cn(
+                              "line-clamp-1 text-sm",
+                              quickNote ? "text-muted-foreground" : "text-muted-foreground/80",
+                            )}
+                          >
+                            {quickNote || "Sin nota"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </details>
