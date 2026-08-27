@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DayContextEditor } from "./day-context-editor";
@@ -13,6 +10,8 @@ type Props = React.ComponentProps<typeof DayContextEditor> & {
   gymLabel: string;
   gymSourceLabel: string;
   waterTargetLabel: string | null;
+  activity: { steps: string; waterL: string; mateL: string };
+  onActivityChange: (activity: { steps: string; waterL: string; mateL: string }) => void;
 };
 
 function valueOrDash(value: string, suffix = "") {
@@ -27,14 +26,10 @@ export function DayActivityPanel({
   gymLabel,
   gymSourceLabel,
   waterTargetLabel,
+  activity,
+  onActivityChange,
   ...editorProps
 }: Props) {
-  const [activity, setActivity] = useState({
-    steps: editorProps.stepsInitial == null ? "" : String(editorProps.stepsInitial),
-    waterL: editorProps.waterInitial == null ? "" : String(editorProps.waterInitial),
-    mateL: editorProps.mateInitial == null ? "" : String(editorProps.mateInitial),
-  });
-
   return (
     <Card size="sm">
       <details className="group/activity">
@@ -43,8 +38,7 @@ export function DayActivityPanel({
             <p className="font-semibold">Actividad de hoy</p>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open/activity:rotate-90" aria-hidden />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4 lg:grid-cols-2">
-            <div><p className="text-xs text-muted-foreground">Pasos</p><p className="font-semibold">{valueOrDash(activity.steps)}</p></div>
+          <div className="mt-3 grid grid-cols-3 gap-x-4 gap-y-2 text-sm lg:grid-cols-3">
             <div><p className="text-xs text-muted-foreground">Agua</p><p className="font-semibold">{valueOrDash(activity.waterL, " L")}</p></div>
             <div><p className="text-xs text-muted-foreground">Trabajo</p><p className="font-semibold">{workLabel}</p></div>
             <div><p className="text-xs text-muted-foreground">Entrenamiento</p><p className="font-semibold">{gymLabel}</p></div>
@@ -60,7 +54,7 @@ export function DayActivityPanel({
             <div><p className="text-xs text-muted-foreground">Mate</p><p className="font-semibold">{valueOrDash(activity.mateL, " L")}</p></div>
           </div>
           <div className="border-t pt-4">
-            <DayContextEditor {...editorProps} onActivityChange={setActivity} />
+            <DayContextEditor {...editorProps} onActivityChange={onActivityChange} />
           </div>
         </CardContent>
       </details>

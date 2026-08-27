@@ -20,6 +20,7 @@ los tests.
 | Energía legacy | `profiles.maintenance_kcal_current`, `target_kcal_current`, `goal_type` (deprecated) | `maintenance_kcal_snapshot`, `target_kcal_snapshot`, `goal_type_snapshot` | preservación histórica; sin consumidores nutricionales nuevos | deltas legacy únicamente |
 | Plan nutricional versionado | `nutrition_goal_periods` | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | objetivos sin reescritura histórica |
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` | IDs, fuentes y snapshots nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | gasto estimado y contexto del día |
+| Pasos diarios | `day_logs.steps` | `day_logs.steps` | editor de Actividad de Hoy | contexto de actividad e historial de sólo lectura en `/today/steps`; `null` es sin dato y no modifica el gasto |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; lectura contextual en History | contexto de permitidos, sin sumar consumo |

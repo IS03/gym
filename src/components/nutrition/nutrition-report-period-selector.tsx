@@ -24,9 +24,10 @@ type Props = {
   end: string;
   today: string;
   rangeLabel: string;
+  basePath?: string;
 };
 
-export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel }: Props) {
+export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel, basePath = "/today/reports" }: Props) {
   const [customOpen, setCustomOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRangeValue>({ start, end });
 
@@ -36,7 +37,7 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
         {presets.map((option) => (
           <Link
             key={option.period}
-            href={`/today/reports?period=${option.period}`}
+            href={`${basePath}?period=${option.period}`}
             className={cn(
               buttonVariants({ variant: preset === option.period ? "default" : "outline", size: "sm" }),
               "min-w-0 w-full px-1.5 text-center text-[13px] sm:px-2",
@@ -64,7 +65,7 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
         description="Elegí el rango que querés analizar."
         closeLabel="Cerrar período personalizado"
       >
-        <form action="/today/reports" className="space-y-4" onSubmit={() => setCustomOpen(false)}>
+        <form action={basePath} className="space-y-4" onSubmit={() => setCustomOpen(false)}>
           <input type="hidden" name="period" value="custom" />
           <DateRangePicker
             value={customRange}

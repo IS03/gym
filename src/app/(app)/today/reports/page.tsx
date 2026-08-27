@@ -116,6 +116,7 @@ export default async function NutritionReportsPage({
           <section className="space-y-3 border-t pt-4 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Actividad</p>
             <div><p className="text-xs text-muted-foreground">Pasos promedio</p><p className="metric-number font-semibold">{formatValue(summary.activity.averageSteps, "pasos", true)}</p><p className="text-xs text-muted-foreground">Sólo {summary.activity.stepDays} días con dato</p></div>
+            <Link href="/today/steps" className="inline-flex text-sm font-medium text-primary hover:underline">Ver detalle de pasos →</Link>
             <div className="grid grid-cols-2 gap-3"><div><p className="text-xs text-muted-foreground">Entrenamientos</p><p className="metric-number text-lg font-semibold">{summary.activity.completedWorkoutDays}</p></div><div><p className="text-xs text-muted-foreground">Días trabajados</p><p className="metric-number text-lg font-semibold">{summary.activity.workedDays}</p></div></div>
           </section>
         </CardContent>

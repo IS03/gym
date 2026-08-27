@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
+import { getStepsOverview } from "@/lib/nutrition/steps-report";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { softDeleteMealAction, updateMealAction } from "./actions";
-import { DayActivityPanel } from "./day-activity-panel";
+import { TodayActivity } from "./today-activity";
 import { MealComposer } from "./meal-composer";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,10 @@ function formatMealMacros(meal: {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const { dayLog, meals, context } = await getNutritionDay(today, undefined, auth);
+  const [{ dayLog, meals, context }, stepsOverview] = await Promise.all([
+    getNutritionDay(today, undefined, auth),
+    getStepsOverview(today, auth),
+  ]);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
@@ -120,7 +124,7 @@ export default async function TodayPage() {
 
       <MealComposer date={today} />
 
-      <DayActivityPanel
+      <TodayActivity
         dayLogId={dayLog.id}
         stepsInitial={dayLog.steps}
         waterInitial={dayLog.water_l}
@@ -137,6 +141,7 @@ export default async function TodayPage() {
         gymLabel={context.gym.effective ? "Sí" : "No"}
         gymSourceLabel={context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}
         waterTargetLabel={context.targets.waterL == null ? null : formatLiters(context.targets.waterL)}
+        stepsSummary={stepsOverview.summary}
       />
       </aside>
 

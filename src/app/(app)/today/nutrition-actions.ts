@@ -19,6 +19,7 @@ function refreshNutritionPages() {
   revalidatePath("/home");
   revalidatePath("/history");
   revalidatePath("/today/reports");
+  revalidatePath("/today/steps");
 }
 
 export async function saveDailyActivityAction(input: {

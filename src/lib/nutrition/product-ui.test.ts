@@ -9,6 +9,9 @@ import { parseFoodInput, parseOptionalNumber, parseRequiredNumber } from "./prod
 const source = (path: string) => readFileSync(path, "utf8");
 const today = source("src/app/(app)/today/page.tsx");
 const todayActivity = source("src/app/(app)/today/day-activity-panel.tsx");
+const todayActivitySection = source("src/app/(app)/today/today-activity.tsx");
+const stepsCard = source("src/app/(app)/today/steps-card.tsx");
+const stepsPage = source("src/app/(app)/today/steps/page.tsx");
 const todayEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const product = source("src/lib/nutrition/product.ts");
 const settings = source("src/app/(app)/settings/nutrition/nutrition-settings-forms.tsx");
@@ -62,6 +65,21 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(activity).toContain("mate_l:");
     expect(activity).not.toContain("refresh_nutrition_day");
     expect(activity).not.toContain("total_calories_consumed");
+    expect(activity).not.toContain("expenditure_override_kcal");
+    expect(activity).not.toContain("estimated_expenditure_kcal_snapshot");
+    expect(activity).not.toContain("energy_balance_kcal");
+  });
+
+  it("Pasos tiene una card propia sincronizada con el editor y no se duplica en Actividad", () => {
+    expect(today).toContain("<TodayActivity");
+    expect(todayActivitySection).toContain("<StepsCard steps={activity.steps}");
+    expect(stepsCard).toContain('href="/today/steps"');
+    expect(stepsCard).toContain("stepsFromInput");
+    expect(todayActivity).not.toContain('<p className="text-xs text-muted-foreground">Pasos</p>');
+    expect(todayEditor).toContain('htmlFor="daily-steps"');
+    expect(nutritionActions).toContain('revalidatePath("/today/steps")');
+    expect(stepsPage).toContain("<StepsReport");
+    expect(stepsPage).toContain('href="/today"');
   });
 
   it("Ajustes inserta versiones y no actualiza períodos históricos", () => {

@@ -39,11 +39,18 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(periodSelector).toContain('value={customRange}');
     expect(periodSelector).toContain('NUTRITION_REPORT_MAX_DAYS');
     expect(periodSelector).toContain('disabled={!customRange.start || !customRange.end}');
-    expect(periodSelector).toContain('action="/today/reports"');
+    expect(periodSelector).toContain('basePath = "/today/reports"');
+    expect(periodSelector).toContain('action={basePath}');
     expect(periodSelector).toContain('name="period" value="custom"');
     expect(rangePicker).toContain('name={fromName}');
     expect(rangePicker).toContain('name={toName}');
     expect(periodSelector).toContain('name="period" value="custom"');
+  });
+
+  it("permite reutilizar los presets y el rango personalizado para Pasos", () => {
+    const stepsPage = source("src/app/(app)/today/steps/page.tsx");
+    expect(stepsPage).toContain('basePath="/today/steps"');
+    expect(periodSelector).toContain('href={`${basePath}?period=${option.period}`}');
   });
 
   it("presenta proteína, carbos y grasas en la misma grilla", () => {
