@@ -31,7 +31,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 min-[430px]:grid-cols-2">
         <div className="min-w-0 space-y-1">
           <Label htmlFor="birth_date">Nacimiento</Label>
           <DateField

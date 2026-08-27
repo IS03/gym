@@ -1,19 +1,39 @@
-export const BODY_MEASUREMENT_FIELDS = [
+export const EDITABLE_BODY_MEASUREMENT_FIELDS = [
   "waist_cm",
   "abdomen_cm",
   "chest_cm",
-  "arm_cm",
+  "hip_cm",
   "arm_right_cm",
   "arm_left_cm",
-  "thigh_cm",
   "thigh_right_cm",
   "thigh_left_cm",
   "calf_right_cm",
   "calf_left_cm",
-  "hip_cm",
+] as const;
+
+export const LEGACY_BODY_MEASUREMENT_FIELDS = ["arm_cm", "thigh_cm"] as const;
+
+export const BODY_MEASUREMENT_FIELDS = [
+  ...EDITABLE_BODY_MEASUREMENT_FIELDS,
+  ...LEGACY_BODY_MEASUREMENT_FIELDS,
 ] as const;
 
 export type BodyMeasurementField = (typeof BODY_MEASUREMENT_FIELDS)[number];
+
+export const BODY_MEASUREMENT_LABELS: Record<BodyMeasurementField, string> = {
+  waist_cm: "Cintura",
+  abdomen_cm: "Abdomen",
+  chest_cm: "Pecho",
+  hip_cm: "Cadera",
+  arm_right_cm: "Brazo derecho",
+  arm_left_cm: "Brazo izquierdo",
+  thigh_right_cm: "Muslo derecho",
+  thigh_left_cm: "Muslo izquierdo",
+  calf_right_cm: "Pantorrilla derecha",
+  calf_left_cm: "Pantorrilla izquierda",
+  arm_cm: "Brazo",
+  thigh_cm: "Muslo",
+};
 
 export type BodyMeasurement = {
   id: string;
@@ -42,6 +62,15 @@ export type BodyMeasurement = {
   created_at: string;
   updated_at: string;
 };
+
+export function bodyMeasurementEvolutionFields(
+  entries: ReadonlyArray<Pick<BodyMeasurement, "arm_cm" | "thigh_cm">>,
+): BodyMeasurementField[] {
+  const fields: BodyMeasurementField[] = [...EDITABLE_BODY_MEASUREMENT_FIELDS];
+  if (entries.some((entry) => entry.arm_cm !== null)) fields.push("arm_cm");
+  if (entries.some((entry) => entry.thigh_cm !== null)) fields.push("thigh_cm");
+  return fields;
+}
 
 export type BodyMeasurementInput = {
   measuredOn: string;

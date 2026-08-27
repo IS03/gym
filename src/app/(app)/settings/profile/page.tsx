@@ -11,7 +11,7 @@ export default async function ProfileSettingsPage() {
   const profile = await getProfileForUser(user.id);
 
   return (
-    <div className="space-y-6 pb-16 lg:pb-0">
+    <div className="mx-auto w-full max-w-2xl space-y-6 pb-16 lg:pb-0">
       <div className="space-y-2">
         <Link href="/settings" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> Ajustes
@@ -23,7 +23,7 @@ export default async function ProfileSettingsPage() {
         <p className="text-sm text-muted-foreground">Tus datos personales y referencia física.</p>
       </div>
 
-      <Card className="max-w-2xl">
+      <Card className="w-full">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Información y referencia física</CardTitle>
           <p className="text-sm text-muted-foreground">Se usa para personalizar el seguimiento nutricional.</p>

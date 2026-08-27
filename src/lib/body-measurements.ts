@@ -94,16 +94,16 @@ async function getAuthedContext() {
   return { supabase, userId: user.id };
 }
 
-function rowPayload(input: BodyMeasurementInput) {
+function rowPayload(input: BodyMeasurementInput, { preserveLegacy = false } = {}) {
   return {
     measured_on: input.measuredOn,
     waist_cm: input.waistCm,
     abdomen_cm: input.abdomenCm,
     chest_cm: input.chestCm,
-    arm_cm: input.armCm,
+    ...(preserveLegacy ? {} : { arm_cm: input.armCm }),
     arm_right_cm: input.armRightCm,
     arm_left_cm: input.armLeftCm,
-    thigh_cm: input.thighCm,
+    ...(preserveLegacy ? {} : { thigh_cm: input.thighCm }),
     thigh_right_cm: input.thighRightCm,
     thigh_left_cm: input.thighLeftCm,
     calf_right_cm: input.calfRightCm,
@@ -145,7 +145,7 @@ export async function updateBodyMeasurement(input: BodyMeasurementInput & { id: 
   const { supabase, userId } = await getAuthedContext();
   const { data, error } = await supabase
     .from("body_measurements")
-    .update(rowPayload(input))
+    .update(rowPayload(input, { preserveLegacy: true }))
     .eq("id", input.id)
     .eq("user_id", userId)
     .select("*")

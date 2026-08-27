@@ -1,7 +1,7 @@
 import { signOut } from "./actions";
 import { ThemeSettings } from "./theme-settings";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
 import Link from "next/link";
 import { ChevronRight, Mail, Palette, ShieldCheck, UserRound, Utensils } from "lucide-react";
@@ -70,13 +70,8 @@ export default async function SettingsPage() {
           </h2>
         </div>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Apariencia</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Esta preferencia queda guardada en este dispositivo.
-            </p>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3 py-4">
+            <p className="text-sm font-medium">Tema</p>
             <ThemeSettings />
           </CardContent>
         </Card>

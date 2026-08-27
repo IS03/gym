@@ -11,6 +11,11 @@ import {
   updateBodyMeasurement,
   upsertBodyMeasurement,
 } from "./body-measurements";
+import {
+  BODY_MEASUREMENT_LABELS,
+  EDITABLE_BODY_MEASUREMENT_FIELDS,
+  bodyMeasurementEvolutionFields,
+} from "./body-measurement-types";
 
 type QueryResult = { data: unknown; error: { message: string } | null };
 function query(result: QueryResult) {
@@ -48,6 +53,20 @@ describe("medidas corporales", () => {
     expect(() => parseBodyMeasurementInput({ measuredOn: "2026-08-13", waistCm: "78.123" })).toThrow("dos decimales");
   });
 
+  it("mantiene lectura histórica, pero no ofrece los campos históricos para nuevos registros", () => {
+    expect(EDITABLE_BODY_MEASUREMENT_FIELDS).not.toContain("arm_cm");
+    expect(EDITABLE_BODY_MEASUREMENT_FIELDS).not.toContain("thigh_cm");
+    expect(EDITABLE_BODY_MEASUREMENT_FIELDS).toEqual(expect.arrayContaining(["arm_right_cm", "arm_left_cm", "thigh_right_cm", "thigh_left_cm"]));
+    expect(BODY_MEASUREMENT_LABELS.arm_cm).toBe("Brazo");
+    expect(BODY_MEASUREMENT_LABELS.thigh_cm).toBe("Muslo");
+  });
+
+  it("muestra Brazo y Muslo en evolución sólo cuando hay datos históricos", () => {
+    expect(bodyMeasurementEvolutionFields([])).not.toEqual(expect.arrayContaining(["arm_cm", "thigh_cm"]));
+    expect(bodyMeasurementEvolutionFields([{ arm_cm: 32, thigh_cm: null }])).toContain("arm_cm");
+    expect(bodyMeasurementEvolutionFields([{ arm_cm: null, thigh_cm: 55 }])).toContain("thigh_cm");
+  });
+
   it("lee cronológicamente y crea sin reemplazar una fila existente", async () => {
     await expect(listBodyMeasurements()).resolves.toEqual([row]);
     expect(builder.eq).toHaveBeenCalledWith("user_id", "user-1");
@@ -58,10 +77,13 @@ describe("medidas corporales", () => {
     expect(builder.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: "user-1", measured_on: "2026-08-13", waist_cm: 78 }));
   });
 
-  it("acota editar y eliminar al usuario autenticado", async () => {
+  it("acota editar y eliminar al usuario autenticado sin borrar medidas históricas", async () => {
     builder.single.mockResolvedValue({ data: row, error: null });
-    await updateBodyMeasurement({ ...input, id: "measurement-1", waistCm: 79 });
+    await updateBodyMeasurement({ ...input, id: "measurement-1", waistCm: 79, armCm: 32, thighCm: 55 });
     expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ waist_cm: 79 }));
+    const updatePayload = builder.update.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(updatePayload).not.toHaveProperty("arm_cm");
+    expect(updatePayload).not.toHaveProperty("thigh_cm");
     expect(builder.eq).toHaveBeenCalledWith("user_id", "user-1");
 
     await deleteBodyMeasurement("measurement-1");
