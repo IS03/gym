@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { createResilientSupabaseFetch } from "./resilient-fetch";
+import {
+  createResilientSupabaseFetch,
+  JWT_CLOCK_SKEW_MUTATION_MAX_ATTEMPTS,
+  JWT_CLOCK_SKEW_MUTATION_MAX_RETRY_DELAY_MS,
+  JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS,
+  JWT_CLOCK_SKEW_READ_MAX_ATTEMPTS,
+  JWT_CLOCK_SKEW_READ_MAX_RETRY_DELAY_MS,
+  JWT_CLOCK_SKEW_READ_RETRY_DELAYS_MS,
+  totalRetryDelay,
+} from "./resilient-fetch";
 
 const DATA_API_URL = "https://project.supabase.co/rest/v1/rpc/get_or_create_day_log";
+const PROFILES_API_URL = "https://project.supabase.co/rest/v1/profiles";
 
 function jsonResponse(
   status: number,
@@ -30,7 +40,31 @@ function testFetch(fetchImplementation: typeof fetch) {
   });
 }
 
+function injectedSleep() {
+  return vi.fn<(delayMs: number) => Promise<void>>(async () => undefined);
+}
+
 describe("Supabase Data API JWT clock-skew retry", () => {
+  it("declara budgets deterministas para lecturas y mutaciones", () => {
+    expect(JWT_CLOCK_SKEW_READ_RETRY_DELAYS_MS).toEqual([
+      250,
+      750,
+      1500,
+      2500,
+      3000,
+    ]);
+    expect(JWT_CLOCK_SKEW_READ_MAX_RETRY_DELAY_MS).toBe(8000);
+    expect(JWT_CLOCK_SKEW_READ_MAX_ATTEMPTS).toBe(6);
+    expect(JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS).toEqual([
+      250,
+      750,
+      1500,
+    ]);
+    expect(JWT_CLOCK_SKEW_MUTATION_MAX_RETRY_DELAY_MS).toBe(2500);
+    expect(JWT_CLOCK_SKEW_MUTATION_MAX_ATTEMPTS).toBe(4);
+    expect(totalRetryDelay([100, 200, 300])).toBe(600);
+  });
+
   it("absorbe el primer PGRST303 transitorio y deja continuar la navegación", async () => {
     const implementation = vi
       .fn<typeof fetch>()
@@ -59,6 +93,83 @@ describe("Supabase Data API JWT clock-skew retry", () => {
       expect(response.status).toBe(200);
     },
   );
+
+  it("se recupera en un retry posterior al límite anterior de PR12", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    const sleep = injectedSleep();
+    const logger = { info: vi.fn(), warn: vi.fn() };
+
+    const response = await createResilientSupabaseFetch(implementation, {
+      sleep,
+      logger,
+    })(PROFILES_API_URL);
+
+    expect(response.status).toBe(200);
+    expect(implementation).toHaveBeenCalledTimes(5);
+    expect(sleep.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250,
+      750,
+      1500,
+      2500,
+    ]);
+    expect(logger.info).toHaveBeenCalledWith(
+      "[supabase-jwt-skew] recovered",
+      {
+        attempt: 5,
+        pathname: "/rest/v1/profiles",
+        retryDelayTotalMs: 5000,
+      },
+    );
+  });
+
+  it("usa toda la ventana de lectura y no duerme ni reintenta después del máximo", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => jwtIssuedAtFutureResponse());
+    const sleep = injectedSleep();
+
+    const response = await createResilientSupabaseFetch(implementation, {
+      sleep,
+      logger: { info: vi.fn(), warn: vi.fn() },
+    })(PROFILES_API_URL);
+
+    expect(implementation).toHaveBeenCalledTimes(6);
+    expect(sleep.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250,
+      750,
+      1500,
+      2500,
+      3000,
+    ]);
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PGRST303",
+      message: "JWT issued at future",
+    });
+  });
+
+  it("no hace un sleep extra después de recuperar una lectura", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    const sleep = injectedSleep();
+
+    await createResilientSupabaseFetch(implementation, {
+      sleep,
+      logger: { info: vi.fn(), warn: vi.fn() },
+    })(PROFILES_API_URL);
+
+    expect(implementation).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenLastCalledWith(250);
+  });
 
   it("agota tres retries y devuelve el último 401 con el body intacto", async () => {
     const implementation = vi
@@ -119,6 +230,30 @@ describe("Supabase Data API JWT clock-skew retry", () => {
       '{"display_name":"Nacho"}',
       '{"display_name":"Nacho"}',
     ]);
+  });
+
+  it("mantiene las mutaciones en el budget de 2,5 s de PR12", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => jwtIssuedAtFutureResponse());
+    const sleep = injectedSleep();
+
+    const response = await createResilientSupabaseFetch(implementation, {
+      sleep,
+      logger: { info: vi.fn(), warn: vi.fn() },
+    })(DATA_API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ p_session_exercise_id: "exercise-id" }),
+    });
+
+    expect(implementation).toHaveBeenCalledTimes(4);
+    expect(sleep.mock.calls.map(([delayMs]) => delayMs)).toEqual([
+      250,
+      750,
+      1500,
+    ]);
+    expect(response.status).toBe(401);
   });
 
   it.each([
