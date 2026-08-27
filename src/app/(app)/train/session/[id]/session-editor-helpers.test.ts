@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   completedExerciseSummary,
+  calculateScrollCompensation,
   completionStats,
+  hasFutureExerciseAction,
   initialExpandedExerciseId,
   nextSessionReminder,
   formatWorkoutClockTime,
@@ -48,6 +50,20 @@ function payload(): WorkoutExercisePayload {
 }
 
 describe("borrador de sesión", () => {
+  it("calcula la compensación de scroll con signo según el desplazamiento de la card", () => {
+    expect(calculateScrollCompensation(500, 200)).toBe(-300);
+    expect(calculateScrollCompensation(200, 500)).toBe(300);
+    expect(calculateScrollCompensation(300, 300)).toBe(0);
+  });
+
+  it("distingue acciones futuras de una nota meramente informativa", () => {
+    expect(hasFutureExerciseAction("maintain", false)).toBe(false);
+    expect(hasFutureExerciseAction("increase_weight", false)).toBe(true);
+    expect(hasFutureExerciseAction("increase_reps", false)).toBe(true);
+    expect(hasFutureExerciseAction("custom", false)).toBe(true);
+    expect(hasFutureExerciseAction("maintain", true)).toBe(true);
+  });
+
   it.each([
     ["maintain", "increase_weight", "increase_weight"],
     ["increase_weight", "increase_weight", "maintain"],

@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Check, ChevronDown, Clock3, Minus, Plus, Search, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, Clock3, Info, Minus, Plus, Search, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,6 +64,7 @@ import type {
 } from "@/lib/phase2/types";
 import {
   completedExerciseSummary,
+  calculateScrollCompensation,
   completionStats,
   exerciseCompletion,
   initialExpandedExerciseId,
@@ -63,6 +72,7 @@ import {
   formatWorkoutDuration,
   formatWorkoutTimeRange,
   getWorkoutElapsedMilliseconds,
+  hasFutureExerciseAction,
   nextSessionReminder,
   renumberWorkoutPayload,
   sessionHasCardioExercise,
@@ -411,6 +421,11 @@ export function SessionEditor({
   const [overrides, setOverrides] = useState<Record<string, WorkoutExercisePayload>>({});
   const [statuses, setStatuses] = useState<Record<string, ExerciseStatus>>({});
   const mountedRef = useRef(true);
+  const exerciseCardRefs = useRef(new Map<string, HTMLDivElement>());
+  const pendingScrollAnchorRef = useRef<{
+    exerciseId: string;
+    beforeTop: number;
+  } | null>(null);
   const editingFencedRef = useRef(false);
   const removingExerciseIdsRef = useRef(new Set<string>());
   const serverPayloadsRef = useRef(initialPayloads);
@@ -596,6 +611,17 @@ export function SessionEditor({
     ),
   );
   const appliedHydratedFocus = useRef(false);
+
+  useLayoutEffect(() => {
+    const anchor = pendingScrollAnchorRef.current;
+    if (!anchor) return;
+    const card = exerciseCardRefs.current.get(anchor.exerciseId);
+    pendingScrollAnchorRef.current = null;
+    if (!card) return;
+
+    const delta = calculateScrollCompensation(anchor.beforeTop, card.getBoundingClientRect().top);
+    if (delta !== 0) window.scrollBy(0, delta);
+  }, [expandedExerciseId]);
 
   const staleDraftIds = useMemo(
     () =>
@@ -826,7 +852,19 @@ export function SessionEditor({
   }
 
   function toggleExercise(exerciseId: string) {
-    if (expandedExerciseId) void autosaveRef.current?.flush(expandedExerciseId);
+    const previouslyExpanded = expandedExerciseId;
+    if (previouslyExpanded && previouslyExpanded !== exerciseId) {
+      const card = exerciseCardRefs.current.get(exerciseId);
+      if (card) {
+        pendingScrollAnchorRef.current = {
+          exerciseId,
+          beforeTop: card.getBoundingClientRect().top,
+        };
+      }
+    } else {
+      pendingScrollAnchorRef.current = null;
+    }
+    if (previouslyExpanded) void autosaveRef.current?.flush(previouslyExpanded);
     setExpandedExerciseId((current) => (current === exerciseId ? null : exerciseId));
   }
 
@@ -1211,16 +1249,23 @@ export function SessionEditor({
               implement: exercise.implement_snapshot,
               weight_mode: exercise.weight_mode_snapshot,
             });
+            const quickNote = payload.notes.trim();
             return (
-              <Card
+              <div
                 key={exercise.id}
-                size="sm"
-                className={cn(
-                  "relative gap-0 overflow-hidden py-0 transition-[box-shadow] duration-200 motion-reduce:transition-none",
-                  expanded && "shadow-md ring-primary/35",
-                  completion.isComplete && !expanded && "ring-emerald-500/20",
-                )}
+                ref={(node) => {
+                  if (node) exerciseCardRefs.current.set(exercise.id, node);
+                  else exerciseCardRefs.current.delete(exercise.id);
+                }}
               >
+                <Card
+                  size="sm"
+                  className={cn(
+                    "relative gap-0 overflow-hidden py-0 transition-[box-shadow] duration-200 motion-reduce:transition-none",
+                    expanded && "shadow-md ring-primary/35",
+                    completion.isComplete && !expanded && "ring-emerald-500/20",
+                  )}
+                >
                 {expanded ? (
                   <span
                     className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-primary"
@@ -1266,11 +1311,6 @@ export function SessionEditor({
                         <p className="mt-0.5 text-[11px] font-medium text-destructive">
                           Sin sincronizar
                         </p>
-                      ) : status?.saved ? (
-                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                          <Check className="size-3" strokeWidth={2.5} aria-hidden />
-                          Guardado
-                        </p>
                       ) : null}
                       {receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
@@ -1293,6 +1333,14 @@ export function SessionEditor({
                     >
                       {completion.completedSets}/{completion.totalSets}
                     </span>
+                    {status?.saved && !dirty && !status.pending && !status.error ? (
+                      <span
+                        className="flex size-5 shrink-0 items-center justify-center text-emerald-700 dark:text-emerald-300"
+                        aria-label="Guardado"
+                      >
+                        <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
+                      </span>
+                    ) : null}
                     <ChevronDown
                       className={cn(
                         "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
@@ -1332,6 +1380,20 @@ export function SessionEditor({
                         <p className="mt-0.5 break-words font-medium text-foreground">
                           {receivedReminder}
                         </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {quickNote ? (
+                    <div className="flex gap-2 border-b border-border/60 px-1 pb-2 text-xs leading-relaxed text-muted-foreground">
+                      <Info className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground">
+                          {exercise.routine_exercise_id
+                            ? "Nota para próximas sesiones"
+                            : "Nota del ejercicio en esta sesión"}
+                        </p>
+                        <p className="line-clamp-2">{quickNote}</p>
                       </div>
                     </div>
                   ) : null}
@@ -1430,7 +1492,7 @@ export function SessionEditor({
                     </Button>
                   ) : null}
 
-                  {!readOnly ? (
+                  {!readOnly && (dirty || status?.pending || status?.error) ? (
                     <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border/60 pt-3">
                       <div className="min-w-0" aria-live="polite">
                         <p
@@ -1494,17 +1556,17 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <details className="group rounded-xl border border-border/75 bg-muted/15">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
+                  <details className="group border-t border-border/60 pt-1">
+                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-1 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
                       <span className="flex min-w-0 items-center gap-2">
                         <span>Progresión y próxima vez</span>
-                        {payload.decision !== "maintain" || payload.apply_to_routine ? (
+                        {hasFutureExerciseAction(payload.decision, payload.apply_to_routine) ? (
                           <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene acción futura configurada" />
                         ) : null}
                       </span>
                       <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
                     </summary>
-                    <div className="space-y-4 border-t border-border/60 p-3">
+                    <div className="space-y-3 pb-1 pt-2">
                       <div className="space-y-2">
                         <Label>Próxima vez</Label>
                         <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
@@ -1536,12 +1598,12 @@ export function SessionEditor({
                           ))}
                         </div>
                         <p className="text-xs leading-relaxed text-muted-foreground">
-                          Es sólo un recordatorio para la próxima vez; no modifica peso ni repeticiones.
+                          Es un recordatorio; no modifica objetivos reales.
                         </p>
                       </div>
 
                       {payload.decision === "custom" ? (
-                        <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                        <div className="space-y-2 border-l-2 border-primary/35 pl-3">
                           <div>
                             <p className="text-xs font-medium text-primary">
                               Recordatorio anterior
@@ -1576,10 +1638,10 @@ export function SessionEditor({
                       ) : null}
 
                       {exercise.routine_exercise_id ? (
-                        <label className="flex items-start gap-3 rounded-xl border border-border/75 bg-background/45 p-3 text-sm">
+                        <label className="flex items-start gap-2.5 text-sm">
                           <input
                             type="checkbox"
-                            className="mt-0.5 size-5 shrink-0"
+                            className="mt-0.5 size-4 shrink-0"
                             checked={payload.apply_to_routine}
                             disabled={interactionLocked}
                             onChange={(event) =>
@@ -1593,7 +1655,7 @@ export function SessionEditor({
                               )
                             }
                           />
-                          <span>
+                          <span className="min-w-0">
                             <span className="block font-medium">
                               Guardar lo realizado como nuevo objetivo
                             </span>
@@ -1604,7 +1666,7 @@ export function SessionEditor({
                         </label>
                       ) : null}
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 pt-0.5">
                         <Label htmlFor={`exercise-notes-${exercise.id}`}>
                           {exercise.routine_exercise_id
                             ? "Nota para próximas sesiones"
@@ -1660,7 +1722,8 @@ export function SessionEditor({
                   ) : null}
                   </CardContent>
                 ) : null}
-              </Card>
+                </Card>
+              </div>
             );
           })
         )}

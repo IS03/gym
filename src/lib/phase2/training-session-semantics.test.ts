@@ -47,7 +47,7 @@ describe("PR 13 — semántica de la sesión", () => {
   });
 
   it("mantiene acciones futuras separadas de notas y targets", () => {
-    expect(editor).toContain('payload.decision !== "maintain" || payload.apply_to_routine');
+    expect(editor).toContain("hasFutureExerciseAction(payload.decision, payload.apply_to_routine)");
     expect(editor).toContain("Guardar lo realizado como nuevo objetivo");
     expect(editor).toContain("Nota para próximas sesiones");
     expect(editor).toContain("Nota del ejercicio en esta sesión");

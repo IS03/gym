@@ -20,6 +20,19 @@ export function toggleTrainingDecision(
   return current === clicked ? "maintain" : clicked;
 }
 
+/** Keeps an expanded card at the same viewport position after sibling layout changes. */
+export function calculateScrollCompensation(beforeTop: number, afterTop: number) {
+  return afterTop - beforeTop;
+}
+
+/** A note alone is informational; only reminders or target updates configure a future action. */
+export function hasFutureExerciseAction(
+  decision: WorkoutSessionExerciseClient["decision"],
+  applyToRoutine: boolean,
+) {
+  return decision !== "maintain" || applyToRoutine;
+}
+
 export function workoutPayloadFromDetail(
   exercise: WorkoutSessionExerciseClient,
 ): WorkoutExercisePayload {
