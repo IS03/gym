@@ -21,7 +21,7 @@ los tests.
 | Plan nutricional versionado | `nutrition_goal_periods` | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | objetivos sin reescritura histórica |
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` | IDs, fuentes y snapshots nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | gasto estimado y contexto del día |
 | Pasos diarios | `day_logs.steps` | `day_logs.steps` | editor de Actividad de Hoy | contexto de actividad e historial de sólo lectura en `/today/steps`; `null` es sin dato y no modifica el gasto |
-| Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día |
+| Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día; Comidas rápidas es un read model derivado |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; lectura contextual en History | contexto de permitidos, sin sumar consumo |
 | Catálogo personal | No aplica | `foods`, con nutrición completa o parcial | importador histórico + CRUD blando en Ajustes | referencia alimentaria, no totales diarios |
@@ -179,6 +179,13 @@ Calorías sigue siendo obligatoria; cada macro puede quedar en `null` si no fue
 informada, mientras que `0` representa un cero conocido. Crear, editar o hacer
 soft delete dispara el agregado canónico en Postgres y revalida Today, History
 y el resumen compacto de Home.
+
+`Comidas rápidas` no guarda favoritos, templates ni contadores: es un read model
+derivado de `meal_entries` manuales, activas y de tipo `meal` de los 60 días
+completos anteriores al día de Córdoba. Las entradas `sheet_import` y los
+resúmenes heredados se excluyen. Al elegir una sugerencia, el servidor vuelve a
+verificar ownership y crea una `meal_entry` manual normal para hoy; los totales
+siguen siendo responsabilidad del trigger canónico.
 
 La protección de doble envío compara fecha, texto, calorías y los tres macros
 durante la ventana reciente. Conserva la diferencia entre `null` y `0`; el

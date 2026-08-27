@@ -114,7 +114,7 @@ describe("manual meal application wiring", () => {
     expect(actionSource).toContain('revalidatePath("/today")');
     expect(actionSource).toContain('revalidatePath("/history")');
     expect(actionSource).toContain('revalidatePath("/home")');
-    expect(actionSource.match(/revalidateMealPages\(\)/g)?.length).toBe(4);
+    expect(actionSource.match(/revalidateMealPages\(\)/g)?.length).toBe(5);
   });
 
   it("usa la fecha elegida para crear, detectar duplicados y mover la misma comida", () => {

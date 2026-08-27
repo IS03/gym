@@ -2,6 +2,13 @@ import { parseLocalizedDecimal } from "../localized-decimal";
 
 export const MEAL_MACRO_MATCH_TOLERANCE = 0.01;
 
+/** Alineado con public.normalize_name() sin modificar texto persistido. */
+export function normalizeMealText(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const normalized = value.trim().replace(/\s+/g, " ").toUpperCase();
+  return normalized === "" ? null : normalized;
+}
+
 function numberFromInput(value: unknown, field: string): number {
   const parsed = parseLocalizedDecimal(value);
   if (parsed === null || !Number.isFinite(parsed)) {

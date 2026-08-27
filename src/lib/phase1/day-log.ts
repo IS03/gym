@@ -10,6 +10,7 @@ import {
 } from "../weight-history";
 import {
   nullableMealMacrosMatch,
+  normalizeMealText,
   optionalMealMacro,
   requiredMealCalories,
 } from "../nutrition/meal-macros";
@@ -62,13 +63,6 @@ export type CreateMealInput = {
   final_carbs_g?: number | null;
   final_fat_g?: number | null;
 };
-
-/** Alineado con public.normalize_name() (trim, espacios colapsados, mayúsculas). */
-function normalizeMealText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const s = value.trim().replace(/\s+/g, " ").toUpperCase();
-  return s === "" ? null : s;
-}
 
 /** Título o descripción nuevos coinciden con el registro (ya normalizado en BD). */
 function newMealTextMatchesExisting(
@@ -141,15 +135,18 @@ export async function findRecentPossibleDuplicateMeal(input: {
   return null;
 }
 
-export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
+export async function createMeal(
+  input: CreateMealInput,
+  context?: AuthenticatedRequestContext,
+): Promise<MealEntry> {
   assertIsoDate(input.date);
   const calories = requiredMealCalories(input.final_calories);
   const protein = optionalMealMacro(input.final_protein_g, "Proteína");
   const carbs = optionalMealMacro(input.final_carbs_g, "Carbohidratos");
   const fat = optionalMealMacro(input.final_fat_g, "Grasas");
-  const dayLog = await getOrCreateDayLog(input.date);
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+  const dayLog = await getOrCreateDayLog(input.date, context);
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   const { data, error } = await supabase
     .from("meal_entries")
@@ -171,6 +168,45 @@ export async function createMeal(input: CreateMealInput): Promise<MealEntry> {
 
   if (error) throw new Error(`Crear meal_entries: ${error.message}`);
   return data as MealEntry;
+}
+
+/**
+ * Crea una nueva comida manual desde una entrada propia, activa y elegible.
+ * La carga nutricional se obtiene siempre del servidor; el navegador sólo
+ * identifica la comida fuente.
+ */
+export async function quickAddMeal(
+  sourceMealId: string,
+  date: string,
+  context?: AuthenticatedRequestContext,
+): Promise<MealEntry> {
+  if (!sourceMealId) throw new Error("Comida rápida inválida.");
+  assertIsoDate(date);
+
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("meal_entries")
+    .select("title, description, final_calories, final_protein_g, final_carbs_g, final_fat_g")
+    .eq("id", sourceMealId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .eq("entry_kind", "meal")
+    .eq("source_type", "manual")
+    .maybeSingle();
+
+  if (error) throw new Error(`Buscar comida rápida: ${error.message}`);
+  if (!data) throw new Error("Esta comida rápida ya no está disponible.");
+
+  return createMeal({
+    date,
+    title: data.title ?? undefined,
+    description: data.description ?? undefined,
+    final_calories: data.final_calories,
+    final_protein_g: data.final_protein_g,
+    final_carbs_g: data.final_carbs_g,
+    final_fat_g: data.final_fat_g,
+  }, context);
 }
 
 export type UpdateMealInput = {
