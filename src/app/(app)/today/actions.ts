@@ -35,10 +35,11 @@ export async function quickAddMealAction(
     await quickAddMeal(sourceMealId, todayInCordoba(), auth);
     revalidateMealPages();
     return { ok: true };
-  } catch (error) {
+  } catch {
+    console.warn("[quick-meal] add_failed");
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "No pudimos agregar la comida.",
+      error: "No pudimos agregar la comida.",
     };
   }
 }

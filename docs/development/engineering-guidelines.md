@@ -81,6 +81,40 @@ No derivar fechas lógicas del día mediante UTC si puede cambiar el día local.
 - Mantener migraciones pequeñas, auditables y reversibles cuando sea posible.
 - Revisar constraints, índices y políticas existentes antes de agregar duplicados.
 
+### Reglas de seguridad y protección de datos
+
+- Toda tabla expuesta en `public` debe tener RLS y policies de ownership para
+  `authenticated`; no usar `PUBLIC`, `anon`, `USING (true)` ni `WITH CHECK
+  (true)` para datos de usuario.
+- El `user_id` se deriva de Auth en servidor o de una relación padre ya
+  verificada. Las actions y APIs aceptan únicamente campos permitidos y nunca
+  confían en ownership enviado por el navegador.
+- Toda función `SECURITY DEFINER` debe usar `search_path = ''`, referenciar
+  objetos de aplicación con schema explícito y revocar `EXECUTE` de `PUBLIC`,
+  `anon` y `authenticated`. `service_role` sólo se usa en módulos
+  `server-only` para operaciones estrictamente controladas.
+- Las demás funciones públicas también fijan `search_path` cuando el caller
+  puede controlarlo. No se reemplaza el body si un `ALTER FUNCTION ... SET
+  search_path` conserva exactamente su semántica.
+- Los tokens de integración se generan con entropía criptográfica, se muestran
+  una sola vez y sólo se persisten como SHA-256. Ni el token raw ni su hash se
+  incluyen en UI, responses o logs.
+- Sólo la URL y la publishable/anon key de Supabase pueden usar el prefijo
+  `NEXT_PUBLIC_`. Secret/service-role keys permanecen server-side, fuera de git
+  y nunca se registran.
+- Las páginas, respuestas RSC y APIs autenticadas no se almacenan en el cache
+  del service worker. Los drafts locales de entrenamiento son el único dato de
+  producto persistido deliberadamente en el navegador y se eliminan al cerrar
+  correctamente el flujo.
+- Ejecutar Supabase Security Advisor después de cada cambio DDL. Un finding que
+  dependa del plan del proveedor se documenta como riesgo residual; no se
+  reemplaza con una protección casera.
+
+OWNLEVEL usa actualmente OAuth de Google; no implementa signup, login, reset ni
+cambio de contraseña propios. La protección de contraseñas filtradas de
+Supabase continúa siendo recomendable si se habilita un proveedor basado en
+password y el plan contratado la admite.
+
 ### Resiliencia ante JWT recién emitidos
 
 Los clientes de Data API clasifican exclusivamente `HTTP 401` + `PGRST303` +

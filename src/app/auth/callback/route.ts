@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { safeAuthRedirectPath } from "@/lib/security/auth-redirect";
 
 export async function GET(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
 
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/home";
+  const next = safeAuthRedirectPath(searchParams.get("next"));
 
   if (!url || !anonKey || !code) {
     return NextResponse.redirect(`${origin}/login?error=auth`);

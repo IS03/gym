@@ -10,7 +10,7 @@ import {
 } from "./workout-start";
 
 const routines: WorkoutStartRoutine[] = [
-  { id: "push", name: "PUSH", color: "#8b5cf6", exerciseCount: 9, setCount: 25 },
+  { id: "push", name: "PUSH", color: "violet", exerciseCount: 9, setCount: 25 },
   { id: "pull", name: "PULL", color: null, exerciseCount: 1, setCount: 1 },
 ];
 

@@ -1,9 +1,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
+const supabaseMocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
+  createAdminClient: vi.fn(),
+}));
+
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
-vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
+vi.mock("../supabase/server", () => ({
+  createClient: supabaseMocks.createClient,
+}));
+vi.mock("../supabase/admin", () => ({
+  createAdminClient: supabaseMocks.createAdminClient,
+}));
 
 import {
   handleChatgptMealRequest,
@@ -14,6 +23,7 @@ import { parseBearerToken, parseChatgptMealInput } from "./chatgpt-contract";
 import {
   authenticateIntegrationToken,
   hashIntegrationToken,
+  listIntegrationApiTokens,
   newIntegrationToken,
 } from "./chatgpt-tokens";
 
@@ -116,6 +126,25 @@ describe("ChatGPT private meal contract", () => {
     info.mockRestore();
   });
 
+  it("exige scope meals:write y un token no revocado en el lookup", async () => {
+    const chain = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.is.mockReturnValue(chain);
+    supabaseMocks.createAdminClient.mockReturnValue({
+      from: vi.fn(() => chain),
+    } as never);
+
+    await expect(authenticateIntegrationToken(validToken)).resolves.toBeNull();
+    expect(chain.eq).toHaveBeenCalledWith("scope", "meals:write");
+    expect(chain.is).toHaveBeenCalledWith("revoked_at", null);
+  });
+
   it("rechaza Authorization ausente, inválida o revocada", async () => {
     expect((await handleChatgptMealRequest(request(validBody, null), deps())).status).toBe(401);
     expect((await handleChatgptMealRequest(request(validBody, "Basic abc"), deps())).status).toBe(401);
@@ -176,5 +205,29 @@ describe("ChatGPT private meal contract", () => {
     expect(migration).not.toContain(first);
     expect(migration).toContain("'chatgpt'");
     expect(migration).toContain("'meal'");
+  });
+
+  it("la lectura web nunca selecciona token_hash ni el token raw", async () => {
+    const chain = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(async () => ({ data: [], error: null })),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    const getUser = vi.fn(async () => ({
+      data: { user: { id: "owner" } },
+      error: null,
+    }));
+    supabaseMocks.createClient.mockResolvedValue({
+      auth: { getUser },
+      from: vi.fn(() => chain),
+    } as never);
+
+    await expect(listIntegrationApiTokens()).resolves.toEqual([]);
+    expect(chain.select).toHaveBeenCalledWith(
+      "id,token_prefix,label,scope,created_at,last_used_at,revoked_at",
+    );
+    expect(chain.select.mock.calls[0]?.[0]).not.toContain("token_hash");
   });
 });

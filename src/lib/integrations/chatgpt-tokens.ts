@@ -25,6 +25,8 @@ export type IntegrationApiToken = {
   revoked_at: string | null;
 };
 
+export class ActiveIntegrationTokenError extends Error {}
+
 async function webUser() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -47,7 +49,7 @@ export async function listIntegrationApiTokens(): Promise<IntegrationApiToken[]>
     .select("id,token_prefix,label,scope,created_at,last_used_at,revoked_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw new Error(`Leer claves de integración: ${error.message}`);
+  if (error) throw new Error("No se pudieron leer las claves de integración.");
   return (data ?? []) as IntegrationApiToken[];
 }
 
@@ -70,9 +72,11 @@ export async function createIntegrationApiToken(): Promise<{
     .select("id,token_prefix,label,scope,created_at,last_used_at,revoked_at")
     .single();
   if (error?.code === "23505") {
-    throw new Error("Ya existe una clave activa. Revocala antes de crear otra.");
+    throw new ActiveIntegrationTokenError(
+      "Ya existe una clave activa. Revocala antes de crear otra.",
+    );
   }
-  if (error) throw new Error(`Crear clave de integración: ${error.message}`);
+  if (error) throw new Error("No se pudo crear la clave de integración.");
   return { rawToken, token: data as IntegrationApiToken };
 }
 
@@ -84,7 +88,7 @@ export async function revokeIntegrationApiToken(id: string): Promise<void> {
     .eq("id", id)
     .eq("user_id", userId)
     .is("revoked_at", null);
-  if (error) throw new Error(`Revocar clave de integración: ${error.message}`);
+  if (error) throw new Error("No se pudo revocar la clave de integración.");
 }
 
 export async function authenticateIntegrationToken(rawToken: string) {

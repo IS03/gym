@@ -8,6 +8,10 @@ import {
   handleChatgptMealRequest,
 } from "@/lib/integrations/chatgpt-meals";
 import { persistChatgptMeal } from "@/lib/integrations/chatgpt-server";
+import {
+  readJsonRequestBody,
+  RequestBodyTooLargeError,
+} from "@/lib/security/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +32,14 @@ export async function POST(request: NextRequest) {
   }
 
   let body: unknown;
-  let rawBody: string;
+  let byteLength: number;
   try {
-    rawBody = await request.text();
-    if (new TextEncoder().encode(rawBody).byteLength > CHATGPT_MEAL_MAX_BODY_BYTES) {
+    ({ body, byteLength } = await readJsonRequestBody(
+      request,
+      CHATGPT_MEAL_MAX_BODY_BYTES,
+    ));
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
       return NextResponse.json(
         {
           ok: false,
@@ -41,8 +49,6 @@ export async function POST(request: NextRequest) {
         { status: 413 },
       );
     }
-    body = JSON.parse(rawBody);
-  } catch {
     return NextResponse.json(
       { ok: false, error: "invalid_request", message: "El body debe ser JSON válido." },
       { status: 400 },
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest) {
   const result = await handleChatgptMealRequest(
     {
       authorization: request.headers.get("authorization"),
-      contentLength: String(new TextEncoder().encode(rawBody).byteLength),
+      contentLength: String(byteLength),
       body,
     },
     {
@@ -61,5 +67,8 @@ export async function POST(request: NextRequest) {
       auditAuth: logIntegrationAuthEvent,
     },
   );
+  if (result.status === 500) {
+    console.error("[ownlevel-chatgpt-api] internal_error");
+  }
   return NextResponse.json(result.body, { status: result.status });
 }

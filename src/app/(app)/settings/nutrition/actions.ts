@@ -10,6 +10,7 @@ import {
   type FoodMutationInput,
 } from "@/lib/nutrition/product";
 import {
+  ActiveIntegrationTokenError,
   createIntegrationApiToken,
   revokeIntegrationApiToken,
 } from "@/lib/integrations/chatgpt-tokens";
@@ -59,15 +60,24 @@ export async function createChatgptKeyAction() {
     revalidatePath("/settings/nutrition/integrations");
     return { ok: true as const, ...result };
   } catch (error) {
+    console.warn("[integration-token] create_failed");
     return {
       ok: false as const,
-      error: error instanceof Error ? error.message : "No se pudo crear la clave.",
+      error:
+        error instanceof ActiveIntegrationTokenError
+          ? error.message
+          : "No se pudo crear la clave.",
     };
   }
 }
 
 export async function revokeChatgptKeyAction(id: string) {
-  return run(async () => {
+  try {
     await revokeIntegrationApiToken(id);
-  });
+    refresh();
+    return { ok: true };
+  } catch {
+    console.warn("[integration-token] revoke_failed");
+    return { ok: false, error: "No se pudo revocar la clave." };
+  }
 }
