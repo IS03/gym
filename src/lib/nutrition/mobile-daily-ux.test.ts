@@ -41,12 +41,14 @@ describe("PR 9.6 — UX diaria mobile", () => {
     expect(library).not.toContain('className="h-11 w-full lg:hidden" onClick={openCreate}');
   });
 
-  it("mantiene Resumen, acción compacta, Pasos/Actividad y luego Comidas", () => {
+  it("mantiene Resumen, acción compacta, Actividad/Pasos y luego Comidas", () => {
     expect(today.indexOf("<MealComposer")).toBeGreaterThan(today.indexOf(">Resumen<"));
     expect(today.indexOf("<TodayActivity")).toBeGreaterThan(today.indexOf("<MealComposer"));
     expect(today.indexOf(">Comidas<")).toBeGreaterThan(today.indexOf("<TodayActivity"));
     expect(activityPanel).toContain("Actividad de hoy");
-    expect(activityPanel).toContain("<details");
+    expect(activityPanel).not.toContain("<details");
+    expect(activityEditor).toContain("<details");
+    expect(activityEditor).toContain("Correcciones del día");
   });
 
   it("abre la comida en un diálogo responsive, conserva la fecha y cierra al crear", () => {

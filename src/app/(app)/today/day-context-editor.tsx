@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,10 +28,11 @@ type Props = {
   gymReasonInitial: string | null;
   expenditureInitial: number | null;
   gymSource: "workout" | "override" | "none";
+  waterTargetLabel: string | null;
   onActivityChange?: (draft: DailyActivityDraft) => void;
 };
 
-export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, onActivityChange }: Props) {
+export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, waterTargetLabel, onActivityChange }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -103,23 +105,26 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
-        <div className="space-y-1">
-          <Label htmlFor="daily-steps">Pasos</Label>
-          <Input id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="daily-steps" className="text-xs">Pasos</Label>
+          <Input className="h-10 px-2" id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="daily-water">Agua (L)</Label>
-          <Input id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="daily-water" className="min-w-0 gap-1 text-[11px] sm:text-xs">
+            <span className="shrink-0">Agua</span>
+            {waterTargetLabel ? <span className="truncate font-normal text-muted-foreground">· meta {waterTargetLabel}</span> : null}
+          </Label>
+          <Input className="h-10 px-2" id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="daily-mate">Mate (L)</Label>
-          <Input id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="daily-mate" className="text-xs">Mate</Label>
+          <Input className="h-10 px-2" id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
         </div>
       </div>
       <p
-        className={`min-h-5 text-xs ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+        className={`min-h-4 text-xs leading-4 ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
         role="status"
         aria-live="polite"
       >
@@ -132,9 +137,14 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
               : null}
       </p>
 
-      <details className="rounded-xl border px-3 py-2">
-        <summary className="cursor-pointer text-sm font-medium">Correcciones del día</summary>
-        <div className="mt-3 space-y-4 border-t pt-3">
+      <details className="group/corrections rounded-xl border">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          Correcciones del día
+          <span className="shrink-0 text-muted-foreground transition-transform duration-200 group-open/corrections:rotate-90 motion-reduce:transition-none">
+            <ChevronRight className="size-4" aria-hidden />
+          </span>
+        </summary>
+        <div className="space-y-4 border-t px-3 pb-3 pt-3">
           <div className="space-y-2">
             <Label htmlFor="work-mode">Trabajo</Label>
             <select id="work-mode" value={workMode} onChange={(e) => setWorkMode(e.target.value as typeof workMode)} className="h-11 w-full rounded-md border bg-background px-3 text-sm">
@@ -180,7 +190,9 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
           </div>
         </div>
       </details>
-      <p className="min-h-5 text-xs text-muted-foreground" role="status">{notice}</p>
+      <div className="text-xs text-muted-foreground" role="status" aria-live="polite">
+        {notice ? <p>{notice}</p> : null}
+      </div>
     </div>
   );
 }

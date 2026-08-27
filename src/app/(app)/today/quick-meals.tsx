@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   QUICK_MEALS_INITIAL_LIMIT,
   type QuickMealCandidate,
@@ -24,11 +25,12 @@ type QuickMealRowsProps = {
   meals: QuickMealCandidate[];
   pendingMealId: string | null;
   onQuickAdd: (meal: QuickMealCandidate) => void;
+  framed?: boolean;
 };
 
-function QuickMealRows({ meals, pendingMealId, onQuickAdd }: QuickMealRowsProps) {
+function QuickMealRows({ meals, pendingMealId, onQuickAdd, framed = false }: QuickMealRowsProps) {
   return (
-    <ul className="divide-y divide-border/70 rounded-xl border bg-card">
+    <ul className={cn("divide-y divide-border/70", framed && "rounded-xl border bg-card")}>
       {meals.map((meal) => {
         const pending = pendingMealId === meal.sourceMealId;
         return (
@@ -81,20 +83,35 @@ export function QuickMeals({ meals }: { meals: QuickMealCandidate[] }) {
   }
 
   return (
-    <section className="space-y-2" aria-labelledby="quick-meals-heading">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="quick-meals-heading" className="text-sm font-semibold">Comidas rápidas</h2>
-        {addedMealId ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><Check className="size-3.5" aria-hidden /> Agregada</span> : null}
-      </div>
-      <QuickMealRows meals={visibleMeals} pendingMealId={pendingMealId} onQuickAdd={onQuickAdd} />
-      {pendingMealId ? <p className="text-xs text-muted-foreground" role="status">Agregando…</p> : null}
-      {error ? <p className="text-sm text-destructive" role="alert" aria-live="polite">{error}</p> : null}
-      {hasMore ? <>
-        <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setMoreOpen(true)}>Ver más</Button>
-        <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen} title="Comidas rápidas" description="Elegí una comida anterior para agregarla hoy." closeLabel="Cerrar comidas rápidas">
-          <QuickMealRows meals={meals} pendingMealId={pendingMealId} onQuickAdd={onQuickAdd} />
-        </ResponsiveDialog>
-      </> : null}
+    <section aria-labelledby="quick-meals-heading">
+      <details className="group/quick-meals overflow-hidden rounded-xl border bg-card shadow-sm">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <h2 id="quick-meals-heading" className="min-w-0 flex-1 text-sm font-semibold">Comidas rápidas</h2>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {visibleMeals.length} {visibleMeals.length === 1 ? "sugerida" : "sugeridas"}
+          </span>
+          <span className="shrink-0 text-muted-foreground transition-transform duration-200 group-open/quick-meals:rotate-180 motion-reduce:transition-none">
+            <ChevronDown className="size-4" aria-hidden />
+          </span>
+        </summary>
+
+        <div className="border-t border-border/70">
+          <QuickMealRows meals={visibleMeals} pendingMealId={pendingMealId} onQuickAdd={onQuickAdd} />
+          <div className="min-h-4 px-3 text-xs" aria-live="polite">
+            {pendingMealId ? <p className="text-muted-foreground" role="status">Agregando…</p> : null}
+            {addedMealId ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden /> Agregada</p> : null}
+            {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+          </div>
+          {hasMore ? (
+            <div className="px-1.5 pb-1.5">
+              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setMoreOpen(true)}>Ver más</Button>
+              <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen} title="Comidas rápidas" description="Elegí una comida anterior para agregarla hoy." closeLabel="Cerrar comidas rápidas">
+                <QuickMealRows meals={meals} pendingMealId={pendingMealId} onQuickAdd={onQuickAdd} framed />
+              </ResponsiveDialog>
+            </div>
+          ) : null}
+        </div>
+      </details>
     </section>
   );
 }

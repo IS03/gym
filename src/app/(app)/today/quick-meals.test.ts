@@ -28,6 +28,20 @@ describe("quick meals wiring", () => {
     expect(quickMeals).toContain("<ResponsiveDialog");
   });
 
+  it("keeps suggestions in a native details section closed by default", () => {
+    const detailsTag = quickMeals.slice(quickMeals.indexOf("<details"), quickMeals.indexOf(">", quickMeals.indexOf("<details")));
+    const detailsBody = quickMeals.slice(quickMeals.indexOf("<details"), quickMeals.indexOf("</details>"));
+    expect(detailsTag).not.toContain(" open");
+    expect(detailsBody).toContain("<summary");
+    expect(detailsBody).toContain("Comidas rápidas");
+    expect(detailsBody).toContain("visibleMeals.length");
+    expect(detailsBody).toContain("<QuickMealRows meals={visibleMeals}");
+    expect(detailsBody).toContain("Ver más");
+    expect(detailsBody).toContain("<ResponsiveDialog");
+    expect(detailsBody).toContain("group-open/quick-meals:rotate-180");
+    expect(detailsBody).toContain("motion-reduce:transition-none");
+  });
+
   it("uses a parallel read and sends only sourceMealId to a server-owned copy", () => {
     expect(todayPage).toContain("getQuickMealCandidates(today, auth)");
     expect(quickMeals).toContain("quickAddMealAction(meal.sourceMealId)");

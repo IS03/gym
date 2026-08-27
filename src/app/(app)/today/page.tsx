@@ -38,9 +38,9 @@ function formatLiters(n: number | null | undefined) {
 
 function formatBalance(value: number | null) {
   if (value === null) return "Sin gasto configurado";
-  if (value < 0) return `Déficit estimado: ${Math.abs(value)} kcal`;
-  if (value > 0) return `Superávit estimado: ${value} kcal`;
-  return "Balance estimado: 0 kcal";
+  if (value < 0) return `Déficit ${Math.abs(value)} kcal`;
+  if (value > 0) return `Superávit ${value} kcal`;
+  return "Balance 0 kcal";
 }
 
 function formatProteinProgress(consumed: number, target: number | null) {
@@ -86,7 +86,7 @@ export default async function TodayPage() {
       </div>
 
       <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
-      <aside className="space-y-6 lg:sticky lg:top-8 lg:col-span-4">
+      <aside className="space-y-4 lg:sticky lg:top-8 lg:col-span-4">
       <Card className="surface-elevated">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Resumen</CardTitle>

@@ -47,9 +47,9 @@ describe("PR 7 — experiencia nutricional", () => {
 
   it("Today separa objetivo, gasto, balance y fuentes de trabajo/gym", () => {
     expect(today).toContain("context.targets.calories");
-    expect(todayActivity).toContain("Balance energético");
-    expect(today).toContain("Déficit estimado");
-    expect(todayActivity).toContain("Gasto estimado");
+    expect(todayActivity).toContain(">Balance<");
+    expect(today).toContain("Déficit ${Math.abs(value)} kcal");
+    expect(todayActivity).toContain(">Gasto<");
     expect(today).not.toContain("dayLog.target_kcal_snapshot");
     expect(todayEditor).toContain("Usar horario habitual");
     expect(todayEditor).toContain("Registrar que entrené sin sesión");

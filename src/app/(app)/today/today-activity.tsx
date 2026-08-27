@@ -6,7 +6,7 @@ import { StepsCard } from "./steps-card";
 import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 
 type PanelProps = React.ComponentProps<typeof DayActivityPanel>;
-type TodayActivityProps = Omit<PanelProps, "activity" | "onActivityChange">;
+type TodayActivityProps = Omit<PanelProps, "onActivityChange">;
 
 export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps & { stepsSummary: StepsReportSummary }) {
   const [activity, setActivity] = useState({
@@ -15,5 +15,5 @@ export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps & {
     mateL: props.mateInitial == null ? "" : String(props.mateInitial),
   });
 
-  return <div className="space-y-6"><StepsCard steps={activity.steps} summary={stepsSummary} /><DayActivityPanel {...props} activity={activity} onActivityChange={setActivity} /></div>;
+  return <div className="space-y-4"><DayActivityPanel {...props} onActivityChange={setActivity} /><StepsCard steps={activity.steps} summary={stepsSummary} /></div>;
 }
