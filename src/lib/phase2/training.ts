@@ -17,6 +17,11 @@ import type {
   WorkoutSessionStatus,
 } from "./types";
 import type { ExerciseRoutineMembership } from "./exercise-insights";
+import {
+  assertRoutineColor,
+  resolveRoutineColor,
+  type RoutineColorKey,
+} from "./routine-colors";
 
 async function getAuthedUserId() {
   const supabase = await createClient();
@@ -50,7 +55,7 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
 
 type TrainingDayQueryRow = {
   day_log: { log_date: string } | Array<{ log_date: string }> | null;
-  routine: { color: string | null } | Array<{ color: string | null }> | null;
+  routine: { color: RoutineColorKey | null } | Array<{ color: RoutineColorKey | null }> | null;
 };
 
 type EndedSessionQueryRow = WorkoutSession & {
@@ -154,7 +159,7 @@ export async function listExercises(params?: {
 export async function listTrainingDaysInMonth(input: {
   month: `${number}-${number}`; // YYYY-MM
   routineId?: string | null;
-}): Promise<Map<string, string[]>> {
+}): Promise<Map<string, RoutineColorKey[]>> {
   const supabase = await createClient();
   await getAuthedUserId();
 
@@ -176,14 +181,14 @@ export async function listTrainingDaysInMonth(input: {
   const { data, error } = await q;
   if (error) throw new Error(`Leer días entrenados: ${error.message}`);
 
-  const out = new Map<string, Set<string>>();
+  const out = new Map<string, Set<RoutineColorKey>>();
   for (const row of (data ?? []) as TrainingDayQueryRow[]) {
     const dayLog = firstRelation(row.day_log);
     const routine = firstRelation(row.routine);
     const date = dayLog?.log_date ? String(dayLog.log_date) : null;
     if (!date) continue;
-    const color = routine?.color ? String(routine.color) : "#0f172a";
-    const set = out.get(date) ?? new Set<string>();
+    const color = resolveRoutineColor(routine?.color);
+    const set = out.get(date) ?? new Set<RoutineColorKey>();
     set.add(color);
     out.set(date, set);
   }
@@ -463,7 +468,7 @@ export async function listWorkoutStartRoutines(
 
 export async function createRoutine(input: {
   nombre: string;
-  color?: string | null;
+  color?: RoutineColorKey | null;
 }): Promise<Routine> {
   assertNonEmpty(input.nombre, "Nombre");
   const supabase = await createClient();
@@ -474,7 +479,7 @@ export async function createRoutine(input: {
     .insert({
       user_id: userId,
       nombre: input.nombre.trim(),
-      color: input.color ?? null,
+      color: assertRoutineColor(input.color),
       is_active: true,
     })
     .select("*")
@@ -493,7 +498,7 @@ export async function createRoutine(input: {
 export async function updateRoutine(input: {
   id: string;
   nombre?: string;
-  color?: string | null;
+  color?: RoutineColorKey | null;
   is_active?: boolean;
 }): Promise<Routine> {
   const supabase = await createClient();
@@ -504,7 +509,7 @@ export async function updateRoutine(input: {
     assertNonEmpty(input.nombre, "Nombre");
     patch.nombre = input.nombre.trim();
   }
-  if (input.color !== undefined) patch.color = input.color;
+  if (input.color !== undefined) patch.color = assertRoutineColor(input.color);
   if (input.is_active !== undefined) patch.is_active = input.is_active;
 
   const { data, error } = await supabase

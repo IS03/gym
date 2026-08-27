@@ -1,3 +1,5 @@
+import type { RoutineColorKey } from "./routine-colors";
+
 export type Adjustment =
   | "maintain"
   | "increase_weight"
@@ -33,7 +35,7 @@ export type InitialPlanExercise = {
 export type InitialPlanRoutine = {
   source_key: string;
   name: string;
-  color: string;
+  color: RoutineColorKey;
   order: number;
   notes: string;
   exercises: InitialPlanExercise[];
@@ -59,7 +61,7 @@ export const INITIAL_TRAINING_PLAN: { routines: InitialPlanRoutine[] } = {
     {
       source_key: "R-PECHO",
       name: "Pecho",
-      color: "#ef4444",
+      color: "rose",
       order: 1,
       notes: "Pecho, tríceps y hombros",
       exercises: [
@@ -167,7 +169,7 @@ export const INITIAL_TRAINING_PLAN: { routines: InitialPlanRoutine[] } = {
     {
       source_key: "R-ESPALDA",
       name: "Espalda",
-      color: "#3b82f6",
+      color: "blue",
       order: 2,
       notes: "Espalda, bíceps, hombros y antebrazos",
       exercises: [
@@ -286,7 +288,7 @@ export const INITIAL_TRAINING_PLAN: { routines: InitialPlanRoutine[] } = {
     {
       source_key: "R-PIERNAS",
       name: "Piernas",
-      color: "#22c55e",
+      color: "green",
       order: 3,
       notes: "Piernas completas",
       exercises: [

@@ -7,6 +7,8 @@ import { getRoutineTemplate } from "@/lib/phase2/training-robust";
 import { RoutineExerciseAddDialog } from "./routine-exercise-manager";
 import { RoutineTemplateEditor } from "./routine-template-editor";
 import { RoutineRestoreButton } from "../routine-restore-button";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
+import { RoutineSettingsForm } from "./routine-settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,10 @@ export default async function RoutineDetailPage({
 
   return (
     <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
-      <div className="space-y-1">
+      <div
+        className="space-y-1 border-l-[3px] pl-3"
+        style={{ borderColor: routineColorCssVariable(template.routine.color) }}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">
             {template.routine.nombre}
@@ -49,6 +54,8 @@ export default async function RoutineDetailPage({
           Orden y objetivo independiente para cada serie.
         </p>
       </div>
+
+      <RoutineSettingsForm routine={template.routine} />
 
       {!template.routine.is_active ? (
         <Card className="border-amber-500/25 bg-amber-500/[0.04]">

@@ -7,6 +7,7 @@ import {
   type TrainingMonthDay,
 } from "@/lib/phase2/training-calendar";
 import { cn } from "@/lib/utils";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 
 type TrainingMonthPreviewProps = {
   month: `${number}-${number}`;
@@ -48,7 +49,7 @@ function DayCell({
           <span
             key={color}
             className="size-1.5 rounded-full ring-1 ring-foreground/10"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: routineColorCssVariable(color) }}
           />
         ))}
       </span>

@@ -5,23 +5,14 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RoutineColorPicker } from "@/components/training/routine-color-picker";
+import type { RoutineColorKey } from "@/lib/phase2/routine-colors";
 import {
   type CreateRoutineState,
   createRoutineAction,
 } from "../actions";
 
 const initialState: CreateRoutineState = { error: null };
-
-const ROUTINE_COLORS = [
-  { value: "", label: "Sin color" },
-  { value: "#ef4444", label: "Rojo" },
-  { value: "#f97316", label: "Naranja" },
-  { value: "#eab308", label: "Amarillo" },
-  { value: "#22c55e", label: "Verde" },
-  { value: "#06b6d4", label: "Cian" },
-  { value: "#3b82f6", label: "Azul" },
-  { value: "#a855f7", label: "Violeta" },
-] as const;
 
 export function RoutineCreateForm({
   autoFocus = false,
@@ -35,6 +26,7 @@ export function RoutineCreateForm({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [color, setColor] = useState<RoutineColorKey>("violet");
 
   useEffect(() => {
     onPendingChange?.(pending);
@@ -68,21 +60,7 @@ export function RoutineCreateForm({
           required
         />
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="color">Color</Label>
-        <select
-          id="color"
-          name="color"
-          className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-          defaultValue=""
-        >
-          {ROUTINE_COLORS.map((c) => (
-            <option key={c.value || "none"} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <RoutineColorPicker value={color} onChange={setColor} />
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : null}

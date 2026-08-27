@@ -37,6 +37,7 @@ import type {
   WorkoutSessionExerciseDetail,
   WorkoutSet,
 } from "./types";
+import type { RoutineColorKey } from "./routine-colors";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -324,19 +325,24 @@ type RawSessionExercise = WorkoutSessionExercise & {
   sets: WorkoutSet[] | null;
 };
 
+type RawWorkoutSession = WorkoutSession & {
+  routine: { color: RoutineColorKey | null } | Array<{ color: RoutineColorKey | null }> | null;
+};
+
 export async function getWorkoutSessionDetail(
   sessionId: string,
 ): Promise<WorkoutSessionDetail | null> {
   const { supabase, userId } = await getAuthedContext();
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
-    .select("*")
+    .select("*, routine:routines(color)")
     .eq("id", sessionId)
     .eq("user_id", userId)
     .maybeSingle();
 
+  const rawSession = (session ?? null) as RawWorkoutSession | null;
   const typedSession = resolveWorkoutSessionLookup(
-    (session ?? null) as WorkoutSession | null,
+    rawSession,
     sessionError,
   );
   if (!typedSession) return null;
@@ -368,6 +374,7 @@ export async function getWorkoutSessionDetail(
 
   return {
     session: typedSession,
+    routineColor: firstRelation(rawSession?.routine)?.color ?? null,
     logDate: String((dayLog as { log_date: string }).log_date),
     exercises,
   };

@@ -8,6 +8,7 @@ import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { startWorkoutFromSheetAction } from "@/app/(app)/train/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import {
   getInitialWorkoutSelection,
   getWorkoutOptionDelayMs,
@@ -182,7 +183,7 @@ function StartWorkoutContent({
                         >
                           <span
                             className="size-2.5 shrink-0 rounded-full border border-foreground/10"
-                            style={{ backgroundColor: routine.color ?? "transparent" }}
+                            style={{ backgroundColor: routineColorCssVariable(routine.color) }}
                             aria-hidden
                           />
                           <span className="min-w-0 flex-1">

@@ -106,6 +106,7 @@ export function clientDetailFromWorkoutDetail(
   return {
     session: {
       id: session.id,
+      routine_id: session.routine_id,
       routine_name_snapshot: session.routine_name_snapshot,
       session_name: session.session_name,
       status: session.status,
@@ -121,6 +122,7 @@ export function clientDetailFromWorkoutDetail(
       treadmill_incline_percent: session.treadmill_incline_percent,
       notes: session.notes,
     },
+    routineColor: detail.routineColor,
     logDate: detail.logDate,
     exercises: detail.exercises.map((exercise) => ({
       id: exercise.id,

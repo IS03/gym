@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { LocalizedDecimalInput } from "@/components/ui/localized-decimal-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import {
   filterExercisesByMuscleGroup,
   MUSCLE_GROUP_OPTIONS,
@@ -651,6 +652,10 @@ export function SessionEditor({
   const progressPercent =
     stats.totalSets === 0 ? 0 : Math.round((stats.completedSets / stats.totalSets) * 100);
   const hasUnsavedWork = dirtyIds.size > 0 || metadataDirty;
+  const hasRoutineAccent = !readOnly && detail.session.routine_id !== null;
+  const routineAccent = hasRoutineAccent
+    ? routineColorCssVariable(detail.routineColor)
+    : "var(--primary)";
   const restRemaining = restTimer
     ? Math.max(0, Math.ceil((restTimer.endAt - timerNow) / 1000))
     : 0;
@@ -1019,7 +1024,10 @@ export function SessionEditor({
 
   return (
     <div className="space-y-5">
-      <header className="space-y-3">
+      <header
+        className={cn("space-y-3", hasRoutineAccent && "border-l-[3px] pl-3")}
+        style={hasRoutineAccent ? { borderColor: routineAccent } : undefined}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">
@@ -1068,8 +1076,8 @@ export function SessionEditor({
             aria-valuenow={progressPercent}
           >
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
-              style={{ width: `${progressPercent}%` }}
+              className="h-full rounded-full transition-[width] duration-200 motion-reduce:transition-none"
+              style={{ width: `${progressPercent}%`, backgroundColor: routineAccent }}
             />
           </div>
         </div>
@@ -1900,14 +1908,14 @@ export function SessionEditor({
           </div>
           <details className="group relative rounded-xl border border-border/80 px-3 py-2">
             <span
-              className="pointer-events-none absolute bottom-2.5 left-3 top-2.5 w-0.5 rounded-full bg-destructive/70"
+              className="pointer-events-none absolute bottom-2.5 left-3 top-2.5 w-[3px] rounded-full bg-destructive/80"
               aria-hidden
             />
             <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg py-1 pl-4 pr-2 text-sm font-medium outline-none transition-[background-color,color] duration-150 hover:bg-muted/70 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
               Más opciones
-              <ChevronDown className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-180" aria-hidden />
+              <ChevronDown className="size-4 shrink-0 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
             </summary>
-            <div className="space-y-2 pb-1 pl-4 pt-2">
+            <div className="space-y-2 pb-1 pl-4 pt-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
               <Button
                 className="h-11 w-full"
                 type="button"

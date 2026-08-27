@@ -1,9 +1,10 @@
 import type { WorkoutSession } from "./types";
+import type { RoutineColorKey } from "./routine-colors";
 
 export type WorkoutStartRoutine = {
   id: string;
   name: string;
-  color: string | null;
+  color: RoutineColorKey | null;
   exerciseCount: number;
   setCount: number;
 };

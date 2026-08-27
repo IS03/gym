@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { listRoutineOverviews, listRoutines } from "@/lib/phase2/training";
 import { getInitialPlanStatus } from "@/lib/phase2/training-robust";
 import { partitionRoutines } from "@/lib/phase2/routine-list";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import { ArchivedRoutines } from "./archived-routines";
 import { InitialPlanImportButton } from "./initial-plan-import-button";
 import { RoutineArchiveButton } from "./routine-archive-button";
@@ -85,17 +86,17 @@ export default async function RoutinesPage() {
                 return (
                   <div
                     key={routine.id}
-                    className="flex min-h-16 items-stretch rounded-xl border bg-card shadow-sm ring-1 ring-foreground/5"
+                    className="relative flex min-h-16 items-stretch overflow-hidden rounded-xl border bg-card shadow-sm ring-1 ring-foreground/5"
                   >
+                    <span
+                      className="absolute inset-y-2 left-0 w-[3px] rounded-r-full"
+                      style={{ backgroundColor: routineColorCssVariable(routine.color) }}
+                      aria-hidden
+                    />
                     <Link
                       href={`/train/routines/${routine.id}`}
-                      className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/35 focus-visible:rounded-l-xl focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 outline-none transition-colors hover:bg-muted/35 focus-visible:rounded-l-xl focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <span
-                        className="size-3 shrink-0 rounded-full border border-foreground/10"
-                        style={{ backgroundColor: routine.color ?? "transparent" }}
-                        aria-hidden
-                      />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{routine.nombre}</span>
                         <RoutineMeta
@@ -117,19 +118,19 @@ export default async function RoutinesPage() {
               {active.map((routine) => {
                 const overview = overviews.get(routine.id);
                 return (
-                  <Card key={routine.id} className="relative min-h-64 justify-between">
+                  <Card key={routine.id} className="relative min-h-64 justify-between overflow-hidden">
+                    <span
+                      className="absolute inset-y-4 left-0 w-[3px] rounded-r-full"
+                      style={{ backgroundColor: routineColorCssVariable(routine.color) }}
+                      aria-hidden
+                    />
                     <Link
                       href={`/train/routines/${routine.id}`}
-                      className="flex h-full flex-col gap-5 rounded-xl p-4 pt-1 outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-full flex-col gap-5 rounded-xl p-4 pl-5 pt-1 outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Abrir rutina ${routine.nombre}`}
                     >
                       <div className="min-w-0 pr-10">
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className="size-3 shrink-0 rounded-full border"
-                            style={{ backgroundColor: routine.color ?? "transparent" }}
-                            aria-hidden
-                          />
                           <h3 className="truncate text-lg font-semibold tracking-tight">{routine.nombre}</h3>
                         </div>
                         <p className="mt-1.5 text-xs text-muted-foreground">

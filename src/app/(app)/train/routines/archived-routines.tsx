@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Archive, ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 import type { Routine } from "@/lib/phase2/types";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import { RoutineRestoreButton } from "./routine-restore-button";
 
 export function ArchivedRoutines({ routines }: { routines: Routine[] }) {
@@ -40,17 +41,17 @@ export function ArchivedRoutines({ routines }: { routines: Routine[] }) {
           {routines.map((routine) => (
             <div
               key={routine.id}
-              className="flex min-h-14 items-stretch gap-2 rounded-xl border border-dashed bg-muted/30 px-3 text-muted-foreground"
+              className="relative flex min-h-14 items-stretch gap-2 overflow-hidden rounded-xl border border-dashed bg-muted/30 px-3 text-muted-foreground"
             >
+              <span
+                className="absolute inset-y-2 left-0 w-[3px] rounded-r-full opacity-55"
+                style={{ backgroundColor: routineColorCssVariable(routine.color) }}
+                aria-hidden
+              />
               <Link
                 href={`/train/routines/${routine.id}`}
-                className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-2 outline-none focus-visible:rounded-lg focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span
-                  className="size-2.5 shrink-0 rounded-full border border-foreground/10 opacity-55"
-                  style={{ backgroundColor: routine.color ?? "transparent" }}
-                  aria-hidden
-                />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {routine.nombre}
                 </span>

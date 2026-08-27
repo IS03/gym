@@ -1,3 +1,5 @@
+import type { RoutineColorKey } from "./routine-colors";
+
 export type MuscleGroup =
   | "pecho"
   | "espalda"
@@ -40,7 +42,7 @@ export type Routine = {
   user_id: string;
   source_key: string | null;
   nombre: string;
-  color: string | null;
+  color: RoutineColorKey | null;
   routine_order: number;
   notes: string | null;
   is_active: boolean;
@@ -187,6 +189,7 @@ export type WorkoutSessionExerciseDetail = WorkoutSessionExercise & {
 
 export type WorkoutSessionDetail = {
   session: WorkoutSession;
+  routineColor: RoutineColorKey | null;
   logDate: string;
   exercises: WorkoutSessionExerciseDetail[];
 };
@@ -242,6 +245,7 @@ export type CompletedSessionCorrectionInput = {
 export type WorkoutSessionClient = Pick<
   WorkoutSession,
   | "id"
+  | "routine_id"
   | "routine_name_snapshot"
   | "session_name"
   | "status"
@@ -283,6 +287,7 @@ export type WorkoutSessionExerciseClient = Pick<
 
 export type WorkoutSessionClientDetail = {
   session: WorkoutSessionClient;
+  routineColor: RoutineColorKey | null;
   logDate: string;
   exercises: WorkoutSessionExerciseClient[];
 };

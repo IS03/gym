@@ -3,11 +3,12 @@ import type {
   TrainingAdjustment,
   WorkoutSet,
 } from "./types";
+import type { RoutineColorKey } from "./routine-colors";
 
 export type ExerciseRoutineMembership = {
   id: string;
   nombre: string;
-  color: string | null;
+  color: RoutineColorKey | null;
 };
 
 export type ExerciseDirectoryEntry = {

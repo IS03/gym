@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { MuscleGroup } from "@/lib/phase2/types";
 import { parseLocalizedDecimal } from "@/lib/localized-decimal";
+import { assertRoutineColor } from "@/lib/phase2/routine-colors";
 import type {
   ExerciseActionExercise,
   ExerciseActionResult,
@@ -155,7 +156,7 @@ export async function createRoutineAction(
 ): Promise<CreateRoutineState> {
   try {
     const nombre = str(formData, "nombre");
-    const color = str(formData, "color") || null;
+    const color = assertRoutineColor(str(formData, "color") || null);
     const routine = await createRoutine({ nombre, color });
     revalidatePath("/train/routines");
     revalidatePath(`/train/routines/${routine.id}`);
@@ -186,7 +187,7 @@ export async function restoreRoutineAction(id: string) {
 export async function updateRoutineAction(formData: FormData) {
   const id = str(formData, "id");
   const nombre = str(formData, "nombre");
-  const color = str(formData, "color") || null;
+  const color = assertRoutineColor(str(formData, "color") || null);
   await updateRoutine({ id, nombre, color });
   revalidatePath("/train/routines");
   revalidatePath(`/train/routines/${id}`);
