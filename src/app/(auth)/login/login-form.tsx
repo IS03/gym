@@ -56,8 +56,8 @@ export function LoginForm({ authError }: LoginFormProps) {
   }
 
   return (
-    <main className="grid min-h-full w-full grid-rows-[1fr_auto_auto] gap-10 py-5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 lg:min-h-[min(44rem,calc(100dvh-6rem))] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] lg:grid-rows-[1fr_auto] lg:gap-x-20 lg:py-10">
-      <section className="flex max-w-xl flex-col justify-center lg:py-12" aria-labelledby="login-title">
+    <main className="flex min-h-[calc(100dvh-max(3rem,calc(2rem+env(safe-area-inset-top)+env(safe-area-inset-bottom))))] w-full flex-col py-5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300 lg:grid lg:min-h-[min(44rem,calc(100dvh-6rem))] lg:grid-cols-[minmax(0,1.2fr)_minmax(22rem,0.8fr)] lg:grid-rows-[1fr_auto] lg:gap-10 lg:gap-x-20 lg:py-10">
+      <section className="flex max-w-xl flex-col pt-[clamp(4rem,12vh,7rem)] lg:justify-center lg:py-12" aria-labelledby="login-title">
         <div className="flex items-center gap-3">
           <Image
             src={brandAssets.symbolOnLight}
@@ -77,20 +77,20 @@ export function LoginForm({ authError }: LoginFormProps) {
           />
           <p className="text-sm font-bold tracking-[0.16em] text-foreground">OWNLEVEL</p>
         </div>
-        <div className="mt-9 space-y-3 sm:mt-11">
+        <div className="mt-8 space-y-3 sm:mt-10">
           <h1 id="login-title" className="max-w-[16ch] text-3xl leading-[1.08] font-semibold tracking-[-0.045em] text-balance sm:text-4xl lg:text-5xl">
             Entrenamiento, nutrición y progreso.
           </h1>
-          <p className="max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
+          <p className="max-w-md text-base leading-relaxed text-foreground/70 sm:text-lg">
             Todo en un solo lugar.
           </p>
         </div>
       </section>
 
-      <section className="flex flex-col justify-center lg:border-l lg:border-border/70 lg:pl-12">
+      <section className="mt-10 flex flex-col justify-center sm:mt-12 lg:mt-0 lg:border-l lg:border-border/70 lg:pl-12">
         <div className="w-full max-w-md lg:mx-auto">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">Entrá a OWNLEVEL</p>
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="mb-2 text-sm font-semibold text-foreground">Entrá a OWNLEVEL</p>
+          <p className="text-sm leading-relaxed text-foreground/70">
             Usá tu cuenta de Google para continuar.
           </p>
           <div className="mt-7">
@@ -124,7 +124,7 @@ export function LoginForm({ authError }: LoginFormProps) {
         </div>
       </section>
 
-      <footer className="text-sm leading-relaxed text-muted-foreground lg:col-span-2">
+      <footer className="mt-auto pt-10 text-sm leading-relaxed text-foreground/65 sm:pt-12 lg:col-span-2 lg:mt-0 lg:pt-0">
         <p>Tu progreso. Tus datos. Tu nivel.</p>
       </footer>
     </main>
