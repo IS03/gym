@@ -12,6 +12,9 @@ const sessionForm = source(
 const sessionEditor = source(
   "src/app/(app)/train/session/[id]/session-editor.tsx",
 );
+const addExerciseSheet = source(
+  "src/app/(app)/train/session/[id]/add-exercise-sheet.tsx",
+);
 const library = source(
   "src/app/(app)/train/exercises/exercise-library.tsx",
 );
@@ -58,10 +61,11 @@ describe("PR 7.1 — defaults y UX de entrenamiento", () => {
   });
 
   it("el selector de sesión tiene header fijo y contenido vertical desplazable", () => {
-    expect(sessionEditor).toContain("flex-col overflow-hidden");
-    expect(sessionEditor).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
-    expect(sessionEditor).toContain("100dvh");
-    expect(sessionEditor).toContain("env(safe-area-inset-bottom)");
-    expect(sessionEditor).toContain("overflow-x-auto");
+    expect(sessionEditor).toContain("AddExerciseSheet");
+    expect(addExerciseSheet).toContain("flex-col overflow-hidden");
+    expect(addExerciseSheet).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
+    expect(addExerciseSheet).toContain("82dvh");
+    expect(addExerciseSheet).toContain("env(safe-area-inset-bottom)");
+    expect(addExerciseSheet).toContain("overflow-x-auto");
   });
 });

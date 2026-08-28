@@ -20,7 +20,6 @@ import {
   LoaderCircle,
   Minus,
   Plus,
-  Search,
   X,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -94,7 +93,7 @@ import {
   workoutPayloadFromDetail,
   type SelectableTrainingDecision,
 } from "./session-editor-helpers";
-import { SessionCreateExerciseForm } from "./session-create-exercise-form";
+import { AddExerciseSheet } from "./add-exercise-sheet";
 import { CompletedSessionActions } from "./completed-session-actions";
 import { WorkoutFinishedDialog } from "./workout-finished-dialog";
 
@@ -565,11 +564,11 @@ export function SessionEditor({
       ),
     [exerciseSearch, libraryExercises, selectedMuscleGroup, sessionExerciseLibraryIds],
   );
-  const activeSelectedExerciseId = filteredLibraryExercises.some(
-    (exercise) => exercise.id === selectedExerciseId,
-  )
-    ? selectedExerciseId
-    : (filteredLibraryExercises[0]?.id ?? "");
+  const selectedLibraryExercise = libraryExercises.find(
+    (exercise) =>
+      exercise.id === selectedExerciseId &&
+      !sessionExerciseLibraryIds.has(exercise.id),
+  );
 
   const baseMetadata = useMemo(
     () => sessionMetadataFromSession(detail.session),
@@ -888,12 +887,12 @@ export function SessionEditor({
   }
 
   async function addExistingExercise() {
-    if (!activeSelectedExerciseId) return;
+    if (!selectedLibraryExercise) return;
     setGlobalPending(true);
     setGlobalError(null);
     const result = await appendWorkoutExerciseAction({
       sessionId: detail.session.id,
-      exerciseId: activeSelectedExerciseId,
+      exerciseId: selectedLibraryExercise.id,
     });
     setGlobalPending(false);
     if (!result.ok) {
@@ -1039,9 +1038,18 @@ export function SessionEditor({
   return (
     <div className="space-y-5">
       <header
-        className={cn("space-y-3", hasRoutineAccent && "border-l-[3px] pl-3")}
-        style={hasRoutineAccent ? { borderColor: routineAccent } : undefined}
+        className={cn(
+          "relative space-y-3 border-b border-border/70 pb-4",
+          hasRoutineAccent && "pl-3",
+        )}
       >
+        {hasRoutineAccent ? (
+          <span
+            className="absolute bottom-4 left-0 top-0 w-[3px] rounded-full"
+            style={{ backgroundColor: routineAccent }}
+            aria-hidden
+          />
+        ) : null}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">
@@ -1118,114 +1126,23 @@ export function SessionEditor({
         </div>
       ) : null}
 
-      {!readOnly && exercisePickerOpen ? (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center overflow-hidden bg-black/45 px-2 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-[2px] lg:items-center lg:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="extra-exercise-title"
-        >
-          <div className="flex max-h-[calc(100dvh-max(0.75rem,env(safe-area-inset-top)))] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.7rem] border border-border bg-card shadow-2xl motion-safe:animate-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-200 lg:max-h-[min(90dvh,46rem)] lg:rounded-[1.7rem]">
-            <div className="shrink-0 px-4 pt-4">
-                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h2 id="extra-exercise-title" className="text-lg font-semibold tracking-tight">
-                      Agregar ejercicio
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Los ejercicios de esta sesión no se pueden duplicar.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Cerrar selector de ejercicios"
-                    onClick={() => setExercisePickerOpen(false)}
-                  >
-                    <X aria-hidden />
-                  </Button>
-                </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-                  <Input
-                    aria-label="Buscar ejercicio"
-                    className="pl-9"
-                    value={exerciseSearch}
-                    placeholder="Buscar ejercicio"
-                    onChange={(event) => setExerciseSearch(event.target.value)}
-                  />
-                </div>
-                <div className="my-3 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={selectedMuscleGroup === "all" ? "default" : "outline"}
-                    onClick={() => setSelectedMuscleGroup("all")}
-                  >
-                    Todos
-                  </Button>
-                  {MUSCLE_GROUP_OPTIONS.map((group) => (
-                    <Button
-                      key={group.value}
-                      type="button"
-                      size="sm"
-                      variant={selectedMuscleGroup === group.value ? "default" : "outline"}
-                      onClick={() => setSelectedMuscleGroup(group.value)}
-                    >
-                      {group.label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="max-h-[42dvh] space-y-1 overflow-y-auto pb-3">
-                  {filteredLibraryExercises.length === 0 ? (
-                    <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-                      No hay ejercicios disponibles con ese filtro.
-                    </p>
-                  ) : (
-                    filteredLibraryExercises.map((exercise) => (
-                      <button
-                        key={exercise.id}
-                        type="button"
-                        className={cn(
-                          "flex min-h-12 w-full items-center justify-between rounded-xl px-3 text-left transition-colors",
-                          activeSelectedExerciseId === exercise.id
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted",
-                        )}
-                        onClick={() => setSelectedExerciseId(exercise.id)}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium">{exercise.nombre}</span>
-                          <span className="block truncate text-xs opacity-70">{exerciseIdentityLabel(exercise)}</span>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-                <Button
-                  className="h-12 w-full"
-                  type="button"
-                  disabled={!activeSelectedExerciseId || globalPending}
-                  onClick={() => void addExistingExercise()}
-                >
-                  {globalPending ? "Agregando…" : "Agregar a la sesión"}
-                </Button>
-                <details className="mt-3 rounded-xl border p-3">
-                  <summary className="cursor-pointer text-sm font-medium">Crear ejercicio nuevo</summary>
-                  <div className="mt-3">
-                    <SessionCreateExerciseForm
-                      sessionId={detail.session.id}
-                      muscleGroups={[...MUSCLE_GROUP_OPTIONS]}
-                    />
-                  </div>
-                </details>
-            </div>
-          </div>
-        </div>
+      {!readOnly ? (
+        <AddExerciseSheet
+          open={exercisePickerOpen}
+          onOpenChange={setExercisePickerOpen}
+          sessionId={detail.session.id}
+          exercises={libraryExercises}
+          filteredExercises={filteredLibraryExercises}
+          muscleGroups={[...MUSCLE_GROUP_OPTIONS]}
+          selectedMuscleGroup={selectedMuscleGroup}
+          onMuscleGroupChange={setSelectedMuscleGroup}
+          search={exerciseSearch}
+          onSearchChange={setExerciseSearch}
+          selectedExerciseId={selectedExerciseId}
+          onSelectExercise={setSelectedExerciseId}
+          onAddExercise={() => void addExistingExercise()}
+          pending={globalPending}
+        />
       ) : null}
 
       <section className="space-y-3">
@@ -1271,6 +1188,9 @@ export function SessionEditor({
               implement: exercise.implement_snapshot,
               weight_mode: exercise.weight_mode_snapshot,
             });
+            const collapsedSubtitle = [exerciseMeta, completedSummary]
+              .filter(Boolean)
+              .join(" · ");
             const quickNote = payload.notes.trim();
             const autosaveVisualStatus = compactAutosaveStatus({
               saved: Boolean(status?.saved),
@@ -1300,17 +1220,19 @@ export function SessionEditor({
                 <Card
                   size="sm"
                   className={cn(
-                    "relative gap-0 overflow-hidden py-0 transition-[box-shadow] duration-200 motion-reduce:transition-none",
-                    expanded && "shadow-md ring-primary/35",
+                    "relative gap-0 overflow-hidden py-0 transition-[box-shadow,transform] duration-200 motion-reduce:transition-none",
+                    expanded && "shadow-md ring-1 ring-primary/30",
                     completion.isComplete && !expanded && "ring-emerald-500/20",
                   )}
                 >
-                {expanded ? (
-                  <span
-                    className="absolute inset-y-3 left-0 w-0.5 rounded-r-full bg-primary"
-                    aria-hidden
-                  />
-                ) : null}
+                <span
+                  className={cn(
+                    "absolute inset-y-3 left-0 w-0.5 rounded-r-full transition-opacity duration-200",
+                    expanded ? "opacity-100" : "opacity-35",
+                  )}
+                  style={{ backgroundColor: routineAccent }}
+                  aria-hidden
+                />
                 <CardHeader className="p-0">
                   <button
                     type="button"
@@ -1337,9 +1259,7 @@ export function SessionEditor({
                         ) : null}
                       </div>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {!expanded && completion.isComplete && completedSummary
-                          ? completedSummary
-                          : exerciseMeta}
+                        {!expanded ? collapsedSubtitle : exerciseMeta}
                       </p>
                       {receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
@@ -1398,7 +1318,7 @@ export function SessionEditor({
                 {expanded ? (
                   <CardContent
                     id={exerciseContentId}
-                    className="space-y-3 border-t border-border/70 px-3 pb-3 pt-3"
+                    className="space-y-3 border-t border-border/70 px-3 pb-3 pt-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200"
                   >
                   {staleDraftIds.has(exercise.id) ? (
                     <div className="space-y-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm">
@@ -1576,19 +1496,20 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <details className="group border-t border-border/60 pt-1">
-                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-1 text-sm font-medium outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span>Progresión y próxima vez</span>
-                        {hasFutureExerciseAction(payload.decision, payload.apply_to_routine) ? (
-                          <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-label="Tiene acción futura configurada" />
-                        ) : null}
-                      </span>
-                      <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-                    </summary>
-                    <div className="space-y-3 pb-1 pt-2">
+                  <section className="space-y-3 border-t border-border/60 pt-3">
+                    <div className="flex min-h-8 items-center justify-between gap-3 px-1">
+                      <Label>Próxima vez</Label>
+                      {hasFutureExerciseAction(payload.decision, payload.apply_to_routine) ? (
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                          <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
+                          Configurada
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Sin cambios</span>
+                      )}
+                    </div>
+                    <div className="space-y-3 pb-1">
                       <div className="space-y-2">
-                        <Label>Próxima vez</Label>
                         <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
                           {NEXT_SESSION_DECISIONS.map((adjustment) => (
                             <Button
@@ -1756,7 +1677,7 @@ export function SessionEditor({
                         )}
                       </div>
                     </div>
-                  </details>
+                  </section>
 
                   {!readOnly ? (
                     <details className="group rounded-xl border border-transparent">
