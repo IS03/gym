@@ -1,0 +1,1036 @@
+import { createClient } from "@/lib/supabase/server";
+import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+import { getOrCreateDayLog } from "@/lib/phase1/day-log";
+import {
+  buildRoutineOverviews,
+  type RoutineOverview,
+  type RoutineOverviewSourceRow,
+} from "./routine-overview";
+import type { WorkoutStartRoutine } from "./workout-start";
+import type {
+  Exercise,
+  MuscleGroup,
+  Routine,
+  RoutineExercise,
+  WorkoutSession,
+  WorkoutSessionExercise,
+  WorkoutSessionStatus,
+} from "./types";
+import type { ExerciseRoutineMembership } from "./exercise-insights";
+import {
+  assertRoutineColor,
+  resolveRoutineColor,
+  type RoutineColorKey,
+} from "./routine-colors";
+
+async function getAuthedUserId() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error) throw new Error(`Auth falló: ${error.message}`);
+  if (!user) throw new Error("No autenticado.");
+  return user.id;
+}
+
+function assertNonEmpty(value: string, label: string) {
+  if (!value.trim()) throw new Error(`${label} es obligatorio.`);
+}
+
+function asPostgrestError(err: unknown): { code?: string; message?: string } {
+  if (typeof err !== "object" || err === null) return {};
+  const errorRecord = err as Record<string, unknown>;
+  return {
+    code: typeof errorRecord.code === "string" ? errorRecord.code : undefined,
+    message:
+      typeof errorRecord.message === "string" ? errorRecord.message : undefined,
+  };
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+type TrainingDayQueryRow = {
+  day_log: { log_date: string } | Array<{ log_date: string }> | null;
+  routine: { color: RoutineColorKey | null } | Array<{ color: RoutineColorKey | null }> | null;
+};
+
+type EndedSessionQueryRow = WorkoutSession & {
+  routine: { nombre: string | null } | Array<{ nombre: string | null }> | null;
+};
+
+type InProgressSessionQueryRow = WorkoutSession & {
+  day_log?: { log_date: string } | Array<{ log_date: string }> | null;
+};
+
+type RoutineExerciseQueryRow = RoutineExercise & {
+  exercise: Pick<Exercise, "id" | "nombre" | "grupo_muscular">;
+};
+
+const MSG_SESSION_IN_PROGRESS =
+  "Ya tenés una sesión de entrenamiento en curso. Continuá esa sesión o finalizala antes de iniciar otra.";
+
+async function getWorkoutSessionForOwner(sessionId: string): Promise<WorkoutSession> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (error) throw new Error(`Leer sesión: ${error.message}`);
+  if (!data) throw new Error("Sesión no encontrada.");
+  if ((data as WorkoutSession).user_id !== userId) {
+    throw new Error("Forbidden.");
+  }
+  return data as WorkoutSession;
+}
+
+async function requireSessionInProgress(sessionId: string): Promise<void> {
+  const s = await getWorkoutSessionForOwner(sessionId);
+  if (s.status !== "in_progress") {
+    throw new Error("La sesión ya finalizó. No se puede modificar.");
+  }
+}
+
+export async function getInProgressSessionForUser(
+  context?: AuthenticatedRequestContext,
+): Promise<{
+  session: WorkoutSession;
+  log_date: string;
+} | null> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
+  const { data: rawSession, error: sErr } = await supabase
+    .from("workout_sessions")
+    .select("*, day_log:day_logs(log_date)")
+    .eq("user_id", userId)
+    .eq("status", "in_progress")
+    .maybeSingle();
+  if (sErr) throw new Error(`Buscar sesión en curso: ${sErr.message}`);
+  if (!rawSession) return null;
+  const row = rawSession as InProgressSessionQueryRow;
+  const dayLog = firstRelation(row.day_log);
+  if (!dayLog) throw new Error("Leer día de la sesión: relación ausente.");
+  const session = { ...row };
+  delete session.day_log;
+  return {
+    session: session as WorkoutSession,
+    log_date: dayLog.log_date,
+  };
+}
+
+function normalizeNameLocal(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
+export async function listExercises(
+  params?: {
+    includeArchived?: boolean;
+    muscleGroup?: MuscleGroup | "none";
+  },
+  context?: AuthenticatedRequestContext,
+): Promise<Exercise[]> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
+
+  let q = supabase
+    .from("exercises")
+    .select("*")
+    .eq("user_id", userId)
+    .order("nombre", { ascending: true });
+
+  if (!params?.includeArchived) {
+    q = q.eq("is_active", true);
+  }
+  if (params?.muscleGroup) {
+    if (params.muscleGroup === "none") {
+      q = q.is("grupo_muscular", null);
+    } else {
+      q = q.eq("grupo_muscular", params.muscleGroup);
+    }
+  }
+
+  const { data, error } = await q;
+  if (error) throw new Error(`Leer exercises: ${error.message}`);
+  return (data ?? []) as Exercise[];
+}
+
+export async function listTrainingDaysInMonth(
+  input: {
+    month: `${number}-${number}`; // YYYY-MM
+    routineId?: string | null;
+  },
+  context?: AuthenticatedRequestContext,
+): Promise<Map<string, RoutineColorKey[]>> {
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
+
+  const start = `${input.month}-01`;
+  const startDate = new Date(`${start}T00:00:00.000Z`);
+  const endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1));
+  const end = endDate.toISOString().slice(0, 10);
+
+  let q = supabase
+    .from("workout_sessions")
+    .select("id, ended_at, routine_id, routine:routines(color), day_log:day_logs(log_date)")
+    .eq("status", "completed")
+    .not("ended_at", "is", null)
+    .gte("day_logs.log_date", start)
+    .lt("day_logs.log_date", end);
+
+  if (input.routineId) q = q.eq("routine_id", input.routineId);
+
+  const { data, error } = await q;
+  if (error) throw new Error(`Leer días entrenados: ${error.message}`);
+
+  const out = new Map<string, Set<RoutineColorKey>>();
+  for (const row of (data ?? []) as TrainingDayQueryRow[]) {
+    const dayLog = firstRelation(row.day_log);
+    const routine = firstRelation(row.routine);
+    const date = dayLog?.log_date ? String(dayLog.log_date) : null;
+    if (!date) continue;
+    const color = resolveRoutineColor(routine?.color);
+    const set = out.get(date) ?? new Set<RoutineColorKey>();
+    set.add(color);
+    out.set(date, set);
+  }
+  return new Map(Array.from(out.entries()).map(([k, v]) => [k, Array.from(v)]));
+}
+
+export async function listEndedSessionsByDate(input: {
+  date: string; // YYYY-MM-DD
+  routineId?: string | null;
+}): Promise<
+  Array<{
+    session: WorkoutSession;
+    routineNombre: string | null;
+    exercisesCount: number;
+    completedCount: number;
+  }>
+> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  // Get day_log id for date (must exist if you trained)
+  const { data: dayLog, error: dayErr } = await supabase
+    .from("day_logs")
+    .select("id, log_date")
+    .eq("log_date", input.date)
+    .maybeSingle();
+  if (dayErr) throw new Error(`Leer day_log: ${dayErr.message}`);
+  if (!dayLog) return [];
+
+  let q = supabase
+    .from("workout_sessions")
+    .select("*, routine:routines(nombre)")
+    .eq("day_log_id", dayLog.id)
+    .eq("status", "completed")
+    .not("ended_at", "is", null)
+    .order("ended_at", { ascending: false });
+
+  if (input.routineId) q = q.eq("routine_id", input.routineId);
+
+  const { data: sessions, error: sErr } = await q;
+  if (sErr) throw new Error(`Leer sesiones: ${sErr.message}`);
+
+  const sessionRows = (sessions ?? []) as EndedSessionQueryRow[];
+  const ids = sessionRows.map((session) => session.id);
+  if (ids.length === 0) return [];
+
+  const { data: ses, error: seErr } = await supabase
+    .from("workout_session_exercises")
+    .select("workout_session_id, is_completed")
+    .in("workout_session_id", ids);
+  if (seErr) throw new Error(`Leer ejercicios de sesión: ${seErr.message}`);
+
+  const agg = new Map<string, { total: number; done: number }>();
+  for (const r of (ses ?? []) as Array<{
+    workout_session_id: string;
+    is_completed: boolean;
+  }>) {
+    const id = String(r.workout_session_id);
+    const prev = agg.get(id) ?? { total: 0, done: 0 };
+    prev.total += 1;
+    if (r.is_completed) prev.done += 1;
+    agg.set(id, prev);
+  }
+
+  return sessionRows.map((sessionRow) => {
+    const a = agg.get(String(sessionRow.id)) ?? { total: 0, done: 0 };
+    const routine = firstRelation(sessionRow.routine);
+    return {
+      session: sessionRow as WorkoutSession,
+      routineNombre: routine?.nombre ?? null,
+      exercisesCount: a.total,
+      completedCount: a.done,
+    };
+  });
+}
+
+export async function createExercise(input: {
+  nombre: string;
+  grupo_muscular: MuscleGroup | null;
+  muscle_group_label: string | null;
+  implement: string | null;
+  weight_mode: string | null;
+  series_sugeridas: number | null;
+  reps_sugeridas: number | null;
+  peso_sugerido: number | null;
+  rir_sugerido: number | null;
+  descanso_min_sugerido_segundos: number | null;
+  descanso_max_sugerido_segundos: number | null;
+}): Promise<Exercise> {
+  assertNonEmpty(input.nombre, "Nombre");
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  const { data, error } = await supabase
+    .from("exercises")
+    .insert({
+      user_id: userId,
+      nombre: input.nombre.trim(),
+      grupo_muscular: input.grupo_muscular,
+      muscle_group_label: input.muscle_group_label,
+      implement: input.implement,
+      weight_mode: input.weight_mode,
+      series_sugeridas: input.series_sugeridas,
+      reps_sugeridas: input.reps_sugeridas,
+      peso_sugerido: input.peso_sugerido,
+      rir_sugerido: input.rir_sugerido,
+      descanso_min_sugerido_segundos: input.descanso_min_sugerido_segundos,
+      descanso_max_sugerido_segundos: input.descanso_max_sugerido_segundos,
+      is_active: true,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe un ejercicio con ese nombre.");
+    }
+    throw new Error(`Crear exercise: ${error.message}`);
+  }
+  return data as Exercise;
+}
+
+export async function updateExercise(input: {
+  id: string;
+  nombre?: string;
+  grupo_muscular?: MuscleGroup | null;
+  muscle_group_label?: string | null;
+  implement?: string | null;
+  weight_mode?: string | null;
+  series_sugeridas?: number | null;
+  reps_sugeridas?: number | null;
+  peso_sugerido?: number | null;
+  rir_sugerido?: number | null;
+  descanso_min_sugerido_segundos?: number | null;
+  descanso_max_sugerido_segundos?: number | null;
+  is_active?: boolean;
+}): Promise<Exercise> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  const patch: Record<string, unknown> = {};
+  if (input.nombre !== undefined) {
+    assertNonEmpty(input.nombre, "Nombre");
+    patch.nombre = input.nombre.trim();
+  }
+  if (input.grupo_muscular !== undefined)
+    patch.grupo_muscular = input.grupo_muscular;
+  if (input.muscle_group_label !== undefined)
+    patch.muscle_group_label = input.muscle_group_label;
+  if (input.implement !== undefined) patch.implement = input.implement;
+  if (input.weight_mode !== undefined) patch.weight_mode = input.weight_mode;
+  if (input.series_sugeridas !== undefined) patch.series_sugeridas = input.series_sugeridas;
+  if (input.reps_sugeridas !== undefined) patch.reps_sugeridas = input.reps_sugeridas;
+  if (input.peso_sugerido !== undefined) patch.peso_sugerido = input.peso_sugerido;
+  if (input.rir_sugerido !== undefined) patch.rir_sugerido = input.rir_sugerido;
+  if (input.descanso_min_sugerido_segundos !== undefined) {
+    patch.descanso_min_sugerido_segundos = input.descanso_min_sugerido_segundos;
+  }
+  if (input.descanso_max_sugerido_segundos !== undefined) {
+    patch.descanso_max_sugerido_segundos = input.descanso_max_sugerido_segundos;
+  }
+  if (input.is_active !== undefined) patch.is_active = input.is_active;
+
+  const { data, error } = await supabase
+    .from("exercises")
+    .update(patch)
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe un ejercicio con ese nombre.");
+    }
+    throw new Error(`Editar exercise: ${error.message}`);
+  }
+  return data as Exercise;
+}
+
+export async function archiveExercise(id: string): Promise<void> {
+  await updateExercise({ id, is_active: false });
+}
+
+export async function listRoutines(
+  params?: { includeArchived?: boolean },
+  context?: AuthenticatedRequestContext,
+): Promise<Routine[]> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
+
+  let q = supabase
+    .from("routines")
+    .select("*")
+    .eq("user_id", userId)
+    .order("routine_order", { ascending: true })
+    .order("nombre", { ascending: true });
+
+  if (!params?.includeArchived) q = q.eq("is_active", true);
+
+  const { data, error } = await q;
+  if (error) throw new Error(`Leer routines: ${error.message}`);
+  return (data ?? []) as Routine[];
+}
+
+type RoutineMembershipQueryRow = {
+  exercise_id: string;
+  routine: Pick<Routine, "id" | "nombre" | "color"> | Pick<Routine, "id" | "nombre" | "color">[] | null;
+};
+
+export async function listExerciseRoutineMemberships(
+  routineIds: string[],
+): Promise<Map<string, ExerciseRoutineMembership[]>> {
+  if (routineIds.length === 0) return new Map();
+  const supabase = await createClient();
+  await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .select("exercise_id, routine:routines(id, nombre, color)")
+    .in("routine_id", routineIds);
+  if (error) throw new Error(`Leer relaciones ejercicio-rutina: ${error.message}`);
+
+  const memberships = new Map<string, ExerciseRoutineMembership[]>();
+  for (const row of (data ?? []) as RoutineMembershipQueryRow[]) {
+    const routine = firstRelation(row.routine);
+    if (!routine) continue;
+    const current = memberships.get(row.exercise_id) ?? [];
+    current.push({ id: routine.id, nombre: routine.nombre, color: routine.color });
+    memberships.set(row.exercise_id, current);
+  }
+  return memberships;
+}
+
+export async function listRoutineOverviews(
+  routineIds: string[],
+  context?: AuthenticatedRequestContext,
+): Promise<Map<string, RoutineOverview>> {
+  if (routineIds.length === 0) return buildRoutineOverviews([], []);
+
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .select(
+      "id, routine_id, exercise_order, exercise:exercises(nombre, grupo_muscular, muscle_group_label), sets:routine_exercise_sets(id)",
+    )
+    .in("routine_id", routineIds)
+    .order("exercise_order", { ascending: true });
+
+  if (error) throw new Error(`Leer resumen de rutinas: ${error.message}`);
+
+  return buildRoutineOverviews(routineIds, (data ?? []) as RoutineOverviewSourceRow[]);
+}
+
+export async function listWorkoutStartRoutines(
+  context?: AuthenticatedRequestContext,
+): Promise<WorkoutStartRoutine[]> {
+  const routines = await listRoutines({ includeArchived: false }, context);
+  const overviews = await listRoutineOverviews(
+    routines.map((routine) => routine.id),
+    context,
+  );
+
+  return routines.map((routine) => {
+    const overview = overviews.get(routine.id);
+    return {
+      id: routine.id,
+      name: routine.nombre,
+      color: routine.color,
+      exerciseCount: overview?.exerciseCount ?? 0,
+      setCount: overview?.setCount ?? 0,
+    };
+  });
+}
+
+export async function createRoutine(input: {
+  nombre: string;
+  color?: RoutineColorKey | null;
+}): Promise<Routine> {
+  assertNonEmpty(input.nombre, "Nombre");
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  const { data, error } = await supabase
+    .from("routines")
+    .insert({
+      user_id: userId,
+      nombre: input.nombre.trim(),
+      color: assertRoutineColor(input.color),
+      is_active: true,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe una rutina con ese nombre.");
+    }
+    throw new Error(`Crear rutina: ${error.message}`);
+  }
+  return data as Routine;
+}
+
+export async function updateRoutine(input: {
+  id: string;
+  nombre?: string;
+  color?: RoutineColorKey | null;
+  is_active?: boolean;
+}): Promise<Routine> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  const patch: Record<string, unknown> = {};
+  if (input.nombre !== undefined) {
+    assertNonEmpty(input.nombre, "Nombre");
+    patch.nombre = input.nombre.trim();
+  }
+  if (input.color !== undefined) patch.color = assertRoutineColor(input.color);
+  if (input.is_active !== undefined) patch.is_active = input.is_active;
+
+  const { data, error } = await supabase
+    .from("routines")
+    .update(patch)
+    .eq("id", input.id)
+    .eq("user_id", userId)
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ya existe una rutina con ese nombre.");
+    }
+    throw new Error(`Editar rutina: ${error.message}`);
+  }
+  return data as Routine;
+}
+
+/** En la app, "eliminar" rutina = archivar (no hay DELETE en DB para `authenticated`). */
+export async function archiveRoutine(id: string): Promise<void> {
+  await updateRoutine({ id, is_active: false });
+}
+
+export async function listRoutineExercises(routineId: string): Promise<
+  (RoutineExercise & {
+    exercise: Pick<Exercise, "id" | "nombre" | "grupo_muscular">;
+  })[]
+> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .select(
+      `
+      *,
+      exercise:exercises(id, nombre, grupo_muscular)
+    `,
+    )
+    .eq("routine_id", routineId)
+    .order("exercise_order", { ascending: true });
+
+  if (error) throw new Error(`Leer routine_exercises: ${error.message}`);
+
+  const rows = (data ?? []) as RoutineExerciseQueryRow[];
+  for (const r of rows) {
+    if (!r.exercise || typeof r.exercise.id !== "string") {
+      throw new Error("Inconsistencia: routine_exercises sin exercise.");
+    }
+  }
+  // RLS ya filtra por user (vía routine), pero agregamos check defensivo.
+  // No podemos comparar user_id acá porque no viene en el join select.
+  void userId;
+  return rows;
+}
+
+export async function replaceRoutineExercises(input: {
+  routineId: string;
+  items: Array<{
+    exercise_id: string;
+  }>;
+}): Promise<void> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  // Asegura ownership de la rutina.
+  const { data: routine, error: routineErr } = await supabase
+    .from("routines")
+    .select("id, user_id")
+    .eq("id", input.routineId)
+    .maybeSingle();
+  if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
+  if (!routine) throw new Error("Rutina no encontrada.");
+  if (routine.user_id !== userId) throw new Error("Forbidden.");
+
+  const { error: delErr } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("routine_id", input.routineId);
+  if (delErr) throw new Error(`Borrar routine_exercises: ${delErr.message}`);
+
+  if (input.items.length === 0) return;
+
+  const { error: insErr } = await supabase.from("routine_exercises").insert(
+    input.items.map((it) => ({
+      routine_id: input.routineId,
+      exercise_id: it.exercise_id,
+    })),
+  );
+  if (insErr) throw new Error(`Insert routine_exercises: ${insErr.message}`);
+}
+
+export async function addExerciseToRoutine(input: {
+  routineId: string;
+  exerciseId: string;
+}): Promise<RoutineExercise> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+
+  // Validar ownership de rutina y exercise (defensivo; triggers/RLS también protegen)
+  const { data: routine, error: routineErr } = await supabase
+    .from("routines")
+    .select("id, user_id")
+    .eq("id", input.routineId)
+    .maybeSingle();
+  if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
+  if (!routine) throw new Error("Rutina no encontrada.");
+  if (routine.user_id !== userId) throw new Error("Forbidden.");
+
+  const { data: exercise, error: exErr } = await supabase
+    .from("exercises")
+    .select("id, user_id")
+    .eq("id", input.exerciseId)
+    .maybeSingle();
+  if (exErr) throw new Error(`Leer exercise: ${exErr.message}`);
+  if (!exercise) throw new Error("Ejercicio no encontrado.");
+  if (exercise.user_id !== userId) throw new Error("Forbidden.");
+
+  const { data, error } = await supabase
+    .from("routine_exercises")
+    .insert({
+      routine_id: input.routineId,
+      exercise_id: input.exerciseId,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error("Ese ejercicio ya está en la rutina.");
+    }
+    throw new Error(`Agregar ejercicio a rutina: ${error.message}`);
+  }
+
+  return data as RoutineExercise;
+}
+
+export async function removeRoutineExercise(input: {
+  routineExerciseId: string;
+}): Promise<void> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const { error } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("id", input.routineExerciseId);
+
+  if (error) throw new Error(`Quitar ejercicio de rutina: ${error.message}`);
+}
+
+export async function startFreeSession(input: {
+  date: string;
+}): Promise<WorkoutSession> {
+  const dayLog = await getOrCreateDayLog(input.date);
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const existing = await getInProgressSessionForUser();
+  if (existing) {
+    throw new Error(MSG_SESSION_IN_PROGRESS);
+  }
+
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .insert({
+      day_log_id: dayLog.id,
+      user_id: dayLog.user_id,
+      routine_id: null,
+      status: "in_progress" as WorkoutSessionStatus,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const { code } = asPostgrestError(error);
+    if (code === "23505") {
+      throw new Error(MSG_SESSION_IN_PROGRESS);
+    }
+    throw new Error(`Crear workout_session: ${error.message}`);
+  }
+  return data as WorkoutSession;
+}
+
+export async function startSessionFromRoutine(input: {
+  date: string;
+  routineId: string;
+}): Promise<{
+  session: WorkoutSession;
+  sessionExercises: WorkoutSessionExercise[];
+}> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const dayLog = await getOrCreateDayLog(input.date);
+
+  const { data: routine, error: routineErr } = await supabase
+    .from("routines")
+    .select("*")
+    .eq("id", input.routineId)
+    .eq("user_id", userId)
+    .single();
+  if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
+
+  const existing = await getInProgressSessionForUser();
+  if (existing) {
+    throw new Error(MSG_SESSION_IN_PROGRESS);
+  }
+
+  const { data: session, error: sessErr } = await supabase
+    .from("workout_sessions")
+    .insert({
+      day_log_id: dayLog.id,
+      user_id: dayLog.user_id,
+      routine_id: routine.id,
+      status: "in_progress" as WorkoutSessionStatus,
+    })
+    .select("*")
+    .single();
+  if (sessErr) {
+    const { code } = asPostgrestError(sessErr);
+    if (code === "23505") {
+      throw new Error(MSG_SESSION_IN_PROGRESS);
+    }
+    throw new Error(`Crear workout_session: ${sessErr.message}`);
+  }
+
+  const { data: routineItems, error: itemsErr } = await supabase
+    .from("routine_exercises")
+    .select(
+      `
+      *,
+      exercise:exercises(id, nombre, grupo_muscular)
+    `,
+    )
+    .eq("routine_id", routine.id)
+    .order("created_at", { ascending: true });
+  if (itemsErr) throw new Error(`Leer routine_exercises: ${itemsErr.message}`);
+
+  const inserts = ((routineItems ?? []) as RoutineExerciseQueryRow[]).map((item) => ({
+    workout_session_id: (session as WorkoutSession).id,
+    exercise_id: item.exercise.id,
+    nombre_snapshot: item.exercise.nombre,
+    grupo_muscular_snapshot: item.exercise.grupo_muscular ?? null,
+  }));
+
+  let sessionExercises: WorkoutSessionExercise[] = [];
+  if (inserts.length > 0) {
+    const { data: created, error: insErr } = await supabase
+      .from("workout_session_exercises")
+      .insert(inserts)
+      .select("*");
+    if (insErr)
+      throw new Error(`Copiar ejercicios a sesión: ${insErr.message}`);
+    sessionExercises = (created ?? []) as WorkoutSessionExercise[];
+  }
+
+  return { session: session as WorkoutSession, sessionExercises };
+}
+
+export async function getSession(sessionId: string): Promise<{
+  session: WorkoutSession;
+  exercises: WorkoutSessionExercise[];
+}> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const { data: session, error: sessErr } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+  if (sessErr) throw new Error(`Leer sesión: ${sessErr.message}`);
+
+  const { data: exercises, error: exErr } = await supabase
+    .from("workout_session_exercises")
+    .select("*")
+    .eq("workout_session_id", sessionId)
+    .order("created_at", { ascending: true });
+  if (exErr) throw new Error(`Leer ejercicios de sesión: ${exErr.message}`);
+
+  return {
+    session: session as WorkoutSession,
+    exercises: (exercises ?? []) as WorkoutSessionExercise[],
+  };
+}
+
+export async function finishSession(sessionId: string): Promise<WorkoutSession> {
+  const supabase = await createClient();
+  await requireSessionInProgress(sessionId);
+
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .update({
+      status: "completed" as WorkoutSessionStatus,
+      ended_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Terminar sesión: ${error.message}`);
+  return data as WorkoutSession;
+}
+
+export async function addExistingExerciseToSession(input: {
+  sessionId: string;
+  exerciseId: string;
+  sourceType?: "extra" | "manual_new";
+}): Promise<WorkoutSessionExercise> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const { data: appendedId, error: appendError } = await supabase.rpc(
+    "append_workout_exercise",
+    {
+      p_session_id: input.sessionId,
+      p_exercise_id: input.exerciseId,
+      p_source_type: input.sourceType ?? "extra",
+    },
+  );
+  if (appendError) throw new Error(`Agregar ejercicio a sesión: ${appendError.message}`);
+
+  const { data, error } = await supabase
+    .from("workout_session_exercises")
+    .select("*")
+    .eq("id", appendedId)
+    .eq("user_id", userId)
+    .single();
+  if (error) throw new Error(`Leer ejercicio agregado: ${error.message}`);
+  return data as WorkoutSessionExercise;
+}
+
+export async function createExerciseFromSession(input: {
+  sessionId: string;
+  nombre: string;
+  grupo_muscular: MuscleGroup | null;
+  muscle_group_label: string | null;
+  implement: string | null;
+  weight_mode: string | null;
+  series_sugeridas: number | null;
+  reps_sugeridas: number | null;
+  peso_sugerido: number | null;
+  rir_sugerido: number | null;
+  descanso_min_sugerido_segundos: number | null;
+  descanso_max_sugerido_segundos: number | null;
+}): Promise<{
+  exercise: Exercise;
+  sessionExercise: WorkoutSessionExercise;
+}> {
+  await requireSessionInProgress(input.sessionId);
+  // Chequeo previo para avisar sin depender del unique error.
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const nombreNorm = normalizeNameLocal(input.nombre);
+
+  const { data: existing, error: existingErr } = await supabase
+    .from("exercises")
+    .select("id")
+    .eq("user_id", userId)
+    .ilike("nombre", nombreNorm)
+    .limit(1)
+    .maybeSingle();
+  if (existingErr) throw new Error(`Validar exercise existente: ${existingErr.message}`);
+  if (existing) {
+    throw new Error("Ya existe un ejercicio con ese nombre.");
+  }
+
+  const exercise = await createExercise({
+    nombre: nombreNorm,
+    grupo_muscular: input.grupo_muscular,
+    muscle_group_label: input.muscle_group_label,
+    implement: input.implement,
+    weight_mode: input.weight_mode,
+    series_sugeridas: input.series_sugeridas,
+    reps_sugeridas: input.reps_sugeridas,
+    peso_sugerido: input.peso_sugerido,
+    rir_sugerido: input.rir_sugerido,
+    descanso_min_sugerido_segundos: input.descanso_min_sugerido_segundos,
+    descanso_max_sugerido_segundos: input.descanso_max_sugerido_segundos,
+  });
+
+  const sessionExercise = await addExistingExerciseToSession({
+    sessionId: input.sessionId,
+    exerciseId: exercise.id,
+    sourceType: "manual_new",
+  });
+
+  return { exercise, sessionExercise };
+}
+
+export async function removeSessionExercise(id: string): Promise<void> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const { data: row, error: rErr } = await supabase
+    .from("workout_session_exercises")
+    .select("workout_session_id")
+    .eq("id", id)
+    .single();
+  if (rErr) throw new Error(`Leer ejercicio de sesión: ${rErr.message}`);
+  await requireSessionInProgress((row as { workout_session_id: string }).workout_session_id);
+
+  const { error } = await supabase
+    .from("workout_session_exercises")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`Borrar ejercicio de sesión: ${error.message}`);
+}
+
+export async function updateSessionExercise(input: {
+  id: string;
+  series_reales?: number | null;
+  reps_reales?: number | null;
+  peso_real?: number | null;
+  is_completed?: boolean;
+}): Promise<WorkoutSessionExercise> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const { data: row, error: rErr } = await supabase
+    .from("workout_session_exercises")
+    .select("workout_session_id")
+    .eq("id", input.id)
+    .single();
+  if (rErr) throw new Error(`Leer ejercicio de sesión: ${rErr.message}`);
+  await requireSessionInProgress((row as { workout_session_id: string }).workout_session_id);
+
+  const patch: Record<string, unknown> = {};
+  if (input.series_reales !== undefined) patch.series_reales = input.series_reales;
+  if (input.reps_reales !== undefined) patch.reps_reales = input.reps_reales;
+  if (input.peso_real !== undefined) patch.peso_real = input.peso_real;
+  if (input.is_completed !== undefined) patch.is_completed = input.is_completed;
+
+  const { data, error } = await supabase
+    .from("workout_session_exercises")
+    .update(patch)
+    .eq("id", input.id)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Editar ejercicio de sesión: ${error.message}`);
+  return data as WorkoutSessionExercise;
+}
+
+export async function listExerciseHistory(input: {
+  exerciseId: string;
+  limitSessions?: number;
+}): Promise<
+  Array<{
+    session: WorkoutSession;
+    day_log_date: string;
+    sessionExercise: WorkoutSessionExercise;
+  }>
+> {
+  const supabase = await createClient();
+  await getAuthedUserId();
+
+  const limitSessions = input.limitSessions ?? 20;
+
+  // 1) Buscar ejecuciones (workout_session_exercises) para ese exercise.
+  const { data: sessionExercises, error: seErr } = await supabase
+    .from("workout_session_exercises")
+    .select("*")
+    .eq("exercise_id", input.exerciseId)
+    .order("created_at", { ascending: false })
+    .limit(limitSessions);
+  if (seErr) throw new Error(`Leer historial (session exercises): ${seErr.message}`);
+
+  const rows = (sessionExercises ?? []) as WorkoutSessionExercise[];
+  if (rows.length === 0) return [];
+
+  const sessionIds = Array.from(new Set(rows.map((r) => r.workout_session_id)));
+
+  // 2) Traer sesiones + day_log_id (solo finalizadas cuentan como historial)
+  const { data: sessions, error: sErr } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .in("id", sessionIds)
+    .eq("status", "completed");
+  if (sErr) throw new Error(`Leer workout_sessions: ${sErr.message}`);
+
+  const sessionsById = new Map<string, WorkoutSession>();
+  for (const s of (sessions ?? []) as WorkoutSession[]) sessionsById.set(s.id, s);
+
+  const dayLogIds = Array.from(
+    new Set(((sessions ?? []) as WorkoutSession[]).map((session) => session.day_log_id)),
+  );
+
+  // 3) Traer day_logs para fechas
+  const { data: dayLogs, error: dErr } = await supabase
+    .from("day_logs")
+    .select("id, log_date")
+    .in("id", dayLogIds);
+  if (dErr) throw new Error(`Leer day_logs: ${dErr.message}`);
+
+  const dayDateById = new Map<string, string>();
+  for (const day of (dayLogs ?? []) as Array<{ id: string; log_date: string }>) {
+    dayDateById.set(day.id, day.log_date);
+  }
+
+  const completedRows = rows.filter((se) => sessionsById.has(se.workout_session_id));
+
+  // 5) Construir salida ordenada (por created_at desc de sessionExercise)
+  return completedRows.map((se) => {
+    const session = sessionsById.get(se.workout_session_id)!;
+    const dayDate = dayDateById.get(session.day_log_id);
+    if (!dayDate) {
+      throw new Error("Inconsistencia: day_log no encontrado para el historial.");
+    }
+    return {
+      session,
+      day_log_date: dayDate,
+      sessionExercise: se,
+    };
+  });
+}
