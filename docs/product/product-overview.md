@@ -6,6 +6,9 @@ OWNLEVEL es una aplicación personal para registrar y analizar entrenamiento, nu
 
 La prioridad es el uso cotidiano desde el celular: registrar rápido, conservar historia confiable y poder entender el progreso sin convertir la aplicación en un formulario permanente.
 
+La dirección visual, los patrones de interfaz y la prioridad de los próximos
+rediseños se documentan en [`../design/README.md`](../design/README.md).
+
 ## Principios de producto
 
 ### Mobile-first real

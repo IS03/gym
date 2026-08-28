@@ -19,6 +19,18 @@ Cuando dos documentos contradigan el estado actual, usar este orden:
 
 Define el propósito de OWNLEVEL, áreas funcionales, principios de UX y alcance actual.
 
+## Diseño / Product UX
+
+### [`design/README.md`](./design/README.md)
+
+Índice del Design System v1 y de la auditoría visual global. Define principios,
+patrones de interfaz, inventario de componentes y prioridades de los próximos
+rediseños.
+
+- [`design/principles.md`](./design/principles.md): dirección, tokens y reglas de interacción.
+- [`design/patterns.md`](./design/patterns.md): superficies, controles y estados.
+- [`design/visual-audit.md`](./design/visual-audit.md): inventario de rutas y roadmap visual.
+
 ## Arquitectura
 
 ### [`architecture/data-flow.md`](./architecture/data-flow.md)
