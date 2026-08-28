@@ -36,6 +36,13 @@ Describe el modelo de rutinas, sesiones, series, snapshots, autosave, concurrenc
 
 Convenciones de ingeniería, validación, Next.js, Supabase, responsive y criterios para cambios seguros.
 
+## Integraciones
+
+### [`integrations/chatgpt-nutrition.md`](./integrations/chatgpt-nutrition.md)
+
+Configuración y diagnóstico de la integración privada write-only entre ChatGPT
+y las comidas canónicas de OWNLEVEL.
+
 ## Historial
 
 ### [`history/technical-decisions.md`](./history/technical-decisions.md)

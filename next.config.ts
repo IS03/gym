@@ -62,6 +62,11 @@ const withPWA = withPWAInit({
 
 const baseConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/api/integrations/chatgpt/openapi": [
+      "./docs/integrations/ownlevel-chatgpt-action.openapi.yaml",
+    ],
+  },
   async headers() {
     return [
       {

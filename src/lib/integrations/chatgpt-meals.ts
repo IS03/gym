@@ -3,21 +3,18 @@ import type {
   ChatgptMealInput,
   ChatgptMealSuccess,
 } from "./chatgpt-contract";
+import { invalidRequest, parseChatgptMealInput } from "./chatgpt-contract";
 import {
-  invalidRequest,
-  parseBearerToken,
-  parseChatgptMealInput,
-} from "./chatgpt-contract";
-import type { IntegrationAuthEvent } from "./chatgpt-tokens";
+  authenticateChatgptAuthorization,
+  type ChatgptAuthDependencies,
+} from "./chatgpt-auth";
 
 export const CHATGPT_MEAL_MAX_BODY_BYTES = 16_384;
 
 export class PossibleDuplicateError extends Error {}
 
-export type ChatgptMealDependencies = {
-  authenticate: (rawToken: string) => Promise<{ userId: string } | null>;
+export type ChatgptMealDependencies = ChatgptAuthDependencies & {
   persist: (userId: string, meal: ChatgptMealInput) => Promise<ChatgptMealSuccess>;
-  auditAuth?: (event: IntegrationAuthEvent) => void;
   now?: () => Date;
 };
 
@@ -41,38 +38,11 @@ export async function handleChatgptMealRequest(
     };
   }
 
-  const rawToken = parseBearerToken(request.authorization);
-  if (!rawToken) {
-    dependencies.auditAuth?.(
-      request.authorization?.trim()
-        ? "malformed_bearer"
-        : "missing_authorization",
-    );
-    return {
-      status: 401,
-      body: { ok: false, error: "invalid_token", message: "Token inválido." },
-    };
-  }
-
-  let identity: { userId: string } | null;
-  try {
-    identity = await dependencies.authenticate(rawToken);
-  } catch {
-    return {
-      status: 500,
-      body: {
-        ok: false,
-        error: "internal_error",
-        message: "No se pudo autenticar la integración.",
-      },
-    };
-  }
-  if (!identity) {
-    return {
-      status: 401,
-      body: { ok: false, error: "invalid_token", message: "Token inválido." },
-    };
-  }
+  const authentication = await authenticateChatgptAuthorization(
+    request.authorization,
+    dependencies,
+  );
+  if (!authentication.ok) return authentication;
 
   let input: ChatgptMealInput;
   try {
@@ -84,7 +54,10 @@ export async function handleChatgptMealRequest(
   }
 
   try {
-    return { status: 200, body: await dependencies.persist(identity.userId, input) };
+    return {
+      status: 200,
+      body: await dependencies.persist(authentication.identity.userId, input),
+    };
   } catch (error) {
     if (error instanceof PossibleDuplicateError) {
       return {

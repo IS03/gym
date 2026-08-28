@@ -16,9 +16,8 @@ select set_config('request.jwt.claim.sub', '29800000-0000-4000-8000-000000000001
 select set_config('request.jwt.claim.role', 'authenticated', true);
 
 insert into public.integration_api_tokens (
-  id, user_id, token_hash, token_prefix, label, scope
+  user_id, token_hash, token_prefix, label, scope
 ) values (
-  '29800000-0000-4000-8000-000000000010',
   '29800000-0000-4000-8000-000000000001',
   encode(digest('synthetic-token', 'sha256'), 'hex'),
   'ownlevel_syntheti…', 'ChatGPT', 'meals:write'
@@ -134,13 +133,13 @@ select set_config('request.jwt.claim.sub', '29800000-0000-4000-8000-000000000001
 select set_config('request.jwt.claim.role', 'authenticated', true);
 update public.integration_api_tokens
 set revoked_at = now()
-where id = '29800000-0000-4000-8000-000000000010';
+where user_id = '29800000-0000-4000-8000-000000000001';
 
 do $$
 begin
   if not exists (
     select 1 from public.integration_api_tokens
-    where id = '29800000-0000-4000-8000-000000000010'
+    where user_id = '29800000-0000-4000-8000-000000000001'
       and revoked_at is not null
   ) then
     raise exception 'revocación no fue inmediata';

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, Copy, KeyRound, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { IntegrationApiToken } from "@/lib/integrations/chatgpt-tokens";
@@ -13,6 +13,9 @@ const dateTime = new Intl.DateTimeFormat("es-AR", {
   timeZone: "America/Argentina/Cordoba",
 });
 
+const OPENAPI_URL =
+  "https://www.ownlevel.fit/api/integrations/chatgpt/openapi";
+
 export function ChatgptIntegration({
   initialTokens,
 }: {
@@ -21,7 +24,7 @@ export function ChatgptIntegration({
   const [tokens, setTokens] = useState(initialTokens);
   const [rawToken, setRawToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"token" | "schema" | null>(null);
   const [pending, startTransition] = useTransition();
   const active = tokens.find((token) => token.revoked_at === null);
 
@@ -35,7 +38,7 @@ export function ChatgptIntegration({
       }
       setTokens((current) => [result.token, ...current]);
       setRawToken(result.rawToken);
-      setCopied(false);
+      setCopied(null);
     });
   }
 
@@ -57,10 +60,9 @@ export function ChatgptIntegration({
     });
   }
 
-  async function copyToken() {
-    if (!rawToken) return;
-    await navigator.clipboard.writeText(rawToken);
-    setCopied(true);
+  async function copyText(value: string, target: "token" | "schema") {
+    await navigator.clipboard.writeText(value);
+    setCopied(target);
   }
 
   return (
@@ -81,9 +83,14 @@ export function ChatgptIntegration({
             <code className="block break-all rounded-lg border bg-background p-3 text-xs">
               {rawToken}
             </code>
-            <Button type="button" variant="outline" className="w-full" onClick={copyToken}>
-              {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-              {copied ? "Copiada" : "Copiar clave"}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => copyText(rawToken, "token")}
+            >
+              {copied === "token" ? <Check aria-hidden /> : <Copy aria-hidden />}
+              {copied === "token" ? "Copiada" : "Copiar clave"}
             </Button>
           </div>
         ) : null}
@@ -91,9 +98,15 @@ export function ChatgptIntegration({
         {active ? (
           <div className="space-y-2 rounded-xl border p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium">{active.token_prefix}</span>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300">
-                Activa
+              <div>
+                <p className="text-xs text-muted-foreground">Estado</p>
+                <p className="flex items-center gap-2 font-medium">
+                  <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+                  Clave activa
+                </p>
+              </div>
+              <span className="font-mono text-xs text-muted-foreground">
+                {active.token_prefix}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -102,6 +115,11 @@ export function ChatgptIntegration({
             <p className="text-xs text-muted-foreground">
               Último uso: {active.last_used_at ? dateTime.format(new Date(active.last_used_at)) : "Nunca"}
             </p>
+            {!active.last_used_at ? (
+              <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                La clave todavía no fue utilizada por una integración.
+              </p>
+            ) : null}
             <Button
               type="button"
               variant="destructive"
@@ -117,6 +135,29 @@ export function ChatgptIntegration({
             {pending ? "Creando…" : "Crear clave"}
           </Button>
         )}
+
+        <div className="space-y-3 rounded-xl border p-4">
+          <div className="flex items-center gap-2">
+            <Link2 className="size-4 text-primary" aria-hidden />
+            <h3 className="text-sm font-medium">Cómo conectarlo</h3>
+          </div>
+          <ol className="list-decimal space-y-1.5 pl-5 text-xs text-muted-foreground">
+            <li>Creá la clave y copiala cuando aparezca.</li>
+            <li>En tu GPT privado existente, agregá o editá la Action.</li>
+            <li>Importá la URL del esquema.</li>
+            <li>Elegí API Key, tipo Bearer, y pegá la clave.</li>
+            <li>Probá primero la operación de conexión.</li>
+          </ol>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => copyText(OPENAPI_URL, "schema")}
+          >
+            {copied === "schema" ? <Check aria-hidden /> : <Copy aria-hidden />}
+            {copied === "schema" ? "URL copiada" : "Copiar URL del esquema"}
+          </Button>
+        </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <p className="text-xs text-muted-foreground">

@@ -20,6 +20,7 @@ import {
   type ChatgptMealDependencies,
 } from "./chatgpt-meals";
 import { parseBearerToken, parseChatgptMealInput } from "./chatgpt-contract";
+import { handleChatgptStatusRequest } from "./chatgpt-status";
 import {
   authenticateIntegrationToken,
   hashIntegrationToken,
@@ -150,6 +151,84 @@ describe("ChatGPT private meal contract", () => {
     expect((await handleChatgptMealRequest(request(validBody, "Basic abc"), deps())).status).toBe(401);
     expect((await handleChatgptMealRequest(request(), deps({ authenticate: vi.fn(async () => null) }))).status).toBe(401);
     expect((await handleChatgptMealRequest(request(), deps({ authenticate: vi.fn(async () => { throw new Error("db"); }) }))).status).toBe(500);
+  });
+
+  it("status autentica con la misma fuente de verdad y no expone datos", async () => {
+    const authenticate = vi.fn(async () => ({
+      userId: "private-user-id",
+      tokenId: "private-token-id",
+    }));
+    const result = await handleChatgptStatusRequest(`Bearer ${validToken}`, {
+      authenticate,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { ok: true, connected: true },
+    });
+    expect(authenticate).toHaveBeenCalledWith(validToken);
+    expect(JSON.stringify(result.body)).not.toContain("private-user-id");
+    expect(JSON.stringify(result.body)).not.toContain("private-token-id");
+    expect(JSON.stringify(result.body)).not.toMatch(
+      /email|calories|protein|carbs|fat|weight|steps|token_hash/i,
+    );
+  });
+
+  it("status devuelve 401 para token ausente, inválido o revocado", async () => {
+    const authenticate = vi.fn(async () => null);
+    expect(
+      (await handleChatgptStatusRequest(null, { authenticate })).status,
+    ).toBe(401);
+    expect(
+      (await handleChatgptStatusRequest("Basic invalid", { authenticate })).status,
+    ).toBe(401);
+    expect(
+      (
+        await handleChatgptStatusRequest(`Bearer ${validToken}`, {
+          authenticate,
+        })
+      ).status,
+    ).toBe(401);
+  });
+
+  it("un token autenticado actualiza last_used_at sin devolver el hash", async () => {
+    const lookup = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(),
+      maybeSingle: vi.fn(async () => ({
+        data: { id: "token-id", user_id: "owner-id", scope: "meals:write" },
+        error: null,
+      })),
+    };
+    lookup.select.mockReturnValue(lookup);
+    lookup.eq.mockReturnValue(lookup);
+    lookup.is.mockReturnValue(lookup);
+
+    const usage = {
+      update: vi.fn(),
+      eq: vi.fn(),
+      is: vi.fn(async () => ({ error: null })),
+    };
+    usage.update.mockReturnValue(usage);
+    usage.eq.mockReturnValue(usage);
+
+    const from = vi
+      .fn()
+      .mockReturnValueOnce(lookup)
+      .mockReturnValueOnce(usage);
+    supabaseMocks.createAdminClient.mockReturnValue({ from } as never);
+
+    const result = await handleChatgptStatusRequest(`Bearer ${validToken}`, {
+      authenticate: authenticateIntegrationToken,
+    });
+
+    expect(result.status).toBe(200);
+    expect(lookup.select).toHaveBeenCalledWith("id,user_id,scope");
+    expect(usage.update).toHaveBeenCalledWith({
+      last_used_at: expect.any(String),
+    });
+    expect(JSON.stringify(result.body)).not.toContain("token-id");
   });
 
   it("usa exclusivamente el user del token y rechaza user_id en payload", async () => {
