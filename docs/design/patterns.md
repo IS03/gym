@@ -44,6 +44,12 @@ Las filas repetidas comparten altura, padding y foco. Toda fila con navegación 
 
 Seleccionar un ejercicio u objeto muestra check/tint/borde suave. La CTA para confirmar (por ejemplo, **Agregar a la sesión**) conserva el peso violeta.
 
+### Sesión activa
+
+PR25 fija un patrón de foco para tareas secuenciales: un solo ejercicio abierto a la vez, encabezado estable y contenido que se revela dentro de la misma pieza. Cambiar de ejercicio guarda el anterior y compensa el desplazamiento del nuevo encabezado; no se reemplaza por un `scrollIntoView` agresivo. La fila cerrada conserva identidad, progreso, resumen de series y recordatorios suficientes para decidir el siguiente paso.
+
+En el ejercicio abierto, las series dominan la jerarquía. Descanso, próxima vez y notas aparecen después, sin cards anidadas. Autosave usa un slot estable en el header y abre recuperación sólo ante error. Las operaciones destructivas continúan detrás de **Más opciones**, con acento rojo visible también cuando el disclosure está cerrado.
+
 ## Sheets y dialogs
 
 Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El patrón futuro debe mantener:
@@ -54,18 +60,19 @@ Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El p
 - footer con CTA estable cuando la tarea requiere confirmación;
 - altura máxima basada en `dvh`, safe areas y reduced motion.
 
-### Caso confirmado: Agregar ejercicio
+### Agregar ejercicio durante una sesión
 
-Este input queda reservado para **PR25**. Cambiar entre Todos, Espalda o una categoría sin resultados no debe encoger/agrandar el sheet ni mover la CTA. Dirección acordada:
+PR25 consolida este selector como sheet de geometría estable. Cambiar entre Todos, Espalda o una categoría sin resultados cambia únicamente el área central:
 
 1. sheet de altura aproximadamente estable;
 2. header fijo;
 3. buscador y chips de filtro fijos;
 4. lista de resultados interna y scrolleable;
 5. footer y CTA fijos;
-6. selección visual suave; CTA violeta fuerte.
+6. selección persistente y visualmente suave; CTA violeta fuerte;
+7. crear un ejercicio nuevo como escape secundario, no como CTA equivalente.
 
-No se implementa ese cambio en PR23.
+Un filtro nunca descarta una selección válida. Si la fila seleccionada deja de estar visible, el footer conserva su nombre y permite confirmar o cambiar la elección.
 
 ## Loading, feedback, errores y vacíos
 

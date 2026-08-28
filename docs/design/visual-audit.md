@@ -15,6 +15,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 - **Shell y navegación actual:** el límite mobile, safe areas, bottom nav y sidebar desktop responden a roles distintos sin duplicar rutas.
 - **Tema y tokens base:** light/dark, violeta semántico y paleta de rutinas ya ofrecen una base visual coherente.
 - **Integraciones ChatGPT:** configuración compacta, explicación de estado y acciones acotadas; no necesita rediseño dentro de esta etapa.
+- **Sesión activa v2:** foco secuencial, jerarquía de series, autosave estable y selector de altura fija resuelven la dirección de PR23 sin cambiar semántica de entrenamiento.
 
 ### 🟡 Mejorar
 
@@ -28,8 +29,6 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### 🔴 Replantear
 
-- **Sesión activa:** es el momento de mayor frecuencia y complejidad; requiere reordenar ejercicios, series, progreso, acciones y transiciones preservando autosave, drafts y optimistic locking. PR25.
-- **Selector Agregar ejercicio de sesión:** la altura cambia con los filtros y mueve el contexto y la CTA; necesita sheet estable con estructura fija. PR25.
 - **Crear / editar rutina:** no conviene acumular ajustes en el editor actual. Debe ser excelente para una cuenta nueva y una rutina compleja. PR26.
 - **Alimentos por cantidad:** la experiencia actual de catálogo no cubre el futuro flujo de cantidad y comida compuesta. PR29, después de PR28.
 
@@ -45,10 +44,10 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | `/train/routines` | 🟡 Mejorar | archivo, inicio y colores | lista y prioridad de rutinas más clara | PR26 |
 | `/train/routines/[id]` | 🔴 Replantear | snapshots y acciones existentes | editor progresivo para novatos y expertos | PR26 |
 | `/train/session/new` | 🟡 Mejorar | inicio desde rutina/libre | alinear con futura entrada de Train | PR27 |
-| `/train/session/[id]` activa | 🔴 Replantear | autosave, estado de guardado, objetivos | nueva jerarquía de sesión y series | PR25 |
-| ejercicio abierto/cerrado, series, notas, próxima vez, más opciones | 🔴 Replantear | semántica y acciones robustas | disclosure, footer y feedback estables | PR25 |
-| selector Agregar ejercicio | 🔴 Replantear | búsqueda, filtros y selección | sheet fijo; resultados scrollables; CTA fija | PR25 |
-| finalizar / cancelar | 🟡 Mejorar | guardas y confirmaciones | integrarlas en jerarquía PR25 | PR25 |
+| `/train/session/[id]` activa | ✅ Mantener | autosave, drafts, progreso y foco secuencial | mantener jerarquía v2; medir uso real | resuelto PR25 |
+| ejercicio abierto/cerrado, series, notas, próxima vez, más opciones | ✅ Mantener | un ejercicio abierto, header estable y detalle sin cards anidadas | mantenimiento y accesibilidad continua | resuelto PR25 |
+| selector Agregar ejercicio | ✅ Mantener | sheet estable, selección persistente y footer fijo | ampliar filtros sólo con evidencia | resuelto PR25 |
+| finalizar / cancelar | ✅ Mantener | flush antes de finalizar y destructive secundario | preservar separación de jerarquía | resuelto PR25 |
 | `/train/exercises` | 🟡 Mejorar | biblioteca personal, filtros | consolidar exploración y edición | PR27 |
 | `/train/history`, `/train/history/[exerciseId]` | 🟡 Mejorar | histórico por ejercicio | lenguaje común de análisis | PR27 / PR35 |
 | `/train/progress`, `/train/calendar`, `/calendar` | 🟡 Mejorar | hechos, constancia y filtros | agrupar análisis sin perder contexto | PR27 / PR35 |
@@ -69,9 +68,11 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### PR25 — Sesión activa v2
 
-Se puede replantear jerarquía, ejercicios, series, expand/collapse, transiciones, progreso, footer y acciones. Permanecen autosave robusto, drafts, conflicts, retries, ownership, session fences y optimistic locking.
+**Resuelto.** La sesión usa foco secuencial con un ejercicio abierto a la vez, encabezado persistente, compensación de scroll y transición local breve. La fila cerrada resume identidad, avance y series; la abierta prioriza series y expone descanso, próxima vez y notas sin otro accordion principal. El acento de rutina orienta sin competir con estados success o destructive.
 
-El problema del selector **Agregar ejercicio** queda confirmado: Todos, Espalda y una categoría sin resultados producen alturas distintas. La solución objetivo es sheet estable con header, búsqueda y chips fijos, lista interna scrollable y footer/CTA fijo; selected suave y CTA violeta fuerte.
+El selector **Agregar ejercicio** mantiene altura basada en `dvh`, header/búsqueda/chips/footer fijos y sólo desplaza resultados. La selección no se pierde al filtrar, permanece nombrada en el footer y usa un estado suave distinto de la CTA primaria. El empty state conserva geometría y crear un ejercicio nuevo sigue como salida secundaria.
+
+Permanecen sin cambios `ExerciseAutosaveQueue`, drafts versionados, optimistic locking, reconciliación de conflictos, retries, session fences, snapshots, notas, decisiones de próxima sesión y `apply_to_routine`.
 
 ### PR26–29
 
