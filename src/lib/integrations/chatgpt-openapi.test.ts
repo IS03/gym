@@ -37,4 +37,15 @@ describe("OWNLEVEL ChatGPT OpenAPI", () => {
       /email|user_id|calories|protein|carbs|fat|weight|steps|token/i,
     );
   });
+
+  it("logMeal no expone acumulados ni objetivos nutricionales", () => {
+    const successSchema = schema.slice(
+      schema.indexOf("MealSuccess:"),
+      schema.indexOf("Error:"),
+    );
+    expect(successSchema).toContain(
+      "required: [ok, created, idempotent_replay, meal]",
+    );
+    expect(successSchema).not.toMatch(/day:|total_|target_/i);
+  });
 });

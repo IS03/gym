@@ -25,5 +25,19 @@ export async function persistChatgptMeal(
     throw new PossibleDuplicateError();
   }
   if (error) throw new Error("No se pudo persistir la comida.");
-  return data as ChatgptMealSuccess;
+  const result = data as ChatgptMealSuccess;
+  return {
+    ok: true,
+    created: result.created,
+    idempotent_replay: result.idempotent_replay,
+    meal: {
+      id: result.meal.id,
+      date: result.meal.date,
+      title: result.meal.title,
+      calories: result.meal.calories,
+      protein_g: result.meal.protein_g,
+      carbs_g: result.meal.carbs_g,
+      fat_g: result.meal.fat_g,
+    },
+  };
 }

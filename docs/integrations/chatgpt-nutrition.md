@@ -53,6 +53,9 @@ El GPT debe mantener la misma `idempotency_key` al reintentar una misma acción.
 El replay responde `created=false` e `idempotent_replay=true` sin crear otra
 fila.
 
+La respuesta de escritura confirma únicamente el estado de la operación y la
+comida recién enviada. No incluye acumulados, objetivos ni otros datos del día.
+
 Si OWNLEVEL responde `409 possible_duplicate`, el GPT debe pedir confirmación.
 Sólo cuando el usuario confirme que fue otra comida puede reenviar con una
 `idempotency_key` nueva y `force_duplicate=true`.

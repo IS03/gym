@@ -27,6 +27,7 @@ import {
   listIntegrationApiTokens,
   newIntegrationToken,
 } from "./chatgpt-tokens";
+import { persistChatgptMeal } from "./chatgpt-server";
 
 const validToken = `ownlevel_${"a".repeat(43)}`;
 
@@ -53,14 +54,6 @@ const success = {
     protein_g: 55,
     carbs_g: 70,
     fat_g: 14,
-  },
-  day: {
-    total_calories: 650,
-    total_protein_g: 55,
-    total_carbs_g: 70,
-    total_fat_g: 14,
-    target_calories: 2_100,
-    target_protein_g: 130,
   },
 };
 
@@ -271,6 +264,55 @@ describe("ChatGPT private meal contract", () => {
     const persist = vi.fn(async () => success);
     await handleChatgptMealRequest(request({ ...validBody, force_duplicate: true }), deps({ persist }));
     expect(persist).toHaveBeenCalledWith("token-owner", expect.objectContaining({ force_duplicate: true }));
+  });
+
+  it("limita la respuesta pública a la escritura recién confirmada", async () => {
+    const rpc = vi.fn(async () => ({
+      data: {
+        ...success,
+        meal: {
+          ...success.meal,
+          description: "Dato interno no público",
+          daily_position: 3,
+        },
+        day: {
+          total_calories: 1_234,
+          total_protein_g: 99,
+          total_carbs_g: 120,
+          total_fat_g: 45,
+          target_calories: 2_100,
+          target_protein_g: 130,
+        },
+        nutrition_target: { calories: 2_100, protein_g: 130 },
+        other_meals: [{ id: "private-existing-meal" }],
+      },
+      error: null,
+    }));
+    supabaseMocks.createAdminClient.mockReturnValue({ rpc } as never);
+
+    const result = await persistChatgptMeal("token-owner", {
+      ...parseChatgptMealInput(validBody),
+    });
+
+    expect(result).toEqual(success);
+    expect(Object.keys(result)).toEqual([
+      "ok",
+      "created",
+      "idempotent_replay",
+      "meal",
+    ]);
+    expect(Object.keys(result.meal)).toEqual([
+      "id",
+      "date",
+      "title",
+      "calories",
+      "protein_g",
+      "carbs_g",
+      "fat_g",
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(
+      /day|total_|target|other_meals|description|daily_position|private-existing-meal/i,
+    );
   });
 
   it("genera secretos aleatorios y sólo persiste SHA-256", () => {

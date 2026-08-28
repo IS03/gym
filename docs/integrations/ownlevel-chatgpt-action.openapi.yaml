@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: OWNLEVEL Nutrition
-  version: 1.1.0
+  version: 1.2.0
   description: >-
     Comprueba una clave privada y registra comidas estructuradas en la cuenta
     OWNLEVEL vinculada. No ofrece operaciones de lectura nutricional.
@@ -142,7 +142,7 @@ components:
     MealSuccess:
       type: object
       additionalProperties: false
-      required: [ok, created, idempotent_replay, meal, day]
+      required: [ok, created, idempotent_replay, meal]
       properties:
         ok: { type: boolean, const: true }
         created: { type: boolean }
@@ -159,17 +159,6 @@ components:
             protein_g: { type: [number, 'null'] }
             carbs_g: { type: [number, 'null'] }
             fat_g: { type: [number, 'null'] }
-        day:
-          type: object
-          additionalProperties: false
-          required: [total_calories, total_protein_g, total_carbs_g, total_fat_g, target_calories, target_protein_g]
-          properties:
-            total_calories: { type: integer }
-            total_protein_g: { type: number }
-            total_carbs_g: { type: number }
-            total_fat_g: { type: number }
-            target_calories: { type: [integer, 'null'] }
-            target_protein_g: { type: [number, 'null'] }
     Error:
       type: object
       additionalProperties: false

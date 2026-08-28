@@ -41,14 +41,6 @@ export type ChatgptMealSuccess = {
     carbs_g: number | null;
     fat_g: number | null;
   };
-  day: {
-    total_calories: number;
-    total_protein_g: number;
-    total_carbs_g: number;
-    total_fat_g: number;
-    target_calories: number | null;
-    target_protein_g: number | null;
-  };
 };
 
 export type ChatgptMealErrorCode =
