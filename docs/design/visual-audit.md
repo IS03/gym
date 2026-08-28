@@ -65,7 +65,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### PR24 — Login / Entrada
 
-**Resuelto.** La entrada dejó la card partida por una composición de página: símbolos canónicos claros/oscuros, un mensaje breve, una única CTA de Google y un cierre discreto. En desktop la identidad y la acción se separan por espacio y jerarquía, no por un contenedor pesado; en mobile se conservan safe areas. El pending mantiene tamaño del botón y el error público se reserva inline, sin exponer detalles de OAuth. Google OAuth, callback y redirects seguros permanecen sin cambios.
+**Resuelto.** La entrada dejó la card partida por una composición de página: símbolos canónicos claros/oscuros, un mensaje breve, una única CTA de Google y un cierre discreto. En desktop la identidad y la acción se separan por espacio y jerarquía, no por un contenedor pesado; en mobile se conservan safe areas. El pending mantiene tamaño del botón y el error público se reserva inline, sin exponer detalles de OAuth. Google OAuth, callback y redirects seguros permanecen sin cambios. La verificación productiva visual quedó disponible en desktop; la herramienta administrada no permitió emular exactamente 390 × 844 ni alternar el tema del sistema, por lo que mobile y light/dark se cubren estructuralmente con breakpoints, safe areas, tokens y assets semánticos, sin declarar una comprobación visual inexistente.
 
 ### PR25 — Sesión activa v2
 
