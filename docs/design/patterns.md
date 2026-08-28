@@ -32,6 +32,12 @@ En mobile un sheet se ancla abajo; en desktop el mismo contenido puede pasar a d
 | Toggle / segmentado | estados mutuamente excluyentes y cortos; no usar para navegación profunda |
 | Chip | filtro o atributo corto; nunca única señal de una acción crítica |
 
+## Entrada y autenticación
+
+La entrada es una composición de página, no una card de marketing. En mobile ocupa el alto disponible con safe areas, identidad visible, un único mensaje y una CTA de acceso; en desktop puede separar identidad y acción con espacio, no con un bloque dividido pesado. El botón conserva ancho y alto entre idle y pending; el error público se reserva cerca de la CTA para no desplazar la jerarquía.
+
+La autenticación comunica sólo lo necesario: qué es OWNLEVEL, qué resuelve y cómo continuar. Los detalles técnicos de proveedores o configuración no llegan al usuario. El patrón reutilizable de PR24 es: marca semántica + `h1` real + mensaje breve + una acción de proveedor + feedback inline estable + cierre de confianza discreto.
+
 ## Listas, expandibles y selección
 
 Las filas repetidas comparten altura, padding y foco. Toda fila con navegación es un objetivo único, no varios links competidores. Accordions se usan para detalle secundario dentro del flujo; el encabezado mantiene siempre título, progreso o estado que permita decidir si abrirlo.
@@ -92,6 +98,7 @@ La interfaz de sesión ya contiene aprendizajes valiosos de autosave: no borrar 
 | Sidebar desktop | `components/layout/desktop-sidebar.tsx` | ✅ agrupación y estados claros | mantener como referencia desktop |
 | App shell | `components/layout/app-shell.tsx` | ✅ safe areas y límites mobile explícitos | mantener |
 | Theme provider / selector | `components/providers/`, settings | ✅ roles light/dark existentes | mantener y validar contraste por cambio |
+| Entrada / Login | `src/app/(auth)/login/login-form.tsx` | ✅ composición propia, CTA única y feedback estable | mantener; extender hacia onboarding sin rehacer identidad |
 | Charts y selector de período | `components/nutrition/` | ✅ reportes informativos y accesibles | mantener como referencia; ampliar en PR35 |
 | Empty / status inline | distribuidos por dominios | 🟡 semántica existe, presentación no unificada | consolidar lenguaje en cada rediseño |
 

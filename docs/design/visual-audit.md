@@ -28,7 +28,6 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### 🔴 Replantear
 
-- **Login / Auth:** funciona técnicamente, pero la entrada no transmite aún la calidad ni dirección de producto. Será una pantalla nueva, no un retoque de botón, en PR24.
 - **Sesión activa:** es el momento de mayor frecuencia y complejidad; requiere reordenar ejercicios, series, progreso, acciones y transiciones preservando autosave, drafts y optimistic locking. PR25.
 - **Selector Agregar ejercicio de sesión:** la altura cambia con los filtros y mueve el contexto y la CTA; necesita sheet estable con estructura fija. PR25.
 - **Crear / editar rutina:** no conviene acumular ajustes en el editor actual. Debe ser excelente para una cuenta nueva y una rutina compleja. PR26.
@@ -38,7 +37,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 | Ruta / área | Estado | Qué conservar | Dirección recomendada | PR |
 | --- | --- | --- | --- | --- |
-| `/login` | 🔴 Replantear | Auth estable | pantalla de entrada nueva, mobile/desktop/light/dark | PR24 |
+| `/login` | ✅ Mantener | Auth estable, identidad clara, CTA única y feedback inline | mantener composición de página; extender hacia onboarding sin rehacer identidad | resuelto PR24 |
 | `/home` | ✅ Mantener | foco operativo, CTA contextual, resumen semanal | referencia de lenguaje, mantenimiento menor | — |
 | `/today` | 🟡 Mejorar | datos canónicos, quick add, actividad compacta | revisar arquitectura diaria antes de sumar features | PR28 |
 | `/today/reports` y `/today/steps` | ✅ / 🟡 | período, resumen, charts accesibles | preservar claridad; expandir análisis luego | PR35 |
@@ -66,7 +65,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### PR24 — Login / Entrada
 
-La entrada será una pantalla nueva. Debe expresar identidad, reducir fricción y ser deliberada en mobile, desktop y ambos temas. No se implementa en PR23.
+**Resuelto.** La entrada dejó la card partida por una composición de página: símbolos canónicos claros/oscuros, un mensaje breve, una única CTA de Google y un cierre discreto. En desktop la identidad y la acción se separan por espacio y jerarquía, no por un contenedor pesado; en mobile se conservan safe areas. El pending mantiene tamaño del botón y el error público se reserva inline, sin exponer detalles de OAuth. Google OAuth, callback y redirects seguros permanecen sin cambios.
 
 ### PR25 — Sesión activa v2
 
