@@ -16,6 +16,7 @@ import {
 } from "@/lib/phase2/training";
 import { todayInCordoba } from "@/lib/phase2/training-robust";
 import { toWorkoutStartActiveSession } from "@/lib/phase2/workout-start";
+import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +63,11 @@ const trainingLinks = [
 export default async function TrainPage() {
   const today = todayInCordoba();
   const month = today.slice(0, 7) as `${number}-${number}`;
+  const auth = await requireAuthenticatedRequestContext();
   const [inProgress, workoutStartRoutines, trainedDays] = await Promise.all([
-    getInProgressSessionForUser(),
-    listWorkoutStartRoutines(),
-    listTrainingDaysInMonth({ month }),
+    getInProgressSessionForUser(auth),
+    listWorkoutStartRoutines(auth),
+    listTrainingDaysInMonth({ month }, auth),
   ]);
 
   return (

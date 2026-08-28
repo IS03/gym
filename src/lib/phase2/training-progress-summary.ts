@@ -6,9 +6,18 @@ import type {
 } from "./types";
 
 type TrainingProgressSource = {
-  sessions: WorkoutSession[];
-  sessionExercises: WorkoutSessionExercise[];
-  sets: WorkoutSet[];
+  sessions: Array<Pick<
+    WorkoutSession,
+    "id" | "day_log_id" | "routine_name_snapshot" | "session_name" | "status" | "started_at" | "ended_at"
+  >>;
+  sessionExercises: Array<Pick<
+    WorkoutSessionExercise,
+    "id" | "workout_session_id" | "grupo_muscular_snapshot" | "muscle_group_label_snapshot"
+  >>;
+  sets: Array<Pick<
+    WorkoutSet,
+    "workout_session_exercise_id" | "actual_reps" | "actual_weight_kg" | "is_completed"
+  >>;
   dateByDayLog: Map<string, string>;
 };
 
@@ -42,7 +51,7 @@ export function formatTrainingMinutes(minutes: number): string {
   return `${hours} h ${remainingMinutes} min`;
 }
 
-function sessionMinutes(session: WorkoutSession): number {
+function sessionMinutes(session: TrainingProgressSource["sessions"][number]): number {
   if (!session.started_at || !session.ended_at) return 0;
   const milliseconds =
     new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
@@ -50,11 +59,11 @@ function sessionMinutes(session: WorkoutSession): number {
   return Math.round(milliseconds / 60_000);
 }
 
-function workoutSetVolume(set: WorkoutSet): number {
+function workoutSetVolume(set: TrainingProgressSource["sets"][number]): number {
   return (set.actual_reps ?? 0) * (set.actual_weight_kg ?? 0);
 }
 
-function muscleGroupName(exercise: WorkoutSessionExercise): string {
+function muscleGroupName(exercise: TrainingProgressSource["sessionExercises"][number]): string {
   const label = exercise.muscle_group_label_snapshot?.trim();
   if (label) return label;
   const group = exercise.grupo_muscular_snapshot;
@@ -106,7 +115,7 @@ export function buildWeeklyTrainingSummaries(
 
   const completedSessionIds = new Set(completedSessions.map((session) => session.id));
   const sessionById = new Map(completedSessions.map((session) => [session.id, session]));
-  const setsByExercise = new Map<string, WorkoutSet[]>();
+  const setsByExercise = new Map<string, TrainingProgressSource["sets"]>();
   for (const set of data.sets) {
     if (!set.is_completed) continue;
     const current = setsByExercise.get(set.workout_session_exercise_id) ?? [];

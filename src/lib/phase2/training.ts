@@ -127,12 +127,15 @@ function normalizeNameLocal(value: string): string {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
 
-export async function listExercises(params?: {
-  includeArchived?: boolean;
-  muscleGroup?: MuscleGroup | "none";
-}): Promise<Exercise[]> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+export async function listExercises(
+  params?: {
+    includeArchived?: boolean;
+    muscleGroup?: MuscleGroup | "none";
+  },
+  context?: AuthenticatedRequestContext,
+): Promise<Exercise[]> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   let q = supabase
     .from("exercises")
@@ -156,12 +159,15 @@ export async function listExercises(params?: {
   return (data ?? []) as Exercise[];
 }
 
-export async function listTrainingDaysInMonth(input: {
-  month: `${number}-${number}`; // YYYY-MM
-  routineId?: string | null;
-}): Promise<Map<string, RoutineColorKey[]>> {
-  const supabase = await createClient();
-  await getAuthedUserId();
+export async function listTrainingDaysInMonth(
+  input: {
+    month: `${number}-${number}`; // YYYY-MM
+    routineId?: string | null;
+  },
+  context?: AuthenticatedRequestContext,
+): Promise<Map<string, RoutineColorKey[]>> {
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
 
   const start = `${input.month}-01`;
   const startDate = new Date(`${start}T00:00:00.000Z`);

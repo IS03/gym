@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { BrandSymbol } from "@/components/brand/brand-symbol";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { MuscleDistribution, WeeklyVolumeChart } from "@/components/training/training-insights";
-import { getNutritionDay } from "@/lib/nutrition/day";
+import { getNutritionDaySummary } from "@/lib/nutrition/day";
 import { getMyProfile } from "@/lib/phase1/profile";
 import {
   getCompactProfile,
@@ -156,12 +156,12 @@ export default async function HomePage() {
   const auth = await requireAuthenticatedRequestContext();
   const [profile, todayData, inProgress, training, workoutStartRoutines] = await Promise.all([
     getMyProfile(auth),
-    getNutritionDay(today, undefined, auth),
+    getNutritionDaySummary(today, auth),
     getInProgressSessionForUser(auth),
     getHomeTrainingSnapshot(today, auth),
     listWorkoutStartRoutines(auth),
   ]);
-  const { dayLog, meals, context } = todayData;
+  const { dayLog, mealCount, context } = todayData;
   const { currentWeek, todaySessions } = training;
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
@@ -297,8 +297,8 @@ export default async function HomePage() {
                 <p className="text-xs text-muted-foreground">Proteína</p>
               </div>
               <div className="pl-3">
-                <p className="text-lg font-semibold">{meals.length}</p>
-                <p className="text-xs text-muted-foreground">{meals.length === 1 ? "Comida cargada" : "Comidas cargadas"}</p>
+                <p className="text-lg font-semibold">{mealCount}</p>
+                <p className="text-xs text-muted-foreground">{mealCount === 1 ? "Comida cargada" : "Comidas cargadas"}</p>
               </div>
             </div>
             <p className="border-t pt-3 text-xs font-medium text-muted-foreground">{balanceSummary}</p>
@@ -493,7 +493,7 @@ export default async function HomePage() {
                 <p className="text-xs text-muted-foreground">Proteína</p>
               </div>
               <div className="pl-4">
-                <p className="metric-number text-lg font-semibold">{meals.length}</p>
+                <p className="metric-number text-lg font-semibold">{mealCount}</p>
                 <p className="text-xs text-muted-foreground">Comidas</p>
               </div>
             </div>

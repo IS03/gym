@@ -331,8 +331,9 @@ type RawWorkoutSession = WorkoutSession & {
 
 export async function getWorkoutSessionDetail(
   sessionId: string,
+  context?: AuthenticatedRequestContext,
 ): Promise<WorkoutSessionDetail | null> {
-  const { supabase, userId } = await getAuthedContext();
+  const { supabase, userId } = context ?? await getAuthedContext();
   const { data: session, error: sessionError } = await supabase
     .from("workout_sessions")
     .select("*, routine:routines(color)")
@@ -508,11 +509,15 @@ export async function cancelWorkoutSession(sessionId: string) {
   if (!data) throw new Error("La sesión no existe o ya fue finalizada.");
 }
 
-function sessionDisplayName(session: WorkoutSession) {
+function sessionDisplayName(
+  session: Pick<WorkoutSession, "routine_name_snapshot" | "session_name">,
+) {
   return session.routine_name_snapshot ?? session.session_name ?? "Sesión libre";
 }
 
-function sessionDurationMilliseconds(session: WorkoutSession) {
+function sessionDurationMilliseconds(
+  session: Pick<WorkoutSession, "started_at" | "ended_at">,
+) {
   if (!session.started_at || !session.ended_at) return null;
   const milliseconds = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
   return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : null;
@@ -785,16 +790,41 @@ export type HomeTrainingSnapshot = {
   todaySessions: CompletedSessionSummary[];
 };
 
-type HomeTrainingSessionRow = WorkoutSession & {
+type HomeTrainingSession = Pick<
+  WorkoutSession,
+  | "id"
+  | "day_log_id"
+  | "routine_id"
+  | "routine_name_snapshot"
+  | "session_name"
+  | "status"
+  | "started_at"
+  | "ended_at"
+>;
+type HomeTrainingExercise = Pick<
+  WorkoutSessionExercise,
+  "id" | "workout_session_id" | "is_completed" | "muscle_group_label_snapshot" | "grupo_muscular_snapshot"
+>;
+type HomeTrainingSet = Pick<
+  WorkoutSet,
+  "workout_session_exercise_id" | "actual_reps" | "actual_weight_kg" | "is_completed"
+>;
+type HomeTrainingData = {
+  sessions: HomeTrainingSession[];
+  sessionExercises: HomeTrainingExercise[];
+  sets: HomeTrainingSet[];
+  dateByDayLog: Map<string, string>;
+};
+type HomeTrainingSessionRow = HomeTrainingSession & {
   day_log?: { log_date: string } | Array<{ log_date: string }> | null;
-  exercises?: Array<WorkoutSessionExercise & { sets: WorkoutSet[] }>;
+  exercises?: Array<HomeTrainingExercise & { sets: HomeTrainingSet[] }>;
 };
 
 function summarizeCompletedSessions(
-  data: CompletedTrainingData,
+  data: HomeTrainingData,
   logDate: string,
 ): CompletedSessionSummary[] {
-  const exercisesBySession = new Map<string, WorkoutSessionExercise[]>();
+  const exercisesBySession = new Map<string, HomeTrainingExercise[]>();
   const sessionIdByExercise = new Map<string, string>();
   for (const exercise of data.sessionExercises) {
     const items = exercisesBySession.get(exercise.workout_session_id) ?? [];
@@ -839,7 +869,7 @@ function summarizeCompletedSessions(
 }
 
 export function buildHomeTrainingSnapshot(
-  source: CompletedTrainingData,
+  source: HomeTrainingData,
   today: string,
 ): HomeTrainingSnapshot {
   const weeks = buildWeeklyTrainingSummaries(source, today).slice(0, 8);
@@ -865,7 +895,7 @@ export async function getHomeTrainingSnapshot(
   const { data: rawRows, error } = await context.supabase
     .from("workout_sessions")
     .select(
-      "*, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(*, sets:workout_sets(*))",
+      "id, day_log_id, routine_id, routine_name_snapshot, session_name, status, started_at, ended_at, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(id, workout_session_id, is_completed, muscle_group_label_snapshot, grupo_muscular_snapshot, sets:workout_sets(workout_session_exercise_id, actual_reps, actual_weight_kg, is_completed))",
     )
     .eq("user_id", context.userId)
     .eq("status", "completed")
@@ -875,9 +905,9 @@ export async function getHomeTrainingSnapshot(
     .order("ended_at", { ascending: false });
   if (error) throw new Error(`Leer resumen semanal de Home: ${error.message}`);
 
-  const sessions: WorkoutSession[] = [];
-  const sessionExercises: WorkoutSessionExercise[] = [];
-  const sets: WorkoutSet[] = [];
+  const sessions: HomeTrainingSession[] = [];
+  const sessionExercises: HomeTrainingExercise[] = [];
+  const sets: HomeTrainingSet[] = [];
   const dateByDayLog = new Map<string, string>();
 
   for (const row of (rawRows ?? []) as HomeTrainingSessionRow[]) {
@@ -887,11 +917,11 @@ export async function getHomeTrainingSnapshot(
     const exercises = session.exercises;
     delete session.day_log;
     delete session.exercises;
-    sessions.push(session as WorkoutSession);
+    sessions.push(session as HomeTrainingSession);
     dateByDayLog.set(session.day_log_id, day.log_date);
     for (const exerciseRow of exercises ?? []) {
       const { sets: exerciseSets, ...exercise } = exerciseRow;
-      sessionExercises.push(exercise as WorkoutSessionExercise);
+      sessionExercises.push(exercise as HomeTrainingExercise);
       sets.push(...(exerciseSets ?? []));
     }
   }

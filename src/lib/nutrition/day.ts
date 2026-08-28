@@ -111,6 +111,33 @@ async function listActiveMeals(
   return (data ?? []) as MealEntry[];
 }
 
+/** Home sólo necesita los agregados del día y la cantidad de comidas. */
+export async function getNutritionDaySummary(
+  date: string,
+  context: AuthenticatedRequestContext,
+): Promise<{
+  date: string;
+  dayLog: DayLog;
+  mealCount: number;
+  context: NutritionContext;
+}> {
+  assertIsoDate(date);
+  const dayLog = await getOrCreateDayLog(date, context);
+  const { count, error } = await context.supabase
+    .from("meal_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("day_log_id", dayLog.id)
+    .is("deleted_at", null);
+
+  if (error) throw new Error(`Contar meal_entries: ${error.message}`);
+  return {
+    date,
+    dayLog,
+    mealCount: count ?? 0,
+    context: contextFromSnapshot(dayLog),
+  };
+}
+
 export async function getNutritionDay(
   date: string,
   options?: { createIfMissing?: true },

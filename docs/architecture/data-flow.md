@@ -124,6 +124,12 @@ rutina actual
 → historial y reportes sobre completed
 ```
 
+Los read models de Home son deliberadamente acotados: el resumen nutricional
+cuenta comidas sin descargar sus filas, y el snapshot semanal proyecta sólo
+los campos de sesión, ejercicio y serie usados para agregados. Las rutas de
+entrenamiento reutilizan el `AuthenticatedRequestContext` request-scoped; no se
+cachean datos privados entre requests.
+
 La rutina y la sesión son entidades distintas. Cambiar `exercises` o una rutina
 no reescribe `workout_session_exercises` ni `workout_sets` ya creados.
 
