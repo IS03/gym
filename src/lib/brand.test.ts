@@ -42,13 +42,13 @@ describe("identidad OWNLEVEL", () => {
     });
   });
 
-  it("elimina Appgym de la identidad visible del login", () => {
+  it("usa los símbolos de marca canónicos en la nueva entrada", () => {
     const loginSource = readFileSync(
       join(process.cwd(), "src/app/(auth)/login/login-form.tsx"),
       "utf8",
     );
     expect(loginSource).not.toContain("Appgym");
-    expect(loginSource).toContain("brandAssets.lockupMobile");
-    expect(loginSource).toContain("brandAssets.lockupHorizontal");
+    expect(loginSource).toContain("brandAssets.symbolOnLight");
+    expect(loginSource).toContain("brandAssets.symbolOnDark");
   });
 });

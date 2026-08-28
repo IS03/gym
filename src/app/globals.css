@@ -284,36 +284,8 @@
 
 .auth-shell {
   background:
-    radial-gradient(circle at 50% 0%, oklch(0.67 0.2 285 / 11%), transparent 34rem),
+    radial-gradient(circle at 18% 8%, oklch(0.67 0.2 285 / 10%), transparent 31rem),
     var(--background);
-}
-
-.login-brand-surface {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background: #0d0d12;
-}
-
-.login-brand-surface::before,
-.login-brand-surface::after {
-  position: absolute;
-  pointer-events: none;
-  content: "";
-}
-
-.login-brand-surface::before {
-  inset: -34%;
-  z-index: 0;
-  background: radial-gradient(circle, oklch(0.66 0.2 285 / 23%), transparent 57%);
-  filter: blur(18px);
-}
-
-.login-brand-surface::after {
-  inset: 0;
-  z-index: 1;
-  border: 1px solid oklch(1 0 0 / 9%);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 8%), inset 0 -1px 0 oklch(0 0 0 / 24%);
 }
 
 /* One filtered material for the whole navigation bar. Its children only add tint and light. */
