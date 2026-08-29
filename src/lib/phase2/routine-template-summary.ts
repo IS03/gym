@@ -1,4 +1,4 @@
-import type { RoutineExercisePayload } from "./types";
+import type { RoutineExercisePayload, TrainingAdjustment } from "./types";
 
 type TargetValue = number | null;
 
@@ -19,11 +19,25 @@ function formatNumber(value: number) {
 export type RoutineExerciseTargetSummary = {
   setLabel: string;
   signals: string[];
+  adjustmentLabel: string | null;
 };
+
+function adjustmentLabel(adjustment: TrainingAdjustment) {
+  switch (adjustment) {
+    case "increase_weight":
+      return "+ Peso";
+    case "increase_reps":
+      return "+ Repeticiones";
+    case "custom":
+      return "Ajuste personalizado";
+    case "maintain":
+      return null;
+  }
+}
 
 /** A compact, truthful summary of independently configured routine sets. */
 export function summarizeRoutineExerciseTarget(
-  payload: Pick<RoutineExercisePayload, "sets">,
+  payload: Pick<RoutineExercisePayload, "sets" | "next_adjustment">,
 ): RoutineExerciseTargetSummary {
   const setLabel = `${payload.sets.length} ${payload.sets.length === 1 ? "serie" : "series"}`;
   const weights = payload.sets.map((set) => set.target_weight_kg);
@@ -44,5 +58,9 @@ export function summarizeRoutineExerciseTarget(
     signals.push(`${formatNumber(uniformReps)} reps`);
   }
 
-  return { setLabel, signals: signals.slice(0, 2) };
+  return {
+    setLabel,
+    signals: signals.slice(0, 2),
+    adjustmentLabel: adjustmentLabel(payload.next_adjustment),
+  };
 }

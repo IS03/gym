@@ -17,20 +17,21 @@ import { nullableNumberFromInput, payloadsEqual } from "@/lib/phase2/training-va
 import type {
   RoutineExercisePayload,
   RoutineExerciseTemplate,
-  TrainingAdjustment,
 } from "@/lib/phase2/types";
 import {
   moveRoutineExerciseTargetAction,
   removeRoutineExerciseAction,
   saveRoutineExerciseTargetAction,
 } from "../../actions";
-import { nextExpandedRoutineExerciseId } from "./routine-editor-interaction";
+import {
+  nextExpandedRoutineExerciseId,
+  toggleRoutineNextAdjustment,
+  type SelectableRoutineAdjustment,
+} from "./routine-editor-interaction";
 
-const ADJUSTMENTS: Array<{ value: TrainingAdjustment; label: string }> = [
-  { value: "maintain", label: "Mantener" },
+const NEXT_TIME_TOGGLES: Array<{ value: SelectableRoutineAdjustment; label: string }> = [
   { value: "increase_weight", label: "+ Peso" },
   { value: "increase_reps", label: "+ Repeticiones" },
-  { value: "custom", label: "Personalizado" },
 ];
 
 type ItemStatus = { pending: boolean; error: string | null; saved: boolean };
@@ -265,7 +266,7 @@ export function RoutineTemplateEditor({
                     <span className="block truncate text-base font-medium leading-snug">{item.exercise.nombre}</span>
                     <span className="mt-1 block truncate text-xs text-muted-foreground">{identity}</span>
                     <span className="mt-1.5 block truncate text-xs text-muted-foreground">
-                      {[summary.setLabel, ...summary.signals].join(" · ")}
+                      {[summary.setLabel, ...summary.signals, summary.adjustmentLabel].filter(Boolean).join(" · ")}
                     </span>
                     <span className="mt-1.5 flex min-h-4 items-center gap-2 text-[11px] font-medium" aria-live="polite">
                       {dirty ? <span className="text-amber-700 dark:text-amber-300">Sin guardar</span> : null}
@@ -400,9 +401,19 @@ export function RoutineTemplateEditor({
                   </section>
 
                   <section className="space-y-2 border-t pt-4" aria-labelledby={`next-time-title-${item.id}`}>
-                    <h3 id={`next-time-title-${item.id}`} className="text-sm font-semibold">Próxima vez</h3>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {ADJUSTMENTS.map((adjustment) => {
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 id={`next-time-title-${item.id}`} className="text-sm font-semibold">Próxima vez</h3>
+                      {payload.next_adjustment === "custom" ? (
+                        <div className="min-w-0 text-right text-xs text-muted-foreground">
+                          <p>Ajuste anterior: Personalizado</p>
+                          {item.next_adjustment_note?.trim() ? (
+                            <p className="mt-0.5 truncate">{item.next_adjustment_note.trim()}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {NEXT_TIME_TOGGLES.map((adjustment) => {
                         const selected = payload.next_adjustment === adjustment.value;
                         return (
                           <Button
@@ -411,7 +422,13 @@ export function RoutineTemplateEditor({
                             size="sm"
                             variant={selected ? "secondary" : "outline"}
                             aria-pressed={selected}
-                            onClick={() => updatePayload(item.id, (current) => ({ ...current, next_adjustment: adjustment.value }))}
+                            onClick={() => updatePayload(item.id, (current) => ({
+                              ...current,
+                              next_adjustment: toggleRoutineNextAdjustment(
+                                current.next_adjustment,
+                                adjustment.value,
+                              ),
+                            }))}
                           >
                             {adjustment.label}
                           </Button>

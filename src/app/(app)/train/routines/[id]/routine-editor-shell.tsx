@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import type { Exercise, Routine, RoutineExerciseTemplate } from "@/lib/phase2/types";
 import { RoutineExerciseAddDialog } from "./routine-exercise-manager";
+import { shouldShowRoutineExerciseSectionAddAction } from "./routine-editor-interaction";
 import { RoutineSettingsSheet } from "./routine-settings-sheet";
 import { RoutineTemplateEditor } from "./routine-template-editor";
 
@@ -122,10 +123,12 @@ export function RoutineEditorShell({
             <h2 id="routine-exercises-title" className="text-lg font-semibold tracking-tight">Ejercicios</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">La estructura primero; el detalle se abre cuando lo necesitás.</p>
           </div>
-          <Button type="button" className="h-10" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
-            <Plus className="size-4" aria-hidden />
-            Agregar ejercicio
-          </Button>
+          {shouldShowRoutineExerciseSectionAddAction(items.length) ? (
+            <Button type="button" className="h-10" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
+              <Plus className="size-4" aria-hidden />
+              Agregar ejercicio
+            </Button>
+          ) : null}
         </div>
 
         {items.length === 0 ? (

@@ -33,6 +33,21 @@ describe("PR 10.6 — divulgación progresiva de entrenamiento", () => {
     expect(editor).not.toContain("window.confirm");
   });
 
+  it("mantiene un único CTA en vacío y limita Próxima vez a los dos toggles actuales", () => {
+    expect(shell).toContain("shouldShowRoutineExerciseSectionAddAction(items.length)");
+    expect(editor).toContain("NEXT_TIME_TOGGLES");
+    expect(editor).toContain('label: "+ Peso"');
+    expect(editor).toContain('label: "+ Repeticiones"');
+    expect(editor).not.toContain('label: "Mantener"');
+    expect(editor).not.toContain('label: "Personalizado"');
+  });
+
+  it("preserva custom histórico hasta que la persona elige uno de los toggles actuales", () => {
+    expect(editor).toContain("next_adjustment: item.next_adjustment");
+    expect(editor).toContain("item.next_adjustment_note");
+    expect(editor).toContain("toggleRoutineNextAdjustment");
+  });
+
   it("bloquea operaciones estructurales e inicio mientras existen cambios locales", () => {
     expect(shell).toContain("Guardalos antes de cambiar la estructura o iniciar una sesión.");
     expect(shell).toContain("disabled={!canChangeStructure()}");

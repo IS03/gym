@@ -1,4 +1,4 @@
-import type { MuscleGroup } from "@/lib/phase2/types";
+import type { MuscleGroup, TrainingAdjustment } from "@/lib/phase2/types";
 import type { MuscleGroupFilter } from "@/lib/phase2/muscle-groups";
 
 type RoutinePickerExercise = {
@@ -17,6 +17,24 @@ export function nextExpandedRoutineExerciseId(
 
 export function canMutateRoutineStructure(dirtyExerciseCount: number) {
   return dirtyExerciseCount === 0;
+}
+
+/** The section action belongs to the populated list; empty routines own their CTA. */
+export function shouldShowRoutineExerciseSectionAddAction(itemCount: number) {
+  return itemCount > 0;
+}
+
+export type SelectableRoutineAdjustment = Extract<
+  TrainingAdjustment,
+  "increase_weight" | "increase_reps"
+>;
+
+/** Two toggles keep `maintain` neutral and legacy `custom` intact until replaced. */
+export function toggleRoutineNextAdjustment(
+  current: TrainingAdjustment,
+  clicked: SelectableRoutineAdjustment,
+): TrainingAdjustment {
+  return current === clicked ? "maintain" : clicked;
 }
 
 /** Filters only the picker result area; the selected id stays owned by the caller. */
