@@ -58,6 +58,12 @@ El editor mantiene **un solo ejercicio abierto**. Colapsar o abrir otro nunca de
 
 Las series mantienen la misma semántica por fila y evitan scroll horizontal como solución por defecto. Descanso, próxima vez y observaciones siguen a las series; organización y quitar viven detrás de **Más opciones**, con destructive secundario y confirmación.
 
+### Hub de entrenamiento
+
+PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curso o la acción para iniciar una nueva, después la constancia mensual y finalmente accesos compactos para planificar y revisar. Una sesión activa no se descubre dentro de un selector: el hub enlaza directamente a **Continuar entrenamiento** y no ofrece una nueva sesión equivalente.
+
+**Progreso** conserva el análisis transversal. Dentro de ese área, Entrenamiento explica evolución y Cuerpo concentra peso y medidas; ambos mantienen sus rutas propias sin duplicarse como tiles del hub. **Historial** permanece en Entrenar porque responde a los hechos y registros ocurridos, no a sus tendencias.
+
 ## Sheets y dialogs
 
 Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El patrón futuro debe mantener:

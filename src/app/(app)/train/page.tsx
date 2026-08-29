@@ -1,11 +1,12 @@
 import Link from "next/link";
 import {
-  ChartNoAxesCombined,
+  ArrowRight,
+  ChevronRight,
+  Dumbbell,
+  History,
   ListChecks,
   ListPlus,
   Plus,
-  Scale,
-  TimerReset,
 } from "lucide-react";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { TrainingMonthPreview } from "@/components/training/training-month-preview";
@@ -15,50 +16,39 @@ import {
   listWorkoutStartRoutines,
 } from "@/lib/phase2/training";
 import { todayInCordoba } from "@/lib/phase2/training-robust";
+import { formatSessionDate } from "@/lib/phase2/session-history";
 import { toWorkoutStartActiveSession } from "@/lib/phase2/workout-start";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const trainingLinks = [
-  {
-    href: "/train/routines",
-    label: "Rutinas",
-    description: "Tu plan",
-    icon: ListChecks,
-  },
-  {
-    href: "/train/progress",
-    label: "Progreso",
-    description: "Tu evolución",
-    icon: ChartNoAxesCombined,
-  },
-  {
-    href: "/train/history",
-    label: "Historial",
-    description: "Por ejercicio",
-    icon: TimerReset,
-  },
-  {
-    href: "/train/exercises",
-    label: "Ejercicios",
-    description: "Administrar",
-    icon: ListPlus,
-  },
-  {
-    href: "/train/body",
-    label: "Cuerpo",
-    description: "Peso y medidas",
-    icon: Scale,
-    fullWidth: true,
-  },
-] as Array<{
+type TrainHubLinkProps = {
   href: string;
-  label: string;
+  title: string;
   description: string;
   icon: typeof ListChecks;
-  fullWidth?: boolean;
-}>;
+};
+
+function TrainHubLink({ href, title, description, icon: Icon }: TrainHubLinkProps) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-16 items-center gap-3 rounded-xl border border-border/70 bg-card px-3.5 py-3 outline-none transition-[background-color,border-color,transform] duration-150 hover:border-primary/25 hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.99]"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+      </span>
+      <ChevronRight
+        className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        aria-hidden
+      />
+    </Link>
+  );
+}
 
 export default async function TrainPage() {
   const today = todayInCordoba();
@@ -69,54 +59,103 @@ export default async function TrainPage() {
     listWorkoutStartRoutines(auth),
     listTrainingDaysInMonth({ month }, auth),
   ]);
+  const activeSession = inProgress ? toWorkoutStartActiveSession(inProgress) : null;
 
   return (
     <div className="space-y-6 pb-16 lg:pb-0">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Entrenar</h1>
-          <p className="text-sm text-muted-foreground">
-            Registrá tu sesión y seguí tu progreso.
-          </p>
-        </div>
-        <StartWorkoutSheet
-          routines={workoutStartRoutines}
-          activeSession={inProgress ? toWorkoutStartActiveSession(inProgress) : null}
-          triggerAriaLabel="Iniciar entrenamiento"
-          triggerClassName="workout-fab-enter fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-5 z-[60] flex size-14 touch-manipulation items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_24px_-10px_color-mix(in_oklch,var(--primary)_65%,transparent)] outline-none transition-[background-color,box-shadow,transform,opacity] duration-100 ease-out hover:bg-primary/90 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-95 lg:static lg:ml-auto lg:inline-flex lg:h-11 lg:w-auto lg:gap-2 lg:rounded-lg lg:px-4 lg:text-sm lg:font-medium lg:shadow-sm"
-        >
-          <Plus className="size-5" aria-hidden />
-          <span className="sr-only lg:not-sr-only">Nueva sesión</span>
-        </StartWorkoutSheet>
-      </div>
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Entrenar</h1>
+        <p className="text-sm text-muted-foreground">
+          Entrená, organizá tus rutinas y revisá tu actividad.
+        </p>
+      </header>
 
-      <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-5">
-        <section className="lg:col-span-7">
-          <TrainingMonthPreview
-            month={month}
-            today={today}
-            trainedDays={trainedDays}
-          />
-        </section>
-
-        <section className="mt-6 space-y-3 lg:col-span-5 lg:mt-0">
-          <h2 className="text-base font-semibold tracking-tight">Tu entrenamiento</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {trainingLinks.map(({ href, label, description, icon: Icon, fullWidth }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`surface-elevated flex min-h-28 flex-col justify-between rounded-2xl border bg-card p-4 outline-none transition-[border-color,box-shadow,transform] duration-150 hover:border-primary/25 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]${fullWidth ? " col-span-2" : ""}`}
-              >
-                <Icon className="size-5 text-primary" aria-hidden />
-                <span>
-                  <span className="block text-sm font-semibold">{label}</span>
-                  <span className="text-xs text-muted-foreground">{description}</span>
-                </span>
-              </Link>
-            ))}
+      <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
+        {activeSession ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Dumbbell className="size-5" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p id="train-action-title" className="text-sm font-medium text-primary">Sesión en curso</p>
+                <h2 className="truncate text-lg font-semibold tracking-tight">
+                  {activeSession.name}
+                </h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Iniciada {formatSessionDate(activeSession.logDate)}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/train/session/${activeSession.id}`}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+            >
+              Continuar entrenamiento
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
           </div>
+        ) : (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 id="train-action-title" className="text-lg font-semibold tracking-tight">Nueva sesión</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Elegí una rutina o empezá una sesión libre.
+              </p>
+            </div>
+            <StartWorkoutSheet
+              routines={workoutStartRoutines}
+              activeSession={null}
+              triggerAriaLabel="Iniciar entrenamiento"
+              triggerClassName="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+            >
+              <Plus className="size-4" aria-hidden />
+              Nueva sesión
+            </StartWorkoutSheet>
+          </div>
+        )}
+      </section>
+
+      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6 lg:space-y-0">
+        <section className="lg:col-span-7" aria-label="Constancia de entrenamiento">
+          <TrainingMonthPreview month={month} today={today} trainedDays={trainedDays} />
         </section>
+
+        <div className="space-y-6 lg:col-span-5">
+          <section aria-labelledby="train-planning-title" className="space-y-3">
+            <div>
+              <h2 id="train-planning-title" className="text-base font-semibold tracking-tight">Planificar</h2>
+              <p className="text-sm text-muted-foreground">Prepará lo que vas a entrenar.</p>
+            </div>
+            <div className="space-y-2">
+              <TrainHubLink
+                href="/train/routines"
+                title="Rutinas"
+                description="Crear y organizar tus planes"
+                icon={ListChecks}
+              />
+              <TrainHubLink
+                href="/train/exercises"
+                title="Ejercicios"
+                description="Administrar tu biblioteca"
+                icon={ListPlus}
+              />
+            </div>
+          </section>
+
+          <section aria-labelledby="train-review-title" className="space-y-3">
+            <div>
+              <h2 id="train-review-title" className="text-base font-semibold tracking-tight">Revisar</h2>
+              <p className="text-sm text-muted-foreground">Consultá lo que ya registraste.</p>
+            </div>
+            <TrainHubLink
+              href="/train/history"
+              title="Historial"
+              description="Sesiones y registros por ejercicio"
+              icon={History}
+            />
+          </section>
+        </div>
       </div>
     </div>
   );

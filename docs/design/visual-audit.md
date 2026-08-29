@@ -40,7 +40,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | `/home` | ✅ Mantener | foco operativo, CTA contextual, resumen semanal | referencia de lenguaje, mantenimiento menor | — |
 | `/today` | 🟡 Mejorar | datos canónicos, quick add, actividad compacta | revisar arquitectura diaria antes de sumar features | PR28 |
 | `/today/reports` y `/today/steps` | ✅ / 🟡 | período, resumen, charts accesibles | preservar claridad; expandir análisis luego | PR35 |
-| `/train` | 🟡 Mejorar | calendario, CTA de nueva sesión, accesos | reorganizar hub y arquitectura Train | PR27 |
+| `/train` | ✅ Mantener | sesión operativa, calendario y accesos compactos | Train concentra hacer, planificar y revisar; Progreso concentra análisis | resuelto PR27 |
 | `/train/routines` | ✅ Mantener | archivo, inicio y colores | lista compacta y entrada clara al editor | resuelto PR26 |
 | `/train/routines/[id]` | ✅ Mantener | snapshots y acciones existentes | editor progresivo con estructura visible y guardado explícito | resuelto PR26 |
 | `/train/session/new` | 🟡 Mejorar | inicio desde rutina/libre | alinear con futura entrada de Train | PR27 |
@@ -82,9 +82,14 @@ Sólo un ejercicio se abre a la vez. Sus cambios locales sobreviven al collapse 
 
 El selector de ejercicios de rutina adopta la geometría estable de PR25, con búsqueda, chips, resultados internos scrolleables, selección persistente, CTA fija y exclusión de duplicados. La persistencia sigue usando las server actions y validaciones existentes; no se alteran ownership ni snapshots.
 
-### PR27–29
+### PR27 — Arquitectura Train
 
-- **PR27:** arquitectura Train.
+**Resuelto.** `/train` es el centro operativo del entrenamiento: sin una sesión activa presenta **Nueva sesión** mediante el selector existente; con una sesión en curso muestra su nombre y enlaza directamente a **Continuar entrenamiento**. El calendario conserva su papel de constancia mensual y las acciones restantes se organizan como **Planificar** (Rutinas y Ejercicios) y **Revisar** (Historial).
+
+`/train/progress` y `/train/body` conservan sus rutas y deep links, pero su entrada canónica es `/progress`: el primero explica la evolución de entrenamiento y el segundo concentra el seguimiento corporal. Historial queda en Train porque muestra sesiones y registros ocurridos. No se modifica la navegación global ni las experiencias cerradas de sesión activa y rutinas.
+
+### PR28–29
+
 - **PR28:** Today / Nutrición v2, antes de nuevos features de comida.
 - **PR29:** alimentos por cantidad.
 
