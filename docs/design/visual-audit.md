@@ -21,7 +21,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 - **Today / Nutrición:** el resumen y la actividad son funcionales, pero la densidad de cards, contexto diario y registro de comida necesitan una arquitectura de pantalla más deliberada.
 - **Train hub:** calendario, CTA y accesos sirven, pero la estructura de entrada debe alinearse con una arquitectura Train futura.
-- **Lista de rutinas y detalle de rutina:** conservan flujos válidos, pero el escaneo, la planificación y la edición de ejercicios necesitan simplificarse.
+- **Lista de rutinas:** conserva flujos válidos y ahora usa una densidad más deliberada; la arquitectura Train se revisará por separado.
 - **Biblioteca, historial, calendario y progreso de entrenamiento:** los datos y filtros son útiles; falta una jerarquía común entre exploración, historial y análisis.
 - **Cuerpo, peso y medidas:** registros y sheets funcionales; requieren una presentación más clara a medida que las métricas sean configurables.
 - **Ajustes y subáreas nutricionales:** el agrupamiento es entendible, aunque los formularios/versiones necesitan lenguaje de lista, estado y empty más consistente.
@@ -41,8 +41,8 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | `/today` | 🟡 Mejorar | datos canónicos, quick add, actividad compacta | revisar arquitectura diaria antes de sumar features | PR28 |
 | `/today/reports` y `/today/steps` | ✅ / 🟡 | período, resumen, charts accesibles | preservar claridad; expandir análisis luego | PR35 |
 | `/train` | 🟡 Mejorar | calendario, CTA de nueva sesión, accesos | reorganizar hub y arquitectura Train | PR27 |
-| `/train/routines` | 🟡 Mejorar | archivo, inicio y colores | lista y prioridad de rutinas más clara | PR26 |
-| `/train/routines/[id]` | 🔴 Replantear | snapshots y acciones existentes | editor progresivo para novatos y expertos | PR26 |
+| `/train/routines` | ✅ Mantener | archivo, inicio y colores | lista compacta y entrada clara al editor | resuelto PR26 |
+| `/train/routines/[id]` | ✅ Mantener | snapshots y acciones existentes | editor progresivo con estructura visible y guardado explícito | resuelto PR26 |
 | `/train/session/new` | 🟡 Mejorar | inicio desde rutina/libre | alinear con futura entrada de Train | PR27 |
 | `/train/session/[id]` activa | ✅ Mantener | autosave, drafts, progreso y foco secuencial | mantener jerarquía v2; medir uso real | resuelto PR25 |
 | ejercicio abierto/cerrado, series, notas, próxima vez, más opciones | ✅ Mantener | un ejercicio abierto, header estable y detalle sin cards anidadas | mantenimiento y accesibilidad continua | resuelto PR25 |
@@ -74,9 +74,16 @@ El selector **Agregar ejercicio** mantiene altura basada en `dvh`, header/búsqu
 
 Permanecen sin cambios `ExerciseAutosaveQueue`, drafts versionados, optimistic locking, reconciliación de conflictos, retries, session fences, snapshots, notas, decisiones de próxima sesión y `apply_to_routine`.
 
-### PR26–29
+### PR26 — Crear / editar rutinas v2
 
-- **PR26:** crear/editar rutinas v2.
+**Resuelto.** Crear una rutina continúa siendo un primer paso corto de nombre y color; una plantilla vacía explica qué falta y concentra la primera acción. El editor prioriza la estructura: header con identidad, estado y conteos; lista escaneable con orden, metadata y objetivo; nombre/color bajo disclosure en sheet.
+
+Sólo un ejercicio se abre a la vez. Sus cambios locales sobreviven al collapse y se muestran como `Sin guardar` hasta el guardado explícito por ejercicio. Agregar, reordenar, quitar, editar identidad e iniciar entrenamiento quedan protegidos mientras existan objetivos pendientes, y salir del editor requiere confirmación para descartar cambios.
+
+El selector de ejercicios de rutina adopta la geometría estable de PR25, con búsqueda, chips, resultados internos scrolleables, selección persistente, CTA fija y exclusión de duplicados. La persistencia sigue usando las server actions y validaciones existentes; no se alteran ownership ni snapshots.
+
+### PR27–29
+
 - **PR27:** arquitectura Train.
 - **PR28:** Today / Nutrición v2, antes de nuevos features de comida.
 - **PR29:** alimentos por cantidad.

@@ -26,11 +26,12 @@ describe("routine color UI", () => {
 
   it("uses contextual rails without replacing primary controls", () => {
     const list = read("app/(app)/train/routines/page.tsx");
-    const detail = read("app/(app)/train/routines/[id]/page.tsx");
+    const editorShell = read("app/(app)/train/routines/[id]/routine-editor-shell.tsx");
     const session = read("app/(app)/train/session/[id]/session-editor.tsx");
     expect(list).toContain("w-[3px]");
     expect(list).toContain("routineColorCssVariable");
-    expect(detail).toContain("border-l-[3px]");
+    expect(editorShell).toContain("routineColorCssVariable");
+    expect(editorShell).toContain("w-[3px]");
     expect(session).toContain("hasRoutineAccent");
     expect(session).toContain("bg-primary");
     expect(session).toContain("bg-destructive/80");

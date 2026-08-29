@@ -18,4 +18,4 @@ Home y Reportes son las referencias internas aprobadas: no son plantillas para c
 
 PR23 documenta decisiones. No rediseña pantallas, no cambia navegación y no modifica modelos, APIs ni permisos. Los cambios visuales se implementan en PRs posteriores con alcance propio.
 
-Próxima etapa: **PR24 — Login / Entrada a OWNLEVEL**.
+Próxima etapa: **PR27 — Arquitectura Train**.

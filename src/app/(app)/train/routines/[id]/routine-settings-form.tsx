@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { RoutineColorPicker } from "@/components/training/routine-color-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,23 @@ import type { Routine } from "@/lib/phase2/types";
 import { resolveRoutineColor, type RoutineColorKey } from "@/lib/phase2/routine-colors";
 import { updateRoutineAction } from "../../actions";
 
-export function RoutineSettingsForm({ routine }: { routine: Pick<Routine, "id" | "nombre" | "color"> }) {
+export function RoutineSettingsForm({
+  routine,
+  onPendingChange,
+  onSuccess,
+}: {
+  routine: Pick<Routine, "id" | "nombre" | "color">;
+  onPendingChange?: (pending: boolean) => void;
+  onSuccess?: () => void;
+}) {
   const [color, setColor] = useState<RoutineColorKey>(resolveRoutineColor(routine.color));
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [onPendingChange, pending]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,6 +36,7 @@ export function RoutineSettingsForm({ routine }: { routine: Pick<Routine, "id" |
       try {
         await updateRoutineAction(formData);
         setSaved(true);
+        onSuccess?.();
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "No se pudo guardar la rutina.");
       }
@@ -31,7 +44,7 @@ export function RoutineSettingsForm({ routine }: { routine: Pick<Routine, "id" |
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-xl border bg-muted/20 p-3 sm:p-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <input type="hidden" name="id" value={routine.id} />
       <div className="space-y-1">
         <Label htmlFor="routine-name">Nombre</Label>

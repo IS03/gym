@@ -213,11 +213,18 @@ export async function replaceRoutineExercisesAction(formData: FormData) {
   revalidatePath(`/train/routines/${routineId}`);
 }
 
-export async function addExerciseToRoutineAction(formData: FormData) {
-  const routineId = str(formData, "routine_id");
-  const exerciseId = str(formData, "exercise_id");
-  await addExerciseToRoutine({ routineId, exerciseId });
-  revalidatePath(`/train/routines/${routineId}`);
+export async function addExerciseToRoutineAction(
+  formData: FormData,
+): Promise<TrainingActionResult<{ routineExerciseId: string }>> {
+  try {
+    const routineId = str(formData, "routine_id");
+    const exerciseId = str(formData, "exercise_id");
+    const routineExercise = await addExerciseToRoutine({ routineId, exerciseId });
+    revalidatePath(`/train/routines/${routineId}`);
+    return { ok: true, data: { routineExerciseId: routineExercise.id } };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
+  }
 }
 
 export async function removeRoutineExerciseAction(formData: FormData) {

@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  ChevronDown,
-  Dumbbell,
-  Layers3,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, ChevronDown, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { listRoutineOverviews, listRoutines } from "@/lib/phase2/training";
 import { getInitialPlanStatus } from "@/lib/phase2/training-robust";
@@ -114,65 +108,37 @@ export default async function RoutinesPage() {
               })}
             </div>
 
-            <div className="hidden grid-cols-2 gap-4 lg:grid">
+            <div className="hidden grid-cols-2 gap-3 lg:grid">
               {active.map((routine) => {
                 const overview = overviews.get(routine.id);
                 return (
-                  <Card key={routine.id} className="relative min-h-64 justify-between overflow-hidden">
+                  <Card key={routine.id} className="relative overflow-hidden shadow-sm">
                     <span
-                      className="absolute inset-y-4 left-0 w-[3px] rounded-r-full"
+                      className="absolute inset-y-3 left-0 w-[3px] rounded-r-full"
                       style={{ backgroundColor: routineColorCssVariable(routine.color) }}
                       aria-hidden
                     />
                     <Link
                       href={`/train/routines/${routine.id}`}
-                      className="flex h-full flex-col gap-5 rounded-xl p-4 pl-5 pt-1 outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-36 flex-col gap-3 rounded-xl p-4 pl-5 outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Abrir rutina ${routine.nombre}`}
                     >
-                      <div className="min-w-0 pr-10">
-                        <div className="flex items-center gap-2.5">
-                          <h3 className="truncate text-lg font-semibold tracking-tight">{routine.nombre}</h3>
-                        </div>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          Editar la plantilla no cambia sesiones anteriores.
-                        </p>
+                      <div className="min-w-0 pr-9">
+                        <h3 className="truncate text-lg font-semibold tracking-tight">{routine.nombre}</h3>
+                        <RoutineMeta
+                          exerciseCount={overview?.exerciseCount ?? 0}
+                          setCount={overview?.setCount ?? 0}
+                        />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-muted/55 p-3">
-                          <Dumbbell className="size-4 text-primary" aria-hidden />
-                          <p className="metric-number mt-2 text-xl font-semibold">{overview?.exerciseCount ?? 0}</p>
-                          <p className="text-xs text-muted-foreground">Ejercicios</p>
-                        </div>
-                        <div className="rounded-xl bg-muted/55 p-3">
-                          <Layers3 className="size-4 text-primary" aria-hidden />
-                          <p className="metric-number mt-2 text-xl font-semibold">{overview?.setCount ?? 0}</p>
-                          <p className="text-xs text-muted-foreground">Series objetivo</p>
-                        </div>
-                      </div>
-
-                      <div className="min-h-10 space-y-2">
+                      <div className="min-h-5">
                         {(overview?.muscleGroups.length ?? 0) > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {overview?.muscleGroups.slice(0, 4).map((group) => (
-                              <span key={group} className="rounded-full bg-primary/9 px-2.5 py-1 text-[11px] font-medium text-primary">
-                                {group}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {(overview?.exerciseNames.length ?? 0) > 0 ? (
-                          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                            {overview?.exerciseNames.slice(0, 4).join(" · ")}
-                            {(overview?.exerciseNames.length ?? 0) > 4
-                              ? ` · +${(overview?.exerciseNames.length ?? 0) - 4}`
-                              : ""}
-                          </p>
-                        ) : null}
+                          <p className="truncate text-xs text-muted-foreground">{overview?.muscleGroups.slice(0, 4).join(" · ")}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Sin ejercicios todavía</p>
+                        )}
                       </div>
-
-                      <span className="mt-auto flex h-10 items-center justify-between rounded-lg border px-3 text-sm font-medium">
-                        Abrir rutina <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
+                      <span className="mt-auto flex items-center gap-1 text-sm font-medium text-primary">
+                        Editar rutina <ArrowRight className="size-4" aria-hidden />
                       </span>
                     </Link>
                     <div className="absolute right-3 top-3">

@@ -50,6 +50,14 @@ PR25 fija un patrón de foco para tareas secuenciales: un solo ejercicio abierto
 
 En el ejercicio abierto, las series dominan la jerarquía. Descanso, próxima vez y notas aparecen después, sin cards anidadas. Autosave usa un slot estable en el header y abre recuperación sólo ante error. Las operaciones destructivas continúan detrás de **Más opciones**, con acento rojo visible también cuando el disclosure está cerrado.
 
+### Editor de rutina
+
+PR26 fija el patrón de edición progresiva de una plantilla: el header expresa identidad de rutina, estado y conteo; la lista explica orden, ejercicio, metadata y objetivo aun cerrada. Nombre y color se editan en un sheet compacto, no como formulario permanente al inicio de la página.
+
+El editor mantiene **un solo ejercicio abierto**. Colapsar o abrir otro nunca descarta sus overrides locales: una fila cerrada conserva `Sin guardar` hasta que se confirme el guardado explícito. Las mutaciones estructurales —agregar, reordenar, quitar, editar identidad o iniciar una sesión— se bloquean mientras haya objetivos dirty; salir del editor pide confirmación antes de descartarlos. Esto evita refreshes que destruyan un estado local que el usuario todavía ve.
+
+Las series mantienen la misma semántica por fila y evitan scroll horizontal como solución por defecto. Descanso, próxima vez y observaciones siguen a las series; organización y quitar viven detrás de **Más opciones**, con destructive secundario y confirmación.
+
 ## Sheets y dialogs
 
 Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El patrón futuro debe mantener:
@@ -73,6 +81,10 @@ PR25 consolida este selector como sheet de geometría estable. Cambiar entre Tod
 7. crear un ejercicio nuevo como escape secundario, no como CTA equivalente.
 
 Un filtro nunca descarta una selección válida. Si la fila seleccionada deja de estar visible, el footer conserva su nombre y permite confirmar o cambiar la elección.
+
+### Agregar ejercicio a una rutina
+
+El contexto de rutina reutiliza la geometría y jerarquía del selector de sesión, no su persistencia: sheet de alto estable, header/búsqueda/chips/footer fijos y sólo resultados con scroll. Busca por nombre, filtra por grupo y excluye los ejercicios que ya pertenecen a la plantilla; el servidor continúa siendo la autoridad contra duplicados. La selección persiste si el filtro deja de mostrarla y el CTA permanece deshabilitado hasta elegir una opción.
 
 ## Loading, feedback, errores y vacíos
 
