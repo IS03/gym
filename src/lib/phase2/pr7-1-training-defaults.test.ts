@@ -64,7 +64,7 @@ describe("PR 7.1 — defaults y UX de entrenamiento", () => {
     expect(sessionEditor).toContain("AddExerciseSheet");
     expect(addExerciseSheet).toContain("flex-col overflow-hidden");
     expect(addExerciseSheet).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
-    expect(addExerciseSheet).toContain("82dvh");
+    expect(addExerciseSheet).toContain("82svh");
     expect(addExerciseSheet).toContain("env(safe-area-inset-bottom)");
     expect(addExerciseSheet).toContain("overflow-x-auto");
   });

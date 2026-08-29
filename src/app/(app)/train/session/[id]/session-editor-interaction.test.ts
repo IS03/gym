@@ -77,8 +77,10 @@ describe("PR 14 — interacción de sesión", () => {
 });
 
 describe("PR25 — selector estable de ejercicios", () => {
-  it("usa altura estable y reserva el scroll al área de resultados", () => {
-    expect(addExerciseSheet).toContain("h-[min(82dvh,44rem)]");
+  it("usa una altura mobile estable y reserva el scroll al área de resultados", () => {
+    expect(addExerciseSheet).toContain("h-[min(82svh,44rem)]");
+    expect(addExerciseSheet).toContain("lg:h-[min(78dvh,44rem)]");
+    expect(addExerciseSheet).not.toContain("visualViewport");
     expect(addExerciseSheet).toContain("min-h-0 flex-1 overflow-y-auto");
     expect(addExerciseSheet).toContain("shrink-0 border-t");
     expect(addExerciseSheet).not.toContain("max-h-[42dvh]");
