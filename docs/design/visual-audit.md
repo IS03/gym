@@ -19,7 +19,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 
 ### 🟡 Mejorar
 
-- **Today / Nutrición:** el resumen y la actividad son funcionales, pero la densidad de cards, contexto diario y registro de comida necesitan una arquitectura de pantalla más deliberada.
+- **Today / Nutrición:** resumen, comidas, actividad y pasos mantienen fuentes canónicas; el refinamiento futuro deberá partir de la arquitectura meals-first de PR28, no volver a mezclar el registro con contexto secundario.
 - **Train hub:** calendario, CTA y accesos sirven, pero la estructura de entrada debe alinearse con una arquitectura Train futura.
 - **Lista de rutinas:** conserva flujos válidos y ahora usa una densidad más deliberada; la arquitectura Train se revisará por separado.
 - **Biblioteca, historial, calendario y progreso de entrenamiento:** los datos y filtros son útiles; falta una jerarquía común entre exploración, historial y análisis.
@@ -38,7 +38,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | --- | --- | --- | --- | --- |
 | `/login` | ✅ Mantener | Auth estable, identidad clara, CTA única y feedback inline | mantener composición de página; extender hacia onboarding sin rehacer identidad | resuelto PR24 |
 | `/home` | ✅ Mantener | foco operativo, CTA contextual, resumen semanal | referencia de lenguaje, mantenimiento menor | — |
-| `/today` | 🟡 Mejorar | datos canónicos, quick add, actividad compacta | revisar arquitectura diaria antes de sumar features | PR28 |
+| `/today` | ✅ Mantener | datos canónicos, quick add, actividad compacta | arquitectura meals-first; edición responsive y borrado confirmado | resuelto PR28 |
 | `/today/reports` y `/today/steps` | ✅ / 🟡 | período, resumen, charts accesibles | preservar claridad; expandir análisis luego | PR35 |
 | `/train` | ✅ Mantener | sesión operativa, calendario y accesos compactos | Train concentra hacer, planificar y revisar; Progreso concentra análisis | resuelto PR27 |
 | `/train/routines` | ✅ Mantener | archivo, inicio y colores | lista compacta y entrada clara al editor | resuelto PR26 |
@@ -88,9 +88,14 @@ El selector de ejercicios de rutina adopta la geometría estable de PR25, con b�
 
 `/train/progress` y `/train/body` conservan sus rutas y deep links, pero su entrada canónica es `/progress`: el primero explica la evolución de entrenamiento y el segundo concentra el seguimiento corporal. Historial queda en Train porque muestra sesiones y registros ocurridos. No se modifica la navegación global ni las experiencias cerradas de sesión activa y rutinas.
 
-### PR28–29
+### PR28 — Today / Nutrición v2
 
-- **PR28:** Today / Nutrición v2, antes de nuevos features de comida.
+**Resuelto.** Today prioriza cómo viene el día, registrar una comida y revisar los registros del día antes del contexto secundario. La fecha se presenta como lenguaje de producto y el editor de nueva comida evita exponer la regla interna de Córdoba sin cambiarla. Las comidas rápidas siguen siendo sugerencias históricas plegadas, no comidas guardadas.
+
+La lista de comidas abandona el formulario inline: cada registro se consulta como una fila compacta y se edita en un sheet/dialog responsive único. El borrado sigue usando soft-delete canónico, pero ahora exige una confirmación, comunica pending, éxito o error y no promete una eliminación física. Actividad, pasos, agua, mate y correcciones permanecen intactos y se muestran después de las comidas.
+
+### PR29
+
 - **PR29:** alimentos por cantidad.
 
 ## Roadmap visual y de producto

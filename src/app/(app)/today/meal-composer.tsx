@@ -21,7 +21,7 @@ export function MealComposer({ date, quickMeals }: { date: string; quickMeals: Q
         open={open}
         onOpenChange={setOpen}
         title="Nueva comida"
-        description="Registrá los datos que conozcas. La fecha usa el día lógico de Córdoba."
+        description="Registrá lo que comiste y los datos que conozcas."
         closeLabel="Cerrar nueva comida"
       >
         <CreateMealForm date={date} onSuccess={() => setOpen(false)} />

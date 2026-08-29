@@ -66,6 +66,7 @@ describe("manual meal application wiring", () => {
     "utf8",
   );
   const todaySource = readFileSync("src/app/(app)/today/page.tsx", "utf8");
+  const mealListSource = readFileSync("src/app/(app)/today/meal-list.tsx", "utf8");
   const historySource = readFileSync("src/app/(app)/history/page.tsx", "utf8");
   const homeSource = readFileSync("src/app/(app)/home/page.tsx", "utf8");
 
@@ -95,7 +96,7 @@ describe("manual meal application wiring", () => {
       "final_fat_g",
     ]) {
       expect(createFormSource).toContain(`name="${name}"`);
-      expect(todaySource).toContain(`name="${name}"`);
+      expect(mealListSource).toContain(`name="${name}"`);
     }
   });
 
@@ -122,7 +123,7 @@ describe("manual meal application wiring", () => {
     expect(createFormSource).toContain("defaultValue={date}");
     expect(createFormSource).not.toContain('fd.set("date", date)');
     expect(actionSource).toContain('formData.get("date")');
-    expect(todaySource).toContain('name="date"');
+    expect(mealListSource).toContain('name="date"');
     expect(dayLogSource).toContain("patch.day_log_id = destinationDay.id");
     expect(dayLogSource).not.toContain("delete().eq(\"id\", input.id)");
     expect(dayLogSource).not.toContain("legacy_import_source =");

@@ -64,6 +64,14 @@ PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curs
 
 **Progreso** conserva el análisis transversal. Dentro de ese área, Entrenamiento explica evolución y Cuerpo concentra peso y medidas; ambos mantienen sus rutas propias sin duplicarse como tiles del hub. **Historial** permanece en Entrenar porque responde a los hechos y registros ocurridos, no a sus tendencias.
 
+### Today / nutrición diaria
+
+PR28 fija Today como un flujo **meals-first**: resumen y registro manual primero, sugerencias rápidas como disclosure compacto y, a continuación, los registros del día. La actividad, agua, mate, correcciones y pasos siguen disponibles, pero quedan después de las comidas como contexto secundario.
+
+Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.
+
+Las acciones destructivas viven detrás de **Más opciones** dentro del editor y requieren una confirmación explícita. El pending impide el doble envío y el éxito/error se comunica en un slot estable. El borrado usa el soft-delete canónico: el producto describe que el registro deja de contar y de aparecer, sin prometer una eliminación física.
+
 ## Sheets y dialogs
 
 Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El patrón futuro debe mantener:

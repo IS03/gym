@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const source = (path: string) => readFileSync(path, "utf8");
 const mealCreate = source("src/app/(app)/today/create-meal-form.tsx");
-const mealEdit = source("src/app/(app)/today/page.tsx");
+const mealEdit = source("src/app/(app)/today/meal-list.tsx");
 const sessionEditor = source("src/app/(app)/train/session/[id]/session-editor.tsx");
 const routineEditor = source("src/app/(app)/train/routines/[id]/routine-template-editor.tsx");
 const correction = source("src/app/(app)/train/session/[id]/correct/session-correction-form.tsx");
