@@ -33,7 +33,9 @@ describe("quick meals wiring", () => {
     const detailsBody = quickMeals.slice(quickMeals.indexOf("<details"), quickMeals.indexOf("</details>"));
     expect(detailsTag).not.toContain(" open");
     expect(detailsBody).toContain("<summary");
-    expect(detailsBody).toContain("Comidas rápidas");
+    expect(detailsBody).toContain("Comidas sugeridas");
+    expect(quickMeals).toContain('title="Comidas sugeridas"');
+    expect(quickMeals).toContain('closeLabel="Cerrar comidas sugeridas"');
     expect(detailsBody).toContain("visibleMeals.length");
     expect(detailsBody).toContain("<QuickMealRows meals={visibleMeals}");
     expect(detailsBody).toContain("Ver más");

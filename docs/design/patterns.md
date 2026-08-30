@@ -66,7 +66,9 @@ PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curs
 
 ### Today / nutrición diaria
 
-PR28 fija Today como un flujo **meals-first**: resumen y registro manual primero, sugerencias rápidas como disclosure compacto y, a continuación, los registros del día. La actividad, agua, mate, correcciones y pasos siguen disponibles, pero quedan después de las comidas como contexto secundario.
+PR28.1 fija Today como un flujo de contexto diario: resumen y registro manual primero, **Comidas sugeridas** como disclosure compacto, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
+
+Las Comidas sugeridas se infieren automáticamente de `meal_entries` manuales históricos; no son Foods ni comidas guardadas administrables. La futura separación entre alimentos por cantidad (PR29) y comidas habituales/guardadas (PR30) conserva este concepto histórico como una fuente distinta.
 
 Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.
 

@@ -41,10 +41,14 @@ describe("PR 9.6 — UX diaria mobile", () => {
     expect(library).not.toContain('className="h-11 w-full lg:hidden" onClick={openCreate}');
   });
 
-  it("prioriza Resumen y creación, luego Comidas y recién después Actividad/Pasos", () => {
+  it("prioriza Resumen y creación, luego sugerencias, Actividad/Pasos y finalmente Comidas", () => {
     expect(today.indexOf("<MealComposer")).toBeGreaterThan(today.indexOf(">Resumen<"));
-    expect(today.indexOf("<MealList")).toBeGreaterThan(today.indexOf("<MealComposer"));
-    expect(today.indexOf("<TodayActivity")).toBeGreaterThan(today.indexOf("<MealList"));
+    expect(mealComposer).toContain("<QuickMeals meals={quickMeals} />");
+    expect(today.indexOf("<TodayActivity")).toBeGreaterThan(today.indexOf("<MealComposer"));
+    expect(today.indexOf("<MealList")).toBeGreaterThan(today.indexOf("<TodayActivity"));
+    expect(today).toContain("lg:col-start-1 lg:row-start-2");
+    expect(today).toContain("lg:col-start-5");
+    expect(today).toContain("lg:row-start-1");
     expect(activityPanel).toContain("Actividad de hoy");
     expect(activityPanel).not.toContain("<details");
     expect(activityEditor).toContain("<details");

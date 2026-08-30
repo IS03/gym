@@ -124,11 +124,7 @@ export default async function TodayPage() {
 
       </aside>
 
-      <div className="min-w-0 lg:col-span-8 lg:row-span-2">
-        <MealList meals={mealListItems} date={dayLog.log_date} />
-      </div>
-
-      <div className="lg:col-span-4">
+      <div className="lg:col-span-4 lg:col-start-1 lg:row-start-2">
         <TodayActivity
           dayLogId={dayLog.id}
           stepsInitial={dayLog.steps}
@@ -148,6 +144,10 @@ export default async function TodayPage() {
           waterTargetLabel={context.targets.waterL == null ? null : formatLiters(context.targets.waterL)}
           stepsSummary={stepsOverview.summary}
         />
+      </div>
+
+      <div className="min-w-0 lg:col-span-8 lg:col-start-5 lg:row-span-2 lg:row-start-1">
+        <MealList meals={mealListItems} date={dayLog.log_date} />
       </div>
       </div>
     </div>

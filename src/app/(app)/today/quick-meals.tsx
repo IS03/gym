@@ -86,7 +86,7 @@ export function QuickMeals({ meals }: { meals: QuickMealCandidate[] }) {
     <section aria-labelledby="quick-meals-heading">
       <details className="group/quick-meals overflow-hidden rounded-xl border bg-card shadow-sm">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-          <h2 id="quick-meals-heading" className="min-w-0 flex-1 text-sm font-semibold">Comidas rápidas</h2>
+          <h2 id="quick-meals-heading" className="min-w-0 flex-1 text-sm font-semibold">Comidas sugeridas</h2>
           <span className="shrink-0 text-xs text-muted-foreground">
             {visibleMeals.length} {visibleMeals.length === 1 ? "sugerida" : "sugeridas"}
           </span>
@@ -105,7 +105,7 @@ export function QuickMeals({ meals }: { meals: QuickMealCandidate[] }) {
           {hasMore ? (
             <div className="px-1.5 pb-1.5">
               <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setMoreOpen(true)}>Ver más</Button>
-              <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen} title="Comidas rápidas" description="Elegí una comida anterior para agregarla hoy." closeLabel="Cerrar comidas rápidas">
+              <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen} title="Comidas sugeridas" description="Elegí una comida anterior para agregarla hoy." closeLabel="Cerrar comidas sugeridas">
                 <QuickMealRows meals={meals} pendingMealId={pendingMealId} onQuickAdd={onQuickAdd} framed />
               </ResponsiveDialog>
             </div>

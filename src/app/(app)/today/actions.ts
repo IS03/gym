@@ -33,7 +33,7 @@ export type MealMutationActionResult =
 export async function quickAddMealAction(
   sourceMealId: string,
 ): Promise<QuickAddMealActionResult> {
-  if (!sourceMealId.trim()) return { ok: false, error: "Comida rápida inválida." };
+  if (!sourceMealId.trim()) return { ok: false, error: "Comida sugerida inválida." };
   try {
     const auth = await requireAuthenticatedRequestContext();
     await quickAddMeal(sourceMealId, todayInCordoba(), auth);
