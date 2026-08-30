@@ -5,12 +5,13 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Food } from "@/lib/phase1/types";
 import type { QuickMealCandidate } from "@/lib/nutrition/quick-meals-core";
+import type { SavedMealSummary } from "@/lib/nutrition/saved-meal-core";
 import { CreateMealForm } from "./create-meal-form";
 import { FoodMealForm } from "./food-meal-form";
-import { QuickMeals } from "./quick-meals";
+import { QuickAddMeals } from "./quick-meals";
 import { ResponsiveDialog } from "./responsive-dialog";
 
-export function MealComposer({ date, quickMeals, foods }: { date: string; quickMeals: QuickMealCandidate[]; foods: Food[] }) {
+export function MealComposer({ date, quickMeals, foods, savedMeals }: { date: string; quickMeals: QuickMealCandidate[]; foods: Food[]; savedMeals: SavedMealSummary[] }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"manual" | "food">("manual");
 
@@ -24,7 +25,7 @@ export function MealComposer({ date, quickMeals, foods }: { date: string; quickM
       <Button type="button" className="h-11 w-full" onClick={() => setOpen(true)}>
         <Plus className="size-4" aria-hidden /> Agregar comida
       </Button>
-      <QuickMeals meals={quickMeals} />
+      <QuickAddMeals date={date} suggestedMeals={quickMeals} initialSavedMeals={savedMeals} />
       <ResponsiveDialog
         open={open}
         onOpenChange={handleOpenChange}

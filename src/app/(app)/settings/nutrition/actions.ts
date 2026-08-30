@@ -16,11 +16,18 @@ import {
   createIntegrationApiToken,
   revokeIntegrationApiToken,
 } from "@/lib/integrations/chatgpt-tokens";
+import {
+  deleteSavedMeal,
+  SavedMealProductError,
+  saveSavedMeal,
+  setSavedMealActive,
+  type SavedMealMutationInput,
+} from "@/lib/nutrition/saved-meals";
 
 export type SettingsActionState = { ok: boolean; error?: string };
 
 function refresh() {
-  for (const path of ["/settings", "/settings/nutrition", "/settings/nutrition/goals", "/settings/nutrition/expenditure", "/settings/nutrition/schedule", "/settings/nutrition/foods", "/settings/nutrition/integrations", "/today", "/home", "/history"]) {
+  for (const path of ["/settings", "/settings/nutrition", "/settings/nutrition/goals", "/settings/nutrition/expenditure", "/settings/nutrition/schedule", "/settings/nutrition/foods", "/settings/nutrition/meals", "/settings/nutrition/integrations", "/today", "/home", "/history"]) {
     revalidatePath(path);
   }
 }
@@ -88,6 +95,51 @@ export async function deleteFoodAction(input: { id: string }) {
       error: error instanceof FoodProductError
         ? error.message
         : "No pudimos eliminar el alimento.",
+    };
+  }
+}
+
+export async function saveSavedMealAction(input: SavedMealMutationInput) {
+  try {
+    const meal = await saveSavedMeal(input);
+    refresh();
+    return { ok: true as const, meal };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos guardar la comida habitual.",
+    };
+  }
+}
+
+export async function setSavedMealActiveAction(input: { id: string; active: boolean }) {
+  try {
+    const meal = await setSavedMealActive(input.id, input.active);
+    refresh();
+    return { ok: true as const, meal };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos actualizar la comida habitual.",
+    };
+  }
+}
+
+export async function deleteSavedMealAction(input: { id: string }) {
+  try {
+    await deleteSavedMeal(input.id);
+    refresh();
+    return { ok: true as const };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos eliminar la comida habitual.",
     };
   }
 }

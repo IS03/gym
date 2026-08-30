@@ -1,67 +1,65 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
-const root = resolve(process.cwd());
-const read = (path: string) => readFileSync(resolve(root, path), "utf8");
+const read = (path: string) => readFileSync(path, "utf8");
 
-describe("quick meals wiring", () => {
+describe("PR30 — Agregar rápido", () => {
   const composer = read("src/app/(app)/today/meal-composer.tsx");
-  const quickMeals = read("src/app/(app)/today/quick-meals.tsx");
+  const quickAdd = read("src/app/(app)/today/quick-meals.tsx");
   const actions = read("src/app/(app)/today/actions.ts");
-  const dayLog = read("src/lib/phase1/day-log.ts");
+  const savedDomain = read("src/lib/nutrition/saved-meals.ts");
+  const quickDomain = read("src/lib/nutrition/quick-meals.ts");
+  const quickCore = read("src/lib/nutrition/quick-meals-core.ts");
   const todayPage = read("src/app/(app)/today/page.tsx");
 
-  it("keeps the manual CTA and only renders quick meals when candidates exist", () => {
+  it("mantiene Agregar comida y separa Habituales de Sugeridas", () => {
     expect(composer).toContain("Agregar comida");
-    expect(composer).toContain("<QuickMeals meals={quickMeals} />");
-    expect(quickMeals).toContain("if (meals.length === 0) return null");
+    expect(composer).toContain("<QuickAddMeals");
+    expect(quickAdd).toContain("Agregar rápido");
+    expect(quickAdd).toContain('tabButton("saved", "Habituales")');
+    expect(quickAdd).toContain('tabButton("suggested", "Sugeridas")');
   });
 
-  it("shows four initially, exposes compact accessible quick add, pending and inline errors", () => {
-    expect(quickMeals).toContain("meals.slice(0, QUICK_MEALS_INITIAL_LIMIT)");
-    expect(quickMeals).toContain("aria-label={`Agregar ${meal.label}`}");
-    expect(quickMeals).toContain("disabled={pending}");
-    expect(quickMeals).toContain("pendingSourceMealId.current");
-    expect(quickMeals).toContain('role="status"');
-    expect(quickMeals).toContain('aria-live="polite"');
-    expect(quickMeals).toContain("<ResponsiveDialog");
+  it("muestra cuatro filas inicialmente y preserva Ver más, pending y feedback", () => {
+    expect(quickAdd).toContain("savedMeals.slice(0, QUICK_MEALS_INITIAL_LIMIT)");
+    expect(quickAdd).toContain("suggestedMeals.slice(0, QUICK_MEALS_INITIAL_LIMIT)");
+    expect(quickAdd).toContain("Ver más");
+    expect(quickAdd).toContain('aria-live="polite"');
+    expect(quickAdd).toContain("pendingRef.current");
+    expect(quickAdd).toContain("Agregada");
   });
 
-  it("keeps suggestions in a native details section closed by default", () => {
-    const detailsTag = quickMeals.slice(quickMeals.indexOf("<details"), quickMeals.indexOf(">", quickMeals.indexOf("<details")));
-    const detailsBody = quickMeals.slice(quickMeals.indexOf("<details"), quickMeals.indexOf("</details>"));
-    expect(detailsTag).not.toContain(" open");
-    expect(detailsBody).toContain("<summary");
-    expect(detailsBody).toContain("Comidas sugeridas");
-    expect(quickMeals).toContain('title="Comidas sugeridas"');
-    expect(quickMeals).toContain('closeLabel="Cerrar comidas sugeridas"');
-    expect(detailsBody).toContain("visibleMeals.length");
-    expect(detailsBody).toContain("<QuickMealRows meals={visibleMeals}");
-    expect(detailsBody).toContain("Ver más");
-    expect(detailsBody).toContain("<ResponsiveDialog");
-    expect(detailsBody).toContain("group-open/quick-meals:rotate-180");
-    expect(detailsBody).toContain("motion-reduce:transition-none");
-  });
-
-  it("uses a parallel read and sends only sourceMealId to a server-owned copy", () => {
+  it("carga Habituales en paralelo sin reemplazar el read-model de Sugeridas", () => {
     expect(todayPage).toContain("getQuickMealCandidates(today, auth)");
-    expect(quickMeals).toContain("quickAddMealAction(meal.sourceMealId)");
-    expect(actions).toContain("requireAuthenticatedRequestContext()");
-    expect(actions).toContain("quickAddMeal(sourceMealId, todayInCordoba(), auth)");
-    expect(dayLog).toContain('.eq("id", sourceMealId)');
-    expect(dayLog).toContain('.eq("user_id", userId)');
-    expect(dayLog).toContain('.eq("source_type", "manual")');
-    expect(dayLog).toContain("return createMeal({");
+    expect(todayPage).toContain("listActiveSavedMeals(auth)");
+    expect(todayPage).toContain("Promise.all");
+    expect(quickDomain).toContain('eq("source_type", "manual")');
+    expect(quickCore).toContain("QUICK_MEAL_WINDOW_DAYS = 60");
+    expect(quickCore).toContain("QUICK_MEALS_MAX = 10");
   });
 
-  it("keeps quick-add separate from manual duplicate detection and copies only canonical meal fields", () => {
-    const quickAction = actions.slice(actions.indexOf("export async function quickAddMealAction"), actions.indexOf("function parseCreateMealFromFormData"));
-    expect(quickAction).not.toContain("findRecentPossibleDuplicateMeal");
-    const quickCopy = dayLog.slice(dayLog.indexOf("export async function quickAddMeal"), dayLog.indexOf("export type UpdateMealInput"));
-    expect(quickCopy).toContain("title: data.title");
-    expect(quickCopy).toContain("final_fat_g: data.final_fat_g");
-    expect(quickCopy).not.toContain("day_log_id:");
-    expect(quickCopy).not.toContain("created_at:");
+  it("conserva el + sugerido y agrega Guardar como habitual como acción distinta", () => {
+    expect(quickAdd).toContain("quickAddMealAction(meal.sourceMealId)");
+    expect(quickAdd).toContain("saveSuggestedMealAction(meal.sourceMealId)");
+    expect(quickAdd).toContain("Guardar ${meal.label} como habitual");
+    expect(actions).toContain("saveSuggestedMeal(sourceMealId, todayInCordoba(), auth)");
+    expect(savedDomain).toContain('.eq("id", sourceMealId).eq("user_id", auth.userId)');
+    expect(savedDomain).toContain('.is("deleted_at", null)');
+  });
+
+  it("one-tap y Ajustar envían IDs/cantidades y el servidor relee snapshots", () => {
+    expect(quickAdd).toContain("quickAddSavedMealAction({ savedMealId: meal.id, date })");
+    expect(quickAdd).toContain("itemId: item.id, quantity:");
+    expect(quickAdd).not.toContain("final_calories:");
+    expect(actions).toContain("quickAddSavedMeal(input.savedMealId, input.date, auth)");
+    expect(actions).toContain("addAdjustedSavedMeal(input, auth)");
+    expect(savedDomain).toContain("readSavedMeal(savedMealId, auth, true)");
+    expect(savedDomain).toContain("scaleSavedMealItem(item, byId.get(item.id))");
+  });
+
+  it("ofrece empty states de ambos conceptos sin auto-guardar sugerencias", () => {
+    expect(quickAdd).toContain("Todavía no guardaste comidas habituales.");
+    expect(quickAdd).toContain("Todavía no hay suficientes comidas anteriores para sugerir.");
+    expect(savedDomain).not.toContain("buildQuickMealCandidates");
   });
 });

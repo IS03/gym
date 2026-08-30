@@ -157,6 +157,46 @@ export type Food = {
   updated_at: string;
 };
 
+export type SavedMealTemplateType = "manual" | "composite";
+
+export type SavedMeal = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  template_type: SavedMealTemplateType;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Snapshot nutricional: source_food_id es procedencia, no dependencia viva. */
+export type SavedMealItem = {
+  id: string;
+  saved_meal_id: string;
+  user_id: string;
+  label: string;
+  quantity: number;
+  unit: string;
+  base_quantity: number;
+  base_calories: number | null;
+  base_protein_g: number | null;
+  base_carbs_g: number | null;
+  base_fat_g: number | null;
+  source_food_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SavedMealWithItems = SavedMeal & {
+  items: SavedMealItem[];
+};
+
 export type NutritionEvent = {
   id: string;
   user_id: string;

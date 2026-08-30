@@ -228,16 +228,18 @@ export async function getNutritionConfigurationHub(today: string): Promise<{
   expenditure: ExpenditureRulePeriod | null;
   schedule: WorkSchedulePeriod | null;
   activeFoodCount: number;
+  activeSavedMealCount: number;
 }> {
   assertDate(today);
   const { supabase, userId } = await authed();
-  const [goal, expenditure, schedule, foods] = await Promise.all([
+  const [goal, expenditure, schedule, foods, savedMeals] = await Promise.all([
     supabase.from("nutrition_goal_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("expenditure_rule_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("work_schedule_periods").select("*").eq("user_id", userId).lte("effective_from", today).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("foods").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_active", true),
+    supabase.from("saved_meals").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_active", true),
   ]);
-  for (const result of [goal, expenditure, schedule, foods]) {
+  for (const result of [goal, expenditure, schedule, foods, savedMeals]) {
     if (result.error) throw new Error(`Leer configuración nutricional: ${result.error.message}`);
   }
   return {
@@ -245,6 +247,7 @@ export async function getNutritionConfigurationHub(today: string): Promise<{
     expenditure: (expenditure.data ?? null) as ExpenditureRulePeriod | null,
     schedule: (schedule.data ?? null) as WorkSchedulePeriod | null,
     activeFoodCount: foods.count ?? 0,
+    activeSavedMealCount: savedMeals.count ?? 0,
   };
 }
 

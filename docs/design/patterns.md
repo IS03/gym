@@ -66,9 +66,9 @@ PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curs
 
 ### Today / nutrición diaria
 
-PR28.1 fija Today como un flujo de contexto diario: resumen y registro manual primero, **Comidas sugeridas** como disclosure compacto, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
+PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, **Agregar rápido**, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
 
-Las Comidas sugeridas se infieren automáticamente de `meal_entries` manuales históricos; no son Foods ni comidas guardadas administrables. La futura separación entre alimentos por cantidad (PR29) y comidas habituales/guardadas (PR30) conserva este concepto histórico como una fuente distinta.
+**Agregar rápido** separa dos fuentes mediante tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 
 Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.
 
@@ -79,6 +79,16 @@ Las acciones destructivas viven detrás de **Más opciones** dentro del editor y
 PR29 separa catálogo y consumo. **Food** es una referencia cuantificable con porción y unidad canónicas; **MealEntry** es el snapshot histórico que resulta de usarla. Today ofrece **Manual** y **Desde alimento** dentro de la misma entrada, sin competir con Comidas sugeridas. El selector cotidiano muestra sólo alimentos activos y el servidor relee ownership, estado y nutrición antes de escalar la cantidad en la misma unidad.
 
 El catálogo usa búsqueda, Activos / Archivados / Todos y filas compactas. Archivar es la salida cotidiana y conserva el Food; eliminar es una acción secundaria confirmada. El estado archivado siempre se expresa con texto o badge, no sólo con opacidad. Crear y editar ocurren en un sheet/dialog responsive, preservando `null` como desconocido y `0` como cero conocido.
+
+### Comidas habituales y sugeridas
+
+PR30 consolida cuatro roles distintos: **Food** es un ingrediente/base cuantificable; **SavedMeal** es una plantilla mutable administrada por el usuario; **SuggestedMeal** es un read model del historial; **MealEntry** es el snapshot del consumo ocurrido. Today muestra Habituales y Sugeridas juntas sólo como accesos rápidos, sin mezclar sus fuentes de verdad.
+
+Una comida habitual puede ser manual o compuesta. Los componentes compuestos conservan su propio snapshot de cantidad, unidad y nutrición; la referencia opcional al Food es procedencia, no una dependencia viva. Editar o eliminar el Food no reinterpreta la plantilla. Los totales de la plantilla los calcula el servidor con escalado en la misma unidad, calorías enteras, macros a dos decimales y propagación de `null` por nutriente.
+
+El `+` agrega la versión guardada en un toque. **Ajustar** cambia cantidades sólo para esa ocurrencia y nunca edita la plantilla. El navegador envía IDs y cantidades; el servidor relee ownership, estado y snapshots antes de crear una `MealEntry`. Editar, archivar o eliminar una habitual tampoco modifica las comidas ya registradas.
+
+La gestión reutiliza búsqueda, Activas / Archivadas / Todas, filas compactas, estado archivado explícito y editor responsive. Archivar mantiene la plantilla; eliminar confirma el alcance, borra la plantilla y sus componentes, y deja intacto el historial.
 
 ## Sheets y dialogs
 

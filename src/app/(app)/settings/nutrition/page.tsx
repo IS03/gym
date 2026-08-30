@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Apple, ArrowLeft, BriefcaseBusiness, ChevronRight, Flame, KeyRound, Target } from "lucide-react";
+import { Apple, ArrowLeft, BriefcaseBusiness, ChevronRight, CookingPot, Flame, KeyRound, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getNutritionConfigurationHub } from "@/lib/nutrition/product";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
@@ -42,6 +42,7 @@ export default async function NutritionSettingsPage() {
       <SettingsLink href="/settings/nutrition/expenditure" icon={Flame} title="Gasto estimado" description={config.expenditure ? `${config.expenditure.name} · desde ${dateLabel(config.expenditure.effective_from)}` : "Sin configurar"} />
       <SettingsLink href="/settings/nutrition/schedule" icon={BriefcaseBusiness} title="Horario laboral" description={config.schedule ? `${config.schedule.name} · desde ${dateLabel(config.schedule.effective_from)}` : "Sin configurar"} />
       <SettingsLink href="/settings/nutrition/foods" icon={Apple} title="Alimentos habituales" description={config.activeFoodCount > 0 ? `${config.activeFoodCount} ${config.activeFoodCount === 1 ? "activo" : "activos"} · registralos por cantidad` : "Referencias para registrar cantidades rápidamente"} />
+      <SettingsLink href="/settings/nutrition/meals" icon={CookingPot} title="Comidas habituales" description={config.activeSavedMealCount > 0 ? `${config.activeSavedMealCount} ${config.activeSavedMealCount === 1 ? "activa" : "activas"} · agregalas rápidamente` : "Preparaciones que repetís seguido"} />
       <SettingsLink href="/settings/nutrition/integrations" icon={KeyRound} title="Integraciones" description="ChatGPT" />
     </section>
   </div>;

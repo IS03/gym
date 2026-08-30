@@ -35,6 +35,8 @@ describe("PR29 — registrar alimento por cantidad", () => {
   });
 
   it("mantiene Comidas sugeridas como flujo independiente", () => {
-    expect(composer).toContain("<QuickMeals meals={quickMeals}");
+    expect(composer).toContain("<QuickAddMeals");
+    expect(composer).toContain("suggestedMeals={quickMeals}");
+    expect(composer).toContain("initialSavedMeals={savedMeals}");
   });
 });

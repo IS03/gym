@@ -8,6 +8,7 @@ import { getNutritionDay } from "@/lib/nutrition/day";
 import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { getStepsOverview } from "@/lib/nutrition/steps-report";
 import { listActiveFoods } from "@/lib/nutrition/product";
+import { listActiveSavedMeals } from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { TodayActivity } from "./today-activity";
@@ -50,11 +51,12 @@ function formatProteinProgress(consumed: number, target: number | null) {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods] = await Promise.all([
+  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods, savedMeals] = await Promise.all([
     getNutritionDay(today, undefined, auth),
     getStepsOverview(today, auth),
     getQuickMealCandidates(today, auth),
     listActiveFoods(auth),
+    listActiveSavedMeals(auth),
   ]);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
@@ -122,7 +124,7 @@ export default async function TodayPage() {
         </CardContent>
       </Card>
 
-      <MealComposer date={today} quickMeals={quickMeals} foods={foods} />
+      <MealComposer date={today} quickMeals={quickMeals} foods={foods} savedMeals={savedMeals} />
 
       </aside>
 

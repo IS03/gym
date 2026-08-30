@@ -22,6 +22,7 @@ los tests.
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` | IDs, fuentes y snapshots nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | gasto estimado y contexto del día |
 | Pasos diarios | `day_logs.steps` | `day_logs.steps` | editor de Actividad de Hoy | contexto de actividad e historial de sólo lectura en `/today/steps`; `null` es sin dato y no modifica el gasto |
 | Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día; Comidas sugeridas es un read model derivado |
+| Comida habitual | `saved_meals` + componentes snapshot en `saved_meal_items` | snapshot independiente en `meal_entries` al agregar | CRUD owner-scoped + RPC transaccional de plantilla | Agregar rápido; no recalcula historia |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; lectura contextual en History | contexto de permitidos, sin sumar consumo |
 | Catálogo personal | `foods`, con nutrición completa o parcial | snapshot independiente en `meal_entries` al registrar cantidad | importador histórico + CRUD owner-scoped en Ajustes | registro por cantidad; nunca recalcula historia |
@@ -192,6 +193,23 @@ completos anteriores al día de Córdoba. Las entradas `sheet_import` y los
 resúmenes heredados se excluyen. Al elegir una sugerencia, el servidor vuelve a
 verificar ownership y crea una `meal_entry` manual normal para hoy; los totales
 siguen siendo responsabilidad del trigger canónico.
+
+### Food, SavedMeal, SuggestedMeal y MealEntry
+
+Los cuatro conceptos tienen ciclos de vida distintos:
+
+- `foods`: catálogo mutable de ingredientes/bases cuantificables;
+- `saved_meals`: plantillas mutables que el usuario decidió conservar;
+- Comidas sugeridas: read model derivado de historial, sin tabla propia;
+- `meal_entries`: hechos consumidos y snapshots históricos.
+
+Una `saved_meal` puede ser manual —totales informados directamente— o compuesta. En una compuesta, cada `saved_meal_item` guarda etiqueta, cantidad, unidad, porción base y nutrición base como snapshot. `source_food_id` sólo conserva procedencia y deliberadamente no tiene FK a `foods`: editar, archivar o eliminar un Food no cambia ni bloquea la plantilla.
+
+La FK compuesta `(saved_meal_id, user_id)` impide mezclar ownership y elimina los items cuando se elimina su plantilla. RLS limita SELECT/INSERT/UPDATE/DELETE al usuario autenticado. Eliminar o archivar una plantilla no toca `meal_entries`, porque el consumo copia título, descripción y nutrición en el momento de registrarse.
+
+Al guardar una plantilla compuesta, el servidor relee cada Food nuevo, valida ownership/estado y materializa el snapshot. Postgres reemplaza plantilla e items de forma atómica y recalcula sus totales. El cálculo escala únicamente en la misma unidad: calorías con redondeo entero, macros a dos decimales y `null` propagado si cualquier componente desconoce ese nutriente. No se derivan calorías desde macros.
+
+Agregar rápido recibe sólo `savedMealId` y fecha. El servidor relee la plantilla propia/activa y crea una `meal_entry` snapshot. **Ajustar** recibe IDs de items y cantidades, valida que todos pertenezcan a la plantilla y recalcula sólo esa ocurrencia. Guardar una sugerencia recibe `sourceMealId`, relee la comida histórica propia/elegible y crea una `saved_meal` manual; no existe backfill automático.
 
 La protección de doble envío compara fecha, texto, calorías y los tres macros
 durante la ventana reciente. Conserva la diferencia entre `null` y `0`; el

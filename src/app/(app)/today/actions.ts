@@ -14,6 +14,13 @@ import {
 } from "@/lib/nutrition/meal-macros";
 import { createMealFromFood } from "@/lib/nutrition/food-entry";
 import { FoodQuantityError } from "@/lib/nutrition/food-quantity";
+import {
+  addAdjustedSavedMeal,
+  getSavedMealAdjustment,
+  quickAddSavedMeal,
+  SavedMealProductError,
+  saveSuggestedMeal,
+} from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
@@ -68,6 +75,90 @@ export async function quickAddMealAction(
     return {
       ok: false,
       error: "No pudimos agregar la comida.",
+    };
+  }
+}
+
+export async function quickAddSavedMealAction(input: { savedMealId: string; date: string }) {
+  try {
+    const auth = await requireAuthenticatedRequestContext();
+    await quickAddSavedMeal(input.savedMealId, input.date, auth);
+    revalidateMealPages();
+    return { ok: true as const };
+  } catch (error) {
+    console.warn("[saved-meals] quick_add_failed");
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos agregar la comida habitual.",
+    };
+  }
+}
+
+export async function addAdjustedSavedMealAction(input: {
+  savedMealId: string;
+  date: string;
+  items: Array<{ itemId: string; quantity: string }>;
+}) {
+  try {
+    const auth = await requireAuthenticatedRequestContext();
+    await addAdjustedSavedMeal(input, auth);
+    revalidateMealPages();
+    return { ok: true as const };
+  } catch (error) {
+    console.warn("[saved-meals] adjusted_add_failed");
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos agregar la comida ajustada.",
+    };
+  }
+}
+
+export async function getSavedMealAdjustmentAction(savedMealId: string) {
+  try {
+    return { ok: true as const, meal: await getSavedMealAdjustment(savedMealId) };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos abrir esta comida habitual.",
+    };
+  }
+}
+
+export async function saveSuggestedMealAction(sourceMealId: string) {
+  try {
+    const auth = await requireAuthenticatedRequestContext();
+    const meal = await saveSuggestedMeal(sourceMealId, todayInCordoba(), auth);
+    revalidatePath("/settings/nutrition");
+    revalidatePath("/settings/nutrition/meals");
+    revalidatePath("/today");
+    return {
+      ok: true as const,
+      meal: {
+        id: meal.id,
+        name: meal.name,
+        description: meal.description,
+        template_type: meal.template_type,
+        calories: meal.calories,
+        protein_g: meal.protein_g,
+        carbs_g: meal.carbs_g,
+        fat_g: meal.fat_g,
+        is_active: meal.is_active,
+        itemCount: meal.items.length,
+      },
+    };
+  } catch (error) {
+    console.warn("[saved-meals] suggestion_save_failed");
+    return {
+      ok: false as const,
+      error: error instanceof SavedMealProductError
+        ? error.message
+        : "No pudimos guardar la comida habitual.",
     };
   }
 }

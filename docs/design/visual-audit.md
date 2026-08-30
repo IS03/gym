@@ -30,7 +30,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 ### 🔴 Replantear
 
 - **Crear / editar rutina:** no conviene acumular ajustes en el editor actual. Debe ser excelente para una cuenta nueva y una rutina compleja. PR26.
-- **Alimentos por cantidad:** resuelto en PR29 como catálogo cuantificable y snapshot en comidas; las comidas compuestas permanecen fuera de alcance hasta PR30.
+- **Alimentos por cantidad y comidas habituales:** resueltos en PR29/PR30 como catálogos separados, con snapshots estables en las comidas registradas.
 
 ## Inventario de áreas y próxima decisión
 
@@ -57,6 +57,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | `/settings` y `/settings/profile` | 🟡 Mejorar | agrupación, tema, seguridad | despersonalizar y modularizar sin romper perfil | PR42 / PR45 |
 | `/settings/nutrition` + objetivos/gasto/horario | 🟡 Mejorar | períodos versionados y contexto | simplificar orientación de configuración | PR28 |
 | `/settings/nutrition/foods` | ✅ Mantener | catálogo cuantificable, archivo, búsqueda y ownership | mantener separado de futuras comidas guardadas | resuelto PR29 |
+| `/settings/nutrition/meals` | ✅ Mantener | plantillas manuales/compuestas, archivo, búsqueda y ownership | mantener separado de Foods y sugerencias históricas | resuelto PR30 |
 | `/settings/nutrition/integrations` | ✅ Mantener | clave, estado, revocación | mantenimiento, sin ampliar alcance de datos | — |
 | Tema | ✅ Mantener | Claro/Oscuro/Sistema | validar contrastes por cada rediseño | continuo |
 
@@ -100,13 +101,19 @@ La lista de comidas abandona el formulario inline: cada registro se consulta com
 
 Today conserva el registro Manual y suma **Desde alimento**: el usuario elige un Food activo, indica una cantidad en su unidad canónica y ve una preview con la misma regla compartida que el servidor. La mutación sólo recibe identidad, cantidad y fecha; relee ownership y valores canónicos antes de crear una `meal_entry` snapshot. Editar, archivar o eliminar el Food no reinterpreta el historial.
 
+### PR30 — Comidas habituales / guardadas
+
+**Resuelto.** `/settings/nutrition/meals` administra plantillas manuales y compuestas mediante búsqueda, Activas / Archivadas / Todas, filas compactas y editor responsive. Los componentes son snapshots nutricionales: borrar o editar el Food de origen no rompe la plantilla. Archivar conserva; eliminar confirma y sólo remueve la plantilla y sus componentes.
+
+Today reemplaza la superficie aislada de sugerencias por **Agregar rápido**, con tabs **Habituales** y **Sugeridas**. El `+` habitual crea una comida desde valores canónicos releídos por el servidor; una compuesta ofrece **Ajustar** para modificar sólo la ocurrencia. Las Sugeridas mantienen el algoritmo histórico de 60 días y suman una acción separada para guardarlas explícitamente como habitual. Ninguna plantilla o sugerencia reescribe `meal_entries` ya creadas.
+
 ## Roadmap visual y de producto
 
 | Etapa | Alcance |
 | --- | --- |
 | PR23 | Design System v1 + auditoría visual global |
-| PR24–29 | Login, sesión activa, rutinas, Train, Today y alimentos por cantidad |
-| PR30–34 | comidas guardadas, suplementos, notificaciones, métricas configurables, calidad de datos |
+| PR24–30 | Login, sesión activa, rutinas, Train, Today, alimentos por cantidad y comidas guardadas |
+| PR31–34 | suplementos, notificaciones, métricas configurables, calidad de datos |
 | PR35–39 | reportes, tendencias, comparaciones, métrica de fuerza, performance/a11y/reliability |
 | PR40–45 | fotos, integraciones de salud, despersonalización, empty states, onboarding, módulos/preferencias |
 | PR46–50 | aislamiento multiusuario, amigos, privacidad, compartir, copias de rutinas |
