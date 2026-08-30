@@ -74,6 +74,12 @@ Una comida cerrada es una fila/surface escaneable —título, calorías, macros,
 
 Las acciones destructivas viven detrás de **Más opciones** dentro del editor y requieren una confirmación explícita. El pending impide el doble envío y el éxito/error se comunica en un slot estable. El borrado usa el soft-delete canónico: el producto describe que el registro deja de contar y de aparecer, sin prometer una eliminación física.
 
+### Alimentos por cantidad
+
+PR29 separa catálogo y consumo. **Food** es una referencia cuantificable con porción y unidad canónicas; **MealEntry** es el snapshot histórico que resulta de usarla. Today ofrece **Manual** y **Desde alimento** dentro de la misma entrada, sin competir con Comidas sugeridas. El selector cotidiano muestra sólo alimentos activos y el servidor relee ownership, estado y nutrición antes de escalar la cantidad en la misma unidad.
+
+El catálogo usa búsqueda, Activos / Archivados / Todos y filas compactas. Archivar es la salida cotidiana y conserva el Food; eliminar es una acción secundaria confirmada. El estado archivado siempre se expresa con texto o badge, no sólo con opacidad. Crear y editar ocurren en un sheet/dialog responsive, preservando `null` como desconocido y `0` como cero conocido.
+
 ## Sheets y dialogs
 
 Los componentes actuales usan Base UI `Dialog` y varias envolturas locales. El patrón futuro debe mantener:
@@ -134,6 +140,7 @@ La interfaz de sesión ya contiene aprendizajes valiosos de autosave: no borrar 
 | App shell | `components/layout/app-shell.tsx` | ✅ safe areas y límites mobile explícitos | mantener |
 | Theme provider / selector | `components/providers/`, settings | ✅ roles light/dark existentes | mantener y validar contraste por cambio |
 | Entrada / Login | `src/app/(auth)/login/login-form.tsx` | ✅ composición propia, CTA única y feedback estable | mantener; extender hacia onboarding sin rehacer identidad |
+| Catálogo de Foods | `src/app/(app)/settings/nutrition/foods-catalog.tsx` | ✅ búsqueda, archivo, borrado confirmado y editor responsive | mantener separación Food / MealEntry; PR30 no debe convertirlo en recetas |
 | Charts y selector de período | `components/nutrition/` | ✅ reportes informativos y accesibles | mantener como referencia; ampliar en PR35 |
 | Empty / status inline | distribuidos por dominios | 🟡 semántica existe, presentación no unificada | consolidar lenguaje en cada rediseño |
 

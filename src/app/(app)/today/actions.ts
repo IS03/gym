@@ -12,6 +12,8 @@ import {
   optionalMealMacro,
   requiredMealCalories,
 } from "@/lib/nutrition/meal-macros";
+import { createMealFromFood } from "@/lib/nutrition/food-entry";
+import { FoodQuantityError } from "@/lib/nutrition/food-quantity";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
@@ -28,6 +30,28 @@ export type QuickAddMealActionResult =
 export type MealMutationActionResult =
   | { ok: true }
   | { ok: false; error: string };
+
+export async function addFoodToDayAction(input: {
+  foodId: string;
+  quantity: unknown;
+  date: string;
+}): Promise<MealMutationActionResult> {
+  try {
+    const auth = await requireAuthenticatedRequestContext();
+    await createMealFromFood(input, auth);
+    revalidateMealPages();
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof FoodQuantityError) {
+      return { ok: false, error: error.message };
+    }
+    if (error instanceof Error && error.message === "Este alimento ya no está disponible.") {
+      return { ok: false, error: error.message };
+    }
+    console.warn("[food-quantity] add_failed");
+    return { ok: false, error: "No pudimos agregar el alimento." };
+  }
+}
 
 /** La comida se vuelve a leer con ownership en el servidor antes de copiarse. */
 export async function quickAddMealAction(

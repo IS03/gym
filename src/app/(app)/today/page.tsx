@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
 import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { getStepsOverview } from "@/lib/nutrition/steps-report";
+import { listActiveFoods } from "@/lib/nutrition/product";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { TodayActivity } from "./today-activity";
@@ -49,10 +50,11 @@ function formatProteinProgress(consumed: number, target: number | null) {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, stepsOverview, quickMeals] = await Promise.all([
+  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods] = await Promise.all([
     getNutritionDay(today, undefined, auth),
     getStepsOverview(today, auth),
     getQuickMealCandidates(today, auth),
+    listActiveFoods(auth),
   ]);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
@@ -120,7 +122,7 @@ export default async function TodayPage() {
         </CardContent>
       </Card>
 
-      <MealComposer date={today} quickMeals={quickMeals} />
+      <MealComposer date={today} quickMeals={quickMeals} foods={foods} />
 
       </aside>
 

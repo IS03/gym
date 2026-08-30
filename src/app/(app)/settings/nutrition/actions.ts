@@ -5,6 +5,8 @@ import {
   createExpenditurePeriod,
   createNutritionGoalPeriod,
   createWorkSchedulePeriod,
+  deleteFood,
+  FoodProductError,
   saveFood,
   setFoodActive,
   type FoodMutationInput,
@@ -46,11 +48,48 @@ export async function createScheduleAction(_: SettingsActionState, formData: For
 }
 
 export async function saveFoodAction(input: FoodMutationInput) {
-  return run(() => saveFood(input));
+  try {
+    const food = await saveFood(input);
+    refresh();
+    return { ok: true as const, food };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof FoodProductError
+        ? error.message
+        : "No pudimos guardar el alimento.",
+    };
+  }
 }
 
 export async function setFoodActiveAction(input: { id: string; active: boolean }) {
-  return run(() => setFoodActive(input.id, input.active));
+  try {
+    const food = await setFoodActive(input.id, input.active);
+    refresh();
+    return { ok: true as const, food };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof FoodProductError
+        ? error.message
+        : "No pudimos actualizar el alimento.",
+    };
+  }
+}
+
+export async function deleteFoodAction(input: { id: string }) {
+  try {
+    await deleteFood(input.id);
+    refresh();
+    return { ok: true as const };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof FoodProductError
+        ? error.message
+        : "No pudimos eliminar el alimento.",
+    };
+  }
 }
 
 export async function createChatgptKeyAction() {

@@ -57,7 +57,8 @@ describe("PR 9.6 — UX diaria mobile", () => {
 
   it("abre la comida en un diálogo responsive, conserva la fecha y cierra al crear", () => {
     expect(mealComposer).toContain("<ResponsiveDialog");
-    expect(mealComposer).toContain("onSuccess={() => setOpen(false)}");
+    expect(mealComposer).toContain("onSuccess={() => handleOpenChange(false)}");
+    expect(mealComposer).toContain("<FoodMealForm");
     expect(mealForm).toContain('name="date"');
     expect(mealForm).toContain("defaultValue={date}");
     expect(mealForm).toContain("[min-inline-size:0]");

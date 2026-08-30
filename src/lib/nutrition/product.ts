@@ -1,6 +1,9 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 import { parseLocalizedDecimal } from "../localized-decimal";
 import type {
   DayLog,
@@ -56,6 +59,13 @@ async function authed() {
   if (error) throw new Error(`Autenticación: ${error.message}`);
   if (!user) throw new Error("No autenticado.");
   return { supabase, userId: user.id };
+}
+
+export class FoodProductError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FoodProductError";
+  }
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -198,6 +208,20 @@ export async function listFoods() {
   return (data ?? []) as Food[];
 }
 
+export async function listActiveFoods(
+  context?: AuthenticatedRequestContext,
+): Promise<Food[]> {
+  const auth = context ?? await authed();
+  const { data, error } = await auth.supabase
+    .from("foods")
+    .select("id,user_id,name,description,serving_quantity,serving_unit,calories,protein_g,carbs_g,fat_g,precision_level,source_note,is_active,created_at,updated_at")
+    .eq("user_id", auth.userId)
+    .eq("is_active", true)
+    .order("name");
+  if (error) throw new Error("No pudimos leer los alimentos activos.");
+  return (data ?? []) as Food[];
+}
+
 /** A compact, request-scoped read for the nutrition settings hub. */
 export async function getNutritionConfigurationHub(today: string): Promise<{
   goal: NutritionGoalPeriod | null;
@@ -310,12 +334,22 @@ export function parseFoodInput(input: FoodMutationInput) {
 
 export async function saveFood(input: FoodMutationInput): Promise<Food> {
   const { supabase, userId } = await authed();
-  const payload = parseFoodInput(input);
+  const parsed = parseFoodInput(input);
+  const payload: Record<string, unknown> = { ...parsed };
+  if (input.id && input.precisionLevel === undefined) {
+    delete payload.precision_level;
+  }
   const query = input.id
     ? supabase.from("foods").update(payload).eq("id", input.id).eq("user_id", userId)
     : supabase.from("foods").insert({ ...payload, user_id: userId, is_active: true });
   const { data, error } = await query.select("*").single();
-  if (error) throw new Error(`Guardar alimento: ${error.message}`);
+  if (error?.code === "23505") {
+    throw new FoodProductError("Ya existe un alimento activo con ese nombre.");
+  }
+  if (error) {
+    console.warn("[foods] save_failed", { code: error.code });
+    throw new FoodProductError("No pudimos guardar el alimento.");
+  }
   return data as Food;
 }
 
@@ -323,6 +357,34 @@ export async function setFoodActive(id: string, isActive: boolean): Promise<Food
   const { supabase, userId } = await authed();
   const { data, error } = await supabase.from("foods").update({ is_active: isActive })
     .eq("id", id).eq("user_id", userId).select("*").single();
-  if (error) throw new Error(`${isActive ? "Reactivar" : "Desactivar"} alimento: ${error.message}`);
+  if (error?.code === "23505") {
+    throw new FoodProductError("Ya existe un alimento activo con ese nombre.");
+  }
+  if (error) {
+    console.warn("[foods] active_state_failed", { code: error.code });
+    throw new FoodProductError(
+      `No pudimos ${isActive ? "reactivar" : "archivar"} el alimento.`,
+    );
+  }
   return data as Food;
+}
+
+/**
+ * `foods` no tiene referencias entrantes: las comidas conservan snapshots y
+ * nunca consultan el catálogo para renderizar el historial.
+ */
+export async function deleteFood(id: string): Promise<void> {
+  const { supabase, userId } = await authed();
+  const { data, error } = await supabase
+    .from("foods")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.warn("[foods] delete_failed", { code: error.code });
+    throw new FoodProductError("No pudimos eliminar el alimento.");
+  }
+  if (!data) throw new FoodProductError("Este alimento ya no está disponible.");
 }

@@ -30,7 +30,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 ### 🔴 Replantear
 
 - **Crear / editar rutina:** no conviene acumular ajustes en el editor actual. Debe ser excelente para una cuenta nueva y una rutina compleja. PR26.
-- **Alimentos por cantidad:** la experiencia actual de catálogo no cubre el futuro flujo de cantidad y comida compuesta. PR29, después de PR28.
+- **Alimentos por cantidad:** resuelto en PR29 como catálogo cuantificable y snapshot en comidas; las comidas compuestas permanecen fuera de alcance hasta PR30.
 
 ## Inventario de áreas y próxima decisión
 
@@ -56,7 +56,7 @@ La captura productiva directa estuvo disponible en 1363 × 936 (desktop). El she
 | `/progress` | 🟡 Mejorar | punto de entrada a análisis | definir arquitectura de reportes | PR35–37 |
 | `/settings` y `/settings/profile` | 🟡 Mejorar | agrupación, tema, seguridad | despersonalizar y modularizar sin romper perfil | PR42 / PR45 |
 | `/settings/nutrition` + objetivos/gasto/horario | 🟡 Mejorar | períodos versionados y contexto | simplificar orientación de configuración | PR28 |
-| `/settings/nutrition/foods` | 🔴 Replantear | catálogo personal canónico | alimentos por cantidad y luego comidas guardadas | PR29 / PR30 |
+| `/settings/nutrition/foods` | ✅ Mantener | catálogo cuantificable, archivo, búsqueda y ownership | mantener separado de futuras comidas guardadas | resuelto PR29 |
 | `/settings/nutrition/integrations` | ✅ Mantener | clave, estado, revocación | mantenimiento, sin ampliar alcance de datos | — |
 | Tema | ✅ Mantener | Claro/Oscuro/Sistema | validar contrastes por cada rediseño | continuo |
 
@@ -94,9 +94,11 @@ El selector de ejercicios de rutina adopta la geometría estable de PR25, con b�
 
 La lista de comidas abandona el formulario inline: cada registro se consulta como una fila compacta y se edita en un sheet/dialog responsive único. El borrado sigue usando soft-delete canónico, pero ahora exige una confirmación, comunica pending, éxito o error y no promete una eliminación física. Actividad, pasos, agua, mate y correcciones permanecen intactos y se muestran antes de las comidas en mobile.
 
-### PR29
+### PR29 — Alimentos habituales v2
 
-- **PR29:** alimentos por cantidad.
+**Resuelto.** El catálogo diferencia Activos, Archivados y Todos, busca por nombre y usa filas compactas con estado explícito. Crear y editar dejan el flujo inline por un sheet/dialog responsive; archivar/reactivar sigue siendo la mutación cotidiana y eliminar exige confirmación.
+
+Today conserva el registro Manual y suma **Desde alimento**: el usuario elige un Food activo, indica una cantidad en su unidad canónica y ve una preview con la misma regla compartida que el servidor. La mutación sólo recibe identidad, cantidad y fecha; relee ownership y valores canónicos antes de crear una `meal_entry` snapshot. Editar, archivar o eliminar el Food no reinterpreta el historial.
 
 ## Roadmap visual y de producto
 

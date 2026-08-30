@@ -2,7 +2,7 @@ import {
   createClient,
   type AuthenticatedRequestContext,
 } from "@/lib/supabase/server";
-import type { DayLog, MealEntry } from "./types";
+import type { DayLog, MealEntry, NutritionPrecision } from "./types";
 import {
   isMostRecentWeightEntry,
   parseOptionalWeight,
@@ -62,6 +62,9 @@ export type CreateMealInput = {
   final_protein_g?: number | null;
   final_carbs_g?: number | null;
   final_fat_g?: number | null;
+  precision_level?: NutritionPrecision | null;
+  context_type?: string | null;
+  source_note?: string | null;
 };
 
 /** Título o descripción nuevos coinciden con el registro (ya normalizado en BD). */
@@ -160,6 +163,9 @@ export async function createMeal(
       final_protein_g: protein,
       final_carbs_g: carbs,
       final_fat_g: fat,
+      precision_level: input.precision_level ?? null,
+      context_type: input.context_type ?? null,
+      source_note: input.source_note ?? null,
       source_type: "manual",
       entry_kind: "meal",
     })

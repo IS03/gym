@@ -132,11 +132,18 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(nutritionActions).toContain('revalidatePath("/today/reports")');
   });
 
-  it("Foods tiene CRUD blando y Cuerpo conserva procedencia y laterales", () => {
-    expect(foods).toContain("Desactivar");
+  it("Foods distingue catálogo activo, archivo y borrado sin perder precisión", () => {
+    expect(foods).toContain("Activos");
+    expect(foods).toContain("Archivados");
+    expect(foods).toContain("Todos");
+    expect(foods).toContain("Archivar");
     expect(foods).toContain("Reactivar");
-    expect(foods).toContain("Vacío significa desconocido");
-    expect(product).not.toContain('.from("foods").delete');
+    expect(foods).toContain("Eliminar alimento");
+    expect(foods).toContain("Las comidas ya registradas no cambiarán");
+    expect(foods).toContain("Dejá vacío lo que no conozcas");
+    expect(product).toContain('.from("foods")');
+    expect(product).toContain(".delete()");
+    expect(product).toContain("delete payload.precision_level");
     for (const value of ["abdomen_cm", "arm_right_cm", "arm_left_cm", "thigh_right_cm", "thigh_left_cm", "calf_right_cm", "calf_left_cm"]) expect(body).toContain(value);
     expect(body).toContain("Revisar medición");
     expect(body).toContain("Los lados no se promedian");

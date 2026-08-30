@@ -21,10 +21,10 @@ los tests.
 | Plan nutricional versionado | `nutrition_goal_periods` | `nutrition_goal_period_id` y snapshots nutricionales nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | objetivos sin reescritura histórica |
 | Gasto y trabajo versionados | `expenditure_rule_periods` y `work_schedule_periods` | IDs, fuentes y snapshots nuevos de `day_logs` | INSERT de nuevas versiones desde Ajustes + motor diario | gasto estimado y contexto del día |
 | Pasos diarios | `day_logs.steps` | `day_logs.steps` | editor de Actividad de Hoy | contexto de actividad e historial de sólo lectura en `/today/steps`; `null` es sin dato y no modifica el gasto |
-| Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día; Comidas rápidas es un read model derivado |
+| Comida individual | No aplica | `meal_entries` activa (`deleted_at is null`) | acciones de Nutrición | agregados del día; Comidas sugeridas es un read model derivado |
 | Totales nutricionales | No se copian al perfil | calorías, proteína, carbohidratos y grasas en `day_logs` | trigger de `meal_entries` mediante `recalculate_day_log` | resumen diario e historial |
 | Eventos nutricionales | No aplica | `nutrition_events` por fecha | importador histórico; lectura contextual en History | contexto de permitidos, sin sumar consumo |
-| Catálogo personal | No aplica | `foods`, con nutrición completa o parcial | importador histórico + CRUD blando en Ajustes | referencia alimentaria, no totales diarios |
+| Catálogo personal | `foods`, con nutrición completa o parcial | snapshot independiente en `meal_entries` al registrar cantidad | importador histórico + CRUD owner-scoped en Ajustes | registro por cantidad; nunca recalcula historia |
 | Biblioteca de ejercicios | `exercises` | snapshots de sesión | acciones de Biblioteca | rutinas y nuevas sesiones |
 | Rutina planificada | `routines`, `routine_exercises`, `routine_exercise_sets` | snapshot copiado al iniciar | acciones de Rutinas | inicio y planificación futura |
 | Sesión | `workout_sessions` | la misma fila con estado `completed` o `discarded` | RPCs transaccionales de entrenamiento | historial, calendario y reportes |
@@ -186,7 +186,7 @@ informada, mientras que `0` representa un cero conocido. Crear, editar o hacer
 soft delete dispara el agregado canónico en Postgres y revalida Today, History
 y el resumen compacto de Home.
 
-`Comidas rápidas` no guarda favoritos, templates ni contadores: es un read model
+`Comidas sugeridas` no guarda favoritos, templates ni contadores: es un read model
 derivado de `meal_entries` manuales, activas y de tipo `meal` de los 60 días
 completos anteriores al día de Córdoba. Las entradas `sheet_import` y los
 resúmenes heredados se excluyen. Al elegir una sugerencia, el servidor vuelve a
@@ -250,13 +250,22 @@ web no vuelve a ejecutar ese import: consume Supabase como única fuente.
 
 Ajustes permite crear nuevas versiones de objetivos, gasto y horario mediante
 `INSERT` con `effective_from`; nunca actualiza las versiones históricas. También
-permite crear, editar, desactivar y reactivar `foods`. El catálogo sigue sin
-autocompletar el formulario de comidas: continúa siendo una referencia
-independiente hasta una fase posterior.
+permite crear, editar, archivar, reactivar y eliminar `foods`. No existen FKs
+entrantes hacia `foods`: eliminar una referencia propia no afecta comidas ya
+registradas porque éstas no vuelven a consultar el catálogo.
 
 `foods` permite que calorías o cualquiera de los tres macros sea `null`, pero
 exige al menos un valor nutricional conocido y valores no negativos. Así,
 desconocido no se degrada a cero.
+
+Registrar **Desde alimento** conserva `meal_entries` como única fuente de
+consumo. El cliente envía `foodId`, cantidad y fecha; el servidor relee el Food
+con `id + user_id + is_active`, escala con
+`cantidad / serving_quantity` en la misma unidad y crea una comida manual con
+título, cantidad, calorías y macros como snapshot. Calorías se redondea al
+entero más cercano; macros conocidos a dos decimales; `null` se propaga y cero
+permanece cero. También se capturan `precision_level` y `source_note` cuando
+existen. No hay conversiones de unidad ni relación viva Food → MealEntry.
 
 `nutrition_events` conserva el contexto estructurado de Permitidos —tipo,
 intensidad, planificación, alcohol, tragos equivalentes, kcal del evento,

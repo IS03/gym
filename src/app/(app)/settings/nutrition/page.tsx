@@ -41,7 +41,7 @@ export default async function NutritionSettingsPage() {
       <SettingsLink href="/settings/nutrition/goals" icon={Target} title="Objetivos" description={goal ? `${goal.name} · desde ${dateLabel(goal.effective_from)}` : "Sin configurar"} />
       <SettingsLink href="/settings/nutrition/expenditure" icon={Flame} title="Gasto estimado" description={config.expenditure ? `${config.expenditure.name} · desde ${dateLabel(config.expenditure.effective_from)}` : "Sin configurar"} />
       <SettingsLink href="/settings/nutrition/schedule" icon={BriefcaseBusiness} title="Horario laboral" description={config.schedule ? `${config.schedule.name} · desde ${dateLabel(config.schedule.effective_from)}` : "Sin configurar"} />
-      <SettingsLink href="/settings/nutrition/foods" icon={Apple} title="Alimentos habituales" description={`${config.activeFoodCount} ${config.activeFoodCount === 1 ? "activo" : "activos"}`} />
+      <SettingsLink href="/settings/nutrition/foods" icon={Apple} title="Alimentos habituales" description={config.activeFoodCount > 0 ? `${config.activeFoodCount} ${config.activeFoodCount === 1 ? "activo" : "activos"} · registralos por cantidad` : "Referencias para registrar cantidades rápidamente"} />
       <SettingsLink href="/settings/nutrition/integrations" icon={KeyRound} title="Integraciones" description="ChatGPT" />
     </section>
   </div>;
