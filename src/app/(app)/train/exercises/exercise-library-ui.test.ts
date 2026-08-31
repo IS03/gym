@@ -35,7 +35,9 @@ describe("exercise library v2 composition", () => {
   it("keeps the exercise editor stable before an input is intentionally focused", () => {
     expect(source).not.toContain("autoFocus");
     expect(source).toContain('variant="editor"');
-    expect(source).toContain("h-[min(82svh,42rem)] min-h-0");
+    expect(source).toContain("h-[min(82dvh,42rem)] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-top))]");
+    expect(source).toContain("transition-opacity duration-150");
+    expect(source).toContain("lg:transition-[transform,opacity]");
     expect(source).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
     expect(source).toContain("env(safe-area-inset-bottom)");
     expect(source).toContain("initialFocus={editorCloseRef}");
