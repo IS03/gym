@@ -9,23 +9,29 @@ const activityEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const stepsCard = source("src/app/(app)/today/steps-card.tsx");
 
 describe("PR20 — Today UX polish", () => {
-  it("renders steps within the single daily activity experience", () => {
+  it("renders a compact activity summary and moves editing into its responsive detail", () => {
     expect(todayActivity).toContain("<DayActivityPanel");
     expect(todayActivity).not.toContain("<StepsCard");
-    expect(activityPanel).toContain("stepsSummary={stepsSummary}");
+    expect(todayActivity).toContain("<ResponsiveDialog");
+    expect(todayActivity).toContain("onActivityChange={setActivity}");
+    expect(todayActivity).toContain("activityValuesLabel={activityValuesLabel}");
+    expect(activityPanel).toContain('aria-label="Abrir actividad de hoy"');
+    expect(activityPanel).toContain('aria-haspopup="dialog"');
     expect(activityEditor).toContain("<StepsSummary steps={steps} summary={stepsSummary} />");
+    expect(activityPanel).not.toContain("Prom. 7 días");
+    expect(activityPanel).not.toContain('href="/today/steps"');
   });
 
-  it("keeps the operational activity card visible and removes duplicate summaries", () => {
+  it("keeps one closed-state representation for context, steps, water and mate", () => {
     expect(activityPanel).not.toContain("<details");
-    expect(activityPanel.match(/>Trabajo</g)).toHaveLength(1);
-    expect(activityPanel.match(/>Entrenamiento</g)).toHaveLength(1);
-    expect(activityPanel.match(/>Gasto</g)).toHaveLength(1);
-    expect(activityPanel.match(/>Balance</g)).toHaveLength(1);
-    expect(activityPanel).toContain("<DayContextEditor");
+    for (const label of ["Trabajo", "Entrenamiento", "Gasto", "Balance"]) {
+      expect(activityPanel).toContain(`\"${label}\"`);
+    }
+    for (const label of ["Pasos", "Agua", "Mate"]) expect(activityPanel).toContain(`>${label}<`);
+    expect(activityPanel).not.toContain("<DayContextEditor");
   });
 
-  it("shows the three daily inputs with the water target and a stable autosave slot", () => {
+  it("keeps the three daily inputs, the water target and a stable autosave slot in detail", () => {
     for (const field of ["daily-steps", "daily-water", "daily-mate"]) {
       expect(activityEditor).toContain(`htmlFor="${field}"`);
     }
@@ -61,5 +67,8 @@ describe("PR20 — Today UX polish", () => {
     expect(stepsCard).toContain("Prom. 7 días");
     expect(stepsCard).toContain("{summary.daysWithData}/7 días");
     expect(stepsCard).toContain("Sin datos en los últimos 7 días");
+    expect(todayActivity).toContain("formatSteps(activity.steps)");
+    expect(todayActivity).toContain("formatLiters(activity.waterL)");
+    expect(todayActivity).toContain("formatLiters(activity.mateL)");
   });
 });

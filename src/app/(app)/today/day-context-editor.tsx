@@ -108,39 +108,42 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="daily-steps" className="text-xs">Pasos</Label>
-          <Input className="h-10 px-2" id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+    <div className="space-y-5">
+      <section className="space-y-3" aria-labelledby="daily-activity-inputs">
+        <h3 id="daily-activity-inputs" className="text-sm font-semibold">Registrar</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="daily-steps" className="text-xs">Pasos</Label>
+            <Input className="h-10 px-2" id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="daily-water" className="min-w-0 gap-1 text-[11px] sm:text-xs">
+              <span className="shrink-0">Agua</span>
+              {waterTargetLabel ? <span className="truncate font-normal text-muted-foreground">· meta {waterTargetLabel}</span> : null}
+            </Label>
+            <Input className="h-10 px-2" id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+          </div>
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="daily-mate" className="text-xs">Mate</Label>
+            <Input className="h-10 px-2" id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+          </div>
         </div>
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="daily-water" className="min-w-0 gap-1 text-[11px] sm:text-xs">
-            <span className="shrink-0">Agua</span>
-            {waterTargetLabel ? <span className="truncate font-normal text-muted-foreground">· meta {waterTargetLabel}</span> : null}
-          </Label>
-          <Input className="h-10 px-2" id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
-        </div>
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="daily-mate" className="text-xs">Mate</Label>
-          <Input className="h-10 px-2" id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
-        </div>
-      </div>
-      <p
-        className={`min-h-4 text-xs leading-4 ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
-        role="status"
-        aria-live="polite"
-      >
-        {autosave.phase === "scheduled" || autosave.phase === "saving"
-          ? "Guardando…"
-          : autosave.phase === "saved"
-            ? "Guardado"
-            : autosave.phase === "error"
-              ? autosave.error
-              : null}
-      </p>
+        <p
+          className={`min-h-4 text-xs leading-4 ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+          role="status"
+          aria-live="polite"
+        >
+          {autosave.phase === "scheduled" || autosave.phase === "saving"
+            ? "Guardando…"
+            : autosave.phase === "saved"
+              ? "Guardado"
+              : autosave.phase === "error"
+                ? autosave.error
+                : null}
+        </p>
 
-      <StepsSummary steps={steps} summary={stepsSummary} />
+        <StepsSummary steps={steps} summary={stepsSummary} />
+      </section>
 
       <details className="group/corrections rounded-xl border">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

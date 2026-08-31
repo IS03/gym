@@ -70,7 +70,7 @@ Cuando no hay sesión activa, **Nueva sesión** es una CTA directa y no una card
 
 PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, **Agregar rápido** compacto, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
 
-PR31 consolida los pasos dentro de **Actividad de hoy**: el mismo editor conserva autosave para pasos, agua y mate; el resumen integrado muestra hoy, promedio de siete días y acceso al historial. Una segunda card no se mantiene si duplica el mismo dato y no suma una tarea distinta. El resumen diario e inputs frecuentes permanecen visibles; las correcciones siguen como detalle progresivo.
+PR31 consolida los pasos dentro de **Actividad de hoy** sin hacer permanente la edición. La superficie cerrada muestra sólo el resumen diario —trabajo, entrenamiento, gasto, balance, pasos, agua y mate— y abre un sheet/dialog para editar con el mismo autosave de pasos, agua y mate. Promedio de siete días, días con datos, historial y correcciones viven en ese detalle. Una segunda card no se mantiene si duplica el mismo dato y no suma una tarea distinta; el resumen debe recuperar densidad sin ocultar la interacción frecuente a más de un toque.
 
 **Agregar rápido** es una fila secundaria que abre un sheet/dialog responsive; allí separa dos fuentes mediante búsqueda local y tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 
