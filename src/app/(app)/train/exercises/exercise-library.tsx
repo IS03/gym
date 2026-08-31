@@ -54,17 +54,33 @@ function Sheet({
   children,
   open,
   onOpenChange,
+  variant = "default",
 }: {
   children: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  variant?: "default" | "editor";
 }) {
+  const editorSheet = variant === "editor";
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 opacity-100 backdrop-blur-[2px] transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
-        <Dialog.Viewport className="fixed inset-0 z-[81] flex items-end justify-center overflow-hidden lg:items-center lg:p-6">
-          <Dialog.Popup className="flex max-h-[min(86dvh,42rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:max-h-[min(80dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]">
+        <Dialog.Viewport
+          className={
+            editorSheet
+              ? "fixed inset-0 z-[81] flex items-end justify-center overflow-hidden px-2 pt-[max(0.75rem,env(safe-area-inset-top))] lg:items-center lg:p-6"
+              : "fixed inset-0 z-[81] flex items-end justify-center overflow-hidden lg:items-center lg:p-6"
+          }
+        >
+          <Dialog.Popup
+            className={
+              editorSheet
+                ? "flex h-[min(82svh,42rem)] min-h-0 w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:h-[min(78dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]"
+                : "flex max-h-[min(86dvh,42rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:max-h-[min(80dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]"
+            }
+          >
             {children}
           </Dialog.Popup>
         </Dialog.Viewport>
@@ -89,7 +105,6 @@ function ExerciseForm({
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">Nombre</span>
         <Input
-          autoFocus
           value={values.nombre}
           onChange={(event) => onChange({ ...values, nombre: event.target.value })}
           placeholder="Ej: Press banca"
@@ -609,6 +624,7 @@ export function ExerciseLibrary({
 
       <Sheet
         open={editorOpen}
+        variant="editor"
         onOpenChange={(open) => {
           if (!pending) {
             setEditorOpen(open);
@@ -616,7 +632,7 @@ export function ExerciseLibrary({
           }
         }}
       >
-        <header className="relative border-b border-border/70 px-4 pb-4 pt-3 sm:px-5 lg:pt-5">
+        <header className="relative shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5 lg:pt-5">
           <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
           <Dialog.Title className="text-xl font-semibold tracking-tight">
             {editing ? "Editar ejercicio" : "Nuevo ejercicio"}
@@ -635,7 +651,7 @@ export function ExerciseLibrary({
             <X className="size-4.5" aria-hidden />
           </Dialog.Close>
         </header>
-        <div className="overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 [-webkit-overflow-scrolling:touch] sm:px-5">
           <form onSubmit={saveExercise} noValidate>
             <ExerciseForm
               values={form}

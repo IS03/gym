@@ -31,4 +31,13 @@ describe("exercise library v2 composition", () => {
     expect(source).toContain("updateExerciseAction(editing.id, input)");
     expect(source).toContain("archiveExerciseAction(archiveTarget.id)");
   });
+
+  it("keeps the exercise editor stable before an input is intentionally focused", () => {
+    expect(source).not.toContain("autoFocus");
+    expect(source).toContain('variant="editor"');
+    expect(source).toContain("h-[min(82svh,42rem)] min-h-0");
+    expect(source).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
+    expect(source).toContain("env(safe-area-inset-bottom)");
+    expect(source).toContain('aria-label="Cerrar formulario de ejercicio"');
+  });
 });
