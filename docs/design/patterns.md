@@ -72,6 +72,8 @@ PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, 
 
 PR31 consolida los pasos dentro de **Actividad de hoy** sin hacer permanente la edición. La superficie cerrada muestra sólo el resumen diario —trabajo, entrenamiento, gasto, balance, pasos, agua y mate— y abre un sheet/dialog para editar con el mismo autosave de pasos, agua y mate. Promedio de siete días, días con datos, historial y correcciones viven en ese detalle. Una segunda card no se mantiene si duplica el mismo dato y no suma una tarea distinta; el resumen debe recuperar densidad sin ocultar la interacción frecuente a más de un toque.
 
+Las colecciones densas que se exploran con frecuencia, como una biblioteca de ejercicios, prefieren filas compactas y divisores antes que cards elevadas repetidas. Los filtros exponen sólo dimensiones que existen en el modelo y se mantienen como una herramienta secundaria junto a la búsqueda; las opciones más largas viven en un sheet o dialog responsive, con estado activo explícito.
+
 **Agregar rápido** es una fila secundaria que abre un sheet/dialog responsive; allí separa dos fuentes mediante búsqueda local y tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 
 Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.

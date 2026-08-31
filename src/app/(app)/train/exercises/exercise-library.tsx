@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import {
   exerciseLibrarySummary,
   filterExerciseLibrary,
+  groupExerciseLibrary,
+  sortExerciseLibrary,
   type ExerciseLibraryFilter,
   type ExerciseLibraryItem,
 } from "@/lib/phase2/exercise-library";
@@ -259,6 +261,39 @@ function ExerciseForm({
   );
 }
 
+function ExerciseRows({
+  exercises,
+  onEdit,
+}: {
+  exercises: ExerciseLibraryItem[];
+  onEdit: (exercise: ExerciseLibraryItem) => void;
+}) {
+  return (
+    <div className="divide-y divide-border/70">
+      {exercises.map((exercise) => (
+        <button
+          key={exercise.id}
+          type="button"
+          onClick={() => onEdit(exercise)}
+          className="group flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-[background-color,transform] duration-150 hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:scale-[0.995] motion-reduce:transition-none"
+          aria-label={`Editar ${exercise.nombre}`}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="line-clamp-2 block text-sm font-semibold leading-5">{exercise.nombre}</span>
+            <span className="mt-0.5 block truncate text-xs leading-4 text-muted-foreground">
+              {exerciseLibrarySummary(exercise)}
+            </span>
+          </span>
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
+            aria-hidden
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ExerciseLibrary({
   initialExercises,
 }: {
@@ -268,6 +303,7 @@ export function ExerciseLibrary({
   const [exercises, setExercises] = useState(initialExercises);
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<ExerciseLibraryFilter>("all");
+  const [draftGroup, setDraftGroup] = useState<ExerciseLibraryFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null);
@@ -287,7 +323,16 @@ export function ExerciseLibrary({
     () => filterExerciseLibrary(exercises, { query, group }),
     [exercises, group, query],
   );
+  const groupedExercises = useMemo(
+    () => groupExerciseLibrary(visibleExercises),
+    [visibleExercises],
+  );
+  const filterPreviewCount = useMemo(
+    () => filterExerciseLibrary(exercises, { query, group: draftGroup }).length,
+    [draftGroup, exercises, query],
+  );
   const hasFilters = Boolean(query.trim()) || group !== "all";
+  const showGroups = !query.trim() && group === "all";
   const selectedGroup = GROUP_FILTER_OPTIONS.find((option) => option.value === group);
 
   function openCreate() {
@@ -307,6 +352,17 @@ export function ExerciseLibrary({
   function clearFilters() {
     setQuery("");
     setGroup("all");
+    setDraftGroup("all");
+    setFiltersOpen(false);
+  }
+
+  function handleFiltersOpenChange(open: boolean) {
+    if (open) setDraftGroup(group);
+    setFiltersOpen(open);
+  }
+
+  function applyGroupFilter() {
+    setGroup(draftGroup);
     setFiltersOpen(false);
   }
 
@@ -368,7 +424,7 @@ export function ExerciseLibrary({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 lg:mx-auto lg:max-w-3xl">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
@@ -390,59 +446,40 @@ export function ExerciseLibrary({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-11 pl-9"
-            placeholder="Buscar por nombre..."
+            className="h-11 pr-10 pl-9"
+            placeholder="Buscar ejercicio"
             aria-label="Buscar ejercicio"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          ) : null}
         </label>
-        <Dialog.Root open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <Dialog.Trigger
-            type="button"
-            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
-          >
-            <SlidersHorizontal className="size-4" aria-hidden />Filtros
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 opacity-100 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
-            <Dialog.Viewport className="fixed inset-0 z-[81] flex items-end justify-center overflow-hidden">
-              <Dialog.Popup className="w-full rounded-t-[1.75rem] bg-card p-5 text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full motion-reduce:transition-none">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <Dialog.Title className="text-lg font-semibold">Filtros</Dialog.Title>
-                    <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                      Elegí un grupo muscular para acotar la biblioteca.
-                    </Dialog.Description>
-                  </div>
-                  <Dialog.Close
-                    className="flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Cerrar filtros"
-                  >
-                    <X className="size-4" aria-hidden />
-                  </Dialog.Close>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {GROUP_FILTER_OPTIONS.map((option) => (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      variant={group === option.value ? "secondary" : "outline"}
-                      className="justify-start"
-                      onClick={() => setGroup(option.value)}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <Button type="button" variant="outline" onClick={clearFilters}>
-                    Limpiar
-                  </Button>
-                  <Dialog.Close render={<Button type="button" />}>Aplicar</Dialog.Close>
-                </div>
-              </Dialog.Popup>
-            </Dialog.Viewport>
-          </Dialog.Portal>
-        </Dialog.Root>
+        <button
+          type="button"
+          onClick={() => handleFiltersOpenChange(true)}
+          className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+          aria-label={
+            group === "all"
+              ? "Filtrar ejercicios"
+              : `Filtrar ejercicios. Filtro activo: ${selectedGroup?.label}`
+          }
+          aria-haspopup="dialog"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          {group !== "all" ? (
+            <span
+              className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background"
+              aria-hidden
+            />
+          ) : null}
+        </button>
         <select
           value={group}
           onChange={(event) => setGroup(event.target.value as ExerciseLibraryFilter)}
@@ -473,9 +510,12 @@ export function ExerciseLibrary({
 
       <section aria-labelledby="exercise-library-list-title" className="space-y-2">
         <div className="flex items-center justify-between gap-3 px-1">
-          <h2 id="exercise-library-list-title" className="text-sm font-semibold tracking-tight">
-            {hasFilters ? "Resultados" : "Activos"}
+          <h2 id="exercise-library-list-title" className="sr-only">
+            Biblioteca de ejercicios
           </h2>
+          <span className="text-sm text-muted-foreground">
+            {hasFilters ? "Resultados" : "Ejercicios activos"}
+          </span>
           <span className="text-xs text-muted-foreground">
             {visibleExercises.length} {visibleExercises.length === 1 ? "ejercicio" : "ejercicios"}
           </span>
@@ -490,36 +530,82 @@ export function ExerciseLibrary({
           </div>
         ) : visibleExercises.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-6 text-center">
-            <p className="text-sm text-muted-foreground">No encontramos ejercicios con esos filtros.</p>
+            <p className="text-sm text-muted-foreground">
+              {query ? `No encontramos “${query.trim()}”.` : "No encontramos ejercicios con ese filtro."}
+            </p>
             <Button type="button" variant="link" className="mt-1 h-auto px-0" onClick={clearFilters}>
               Limpiar filtros
             </Button>
           </div>
-        ) : (
-          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-            {visibleExercises.map((exercise) => (
-              <button
-                key={exercise.id}
-                type="button"
-                onClick={() => openEdit(exercise)}
-                className="surface-elevated group flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left outline-none transition-[transform,background-color] duration-150 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] motion-reduce:transition-none"
-                aria-label={`Editar ${exercise.nombre}`}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{exercise.nombre}</span>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                    {exerciseLibrarySummary(exercise)}
-                  </span>
-                </span>
-                <ChevronRight
-                  className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-                  aria-hidden
-                />
-              </button>
+        ) : showGroups ? (
+          <div className="overflow-hidden rounded-xl border bg-card">
+            {groupedExercises.map((section) => (
+              <section key={section.value} aria-labelledby={`exercise-group-${section.value}`}>
+                <h3
+                  id={`exercise-group-${section.value}`}
+                  className="border-y border-border/70 bg-muted/35 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground first:border-t-0"
+                >
+                  {section.label}
+                </h3>
+                <ExerciseRows exercises={section.exercises} onEdit={openEdit} />
+              </section>
             ))}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <ExerciseRows exercises={sortExerciseLibrary(visibleExercises)} onEdit={openEdit} />
           </div>
         )}
       </section>
+
+      <Sheet open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
+        <header className="relative border-b border-border/70 px-4 pb-3 pt-3 sm:px-5 lg:pt-5">
+          <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
+          <Dialog.Title className="text-lg font-semibold">Filtrar ejercicios</Dialog.Title>
+          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+            Elegí un grupo muscular para acotar la biblioteca.
+          </Dialog.Description>
+          <Dialog.Close
+            type="button"
+            className="absolute right-2 top-3 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:right-3 lg:top-3"
+            aria-label="Cerrar filtros"
+          >
+            <X className="size-4" aria-hidden />
+          </Dialog.Close>
+        </header>
+        <div className="overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+          <p className="text-sm font-medium">Grupo muscular</p>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="Grupo muscular">
+            {GROUP_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={draftGroup === option.value}
+                onClick={() => setDraftGroup(option.value)}
+                className={`min-h-9 rounded-full border px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                  draftGroup === option.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-muted"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <footer className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 lg:pb-3">
+          {draftGroup !== "all" ? (
+            <Button type="button" variant="ghost" onClick={() => setDraftGroup("all")}>
+              Limpiar
+            </Button>
+          ) : (
+            <span aria-hidden />
+          )}
+          <Button type="button" onClick={applyGroupFilter}>
+            Ver {filterPreviewCount} {filterPreviewCount === 1 ? "ejercicio" : "ejercicios"}
+          </Button>
+        </footer>
+      </Sheet>
 
       <Sheet
         open={editorOpen}

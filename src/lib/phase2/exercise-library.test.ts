@@ -3,6 +3,9 @@ import {
   exerciseGroupLabel,
   exerciseLibrarySummary,
   filterExerciseLibrary,
+  groupExerciseLibrary,
+  normalizeExerciseSearch,
+  sortExerciseLibrary,
   type ExerciseLibraryItem,
 } from "./exercise-library";
 
@@ -44,6 +47,50 @@ describe("filterExerciseLibrary", () => {
     expect(filterExerciseLibrary(entries, { query: "REMO T", group: "all" }).map((item) => item.id)).toEqual(["REMO T"]);
   });
 
+  it("normaliza acentos y espacios al buscar por nombre", () => {
+    const accentEntries = [
+      exercise("CURL BÍCEPS"),
+      exercise("Press   inclinado"),
+    ];
+
+    expect(filterExerciseLibrary(accentEntries, { query: "biceps", group: "all" })).toEqual([
+      accentEntries[0],
+    ]);
+    expect(filterExerciseLibrary(accentEntries, { query: "press inclinado", group: "all" })).toEqual([
+      accentEntries[1],
+    ]);
+    expect(normalizeExerciseSearch("  BíCEPS   ")).toBe("biceps");
+  });
+
+  it("busca por identidad útil ya cargada", () => {
+    const identityEntries = [
+      exercise("JALÓN NEUTRO", {
+        grupo_muscular: "espalda",
+        muscle_group_label: "Dorsal ancho",
+        implement: "Polea",
+        weight_mode: "Peso total",
+      }),
+      exercise("PRESS MANCUERNAS", {
+        grupo_muscular: "pecho",
+        implement: "Mancuernas",
+        weight_mode: "Por mancuerna",
+      }),
+    ];
+
+    expect(filterExerciseLibrary(identityEntries, { query: "polea", group: "all" })).toEqual([
+      identityEntries[0],
+    ]);
+    expect(filterExerciseLibrary(identityEntries, { query: "dorsal", group: "all" })).toEqual([
+      identityEntries[0],
+    ]);
+    expect(filterExerciseLibrary(identityEntries, { query: "espalda", group: "all" })).toEqual([
+      identityEntries[0],
+    ]);
+    expect(filterExerciseLibrary(identityEntries, { query: "por mancuerna", group: "all" })).toEqual([
+      identityEntries[1],
+    ]);
+  });
+
   it("filtra por grupo, sin grupo y todos", () => {
     expect(filterExerciseLibrary(entries, { query: "", group: "espalda" })).toHaveLength(2);
     expect(filterExerciseLibrary(entries, { query: "", group: "none" }).map((item) => item.id)).toEqual(["Movilidad"]);
@@ -52,6 +99,29 @@ describe("filterExerciseLibrary", () => {
 
   it("devuelve vacío cuando no hay coincidencias", () => {
     expect(filterExerciseLibrary(entries, { query: "sentadilla", group: "all" })).toEqual([]);
+  });
+
+  it("combina búsqueda y grupo", () => {
+    expect(filterExerciseLibrary(entries, { query: "remo", group: "espalda" })).toHaveLength(2);
+    expect(filterExerciseLibrary(entries, { query: "remo", group: "cardio" })).toEqual([]);
+  });
+});
+
+describe("exercise library presentation helpers", () => {
+  it("ordena resultados alfabéticamente y agrupa por el grupo canónico", () => {
+    const grouped = groupExerciseLibrary([
+      exercise("REMO T", { grupo_muscular: "espalda" }),
+      exercise("APERTURAS", { grupo_muscular: "pecho" }),
+      exercise("JALÓN", { grupo_muscular: "espalda" }),
+      exercise("MOVILIDAD"),
+    ]);
+
+    expect(grouped.map((section) => section.label)).toEqual(["Pecho", "Espalda", "Sin grupo"]);
+    expect(grouped[1]?.exercises.map((item) => item.nombre)).toEqual(["JALÓN", "REMO T"]);
+    expect(sortExerciseLibrary([exercise("Z"), exercise("A")]).map((item) => item.nombre)).toEqual([
+      "A",
+      "Z",
+    ]);
   });
 });
 

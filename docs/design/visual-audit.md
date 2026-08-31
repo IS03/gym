@@ -111,6 +111,10 @@ Today ofrece **Agregar rápido** como acceso compacto que abre un sheet/dialog r
 
 **En validación física final.** La densidad mobile se ajusta sin reducir las áreas táctiles: Perfil usa padding vertical equilibrado y Apariencia elimina espacio externo redundante conservando las tres opciones de tema. En Train, una nueva sesión se inicia desde una CTA directa; sólo una sesión en curso conserva una superficie con contexto operativo.
 
+### PR32 — Biblioteca de ejercicios v2
+
+La Biblioteca pasa de cards elevadas repetidas a una lista compacta de filas y divisores, agrupada por grupo muscular cuando no hay una búsqueda en curso. La búsqueda local cubre la identidad disponible del ejercicio y el único filtro actual —grupo muscular— se presenta como chips densos dentro de un sheet responsive.
+
 Today une Actividad y Pasos en una sola superficie compacta: su estado cerrado prioriza trabajo, entrenamiento, gasto, balance, pasos, agua y mate; al abrir, el mismo estado local y autosave conservan la edición, el promedio de siete días, el historial y las correcciones. Trabajo, entrenamiento, gasto, balance y correcciones preservan sus fuentes y acciones; pasos no modifica automáticamente gasto ni balance.
 
 ## Roadmap visual y de producto
