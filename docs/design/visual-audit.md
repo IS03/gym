@@ -119,6 +119,10 @@ La Biblioteca pasa de cards elevadas repetidas a una lista compacta de filas y d
 
 Historial conserva las dos preguntas de producto sin duplicar jerarquía: **Sesiones** prioriza una continuidad compacta y filas navegables de sesiones finalizadas; **Por ejercicio** usa búsqueda local, filtros reales de rutina y músculo, y filas de alta densidad donde **Último** y **Mejor** permanecen explícitamente diferenciados. El detalle de ejercicio y el modo Progreso siguen siendo superficies separadas.
 
+### PR34 — Calendario de entrenamiento v2
+
+El preview mensual conserva celdas, puntos y targets táctiles, pero elimina aire exterior redundante. El detalle de un día usa fecha localizada de Córdoba y un resumen calculado únicamente desde sesiones `completed`: las duraciones se suman por sesión real y las filas conservan nombre snapshot, horario, ejercicios y series. El filtro administrativo del día no se repite; un filtro de rutina ya elegido en Calendario permanece sólo como contexto de URL y back navigation.
+
 Today une Actividad y Pasos en una sola superficie compacta: su estado cerrado prioriza trabajo, entrenamiento, gasto, balance, pasos, agua y mate; al abrir, el mismo estado local y autosave conservan la edición, el promedio de siete días, el historial y las correcciones. Trabajo, entrenamiento, gasto, balance y correcciones preservan sus fuentes y acciones; pasos no modifica automáticamente gasto ni balance.
 
 ## Roadmap visual y de producto

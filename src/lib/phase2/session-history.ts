@@ -17,6 +17,15 @@ export function formatSessionDate(value: string) {
     .replace(".", "");
 }
 
+export function formatTrainingDayHeading(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: CORDOBA_TIME_ZONE,
+  }).format(dateAtNoon(value));
+}
+
 export function formatRelativeTrainingDays(days: number | null) {
   if (days === null) return "Sin registros";
   if (days <= 0) return "Hoy";

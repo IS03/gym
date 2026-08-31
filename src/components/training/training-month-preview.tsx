@@ -71,9 +71,9 @@ export function TrainingMonthPreview({
       aria-label={`Ver calendario de ${label}`}
       className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <Card className="surface-elevated border transition-[border-color,transform,box-shadow] duration-150 hover:border-primary/25 hover:shadow-md active:scale-[0.99]">
-        <CardContent className="pt-4">
-          <div className="mb-4 flex items-center justify-between gap-3">
+      <Card size="sm" className="surface-elevated border transition-[border-color,transform,box-shadow] duration-150 hover:border-primary/25 hover:shadow-md active:scale-[0.99]">
+        <CardContent className="py-0">
+          <div className="mb-2.5 flex items-center justify-between gap-3">
             <div>
               <p className="text-base font-semibold tracking-tight">{label}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">Constancia del mes</p>
@@ -83,10 +83,10 @@ export function TrainingMonthPreview({
 
           <div className="grid grid-cols-7 text-center text-[10px] font-medium text-muted-foreground">
             {weekdayLabels.map((label) => (
-              <span key={label} className="pb-1.5">{label}</span>
+              <span key={label} className="pb-1">{label}</span>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-y-1">
+          <div className="grid grid-cols-7 gap-y-0.5">
             {days.map((day) => (
               <DayCell
                 key={day.date}
