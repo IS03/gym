@@ -70,12 +70,14 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(activity).not.toContain("energy_balance_kcal");
   });
 
-  it("Pasos tiene una card propia sincronizada con el editor y no se duplica en Actividad", () => {
+  it("Pasos está integrado a Actividad y se sincroniza con el mismo editor", () => {
     expect(today).toContain("<TodayActivity");
-    expect(todayActivitySection).toContain("<StepsCard steps={activity.steps}");
+    expect(todayActivitySection).toContain("<DayActivityPanel");
+    expect(todayActivitySection).not.toContain("<StepsCard");
     expect(stepsCard).toContain('href="/today/steps"');
     expect(stepsCard).toContain("stepsFromInput");
-    expect(todayActivity).not.toContain('<p className="text-xs text-muted-foreground">Pasos</p>');
+    expect(todayActivity).toContain("stepsSummary={stepsSummary}");
+    expect(todayEditor).toContain("<StepsSummary steps={steps} summary={stepsSummary} />");
     expect(todayEditor).toContain('htmlFor="daily-steps"');
     expect(nutritionActions).toContain('revalidatePath("/today/steps")');
     expect(stepsPage).toContain("<StepsReport");

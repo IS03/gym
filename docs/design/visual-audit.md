@@ -107,6 +107,12 @@ Today conserva el registro Manual y suma **Desde alimento**: el usuario elige un
 
 Today ofrece **Agregar rápido** como acceso compacto que abre un sheet/dialog responsive con búsqueda y tabs **Habituales** / **Sugeridas**. El `+` habitual crea una comida desde valores canónicos releídos por el servidor; una compuesta ofrece **Ajustar** para modificar sólo la ocurrencia. Las Sugeridas mantienen el algoritmo histórico de 60 días y suman una acción separada para guardarlas explícitamente como habitual. Ninguna plantilla o sugerencia reescribe `meal_entries` ya creadas.
 
+### PR31 — Core Mobile UI v2
+
+**Resuelto.** La densidad mobile se ajusta sin reducir las áreas táctiles: Perfil usa padding vertical equilibrado y Apariencia elimina espacio externo redundante conservando las tres opciones de tema. En Train, una nueva sesión se inicia desde una CTA directa; sólo una sesión en curso conserva una superficie con contexto operativo.
+
+Today une Actividad y Pasos en una sola superficie: pasos, promedio de siete días e historial siguen accesibles desde el mismo estado local y autosave de pasos/agua/mate. Trabajo, entrenamiento, gasto, balance y correcciones preservan sus fuentes y acciones; pasos no modifica automáticamente gasto ni balance.
+
 ## Roadmap visual y de producto
 
 | Etapa | Alcance |

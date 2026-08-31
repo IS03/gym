@@ -70,8 +70,8 @@ export default async function TrainPage() {
         </p>
       </header>
 
-      <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
-        {activeSession ? (
+      {activeSession ? (
+        <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -95,26 +95,18 @@ export default async function TrainPage() {
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
-        ) : (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 id="train-action-title" className="text-lg font-semibold tracking-tight">Nueva sesión</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Elegí una rutina o empezá una sesión libre.
-              </p>
-            </div>
-            <StartWorkoutSheet
-              routines={workoutStartRoutines}
-              activeSession={null}
-              triggerAriaLabel="Iniciar entrenamiento"
-              triggerClassName="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
-            >
-              <Plus className="size-4" aria-hidden />
-              Nueva sesión
-            </StartWorkoutSheet>
-          </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <StartWorkoutSheet
+          routines={workoutStartRoutines}
+          activeSession={null}
+          triggerAriaLabel="Iniciar entrenamiento"
+          triggerClassName="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:w-auto"
+        >
+          <Plus className="size-4" aria-hidden />
+          Nueva sesión
+        </StartWorkoutSheet>
+      )}
 
       <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6 lg:space-y-0">
         <section className="lg:col-span-7" aria-label="Constancia de entrenamiento">

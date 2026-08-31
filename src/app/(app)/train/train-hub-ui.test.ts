@@ -10,6 +10,9 @@ describe("hub operativo de Entrenar", () => {
     expect(page).toContain("Nueva sesión");
     expect(page).toContain("activeSession={null}");
     expect(page).toContain("href={`/train/session/${activeSession.id}`}");
+    expect(page).toContain("activeSession ? (");
+    expect(page).toContain("triggerClassName=\"inline-flex h-11 w-full");
+    expect(page).not.toContain("Elegí una rutina o empezá una sesión libre.");
   });
 
   it("prioriza planificación, historial y calendario sin duplicar análisis global", () => {

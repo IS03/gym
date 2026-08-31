@@ -15,14 +15,16 @@ describe("PR 16 — Perfil y Apariencia", () => {
     expect(profilePage).toContain('<Card className="w-full">');
   });
 
-  it("mantiene el placeholder de hydration y compacta el selector de tema", () => {
+  it("mantiene el placeholder de hydration y compacta el selector de tema sin reducir su touch target", () => {
     expect(theme).toContain("const [mounted, setMounted]");
     expect(theme).toContain('className="h-10 rounded-lg border bg-muted/40"');
     expect(theme).toContain('role="group" aria-label="Tema"');
     expect(theme).toContain("aria-pressed={theme === id}");
     expect(theme).toContain("theme === \"system\"");
     expect(theme).toContain("setTheme(id)");
+    expect(theme).toContain("h-10");
     expect(settings).toContain(">Tema</p>");
+    expect(settings).toContain('className="flex min-h-20 items-center gap-3 py-3"');
     expect(settings).not.toContain('<CardTitle className="text-base">Apariencia</CardTitle>');
   });
 });

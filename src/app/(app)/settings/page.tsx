@@ -34,7 +34,7 @@ export default async function SettingsPage() {
         </div>
         <Link href="/settings/profile" className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
         <Card className="transition-colors hover:bg-muted/45">
-          <CardContent className="flex min-h-20 items-center gap-3 pt-4">
+          <CardContent className="flex min-h-20 items-center gap-3 py-3">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground">
               {initial}
             </div>
@@ -70,7 +70,7 @@ export default async function SettingsPage() {
           </h2>
         </div>
         <Card>
-          <CardContent className="space-y-3 py-4">
+          <CardContent className="space-y-2 py-3">
             <p className="text-sm font-medium">Tema</p>
             <ThemeSettings />
           </CardContent>

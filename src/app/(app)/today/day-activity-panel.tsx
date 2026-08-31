@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 import { DayContextEditor } from "./day-context-editor";
 
 type Props = React.ComponentProps<typeof DayContextEditor> & {
@@ -9,7 +10,7 @@ type Props = React.ComponentProps<typeof DayContextEditor> & {
   gymLabel: string;
   gymSourceLabel: string;
   waterTargetLabel: string | null;
-  onActivityChange: (activity: { steps: string; waterL: string; mateL: string }) => void;
+  stepsSummary: StepsReportSummary;
 };
 
 export function DayActivityPanel({
@@ -20,7 +21,7 @@ export function DayActivityPanel({
   gymLabel,
   gymSourceLabel,
   waterTargetLabel,
-  onActivityChange,
+  stepsSummary,
   ...editorProps
 }: Props) {
   return (
@@ -46,7 +47,7 @@ export function DayActivityPanel({
           </div>
         </div>
         <div className="border-t pt-3">
-          <DayContextEditor {...editorProps} waterTargetLabel={waterTargetLabel} onActivityChange={onActivityChange} />
+          <DayContextEditor {...editorProps} waterTargetLabel={waterTargetLabel} stepsSummary={stepsSummary} />
         </div>
       </CardContent>
     </Card>

@@ -62,11 +62,15 @@ Las series mantienen la misma semántica por fila y evitan scroll horizontal com
 
 PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curso o la acción para iniciar una nueva, después la constancia mensual y finalmente accesos compactos para planificar y revisar. Una sesión activa no se descubre dentro de un selector: el hub enlaza directamente a **Continuar entrenamiento** y no ofrece una nueva sesión equivalente.
 
+Cuando no hay sesión activa, **Nueva sesión** es una CTA directa y no una card que repite el título de la pantalla. La superficie con contexto operativo queda reservada para una sesión en curso, donde el nombre y **Continuar entrenamiento** sí evitan un paso innecesario.
+
 **Progreso** conserva el análisis transversal. Dentro de ese área, Entrenamiento explica evolución y Cuerpo concentra peso y medidas; ambos mantienen sus rutas propias sin duplicarse como tiles del hub. **Historial** permanece en Entrenar porque responde a los hechos y registros ocurridos, no a sus tendencias.
 
 ### Today / nutrición diaria
 
 PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, **Agregar rápido** compacto, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
+
+PR31 consolida los pasos dentro de **Actividad de hoy**: el mismo editor conserva autosave para pasos, agua y mate; el resumen integrado muestra hoy, promedio de siete días y acceso al historial. Una segunda card no se mantiene si duplica el mismo dato y no suma una tarea distinta. El resumen diario e inputs frecuentes permanecen visibles; las correcciones siguen como detalle progresivo.
 
 **Agregar rápido** es una fila secundaria que abre un sheet/dialog responsive; allí separa dos fuentes mediante búsqueda local y tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 

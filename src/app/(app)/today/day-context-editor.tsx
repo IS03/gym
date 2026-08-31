@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 import {
   DailyActivityAutosaveQueue,
   type DailyActivityAutosaveState,
@@ -17,6 +18,7 @@ import {
   saveGymOverrideAction,
   saveWorkOverrideAction,
 } from "./nutrition-actions";
+import { StepsSummary } from "./steps-card";
 
 type Props = {
   dayLogId: string;
@@ -29,10 +31,11 @@ type Props = {
   expenditureInitial: number | null;
   gymSource: "workout" | "override" | "none";
   waterTargetLabel: string | null;
+  stepsSummary: StepsReportSummary;
   onActivityChange?: (draft: DailyActivityDraft) => void;
 };
 
-export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, waterTargetLabel, onActivityChange }: Props) {
+export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, waterTargetLabel, stepsSummary, onActivityChange }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
@@ -136,6 +139,8 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
               ? autosave.error
               : null}
       </p>
+
+      <StepsSummary steps={steps} summary={stepsSummary} />
 
       <details className="group/corrections rounded-xl border">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

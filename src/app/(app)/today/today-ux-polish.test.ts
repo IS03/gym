@@ -9,10 +9,11 @@ const activityEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const stepsCard = source("src/app/(app)/today/steps-card.tsx");
 
 describe("PR20 — Today UX polish", () => {
-  it("renders daily activity before the compact steps card", () => {
-    expect(todayActivity.indexOf("<DayActivityPanel")).toBeLessThan(todayActivity.indexOf("<StepsCard"));
-    expect(todayActivity).toContain("steps={activity.steps}");
-    expect(todayActivity).toContain("onActivityChange={setActivity}");
+  it("renders steps within the single daily activity experience", () => {
+    expect(todayActivity).toContain("<DayActivityPanel");
+    expect(todayActivity).not.toContain("<StepsCard");
+    expect(activityPanel).toContain("stepsSummary={stepsSummary}");
+    expect(activityEditor).toContain("<StepsSummary steps={steps} summary={stepsSummary} />");
   });
 
   it("keeps the operational activity card visible and removes duplicate summaries", () => {
@@ -51,13 +52,12 @@ describe("PR20 — Today UX polish", () => {
     expect(stepsFromInput("8421")).toBe(8421);
   });
 
-  it("uses the compact StepsCard composition without the previous tall rows", () => {
-    expect(stepsCard).toContain('<Card size="sm"');
+  it("uses the compact integrated steps summary without a second card", () => {
+    expect(stepsCard).toContain("export function StepsSummary");
+    expect(stepsCard).not.toContain("<Card");
     expect(stepsCard).toContain('href="/today/steps"');
-    expect(stepsCard).toContain("Historial →");
-    expect(stepsCard).toContain("text-2xl");
-    expect(stepsCard).not.toContain("text-3xl");
-    expect(stepsCard).not.toContain("border-t");
+    expect(stepsCard).toContain("Historial");
+    expect(stepsCard).toContain("text-lg");
     expect(stepsCard).toContain("Prom. 7 días");
     expect(stepsCard).toContain("{summary.daysWithData}/7 días");
     expect(stepsCard).toContain("Sin datos en los últimos 7 días");
