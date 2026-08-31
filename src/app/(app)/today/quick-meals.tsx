@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookmarkPlus, Check, Plus, SlidersHorizontal } from "lucide-react";
+import { BookmarkPlus, Check, ChevronRight, Plus, Search, SlidersHorizontal, X, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,10 +17,8 @@ import {
   type QuickAddTab,
   type SavedMealSummary,
 } from "@/lib/nutrition/saved-meal-core";
-import {
-  QUICK_MEALS_INITIAL_LIMIT,
-  type QuickMealCandidate,
-} from "@/lib/nutrition/quick-meals-core";
+import { type QuickMealCandidate } from "@/lib/nutrition/quick-meals-core";
+import { filterQuickAddItems } from "@/lib/nutrition/quick-add-core";
 import { cn } from "@/lib/utils";
 import {
   addAdjustedSavedMealAction,
@@ -122,13 +120,13 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedSourceId, setSavedSourceId] = useState<string | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjustMeal, setAdjustMeal] = useState<SavedMealWithItems | null>(null);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const visibleSaved = savedMeals.slice(0, QUICK_MEALS_INITIAL_LIMIT);
-  const visibleSuggested = suggestedMeals.slice(0, QUICK_MEALS_INITIAL_LIMIT);
-  const currentHasMore = tab === "saved" ? savedMeals.length > visibleSaved.length : suggestedMeals.length > visibleSuggested.length;
+  const [search, setSearch] = useState("");
+  const filteredSavedMeals = filterQuickAddItems(savedMeals, search, (meal) => meal.name);
+  const filteredSuggestedMeals = filterQuickAddItems(suggestedMeals, search, (meal) => meal.label);
 
   async function run(key: string, task: () => Promise<{ ok: boolean; error?: string }>, success: string) {
     if (pendingRef.current) return false;
@@ -143,13 +141,11 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
   }
 
   async function addSaved(meal: SavedMealSummary) {
-    const ok = await run(`saved-add:${meal.id}`, () => quickAddSavedMealAction({ savedMealId: meal.id, date }), "Agregada");
-    if (ok) setMoreOpen(false);
+    await run(`saved-add:${meal.id}`, () => quickAddSavedMealAction({ savedMealId: meal.id, date }), "Agregada");
   }
 
   async function addSuggested(meal: QuickMealCandidate) {
-    const ok = await run(`suggested-add:${meal.sourceMealId}`, () => quickAddMealAction(meal.sourceMealId), "Agregada");
-    if (ok) setMoreOpen(false);
+    await run(`suggested-add:${meal.sourceMealId}`, () => quickAddMealAction(meal.sourceMealId), "Agregada");
   }
 
   async function saveSuggested(meal: QuickMealCandidate) {
@@ -159,7 +155,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
       const result = await saveSuggestedMealAction(meal.sourceMealId);
       if (!result.ok) { setError(result.error); return; }
       setSavedMeals((current) => [...current, result.meal].toSorted((left, right) => left.name.localeCompare(right.name, "es-AR")));
-      setSavedSourceId(meal.sourceMealId); setNotice("Guardada como habitual."); setMoreOpen(false); router.refresh();
+      setSavedSourceId(meal.sourceMealId); setNotice("Guardada como habitual."); router.refresh();
     } catch { setError("No pudimos guardar la comida habitual."); }
     finally { pendingRef.current = false; setPendingKey(null); }
   }
@@ -172,7 +168,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
       if (!result.ok) { setError(result.error); return; }
       setAdjustMeal(result.meal);
       setQuantities(Object.fromEntries(result.meal.items.map((item) => [item.id, String(item.quantity).replace(".", ",")])));
-      setMoreOpen(false);
+      setQuickAddOpen(false);
       setAdjustOpen(true);
     } finally { pendingRef.current = false; setPendingKey(null); }
   }
@@ -185,14 +181,44 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
 
   const tabButton = (value: QuickAddTab, label: string) => <button id={`quick-add-tab-${value}`} type="button" role="tab" aria-controls={`quick-add-panel-${value}`} aria-selected={tab === value} className={`min-h-10 rounded-lg px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${tab === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`} onClick={() => { setTab(value); setError(null); setNotice(null); }}>{label}</button>;
 
-  return <section className="overflow-hidden rounded-xl border bg-card shadow-sm" aria-labelledby="quick-add-heading">
-    <div className="space-y-3 p-3"><h2 id="quick-add-heading" className="text-sm font-semibold">Agregar rápido</h2><div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div></div>
-    <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`} className="border-t border-border/70">
-      {tab === "saved" ? (visibleSaved.length > 0 ? <SavedRows meals={visibleSaved} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} /> : <div className="p-4 text-sm"><p className="text-muted-foreground">Todavía no guardaste comidas habituales.</p><Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Crear una</Link></div>) : (visibleSuggested.length > 0 ? <SuggestedRows meals={visibleSuggested} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} /> : <p className="p-4 text-sm text-muted-foreground">Todavía no hay suficientes comidas anteriores para sugerir.</p>)}
-      <div className="min-h-5 px-3 text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
-      {currentHasMore ? <div className="px-1.5 pb-1.5"><Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => setMoreOpen(true)}>Ver más</Button></div> : null}
-    </div>
-    <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen} title={tab === "saved" ? "Comidas habituales" : "Comidas sugeridas"} description={tab === "saved" ? "Elegí una comida guardada para agregarla hoy." : "Elegí una comida anterior para agregarla hoy."} closeLabel="Cerrar agregado rápido">{tab === "saved" ? <SavedRows meals={savedMeals} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <SuggestedRows meals={suggestedMeals} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed />}</ResponsiveDialog>
+  function handleQuickAddOpenChange(open: boolean) {
+    setQuickAddOpen(open);
+    if (!open) return;
+    setTab(defaultQuickAddTab(savedMeals.length, suggestedMeals.length));
+    setSearch("");
+    setError(null);
+    setNotice(null);
+  }
+
+  const emptySaved = search
+    ? "No encontramos comidas habituales con esa búsqueda."
+    : "Todavía no guardaste comidas habituales.";
+  const emptySuggested = search
+    ? "No encontramos comidas sugeridas con esa búsqueda."
+    : "Todavía no hay suficientes comidas anteriores para sugerir.";
+
+  return <>
+    <Button type="button" variant="outline" className="h-11 w-full justify-between bg-card px-3 shadow-sm" aria-haspopup="dialog" onClick={() => handleQuickAddOpenChange(true)}>
+      <span className="flex items-center gap-2 text-sm font-medium"><Zap className="size-4 text-primary" aria-hidden />Agregar rápido</span>
+      <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+    </Button>
+    <ResponsiveDialog open={quickAddOpen} onOpenChange={handleQuickAddOpenChange} title="Agregar rápido" description="Elegí una comida habitual o una sugerencia para agregar hoy." closeLabel="Cerrar agregado rápido">
+      <div className="space-y-3">
+        <div className="sticky -top-4 z-10 -mx-4 space-y-3 border-b border-border/70 bg-card px-4 pb-3 pt-4 sm:-mx-5 sm:px-5">
+          <div className="relative">
+            <Label className="sr-only" htmlFor="quick-add-search">Buscar comida</Label>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input id="quick-add-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar comida..." className="h-10 pl-9 pr-10" />
+            {search ? <Button type="button" size="icon" variant="ghost" className="absolute right-0 top-0 size-10" aria-label="Limpiar búsqueda" onClick={() => setSearch("")}><X className="size-4" aria-hidden /></Button> : null}
+          </div>
+          <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div>
+        </div>
+        <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`}>
+          {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
+        </div>
+        <div className="min-h-5 text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
+      </div>
+    </ResponsiveDialog>
     <ResponsiveDialog open={adjustOpen} onOpenChange={(open) => { if (!pendingRef.current) setAdjustOpen(open); }} title={adjustMeal?.name ?? "Ajustar comida"} description="Cambiá cantidades sólo para esta vez." closeLabel="Cerrar ajuste">{adjustMeal ? <AdjustSavedMeal meal={adjustMeal} pending={pendingKey === `adjust-add:${adjustMeal.id}`} error={error} quantities={quantities} onQuantityChange={(itemId, value) => setQuantities((current) => ({ ...current, [itemId]: value }))} onAdd={() => void addAdjusted()} /> : null}</ResponsiveDialog>
-  </section>;
+  </>;
 }

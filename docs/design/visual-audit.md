@@ -105,7 +105,7 @@ Today conserva el registro Manual y suma **Desde alimento**: el usuario elige un
 
 **Resuelto.** `/settings/nutrition/meals` administra plantillas manuales y compuestas mediante búsqueda, Activas / Archivadas / Todas, filas compactas y editor responsive. Los componentes son snapshots nutricionales: borrar o editar el Food de origen no rompe la plantilla. Archivar conserva; eliminar confirma y sólo remueve la plantilla y sus componentes.
 
-Today reemplaza la superficie aislada de sugerencias por **Agregar rápido**, con tabs **Habituales** y **Sugeridas**. El `+` habitual crea una comida desde valores canónicos releídos por el servidor; una compuesta ofrece **Ajustar** para modificar sólo la ocurrencia. Las Sugeridas mantienen el algoritmo histórico de 60 días y suman una acción separada para guardarlas explícitamente como habitual. Ninguna plantilla o sugerencia reescribe `meal_entries` ya creadas.
+Today ofrece **Agregar rápido** como acceso compacto que abre un sheet/dialog responsive con búsqueda y tabs **Habituales** / **Sugeridas**. El `+` habitual crea una comida desde valores canónicos releídos por el servidor; una compuesta ofrece **Ajustar** para modificar sólo la ocurrencia. Las Sugeridas mantienen el algoritmo histórico de 60 días y suman una acción separada para guardarlas explícitamente como habitual. Ninguna plantilla o sugerencia reescribe `meal_entries` ya creadas.
 
 ## Roadmap visual y de producto
 

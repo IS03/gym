@@ -66,9 +66,9 @@ PR27 fija **Entrenar** como centro operativo: primero muestra la sesión en curs
 
 ### Today / nutrición diaria
 
-PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, **Agregar rápido**, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
+PR28.1 fija Today como un flujo de contexto diario: resumen y registro primero, **Agregar rápido** compacto, actividad y pasos, y finalmente los registros del día. En desktop, comidas conserva una columna deliberada junto al contexto, sin duplicar markup.
 
-**Agregar rápido** separa dos fuentes mediante tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
+**Agregar rápido** es una fila secundaria que abre un sheet/dialog responsive; allí separa dos fuentes mediante búsqueda local y tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 
 Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.
 
