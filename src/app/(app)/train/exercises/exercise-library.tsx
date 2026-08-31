@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,11 +55,13 @@ function Sheet({
   open,
   onOpenChange,
   variant = "default",
+  initialFocus,
 }: {
   children: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   variant?: "default" | "editor";
+  initialFocus?: React.RefObject<HTMLElement | null>;
 }) {
   const editorSheet = variant === "editor";
 
@@ -75,6 +77,7 @@ function Sheet({
           }
         >
           <Dialog.Popup
+            initialFocus={initialFocus}
             className={
               editorSheet
                 ? "flex h-[min(82svh,42rem)] min-h-0 w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:h-[min(78dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]"
@@ -324,6 +327,7 @@ export function ExerciseLibrary({
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [archiveTarget, setArchiveTarget] = useState<ExerciseLibraryItem | null>(null);
+  const editorCloseRef = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -625,6 +629,7 @@ export function ExerciseLibrary({
       <Sheet
         open={editorOpen}
         variant="editor"
+        initialFocus={editorCloseRef}
         onOpenChange={(open) => {
           if (!pending) {
             setEditorOpen(open);
@@ -643,6 +648,7 @@ export function ExerciseLibrary({
               : "Agregalo a tu biblioteca para usarlo cuando lo necesites."}
           </Dialog.Description>
           <Dialog.Close
+            ref={editorCloseRef}
             type="button"
             aria-label="Cerrar formulario de ejercicio"
             disabled={pending}

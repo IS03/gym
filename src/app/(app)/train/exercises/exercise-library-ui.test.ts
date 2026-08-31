@@ -38,6 +38,8 @@ describe("exercise library v2 composition", () => {
     expect(source).toContain("h-[min(82svh,42rem)] min-h-0");
     expect(source).toContain("min-h-0 flex-1 overflow-y-auto overscroll-contain");
     expect(source).toContain("env(safe-area-inset-bottom)");
+    expect(source).toContain("initialFocus={editorCloseRef}");
+    expect(source).toContain("ref={editorCloseRef}");
     expect(source).toContain('aria-label="Cerrar formulario de ejercicio"');
   });
 });
