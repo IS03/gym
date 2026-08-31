@@ -39,12 +39,6 @@ export default async function TrainHistoryPage({
   return (
     <div className="space-y-6">
       <HistoryTabs view={view} />
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Por ejercicio</h1>
-        <p className="text-sm text-muted-foreground">
-          Buscá un ejercicio y compará tus registros reales.
-        </p>
-      </div>
       <HistoryExerciseList
         exercises={exercises.map((exercise) => ({
           ...exercise,
@@ -58,7 +52,7 @@ export default async function TrainHistoryPage({
 }
 
 function HistoryTabs({ view }: { view: "sessions" | "exercises" }) {
-  return <div className="space-y-3">
+  return <div className="space-y-2.5">
     <div className="space-y-1">
       <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial</h1>
       <p className="text-sm text-muted-foreground">Revisá tus sesiones y el progreso de cada ejercicio.</p>

@@ -115,6 +115,10 @@ Today ofrece **Agregar rápido** como acceso compacto que abre un sheet/dialog r
 
 La Biblioteca pasa de cards elevadas repetidas a una lista compacta de filas y divisores, agrupada por grupo muscular cuando no hay una búsqueda en curso. La búsqueda local cubre la identidad disponible del ejercicio y el único filtro actual —grupo muscular— se presenta como chips densos dentro de un sheet responsive.
 
+### PR33 — Historial de entrenamiento v2
+
+Historial conserva las dos preguntas de producto sin duplicar jerarquía: **Sesiones** prioriza una continuidad compacta y filas navegables de sesiones finalizadas; **Por ejercicio** usa búsqueda local, filtros reales de rutina y músculo, y filas de alta densidad donde **Último** y **Mejor** permanecen explícitamente diferenciados. El detalle de ejercicio y el modo Progreso siguen siendo superficies separadas.
+
 Today une Actividad y Pasos en una sola superficie compacta: su estado cerrado prioriza trabajo, entrenamiento, gasto, balance, pasos, agua y mate; al abrir, el mismo estado local y autosave conservan la edición, el promedio de siete días, el historial y las correcciones. Trabajo, entrenamiento, gasto, balance y correcciones preservan sus fuentes y acciones; pasos no modifica automáticamente gasto ni balance.
 
 ## Roadmap visual y de producto

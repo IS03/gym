@@ -25,6 +25,12 @@ describe("exercise directory filters", () => {
   it("keeps multi-routine exercises visible from either membership", () => {
     expect(filterExerciseDirectory(items, { query: "", muscleGroup: "all", routineId: "upper" }).map((item) => item.id)).toEqual(["press"]);
   });
+
+  it("matches the loaded muscle identity without depending on accents", () => {
+    expect(filterExerciseDirectory(items, { query: "biceps", muscleGroup: "all", routineId: "all" }).map((item) => item.id)).toEqual(["curl"]);
+    expect(filterExerciseDirectory(items, { query: "pecho", muscleGroup: "all", routineId: "all" }).map((item) => item.id)).toEqual(["press"]);
+    expect(filterExerciseDirectory(items, { query: "inexistente", muscleGroup: "all", routineId: "all" })).toEqual([]);
+  });
 });
 
 describe("exercise report metrics", () => {

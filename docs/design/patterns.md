@@ -74,6 +74,8 @@ PR31 consolida los pasos dentro de **Actividad de hoy** sin hacer permanente la 
 
 Las colecciones densas que se exploran con frecuencia, como una biblioteca de ejercicios, prefieren filas compactas y divisores antes que cards elevadas repetidas. Los filtros exponen sólo dimensiones que existen en el modelo y se mantienen como una herramienta secundaria junto a la búsqueda; las opciones más largas viven en un sheet o dialog responsive, con estado activo explícito.
 
+En colecciones históricas, la primera línea identifica el hecho y las siguientes explican el contexto necesario para decidir si abrirlo. Las métricas comparables conservan una etiqueta explícita: **Último** describe la ejecución más reciente y **Mejor** el máximo histórico; no se diferencian sólo por posición, color o tamaño. La continuidad resume la última sesión y la frecuencia por rutina sin convertirse en otro dashboard permanente.
+
 **Agregar rápido** es una fila secundaria que abre un sheet/dialog responsive; allí separa dos fuentes mediante búsqueda local y tabs: las **Comidas habituales** son plantillas que el usuario decidió guardar; las **Comidas sugeridas** se infieren automáticamente de `meal_entries` manuales históricos. Una sugerencia puede guardarse como habitual, pero nunca se convierte automáticamente por frecuencia.
 
 Una comida cerrada es una fila/surface escaneable —título, calorías, macros, descripción limitada y **Editar**—, nunca un formulario abierto dentro de la lista. Editar ocurre en un único sheet responsive (dialog en desktop), conserva los campos y semánticas actuales y muestra el error cerca del formulario sin perder valores.

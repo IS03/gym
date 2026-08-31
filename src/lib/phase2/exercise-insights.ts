@@ -3,6 +3,7 @@ import type {
   TrainingAdjustment,
   WorkoutSet,
 } from "./types";
+import { normalizeExerciseSearch } from "./exercise-library";
 import type { RoutineColorKey } from "./routine-colors";
 
 export type ExerciseRoutineMembership = {
@@ -35,12 +36,12 @@ export function filterExerciseDirectory(
   items: readonly ExerciseDirectoryEntry[],
   filters: ExerciseDirectoryFilters,
 ): ExerciseDirectoryEntry[] {
-  const query = filters.query.trim().toLocaleLowerCase("es-AR");
+  const query = normalizeExerciseSearch(filters.query);
   return items.filter(
     (item) =>
       (filters.muscleGroup === "all" || item.muscleGroup === filters.muscleGroup) &&
       (filters.routineId === "all" || item.routineIds.includes(filters.routineId)) &&
-      item.name.toLocaleLowerCase("es-AR").includes(query),
+      normalizeExerciseSearch([item.name, item.muscleGroup, item.muscleLabel].filter(Boolean).join(" ")).includes(query),
   );
 }
 
