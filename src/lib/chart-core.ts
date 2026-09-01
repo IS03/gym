@@ -21,6 +21,28 @@ export function nonNegativeChartDomain(values: Array<number | null | undefined>)
   return { min: 0, max: Math.max(1, max * 1.08) };
 }
 
+/**
+ * A non-negative fitted domain for comparable measurements such as one exercise's
+ * working weight. Unlike aggregate metrics it intentionally does not pin to zero.
+ */
+export function fittedNonNegativeChartDomain(values: Array<number | null | undefined>): ChartDomain {
+  const finite = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  if (finite.length === 0) return { min: 0, max: 1 };
+  const observedMin = Math.min(...finite);
+  const observedMax = Math.max(...finite);
+  const span = observedMax - observedMin;
+  const padding = span > 0 ? span * 0.12 : Math.max(observedMax * 0.1, 1);
+  const roughMin = Math.max(0, observedMin - padding);
+  const roughMax = observedMax + padding;
+  const targetStep = Math.max((roughMax - roughMin) / 4, 0.000_001);
+  const magnitude = 10 ** Math.floor(Math.log10(targetStep));
+  const normalized = targetStep / magnitude;
+  const step = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+  const min = Math.max(0, Math.floor(roughMin / step) * step);
+  const max = Math.max(min + step, Math.ceil(roughMax / step) * step);
+  return { min, max };
+}
+
 export function chartX(index: number, count: number, width: number, left = 18, right = left): number {
   const usable = width - left - right;
   return left + (count <= 1 ? usable / 2 : (index / (count - 1)) * usable);

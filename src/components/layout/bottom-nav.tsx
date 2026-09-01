@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Dumbbell, House, LineChart, Utensils } from "lucide-react";
 import {
   bottomNavItems,
@@ -20,7 +20,9 @@ const icons: Record<BottomNavItemId, React.ComponentType<{ className?: string }>
 
 export function BottomNav() {
   const pathname = usePathname();
-  const activeIndex = getActiveBottomNavIndex(pathname);
+  const searchParams = useSearchParams();
+  const context = { fromProgress: searchParams.get("from") === "progress" };
+  const activeIndex = getActiveBottomNavIndex(pathname, context);
 
   return (
     <nav
@@ -38,7 +40,7 @@ export function BottomNav() {
         />
         {bottomNavItems.map(({ id, href, label }) => {
           const Icon = icons[id];
-          const active = isBottomNavItemActive(pathname, href);
+          const active = isBottomNavItemActive(pathname, href, context);
 
           return (
             <Link

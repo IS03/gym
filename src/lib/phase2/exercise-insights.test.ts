@@ -5,6 +5,7 @@ import {
   buildExerciseReportPoints,
   exerciseSessionVolume,
   filterExerciseDirectory,
+  selectedExerciseReportPointIndex,
   summarizeLatestExercisePerformance,
 } from "./exercise-insights";
 import type { ExerciseDirectoryEntry, ExerciseReportSet } from "./exercise-insights";
@@ -47,6 +48,9 @@ describe("exercise report metrics", () => {
     ]);
     expect(points.map((point) => point.sessionId)).toEqual(["old", "new"]);
     expect(points.map((point) => point.bestWeightKg)).toEqual([20, 25]);
+    expect(selectedExerciseReportPointIndex(points, null)).toBe(1);
+    expect(selectedExerciseReportPointIndex(points, "old")).toBe(0);
+    expect(selectedExerciseReportPointIndex(points, "missing")).toBe(1);
   });
   it("summarizes the latest performance without treating the first of varied sets as representative", () => {
     expect(summarizeLatestExercisePerformance([

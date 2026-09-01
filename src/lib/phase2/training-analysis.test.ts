@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, isTrainingAnalysisPeriod } from "./training-analysis";
+import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT } from "./training-analysis";
 import { trainingAnalysisExercisePath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
 import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
@@ -26,6 +26,8 @@ function analysis(input: {
   exercises?: WorkoutSessionExercise[];
   sets?: WorkoutSet[];
   dates?: Array<[string, string]>;
+  today?: string;
+  routines?: Array<{ id: string; nombre: string; is_active?: boolean }>;
   period?: "4w" | "8w" | "3m" | "6m" | "1y";
 } = {}) {
   return buildTrainingAnalysis({
@@ -34,9 +36,9 @@ function analysis(input: {
     sets: input.sets ?? [set()],
     dateByDayLog: new Map(input.dates ?? [["day-1", "2026-08-10"]]),
   }, {
-    today: "2026-08-25",
+    today: input.today ?? "2026-08-25",
     period: input.period ?? "4w",
-    routines: [{ id: "routine-push", nombre: "PUSH actual" }, { id: "routine-never", nombre: "Rutina sin sesiones" }],
+    routines: input.routines ?? [{ id: "routine-push", nombre: "PUSH actual" }, { id: "routine-never", nombre: "Rutina sin sesiones" }],
   });
 }
 
@@ -109,14 +111,53 @@ describe("training analysis", () => {
       sets: [set(), set({ id: "set-prior", workout_session_exercise_id: "session-exercise-prior", actual_reps: 8, actual_weight_kg: 70 })],
       dates: [["day-current", "2026-08-25"], ["day-prior", "2026-08-18"]],
     });
-    expect(result.weekComparison).toMatchObject({ current: { sessions: 1, sets: 1 }, previous: { sessions: 1, sets: 1 } });
+    expect(result.weekComparison).toMatchObject({ current: { sessions: 1, sets: 1 }, previous: { sessions: 1, sets: 1 }, isCurrentWeekComplete: false });
   });
 
-  it("validates workspace periods and formats volume without pointless precision", () => {
+  it("keeps a completed current week eligible for its simple comparison", () => {
+    const result = analysis({
+      today: "2026-08-30",
+      sessions: [session({ day_log_id: "day-current" }), session({ id: "session-prior", day_log_id: "day-prior", started_at: "2026-08-18T14:00:00.000Z", ended_at: "2026-08-18T15:00:00.000Z" })],
+      exercises: [exercise({ workout_session_id: "session-1" }), exercise({ id: "session-exercise-prior", workout_session_id: "session-prior" })],
+      sets: [set(), set({ id: "set-prior", workout_session_exercise_id: "session-exercise-prior", actual_reps: 8, actual_weight_kg: 70 })],
+      dates: [["day-current", "2026-08-30"], ["day-prior", "2026-08-18"]],
+    });
+    expect(result.weekComparison?.isCurrentWeekComplete).toBe(true);
+  });
+
+  it("uses only active routines in current selectors while retaining archived historical analysis", () => {
+    const result = analysis({
+      routines: [{ id: "routine-push", nombre: "PUSH actual", is_active: true }, { id: "routine-archived", nombre: "Rutina archivada", is_active: false }],
+      sessions: [session(), session({ id: "archived-session", day_log_id: "day-archived", routine_id: "routine-archived", routine_name_snapshot: "Rutina histórica archivada", started_at: "2026-08-17T14:00:00.000Z", ended_at: "2026-08-17T15:00:00.000Z" })],
+      exercises: [exercise(), exercise({ id: "archived-exercise", workout_session_id: "archived-session" })],
+      sets: [set(), set({ id: "archived-set", workout_session_exercise_id: "archived-exercise" })],
+      dates: [["day-1", "2026-08-10"], ["day-archived", "2026-08-17"]],
+    });
+    expect(result.activeRoutineIds).toEqual(["routine-push"]);
+    expect(result.routines.find((routine) => routine.id === "routine-archived")?.name).toBe("Rutina histórica archivada");
+  });
+
+  it("counts distinct exercises for a muscle across repeated historical sessions", () => {
+    const result = analysis({
+      sessions: [session(), session({ id: "session-2", day_log_id: "day-2", started_at: "2026-08-17T14:00:00.000Z", ended_at: "2026-08-17T15:00:00.000Z" })],
+      exercises: [exercise(), exercise({ id: "session-exercise-2", workout_session_id: "session-2" }), exercise({ id: "pec-deck", workout_session_id: "session-2", exercise_id: "pec-deck", nombre_snapshot: "Pec deck pecho" })],
+      sets: [set(), set({ id: "set-2", workout_session_exercise_id: "session-exercise-2" }), set({ id: "set-3", workout_session_exercise_id: "pec-deck" })],
+      dates: [["day-1", "2026-08-10"], ["day-2", "2026-08-17"]],
+    });
+    expect(result.muscles.find((muscle) => muscle.key === "pecho")?.summary.exerciseCount).toBe(2);
+  });
+
+  it("validates workspace periods, recent limit and Spanish human volume labels", () => {
     expect(isTrainingAnalysisPeriod("8w")).toBe(true);
     expect(isTrainingAnalysisPeriod("90d")).toBe(false);
-    expect(formatTrainingAnalysisMetric(12_900, "volume")).toMatch(/12,9\s*k\s*kg/);
-    expect(formatTrainingAnalysisMetric(9_600, "volume")).toMatch(/9,6\s*k\s*kg/);
+    expect(TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT).toBe(6);
+    expect(formatTrainingVolumeKg(960)).toBe("960 kg");
+    expect(formatTrainingVolumeKg(9_600)).toBe("9,6 mil kg");
+    expect(formatTrainingVolumeKg(12_900)).toBe("12,9 mil kg");
+    expect(formatTrainingVolumeKg(67_500)).toBe("67,5 mil kg");
+    expect(formatTrainingVolumeKg(163_900)).toBe("163,9 mil kg");
+    expect(formatTrainingVolumeKg(-41_900)).toBe("−41,9 mil kg");
+    expect(formatTrainingAnalysisMetric(12_900, "volume")).toBe("12,9 mil kg");
     expect(formatTrainingAnalysisMetric(0, "sets")).toBe("0 series");
   });
 
@@ -132,5 +173,7 @@ describe("training analysis", () => {
     expect(trainingAnalysisWorkspacePath(state)).toBe("/train/progress?view=muscles&period=8w&muscle=pecho");
     expect(trainingAnalysisExercisePath("press-machine", state)).toBe("/train/history/press-machine?from=progress&period=8w&view=muscles&muscle=pecho");
     expect(trainingAnalysisExercisePath("press-machine", { view: "routines", period: "4w", routineId: "routine-push", muscleKey: null })).toContain("routine_id=routine-push");
+    const exercisesState = { view: "exercises" as const, period: "8w" as const, routineId: null, muscleKey: null, exerciseQuery: "pecho", exerciseRoutineId: "routine-push", exerciseMuscleKey: "pecho" };
+    expect(trainingAnalysisExercisePath("press-machine", exercisesState)).toContain("query=pecho&routine_filter=routine-push&muscle_filter=pecho");
   });
 });

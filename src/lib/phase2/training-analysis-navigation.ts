@@ -8,6 +8,9 @@ export type TrainingAnalysisNavigationState = {
   period: TrainingAnalysisPeriod;
   routineId: string | null;
   muscleKey: string | null;
+  exerciseQuery?: string;
+  exerciseRoutineId?: string | "all";
+  exerciseMuscleKey?: string | "all";
 };
 
 export function isTrainingAnalysisView(value: string | null | undefined): value is TrainingAnalysisView {
@@ -18,6 +21,11 @@ export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationS
   const params = new URLSearchParams({ view: state.view, period: state.period });
   if (state.routineId) params.set("routine", state.routineId);
   if (state.muscleKey) params.set("muscle", state.muscleKey);
+  if (state.view === "exercises") {
+    if (state.exerciseQuery) params.set("query", state.exerciseQuery);
+    if (state.exerciseRoutineId && state.exerciseRoutineId !== "all") params.set("routine_filter", state.exerciseRoutineId);
+    if (state.exerciseMuscleKey && state.exerciseMuscleKey !== "all") params.set("muscle_filter", state.exerciseMuscleKey);
+  }
   return `/train/progress?${params.toString()}`;
 }
 
@@ -28,5 +36,10 @@ export function trainingAnalysisExercisePath(exerciseId: string, state: Training
     if (state.routineId !== "__free__") params.set("routine_id", state.routineId);
   }
   if (state.muscleKey) params.set("muscle", state.muscleKey);
+  if (state.view === "exercises") {
+    if (state.exerciseQuery) params.set("query", state.exerciseQuery);
+    if (state.exerciseRoutineId && state.exerciseRoutineId !== "all") params.set("routine_filter", state.exerciseRoutineId);
+    if (state.exerciseMuscleKey && state.exerciseMuscleKey !== "all") params.set("muscle_filter", state.exerciseMuscleKey);
+  }
   return `/train/history/${exerciseId}?${params.toString()}`;
 }
