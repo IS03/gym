@@ -13,6 +13,14 @@ export function chartDomain(values: Array<number | null | undefined>, includeZer
   return { min: min - pad, max: max + pad };
 }
 
+/** For metrics that cannot be negative (series, sessions, duration and volume). */
+export function nonNegativeChartDomain(values: Array<number | null | undefined>): ChartDomain {
+  const finite = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  const max = finite.length ? Math.max(...finite) : 0;
+  if (max <= 0) return { min: 0, max: 1 };
+  return { min: 0, max: Math.max(1, max * 1.08) };
+}
+
 export function chartX(index: number, count: number, width: number, left = 18, right = left): number {
   const usable = width - left - right;
   return left + (count <= 1 ? usable / 2 : (index / (count - 1)) * usable);
