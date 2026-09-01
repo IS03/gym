@@ -1,5 +1,5 @@
 import type { TrainingAnalysisPeriod } from "./training-analysis";
-import type { TrainingComparisonKind } from "./training-comparison";
+import type { TrainingComparisonKind, TrainingComparisonSubjectType } from "./training-comparison";
 
 export const TRAINING_ANALYSIS_VIEWS = ["general", "routines", "muscles", "exercises"] as const;
 export type TrainingAnalysisView = (typeof TRAINING_ANALYSIS_VIEWS)[number];
@@ -15,6 +15,8 @@ export type TrainingAnalysisNavigationState = {
   comparison?: TrainingComparisonKind;
   comparisonA?: string | null;
   comparisonB?: string | null;
+  comparisonSubjectType?: TrainingComparisonSubjectType | null;
+  comparisonSubject?: string | null;
 };
 
 export function isTrainingAnalysisView(value: string | null | undefined): value is TrainingAnalysisView {
@@ -34,16 +36,32 @@ export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationS
     params.set("compare", state.comparison);
     if (state.comparisonA) params.set("a", state.comparisonA);
     if (state.comparisonB) params.set("b", state.comparisonB);
+    if (state.comparisonSubjectType) params.set("subject_type", state.comparisonSubjectType);
+    if (state.comparisonSubject) params.set("subject", state.comparisonSubject);
   }
   return `/train/progress?${params.toString()}`;
 }
 
 export function trainingAnalysisComparisonPath(
   state: TrainingAnalysisNavigationState,
-  comparison: TrainingComparisonKind,
+  comparison: Exclude<TrainingComparisonKind, "previous">,
   input?: { a?: string | null; b?: string | null },
 ): string {
-  return trainingAnalysisWorkspacePath({ ...state, comparison, comparisonA: input?.a ?? null, comparisonB: input?.b ?? null });
+  return trainingAnalysisWorkspacePath({ ...state, comparison, comparisonA: input?.a ?? null, comparisonB: input?.b ?? null, comparisonSubjectType: null, comparisonSubject: null });
+}
+
+export function trainingAnalysisSelfComparisonPath(
+  state: TrainingAnalysisNavigationState,
+  input: { subjectType: TrainingComparisonSubjectType; subject?: string | null },
+): string {
+  return trainingAnalysisWorkspacePath({
+    ...state,
+    comparison: "previous",
+    comparisonA: null,
+    comparisonB: null,
+    comparisonSubjectType: input.subjectType,
+    comparisonSubject: input.subject ?? null,
+  });
 }
 
 export function trainingAnalysisExercisePath(exerciseId: string, state: TrainingAnalysisNavigationState): string {

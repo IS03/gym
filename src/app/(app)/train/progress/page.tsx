@@ -5,7 +5,7 @@ import {
 } from "@/components/training/training-analysis-workspace";
 import { filterTrainingAnalysisExercises, isTrainingAnalysisPeriod } from "@/lib/phase2/training-analysis";
 import { isTrainingAnalysisView } from "@/lib/phase2/training-analysis-navigation";
-import { buildTrainingComparison, isTrainingComparisonKind, trainingComparisonKindForView } from "@/lib/phase2/training-comparison";
+import { buildTrainingComparison, buildTrainingSelfComparison, isTrainingComparisonKind, isTrainingComparisonSubjectType } from "@/lib/phase2/training-comparison";
 import { getTrainingAnalysis, getTrainingAnalysisWithPreviousPeriod } from "@/lib/phase2/training-robust";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +21,15 @@ export default async function TrainingProgressPage({
   const view = isTrainingAnalysisView(rawView) ? rawView : "general";
   const period = isTrainingAnalysisPeriod(rawPeriod) ? rawPeriod : "8w";
   const rawComparison = typeof sp.compare === "string" ? sp.compare : null;
-  const comparisonKind = isTrainingComparisonKind(rawComparison) && rawComparison === trainingComparisonKindForView(view) ? rawComparison : null;
-  const comparisonData = comparisonKind === "periods" ? await getTrainingAnalysisWithPreviousPeriod(period) : null;
+  const normalizedComparison = rawComparison === "periods" ? "previous" : rawComparison;
+  const parsedComparison = isTrainingComparisonKind(normalizedComparison) ? normalizedComparison : null;
+  const comparisonKind = parsedComparison === "previous"
+    || (parsedComparison === "routines" && view === "routines")
+    || (parsedComparison === "muscles" && view === "muscles")
+    || (parsedComparison === "exercises" && view === "exercises")
+    ? parsedComparison
+    : null;
+  const comparisonData = comparisonKind === "previous" ? await getTrainingAnalysisWithPreviousPeriod(period) : null;
   const analysis = comparisonData?.current ?? await getTrainingAnalysis(period);
   const requestedRoutine = typeof sp.routine === "string" ? sp.routine : null;
   const requestedMuscle = typeof sp.muscle === "string" ? sp.muscle : null;
@@ -33,16 +40,25 @@ export default async function TrainingProgressPage({
   const muscleKey = requestedMuscle && analysis.muscles.some((muscle) => muscle.key === requestedMuscle) ? requestedMuscle : null;
   const requestedA = typeof sp.a === "string" ? sp.a : null;
   const requestedB = typeof sp.b === "string" ? sp.b : null;
-  const comparison = comparisonKind ? buildTrainingComparison({
-    kind: comparisonKind,
-    analysis,
-    previousAnalysis: comparisonData?.previous,
-    requestedA,
-    requestedB,
-    exerciseIds: comparisonKind === "exercises"
-      ? filterTrainingAnalysisExercises(analysis.exercises, { query: exerciseQuery ?? "", routineId: exerciseRoutineId ?? "all", muscleKey: exerciseMuscleKey ?? "all" }).map((exercise) => exercise.id)
-      : undefined,
-  }) : null;
+  const rawSubjectType = typeof sp.subject_type === "string" ? sp.subject_type : null;
+  const requestedSubjectType = isTrainingComparisonSubjectType(rawSubjectType) ? rawSubjectType : null;
+  const defaultSubjectType = view === "general" ? "general" : view === "routines" ? "routine" : view === "muscles" ? "muscle" : "exercise";
+  const subjectType = requestedSubjectType ?? defaultSubjectType;
+  const explicitSubject = typeof sp.subject === "string" ? sp.subject : null;
+  const subjectId = explicitSubject ?? (subjectType === "routine" ? routineId : subjectType === "muscle" ? muscleKey : null);
+  const comparison = comparisonKind === "previous" && comparisonData
+    ? buildTrainingSelfComparison({ analysis, previousAnalysis: comparisonData.previous, subjectType, subjectId })
+    : comparisonKind && comparisonKind !== "previous"
+      ? buildTrainingComparison({
+        kind: comparisonKind,
+        analysis,
+        requestedA,
+        requestedB,
+        exerciseIds: comparisonKind === "exercises"
+          ? filterTrainingAnalysisExercises(analysis.exercises, { query: exerciseQuery ?? "", routineId: exerciseRoutineId ?? "all", muscleKey: exerciseMuscleKey ?? "all" }).map((exercise) => exercise.id)
+          : undefined,
+      })
+      : null;
 
   return <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
     <header className="space-y-3">

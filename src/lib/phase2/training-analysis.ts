@@ -1,14 +1,17 @@
 import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "./muscle-groups";
-import { addUtcDays, buildWeeklyTrainingSummaries, formatTrainingMinutes, mondayOfIsoDate } from "./training-progress-summary";
+import { addUtcDays, buildWeeklyTrainingSummaries, formatTrainingMinutes } from "./training-progress-summary";
 import { normalizeExerciseSearch } from "./exercise-library";
 import type { Routine, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 export const TRAINING_ANALYSIS_PERIODS = [
-  { value: "4w", label: "4 semanas", days: 28, bucketWeeks: 1 },
-  { value: "8w", label: "8 semanas", days: 56, bucketWeeks: 1 },
-  { value: "3m", label: "3 meses", days: 90, bucketWeeks: 1 },
-  { value: "6m", label: "6 meses", days: 183, bucketWeeks: 2 },
-  { value: "1y", label: "1 año", days: 365, bucketWeeks: 4 },
+  { value: "1w", label: "1 semana", days: 7, bucketDays: 1 },
+  { value: "2w", label: "2 semanas", days: 14, bucketDays: 1 },
+  { value: "3w", label: "3 semanas", days: 21, bucketDays: 1 },
+  { value: "4w", label: "4 semanas", days: 28, bucketDays: 7 },
+  { value: "8w", label: "8 semanas", days: 56, bucketDays: 7 },
+  { value: "3m", label: "3 meses", days: 90, bucketDays: 7 },
+  { value: "6m", label: "6 meses", days: 183, bucketDays: 14 },
+  { value: "1y", label: "1 año", days: 365, bucketDays: 28 },
 ] as const;
 
 export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIODS)[number]["value"];
@@ -200,6 +203,16 @@ function dateForPeriod(period: TrainingAnalysisPeriod, today: string) {
   return addUtcDays(today, 1 - config.days);
 }
 
+export function trainingAnalysisPeriodRange(period: TrainingAnalysisPeriod, end: string): { start: string; end: string } {
+  return { start: dateForPeriod(period, end), end };
+}
+
+export function previousTrainingAnalysisPeriodRange(period: TrainingAnalysisPeriod, end: string): { start: string; end: string } {
+  const current = trainingAnalysisPeriodRange(period, end);
+  const previousEnd = addUtcDays(current.start, -1);
+  return trainingAnalysisPeriodRange(period, previousEnd);
+}
+
 export function isTrainingAnalysisPeriod(value: string | null | undefined): value is TrainingAnalysisPeriod {
   return TRAINING_ANALYSIS_PERIODS.some((period) => period.value === value);
 }
@@ -248,14 +261,13 @@ export function filterTrainingAnalysisExercises(
 function buildTimeline(
   records: readonly SessionRecord[],
   range: { start: string; end: string },
-  bucketWeeks: number,
+  bucketDays: number,
   selector?: (record: SessionRecord) => ExerciseRecord[],
 ): TrainingAnalysisTimelinePoint[] {
-  const firstBucket = mondayOfIsoDate(range.start);
-  const finalBucket = mondayOfIsoDate(range.end);
   const buckets: TrainingAnalysisTimelinePoint[] = [];
-  for (let start = firstBucket; start <= finalBucket; start = addUtcDays(start, bucketWeeks * 7)) {
-    const end = addUtcDays(start, bucketWeeks * 7 - 1);
+  for (let start = range.start; start <= range.end; start = addUtcDays(start, bucketDays)) {
+    const candidateEnd = addUtcDays(start, bucketDays - 1);
+    const end = candidateEnd < range.end ? candidateEnd : range.end;
     const scoped = records.filter((record) => record.logDate >= start && record.logDate <= end);
     buckets.push({ id: start, start, end, ...summarize(scoped, selector) });
   }
@@ -350,10 +362,10 @@ function exerciseSummaries(
 function buildExerciseTimeline(
   records: readonly SessionRecord[],
   range: { start: string; end: string },
-  bucketWeeks: number,
+  bucketDays: number,
   exerciseId: string,
 ): TrainingAnalysisExerciseTimelinePoint[] {
-  return buildTimeline(records, range, bucketWeeks, (record) => record.exercises.filter((exercise) => exercise.id === exerciseId)).map((point) => {
+  return buildTimeline(records, range, bucketDays, (record) => record.exercises.filter((exercise) => exercise.id === exerciseId)).map((point) => {
     const completedSets = records
       .filter((record) => record.logDate >= point.start && record.logDate <= point.end)
       .flatMap((record) => record.exercises.filter((exercise) => exercise.id === exerciseId))
@@ -378,7 +390,7 @@ export function buildTrainingAnalysis(
   }
 
   const summary = summarize(records);
-  const timeline = buildTimeline(records, range, config.bucketWeeks);
+  const timeline = buildTimeline(records, range, config.bucketDays);
   const weekly = buildWeeklyTrainingSummaries(source, input.today);
   const currentWeek = weekly[0];
   const previousWeek = weekly[1];
@@ -394,7 +406,7 @@ export function buildTrainingAnalysis(
         id,
         name,
         summary: routineSummary,
-        timeline: buildTimeline(routineRecords, range, config.bucketWeeks),
+        timeline: buildTimeline(routineRecords, range, config.bucketDays),
         muscles: [...new Set(routineRecords.flatMap((record) => record.exercises.filter((exercise) => exercise.sets.length > 0).map((exercise) => exercise.muscleKey)))].map((key) => {
           const scoped = summarize(routineRecords, (record) => record.exercises.filter((exercise) => exercise.muscleKey === key));
           const first = routineRecords.flatMap((record) => record.exercises).find((exercise) => exercise.muscleKey === key);
@@ -415,7 +427,7 @@ export function buildTrainingAnalysis(
         key,
         label,
         summary: summarize(records, selector),
-        timeline: buildTimeline(muscleRecords, range, config.bucketWeeks, selector),
+        timeline: buildTimeline(muscleRecords, range, config.bucketDays, selector),
         exerciseIds: exerciseSummaries(muscleRecords, selector).map((exercise) => exercise.id),
       };
     })
@@ -424,7 +436,7 @@ export function buildTrainingAnalysis(
   const activeRoutineIds = (input.routines ?? []).filter((routine) => routine.is_active !== false).map((routine) => routine.id);
   const exercises = exerciseSummaries(records).map((exercise) => ({
     ...exercise,
-    timeline: buildExerciseTimeline(records, range, config.bucketWeeks, exercise.id),
+    timeline: buildExerciseTimeline(records, range, config.bucketDays, exercise.id),
   }));
   return { period: input.period, range, summary, weekComparison, timeline, routines, activeRoutineIds, muscles, exercises };
 }

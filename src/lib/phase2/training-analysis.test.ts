@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT } from "./training-analysis";
-import { trainingAnalysisComparisonPath, trainingAnalysisExercisePath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
+import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, previousTrainingAnalysisPeriodRange, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT, trainingAnalysisPeriodRange, type TrainingAnalysisPeriod } from "./training-analysis";
+import { trainingAnalysisComparisonPath, trainingAnalysisExercisePath, trainingAnalysisSelfComparisonPath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
 import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 function session(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
@@ -28,7 +28,7 @@ function analysis(input: {
   dates?: Array<[string, string]>;
   today?: string;
   routines?: Array<{ id: string; nombre: string; is_active?: boolean }>;
-  period?: "4w" | "8w" | "3m" | "6m" | "1y";
+  period?: TrainingAnalysisPeriod;
 } = {}) {
   return buildTrainingAnalysis({
     sessions: input.sessions ?? [session()],
@@ -104,6 +104,33 @@ describe("training analysis", () => {
     }
   });
 
+  it("defines short periods as exact inclusive windows with a contiguous, non-overlapping previous period", () => {
+    const expectedStarts: Record<"1w" | "2w" | "3w" | "4w" | "8w", string> = {
+      "1w": "2025-12-28",
+      "2w": "2025-12-21",
+      "3w": "2025-12-14",
+      "4w": "2025-12-07",
+      "8w": "2025-11-09",
+    };
+    for (const period of Object.keys(expectedStarts) as Array<keyof typeof expectedStarts>) {
+      const current = trainingAnalysisPeriodRange(period, "2026-01-03");
+      const previous = previousTrainingAnalysisPeriodRange(period, "2026-01-03");
+      expect(current).toEqual({ start: expectedStarts[period], end: "2026-01-03" });
+      expect(new Date(`${current.end}T12:00:00Z`).getTime() - new Date(`${current.start}T12:00:00Z`).getTime()).toBe((Number.parseInt(period) * 7 - 1) * 86_400_000);
+      expect(new Date(`${current.start}T12:00:00Z`).getTime() - new Date(`${previous.end}T12:00:00Z`).getTime()).toBe(86_400_000);
+      expect(new Date(`${previous.end}T12:00:00Z`).getTime() - new Date(`${previous.start}T12:00:00Z`).getTime()).toBe((Number.parseInt(period) * 7 - 1) * 86_400_000);
+    }
+  });
+
+  it("keeps daily buckets for one, two and three week windows", () => {
+    for (const period of ["1w", "2w", "3w"] as const) {
+      const result = analysis({ period, today: "2026-08-16" });
+      expect(result.timeline).toHaveLength(Number.parseInt(period) * 7);
+      expect(result.timeline.every((point) => point.start === point.end)).toBe(true);
+      expect(result.exercises[0]?.timeline).toHaveLength(Number.parseInt(period) * 7);
+    }
+  });
+
   it("keeps the simple current-week comparison secondary and based on completed snapshots", () => {
     const result = analysis({
       sessions: [session({ day_log_id: "day-current" }), session({ id: "session-prior", day_log_id: "day-prior", started_at: "2026-08-18T14:00:00.000Z", ended_at: "2026-08-18T15:00:00.000Z" })],
@@ -148,6 +175,9 @@ describe("training analysis", () => {
   });
 
   it("validates workspace periods, recent limit and Spanish human volume labels", () => {
+    expect(isTrainingAnalysisPeriod("1w")).toBe(true);
+    expect(isTrainingAnalysisPeriod("2w")).toBe(true);
+    expect(isTrainingAnalysisPeriod("3w")).toBe(true);
     expect(isTrainingAnalysisPeriod("8w")).toBe(true);
     expect(isTrainingAnalysisPeriod("90d")).toBe(false);
     expect(TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT).toBe(6);
@@ -176,5 +206,6 @@ describe("training analysis", () => {
     const exercisesState = { view: "exercises" as const, period: "8w" as const, routineId: null, muscleKey: null, exerciseQuery: "pecho", exerciseRoutineId: "routine-push", exerciseMuscleKey: "pecho" };
     expect(trainingAnalysisExercisePath("press-machine", exercisesState)).toContain("query=pecho&routine_filter=routine-push&muscle_filter=pecho");
     expect(trainingAnalysisComparisonPath(exercisesState, "exercises", { a: "press-machine", b: "pec-deck" })).toBe("/train/progress?view=exercises&period=8w&query=pecho&routine_filter=routine-push&muscle_filter=pecho&compare=exercises&a=press-machine&b=pec-deck");
+    expect(trainingAnalysisSelfComparisonPath(state, { subjectType: "muscle", subject: "pecho" })).toBe("/train/progress?view=muscles&period=8w&muscle=pecho&compare=previous&subject_type=muscle&subject=pecho");
   });
 });
