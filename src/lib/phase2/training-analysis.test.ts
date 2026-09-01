@@ -116,6 +116,7 @@ describe("training analysis", () => {
     expect(isTrainingAnalysisPeriod("8w")).toBe(true);
     expect(isTrainingAnalysisPeriod("90d")).toBe(false);
     expect(formatTrainingAnalysisMetric(12_900, "volume")).toMatch(/12,9\s*k\s*kg/);
+    expect(formatTrainingAnalysisMetric(9_600, "volume")).toMatch(/9,6\s*k\s*kg/);
     expect(formatTrainingAnalysisMetric(0, "sets")).toBe("0 series");
   });
 

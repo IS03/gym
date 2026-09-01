@@ -196,10 +196,11 @@ export function trainingAnalysisMetricValue(summary: TrainingAnalysisSummary, me
 export function formatTrainingAnalysisMetric(value: number, metric: TrainingAnalysisMetric): string {
   if (metric === "minutes") return formatTrainingMinutes(value);
   if (metric === "volume") {
-    return `${new Intl.NumberFormat("es-AR", {
-      notation: value >= 10_000 ? "compact" : "standard",
+    const formatted = new Intl.NumberFormat("es-AR", {
+      notation: value >= 1_000 ? "compact" : "standard",
       maximumFractionDigits: value >= 1_000 ? 1 : 0,
-    }).format(Math.max(0, value))} kg`;
+    }).format(Math.max(0, value)).replace("K", "k");
+    return `${formatted} kg`;
   }
   return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.max(0, value))} ${metric === "sets" ? "series" : "sesiones"}`;
 }
