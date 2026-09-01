@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chartDomain, chartTickIndexes, chartYAxisTicks, formatChartValue, lineSegments } from "./chart-core";
+import { chartDomain, chartTickIndexes, chartYAxisTicks, formatChartValue, lineSegments, nonNegativeChartDomain } from "./chart-core";
 
 describe("chart display helpers", () => {
   it("creates a small, ordered Y scale for positive, mixed and constant data", () => {
@@ -24,5 +24,11 @@ describe("chart display helpers", () => {
     expect(chartTickIndexes(366)).toEqual([0, 91, 183, 274, 365]);
     const domain = chartDomain([10, null, 30]);
     expect(lineSegments([10, null, 30], domain, 320, 152)).toHaveLength(2);
+  });
+
+  it("keeps domains for inherently non-negative metrics on or above zero", () => {
+    expect(nonNegativeChartDomain([10, 30])).toMatchObject({ min: 0 });
+    expect(nonNegativeChartDomain([0, 0])).toEqual({ min: 0, max: 1 });
+    expect(nonNegativeChartDomain([-20, 4])).toMatchObject({ min: 0 });
   });
 });

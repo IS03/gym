@@ -8,7 +8,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const PERIODS = new Set(["30d", "90d", "6m", "all"]);
+const PERIODS = new Set(["30d", "90d", "4w", "8w", "3m", "6m", "1y", "all"]);
 
 function isoDaysBefore(date: string, days: number) {
   const value = new Date(`${date}T12:00:00Z`);
@@ -19,9 +19,17 @@ function isoDaysBefore(date: string, days: number) {
 function periodStart(period: string) {
   const today = todayInCordoba();
   if (period === "30d") return isoDaysBefore(today, 30);
+  if (period === "4w") return isoDaysBefore(today, 27);
+  if (period === "8w") return isoDaysBefore(today, 55);
+  if (period === "3m") return isoDaysBefore(today, 89);
   if (period === "6m") {
     const value = new Date(`${today}T12:00:00Z`);
     value.setUTCMonth(value.getUTCMonth() - 6);
+    return value.toISOString().slice(0, 10);
+  }
+  if (period === "1y") {
+    const value = new Date(`${today}T12:00:00Z`);
+    value.setUTCFullYear(value.getUTCFullYear() - 1);
     return value.toISOString().slice(0, 10);
   }
   return period === "all" ? undefined : isoDaysBefore(today, 90);
@@ -36,25 +44,34 @@ export default async function ExerciseHistoryPage({
 }) {
   const { exerciseId } = await params;
   const sp = (await searchParams) ?? {};
-  const rawPeriod = typeof sp.period === "string" && PERIODS.has(sp.period) ? sp.period : "90d";
+  const rawPeriod = typeof sp.period === "string" && PERIODS.has(sp.period) ? sp.period : "3m";
+  const period = rawPeriod === "30d" ? "4w" : rawPeriod === "90d" ? "3m" : rawPeriod;
   const routineId = typeof sp.routine_id === "string" && sp.routine_id ? sp.routine_id : null;
   const [allExercises, items, routineOptions] = await Promise.all([
     listExercises({ includeArchived: true }),
-    listRobustExerciseHistory({ exerciseId, fromDate: periodStart(rawPeriod), routineId: routineId ?? undefined, limit: 20 }),
+    listRobustExerciseHistory({ exerciseId, fromDate: periodStart(period), routineId: routineId ?? undefined, limit: 20 }),
     listRobustExerciseHistoryRoutineOptions(exerciseId),
   ]);
   const exercise = allExercises.find((item) => item.id === exerciseId) ?? null;
   const cameFromProgress = sp.from === "progress";
+  const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
+  const progressRoutine = typeof sp.routine === "string" ? sp.routine : null;
+  const progressMuscle = typeof sp.muscle === "string" ? sp.muscle : null;
+  const progressParams = new URLSearchParams({ view: progressView, period });
+  if (progressRoutine) progressParams.set("routine", progressRoutine);
+  if (progressMuscle) progressParams.set("muscle", progressMuscle);
+  const latestSnapshot = items[0]?.exercise ?? null;
 
   return <ExerciseReportView
-    exerciseName={exercise?.nombre ?? "Ejercicio"}
-    muscleLabel={exercise?.muscle_group_label ?? exercise?.grupo_muscular ?? null}
-    period={rawPeriod}
+    exerciseName={exercise?.nombre ?? latestSnapshot?.nombre_snapshot ?? "Ejercicio"}
+    muscleLabel={exercise?.muscle_group_label ?? exercise?.grupo_muscular ?? latestSnapshot?.muscle_group_label_snapshot ?? latestSnapshot?.grupo_muscular_snapshot ?? null}
+    period={period}
     routineId={routineId}
     routines={routineOptions}
-    backHref={cameFromProgress ? "/train/progress" : "/train/history?view=exercises"}
+    backHref={cameFromProgress ? `/train/progress?${progressParams.toString()}` : "/train/history?view=exercises"}
     backLabel={cameFromProgress ? "Progreso" : "Historial"}
     source={cameFromProgress ? "progress" : "history"}
+    progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle } : undefined}
     sessions={items.map((item) => ({
       sessionId: item.session.id,
       logDate: item.logDate,

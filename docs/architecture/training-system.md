@@ -228,6 +228,14 @@ Las estadísticas se construyen sobre hechos:
 - volumen = `actual_reps × actual_weight_kg`;
 - snapshots de rutina y músculo.
 
+El workspace de Progreso organiza esos hechos en cuatro contextos: General,
+Rutinas, Músculos y Ejercicios. Las rutinas, ejercicios y músculos se agrupan
+desde los snapshots de sesiones finalizadas; la definición actual de una rutina
+puede aportar una opción sin sesiones, pero no reescribe el análisis histórico.
+Para métricas globales, de rutina y de músculo se usan períodos acotados y
+buckets temporales legibles. Series, sesiones, duración y volumen nunca usan un
+dominio visual negativo.
+
 El peso cargado por mancuerna se conserva como fue registrado; no se multiplica implícitamente por dos.
 
 ## ABS y cardio

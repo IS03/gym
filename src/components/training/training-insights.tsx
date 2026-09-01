@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChartDetail } from "@/components/ui/chart-detail";
-import { chartDomain, chartYAxisTicks, formatChartValue, type ChartUnit } from "@/lib/chart-core";
+import { chartYAxisTicks, formatChartValue, nonNegativeChartDomain, type ChartUnit } from "@/lib/chart-core";
 import {
   WEEKLY_CHART_METRICS,
   completedWeeklyAverage,
@@ -83,7 +83,7 @@ export function WeeklyTrainingChart({ weeks, className }: { weeks: WeeklyTrainin
   const title = weeklyMetricTitle(metric);
   const average = completedWeeklyAverage(visibleWeeks, metric);
   const unit = weeklyUnit(metric);
-  const domain = chartDomain([...values, average?.value ?? null], true);
+  const domain = nonNegativeChartDomain([...values, average?.value ?? null]);
   const selectedIndex = selected ?? visibleWeeks.length - 1;
 
   if (visibleWeeks.length === 0) {

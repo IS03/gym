@@ -10,6 +10,12 @@ import {
   buildWeeklyTrainingSummaries,
   mondayOfIsoDate,
 } from "./training-progress-summary";
+import {
+  buildTrainingAnalysis,
+  type TrainingAnalysis,
+  type TrainingAnalysisPeriod,
+} from "./training-analysis";
+import { listRoutines } from "./training";
 import { daysBetweenIsoDates } from "./session-history";
 import { resolveWorkoutSessionLookup } from "./training-session-lookup";
 import {
@@ -1091,4 +1097,18 @@ export async function getTrainingProgress(): Promise<{
       left.name.localeCompare(right.name, "es"),
     ),
   };
+}
+
+/**
+ * Read model for the Progress workspace. It intentionally aggregates completed
+ * session snapshots, never the current routine definition.
+ */
+export async function getTrainingAnalysis(
+  period: TrainingAnalysisPeriod,
+): Promise<TrainingAnalysis> {
+  const [data, routines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  return buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
 }

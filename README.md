@@ -33,10 +33,10 @@ OWNLEVEL es una PWA personal de seguimiento físico que centraliza entrenamiento
 
 ### Progreso
 
-- Resumen semanal de entrenamiento.
-- Duración, volumen, series y distribución muscular.
-- Comparación entre semanas.
-- Evolución por ejercicio.
+- Análisis de entrenamiento general, por rutina, músculo y ejercicio.
+- Duración, volumen, series y distribución muscular por período.
+- Comparación breve de la semana actual con la anterior.
+- Evolución de peso, reps y volumen por ejercicio.
 
 ### Cuerpo
 
