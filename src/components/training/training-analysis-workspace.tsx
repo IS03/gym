@@ -119,7 +119,9 @@ function AnalysisChart({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const values = points.map((point) => Math.max(0, trainingAnalysisMetricValue(point, metric)));
   const hasValues = values.some((value) => value > 0);
-  const selectedIndex = Math.max(0, points.findIndex((point) => point.id === selectedId));
+  const selectedIndex = selectedId
+    ? Math.max(0, points.findIndex((point) => point.id === selectedId))
+    : Math.max(0, points.length - 1);
   const selected = points[selectedIndex] ?? null;
   const domain = nonNegativeChartDomain(values);
   const width = 340;
