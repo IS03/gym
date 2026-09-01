@@ -76,7 +76,7 @@ function ContextTabs({ state }: { state: WorkspaceState }) {
   ];
   return <nav className="grid grid-cols-4 rounded-xl border bg-muted/35 p-1" aria-label="Contexto de análisis">{contexts.map((context) => {
     const selected = state.view === context.value;
-    return <Link key={context.value} href={trainingAnalysisWorkspacePath({ view: context.value, period: state.period, routineId: null, muscleKey: null })} className={cn("flex h-10 min-w-0 items-center justify-center rounded-lg px-1 text-center text-xs font-medium transition-colors sm:text-sm", selected ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{context.label}</Link>;
+    return <Link key={context.value} href={trainingAnalysisWorkspacePath({ view: context.value, period: state.period, routineId: null, muscleKey: null })} className={cn("flex h-10 min-w-0 items-center justify-center rounded-lg px-1 text-center text-xs font-medium transition-colors sm:text-sm", selected ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{context.label}</Link>;
   })}</nav>;
 }
 
@@ -84,7 +84,7 @@ function PeriodSelector({ state }: { state: WorkspaceState }) {
   return <div className="grid grid-cols-5 gap-1 rounded-xl border bg-muted/25 p-1" aria-label="Período de análisis">{TRAINING_ANALYSIS_PERIODS.map((period) => {
     const selected = period.value === state.period;
     const compact = period.value === "4w" ? "4 sem" : period.value === "8w" ? "8 sem" : period.label;
-    return <Link key={period.value} href={trainingAnalysisWorkspacePath({ ...state, period: period.value })} className={cn("flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-center text-[11px] font-medium whitespace-nowrap transition-colors sm:text-xs", selected ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{compact}</Link>;
+    return <Link key={period.value} href={trainingAnalysisWorkspacePath({ ...state, period: period.value })} className={cn("flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-center text-[11px] font-medium whitespace-nowrap transition-colors sm:text-xs", selected ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{compact}</Link>;
   })}</div>;
 }
 
@@ -139,7 +139,7 @@ function AnalysisChart({
   const summary = `${title}. ${description} ${points.map((point, index) => `${rangeLabel(point)}: ${metricAxisValue(values[index] ?? 0, metric)}`).join(". ")}.`;
 
   return <section className="space-y-4" aria-labelledby="training-analysis-chart-title">
-    <div className="space-y-3"><div><h2 id="training-analysis-chart-title" className="text-lg font-semibold tracking-tight">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>{metrics.length > 1 && <div className={cn("mx-auto grid w-full rounded-lg border bg-muted/25 p-1", metrics.length === 4 ? "max-w-xl grid-cols-4" : "max-w-sm grid-cols-3")} aria-label="Métrica de evolución">{metrics.map((option) => <button key={option} type="button" onClick={() => { setMetric(option); setSelectedId(null); }} className={cn("h-9 min-w-0 rounded-md px-1 text-[11px] font-medium outline-none transition-colors sm:text-xs focus-visible:ring-2 focus-visible:ring-ring", metric === option ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-pressed={metric === option}>{METRIC_META[option].shortLabel}</button>)}</div>}</div>
+    <div className="space-y-3"><div><h2 id="training-analysis-chart-title" className="text-lg font-semibold tracking-tight">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>{metrics.length > 1 && <div className={cn("mx-auto grid w-full rounded-lg border bg-muted/25 p-1", metrics.length === 4 ? "max-w-xl grid-cols-4" : "max-w-sm grid-cols-3")} aria-label="Métrica de evolución">{metrics.map((option) => <button key={option} type="button" onClick={() => { setMetric(option); setSelectedId(null); }} className={cn("h-9 min-w-0 rounded-md px-1 text-[11px] font-medium outline-none transition-colors sm:text-xs focus-visible:ring-2 focus-visible:ring-ring", metric === option ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-pressed={metric === option}>{METRIC_META[option].shortLabel}</button>)}</div>}</div>
     {!hasValues ? <EmptyState>No hay {METRIC_META[metric].label.toLocaleLowerCase("es-AR")} registradas para este período.</EmptyState> : <><p className="sr-only">{summary}</p><svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={summary} className="h-56 w-full overflow-visible" preserveAspectRatio="none">{chartYAxisTicks(domain, 4).map((value) => {
       const y = chartY(value, domain, height, top, bottom);
       return <g key={value}><line x1={left} x2={width - right} y1={y} y2={y} className="stroke-border" strokeDasharray="2 3" /><text x={left - 7} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">{metricAxisValue(value, metric)}</text></g>;

@@ -30,7 +30,7 @@ export default async function TrainingProgressPage({
 
   return <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
     <header className="space-y-3">
-      <Link href="/progress" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+      <Link href="/progress" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-primary hover:underline">
         <ArrowLeft className="size-4" aria-hidden />
         Progreso
       </Link>
