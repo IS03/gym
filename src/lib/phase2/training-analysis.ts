@@ -29,6 +29,11 @@ export type TrainingAnalysisTimelinePoint = TrainingAnalysisSummary & {
   end: string;
 };
 
+export type TrainingAnalysisExerciseTimelinePoint = TrainingAnalysisTimelinePoint & {
+  bestWeightKg: number | null;
+  bestReps: number | null;
+};
+
 export type TrainingAnalysisRoutine = {
   id: string;
   name: string;
@@ -55,8 +60,10 @@ export type TrainingAnalysisExercise = {
   sets: number;
   volumeKg: number;
   bestWeightKg: number | null;
+  bestReps: number | null;
   lastDate: string;
   routineIds: string[];
+  timeline: TrainingAnalysisExerciseTimelinePoint[];
 };
 
 export type TrainingAnalysisExerciseFilters = {
@@ -314,8 +321,9 @@ function exerciseSummaries(
       const existing = exercises.get(exercise.id);
       const volumeKg = exercise.sets.reduce((total, set) => total + (set.reps ?? 0) * (set.weightKg ?? 0), 0);
       const bestWeightKg = exercise.sets.reduce<number | null>((best, set) => set.weightKg !== null && (best === null || set.weightKg > best) ? set.weightKg : best, null);
+      const bestReps = exercise.sets.reduce<number | null>((best, set) => set.reps !== null && (best === null || set.reps > best) ? set.reps : best, null);
       if (!existing) {
-        exercises.set(exercise.id, { id: exercise.id, name: exercise.name, muscleKey: exercise.muscleKey, muscleLabel: exercise.muscleLabel, sessions: 1, sets: exercise.sets.length, volumeKg, bestWeightKg, lastDate: record.logDate, routineIds: record.routineId ? [record.routineId] : [FREE_ROUTINE_ID] });
+        exercises.set(exercise.id, { id: exercise.id, name: exercise.name, muscleKey: exercise.muscleKey, muscleLabel: exercise.muscleLabel, sessions: 1, sets: exercise.sets.length, volumeKg, bestWeightKg, bestReps, lastDate: record.logDate, routineIds: record.routineId ? [record.routineId] : [FREE_ROUTINE_ID], timeline: [] });
         sessionIdsByExercise.set(exercise.id, new Set([record.id]));
         continue;
       }
@@ -325,6 +333,7 @@ function exerciseSummaries(
       existing.sets += exercise.sets.length;
       existing.volumeKg += volumeKg;
       if (bestWeightKg !== null && (existing.bestWeightKg === null || bestWeightKg > existing.bestWeightKg)) existing.bestWeightKg = bestWeightKg;
+      if (bestReps !== null && (existing.bestReps === null || bestReps > existing.bestReps)) existing.bestReps = bestReps;
       if (record.logDate >= existing.lastDate) {
         existing.lastDate = record.logDate;
         existing.name = exercise.name;
@@ -336,6 +345,23 @@ function exerciseSummaries(
     }
   }
   return [...exercises.values()].sort((left, right) => right.lastDate.localeCompare(left.lastDate) || left.name.localeCompare(right.name, "es-AR"));
+}
+
+function buildExerciseTimeline(
+  records: readonly SessionRecord[],
+  range: { start: string; end: string },
+  bucketWeeks: number,
+  exerciseId: string,
+): TrainingAnalysisExerciseTimelinePoint[] {
+  return buildTimeline(records, range, bucketWeeks, (record) => record.exercises.filter((exercise) => exercise.id === exerciseId)).map((point) => {
+    const completedSets = records
+      .filter((record) => record.logDate >= point.start && record.logDate <= point.end)
+      .flatMap((record) => record.exercises.filter((exercise) => exercise.id === exerciseId))
+      .flatMap((exercise) => exercise.sets);
+    const bestWeightKg = completedSets.reduce<number | null>((best, set) => set.weightKg !== null && (best === null || set.weightKg > best) ? set.weightKg : best, null);
+    const bestReps = completedSets.reduce<number | null>((best, set) => set.reps !== null && (best === null || set.reps > best) ? set.reps : best, null);
+    return { ...point, bestWeightKg, bestReps };
+  });
 }
 
 export function buildTrainingAnalysis(
@@ -396,5 +422,9 @@ export function buildTrainingAnalysis(
     .sort((left, right) => Number(right.summary.hasData) - Number(left.summary.hasData) || right.summary.sets - left.summary.sets || left.label.localeCompare(right.label, "es-AR"));
 
   const activeRoutineIds = (input.routines ?? []).filter((routine) => routine.is_active !== false).map((routine) => routine.id);
-  return { period: input.period, range, summary, weekComparison, timeline, routines, activeRoutineIds, muscles, exercises: exerciseSummaries(records) };
+  const exercises = exerciseSummaries(records).map((exercise) => ({
+    ...exercise,
+    timeline: buildExerciseTimeline(records, range, config.bucketWeeks, exercise.id),
+  }));
+  return { period: input.period, range, summary, weekComparison, timeline, routines, activeRoutineIds, muscles, exercises };
 }

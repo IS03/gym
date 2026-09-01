@@ -1,4 +1,5 @@
 import type { TrainingAnalysisPeriod } from "./training-analysis";
+import type { TrainingComparisonKind } from "./training-comparison";
 
 export const TRAINING_ANALYSIS_VIEWS = ["general", "routines", "muscles", "exercises"] as const;
 export type TrainingAnalysisView = (typeof TRAINING_ANALYSIS_VIEWS)[number];
@@ -11,6 +12,9 @@ export type TrainingAnalysisNavigationState = {
   exerciseQuery?: string;
   exerciseRoutineId?: string | "all";
   exerciseMuscleKey?: string | "all";
+  comparison?: TrainingComparisonKind;
+  comparisonA?: string | null;
+  comparisonB?: string | null;
 };
 
 export function isTrainingAnalysisView(value: string | null | undefined): value is TrainingAnalysisView {
@@ -26,7 +30,20 @@ export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationS
     if (state.exerciseRoutineId && state.exerciseRoutineId !== "all") params.set("routine_filter", state.exerciseRoutineId);
     if (state.exerciseMuscleKey && state.exerciseMuscleKey !== "all") params.set("muscle_filter", state.exerciseMuscleKey);
   }
+  if (state.comparison) {
+    params.set("compare", state.comparison);
+    if (state.comparisonA) params.set("a", state.comparisonA);
+    if (state.comparisonB) params.set("b", state.comparisonB);
+  }
   return `/train/progress?${params.toString()}`;
+}
+
+export function trainingAnalysisComparisonPath(
+  state: TrainingAnalysisNavigationState,
+  comparison: TrainingComparisonKind,
+  input?: { a?: string | null; b?: string | null },
+): string {
+  return trainingAnalysisWorkspacePath({ ...state, comparison, comparisonA: input?.a ?? null, comparisonB: input?.b ?? null });
 }
 
 export function trainingAnalysisExercisePath(exerciseId: string, state: TrainingAnalysisNavigationState): string {
