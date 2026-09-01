@@ -1112,3 +1112,23 @@ export async function getTrainingAnalysis(
   ]);
   return buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
 }
+
+/**
+ * Two equal historical intervals for the General comparison. Both reads use the
+ * same completed-session snapshots; only the aggregation end date changes.
+ */
+export async function getTrainingAnalysisWithPreviousPeriod(
+  period: TrainingAnalysisPeriod,
+): Promise<{ current: TrainingAnalysis; previous: TrainingAnalysis }> {
+  const [data, routines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
+  const previous = buildTrainingAnalysis(data, {
+    today: addUtcDays(current.range.start, -1),
+    period,
+    routines,
+  });
+  return { current, previous };
+}

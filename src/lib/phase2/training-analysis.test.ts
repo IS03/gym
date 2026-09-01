@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT } from "./training-analysis";
-import { trainingAnalysisExercisePath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
+import { trainingAnalysisComparisonPath, trainingAnalysisExercisePath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
 import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 function session(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
@@ -175,5 +175,6 @@ describe("training analysis", () => {
     expect(trainingAnalysisExercisePath("press-machine", { view: "routines", period: "4w", routineId: "routine-push", muscleKey: null })).toContain("routine_id=routine-push");
     const exercisesState = { view: "exercises" as const, period: "8w" as const, routineId: null, muscleKey: null, exerciseQuery: "pecho", exerciseRoutineId: "routine-push", exerciseMuscleKey: "pecho" };
     expect(trainingAnalysisExercisePath("press-machine", exercisesState)).toContain("query=pecho&routine_filter=routine-push&muscle_filter=pecho");
+    expect(trainingAnalysisComparisonPath(exercisesState, "exercises", { a: "press-machine", b: "pec-deck" })).toBe("/train/progress?view=exercises&period=8w&query=pecho&routine_filter=routine-push&muscle_filter=pecho&compare=exercises&a=press-machine&b=pec-deck");
   });
 });
