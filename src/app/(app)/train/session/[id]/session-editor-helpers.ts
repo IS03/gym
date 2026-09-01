@@ -223,6 +223,12 @@ export function exerciseCompletion(payload: WorkoutExercisePayload) {
   };
 }
 
+/** Compact, stable progress copy for the collapsed exercise header. */
+export function exerciseProgressLabel(payload: WorkoutExercisePayload) {
+  const { completedSets, totalSets } = exerciseCompletion(payload);
+  return `${completedSets}/${totalSets}`;
+}
+
 export function initialExpandedExerciseId(
   exercises: ExercisePayloadEntry[],
 ): string | null {
@@ -236,32 +242,6 @@ export function initialExpandedExerciseId(
     ({ payload }) => !exerciseCompletion(payload).isComplete,
   );
   return incomplete?.id ?? null;
-}
-
-function compactMetric(value: number) {
-  return String(value).replace(".", ",");
-}
-
-export function completedExerciseSummary(
-  payload: WorkoutExercisePayload,
-): string | null {
-  const completedSets = payload.sets.filter((set) => set.is_completed);
-  if (completedSets.length === 0) return null;
-
-  const weights = completedSets
-    .map((set) => set.actual_weight_kg)
-    .filter((value): value is number => value !== null);
-  const weightSummary =
-    weights.length === completedSets.length
-      ? Math.min(...weights) === Math.max(...weights)
-        ? `${compactMetric(weights[0])} kg`
-        : `${compactMetric(Math.min(...weights))}–${compactMetric(Math.max(...weights))} kg`
-      : null;
-  const repsSummary = `${completedSets
-    .map((set) => (set.actual_reps === null ? "—" : compactMetric(set.actual_reps)))
-    .join(" / ")} reps`;
-
-  return [weightSummary, repsSummary].filter(Boolean).join(" · ");
 }
 
 export function completionStats(payloads: WorkoutExercisePayload[]) {

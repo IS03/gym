@@ -47,6 +47,16 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).toContain("Actualizar");
   });
 
+  it("reserva un rail derecho para progreso y controles antes de truncar el contenido", () => {
+    expect(editor).toContain("grid-cols-[minmax(0,1fr)_auto]");
+    expect(editor).toContain('className="flex shrink-0 items-center gap-2"');
+    expect(editor).toContain("exerciseProgressLabel(payload)");
+    expect(editor).toContain("min-w-[4.25rem]");
+    expect(editor).toContain("tabular-nums");
+    expect(editor).toContain("const collapsedSubtitle = exerciseMeta;");
+    expect(editor).not.toContain("completedExerciseSummary(payload)");
+  });
+
   it("usa un único indicador para recordatorios y actualización de targets", () => {
     expect(editor).toContain("hasFutureExerciseAction(payload.decision, payload.apply_to_routine)");
     expect(editor).toContain("Usar lo realizado hoy como nuevo objetivo");

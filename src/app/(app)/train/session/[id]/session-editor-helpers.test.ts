@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  completedExerciseSummary,
   compactAutosaveStatus,
   calculateScrollCompensation,
   completionStats,
+  exerciseProgressLabel,
   hasFutureExerciseAction,
   initialExpandedExerciseId,
   nextSessionReminder,
@@ -151,14 +151,22 @@ describe("borrador de sesión", () => {
     expect(initialExpandedExerciseId([{ id: "complete", payload: complete }])).toBeNull();
   });
 
-  it("resume pesos variables y repeticiones realizadas", () => {
+  it.each([
+    [0, 3, "0/3"],
+    [1, 3, "1/3"],
+    [3, 3, "3/3"],
+    [0, 4, "0/4"],
+    [4, 4, "4/4"],
+  ])("etiqueta el progreso %i de %i como %s", (completedSets, totalSets, expected) => {
+    const template = payload().sets[0];
     const value = payload();
-    value.sets[1] = {
-      ...value.sets[1],
-      actual_weight_kg: 22.5,
-      is_completed: true,
-    };
-    expect(completedExerciseSummary(value)).toBe("20–22,5 kg · 10 / 8 reps");
+    value.sets = Array.from({ length: totalSets }, (_, index) => ({
+      ...template,
+      set_number: index + 1,
+      is_completed: index < completedSets,
+    }));
+
+    expect(exerciseProgressLabel(value)).toBe(expected);
   });
 });
 

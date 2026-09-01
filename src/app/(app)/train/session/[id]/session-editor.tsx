@@ -74,11 +74,11 @@ import type {
   WorkoutSessionClientDetail,
 } from "@/lib/phase2/types";
 import {
-  completedExerciseSummary,
   calculateScrollCompensation,
   compactAutosaveStatus,
   completionStats,
   exerciseCompletion,
+  exerciseProgressLabel,
   initialExpandedExerciseId,
   formatWorkoutClockTime,
   formatWorkoutDuration,
@@ -1170,7 +1170,6 @@ export function SessionEditor({
             const dirty = dirtyIds.has(exercise.id);
             const completion = exerciseCompletion(payload);
             const expanded = expandedExerciseId === exercise.id;
-            const completedSummary = completedExerciseSummary(payload);
             const restLabel = configuredRestLabel(
               exercise.rest_min_seconds_snapshot,
               exercise.rest_max_seconds_snapshot,
@@ -1188,9 +1187,8 @@ export function SessionEditor({
               implement: exercise.implement_snapshot,
               weight_mode: exercise.weight_mode_snapshot,
             });
-            const collapsedSubtitle = [exerciseMeta, completedSummary]
-              .filter(Boolean)
-              .join(" · ");
+            const collapsedSubtitle = exerciseMeta;
+            const progressLabel = exerciseProgressLabel(payload);
             const quickNote = payload.notes.trim();
             const autosaveVisualStatus = compactAutosaveStatus({
               saved: Boolean(status?.saved),
@@ -1236,18 +1234,13 @@ export function SessionEditor({
                 <CardHeader className="p-0">
                   <button
                     type="button"
-                    className="flex min-h-[4.25rem] w-full touch-manipulation items-center gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+                    className="grid min-h-[4.25rem] w-full touch-manipulation grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                     aria-expanded={expanded}
                     aria-controls={exerciseContentId}
                     onClick={() => toggleExercise(exercise.id)}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        {completion.isComplete ? (
-                          <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <Check className="size-3" strokeWidth={3} aria-hidden />
-                          </span>
-                        ) : null}
                         <h3 className="truncate text-sm font-semibold tracking-tight">
                           {exercise.nombre_snapshot}
                         </h3>
@@ -1273,46 +1266,48 @@ export function SessionEditor({
                         </p>
                       ) : null}
                     </div>
-                    <span
-                      className={cn(
-                        "metric-number shrink-0 rounded-full border px-2 py-1 text-xs font-medium",
-                        completion.isComplete &&
-                          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-                      )}
-                    >
-                      {completion.completedSets}/{completion.totalSets}
+                    <span className="flex shrink-0 items-center gap-2" aria-label={`${progressLabel} series completadas`}>
+                      <span
+                        className={cn(
+                          "metric-number min-w-[4.25rem] rounded-full border px-2 py-1 text-center text-xs font-medium tabular-nums",
+                          completion.isComplete &&
+                            "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+                        )}
+                      >
+                        {progressLabel}
+                      </span>
+                      <span
+                        className={cn(
+                          "flex size-5 shrink-0 items-center justify-center",
+                          autosaveVisualStatus === "saved" &&
+                            "text-emerald-700 dark:text-emerald-300",
+                          autosaveVisualStatus === "saving" && "text-primary",
+                          autosaveVisualStatus === "dirty" &&
+                            "text-amber-700 dark:text-amber-300",
+                          autosaveVisualStatus === "error" && "text-destructive",
+                        )}
+                        role="status"
+                        aria-live="polite"
+                        aria-label={autosaveStatusLabel}
+                      >
+                        {autosaveVisualStatus === "saved" ? (
+                          <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
+                        ) : autosaveVisualStatus === "saving" ? (
+                          <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+                        ) : autosaveVisualStatus === "dirty" ? (
+                          <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                        ) : autosaveVisualStatus === "error" ? (
+                          <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                        ) : null}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
+                          expanded && "rotate-180",
+                        )}
+                        aria-hidden
+                      />
                     </span>
-                    <span
-                      className={cn(
-                        "flex size-5 shrink-0 items-center justify-center",
-                        autosaveVisualStatus === "saved" &&
-                          "text-emerald-700 dark:text-emerald-300",
-                        autosaveVisualStatus === "saving" && "text-primary",
-                        autosaveVisualStatus === "dirty" &&
-                          "text-amber-700 dark:text-amber-300",
-                        autosaveVisualStatus === "error" && "text-destructive",
-                      )}
-                      role="status"
-                      aria-live="polite"
-                      aria-label={autosaveStatusLabel}
-                    >
-                      {autosaveVisualStatus === "saved" ? (
-                        <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
-                      ) : autosaveVisualStatus === "saving" ? (
-                        <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-                      ) : autosaveVisualStatus === "dirty" ? (
-                        <span className="size-1.5 rounded-full bg-current" aria-hidden />
-                      ) : autosaveVisualStatus === "error" ? (
-                        <X className="size-3.5" strokeWidth={2.5} aria-hidden />
-                      ) : null}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
-                        expanded && "rotate-180",
-                      )}
-                      aria-hidden
-                    />
                   </button>
                 </CardHeader>
                 {expanded ? (

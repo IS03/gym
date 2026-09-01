@@ -46,7 +46,9 @@ Seleccionar un ejercicio u objeto muestra check/tint/borde suave. La CTA para co
 
 ### Sesión activa
 
-PR25 fija un patrón de foco para tareas secuenciales: un solo ejercicio abierto a la vez, encabezado estable y contenido que se revela dentro de la misma pieza. Cambiar de ejercicio guarda el anterior y compensa el desplazamiento del nuevo encabezado; no se reemplaza por un `scrollIntoView` agresivo. La fila cerrada conserva identidad, progreso, resumen de series y recordatorios suficientes para decidir el siguiente paso.
+PR25 fija un patrón de foco para tareas secuenciales: un solo ejercicio abierto a la vez, encabezado estable y contenido que se revela dentro de la misma pieza. Cambiar de ejercicio guarda el anterior y compensa el desplazamiento del nuevo encabezado; no se reemplaza por un `scrollIntoView` agresivo. La fila cerrada conserva identidad, progreso y recordatorios suficientes para decidir el siguiente paso; el peso, las repeticiones y la ejecución pertenecen al estado abierto.
+
+En filas densas de mobile, los controles finales tienen un rail reservado. El contenido flexible se trunca antes de desplazar contador, estado o chevron.
 
 En el ejercicio abierto, las series dominan la jerarquía. Descanso, próxima vez y notas aparecen después, sin cards anidadas. Autosave usa un slot estable en el header y abre recuperación sólo ante error. Las operaciones destructivas continúan detrás de **Más opciones**, con acento rojo visible también cuando el disclosure está cerrado.
 
