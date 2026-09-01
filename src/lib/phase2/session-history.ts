@@ -18,12 +18,14 @@ export function formatSessionDate(value: string) {
 }
 
 export function formatTrainingDayHeading(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
+  const formatted = new Intl.DateTimeFormat("es-AR", {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone: CORDOBA_TIME_ZONE,
   }).format(dateAtNoon(value));
+
+  return `${formatted.slice(0, 1).toLocaleUpperCase("es-AR")}${formatted.slice(1)}`;
 }
 
 export function formatRelativeTrainingDays(days: number | null) {

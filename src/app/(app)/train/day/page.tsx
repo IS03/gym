@@ -54,7 +54,7 @@ export default async function TrainDayPage({
           Calendario
         </Link>
         <div className="space-y-1">
-          <h1 className="capitalize text-2xl font-semibold tracking-tight lg:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
             {formatTrainingDayHeading(date)}
           </h1>
           {sessions.length > 0 ? (

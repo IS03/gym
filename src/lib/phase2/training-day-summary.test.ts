@@ -46,13 +46,15 @@ describe("resumen histórico de un día de entrenamiento", () => {
     expect(summary.durationMilliseconds).toBeNull();
   });
 
-  it("ordena las sesiones por inicio y conserva la fecha lógica de Córdoba", () => {
+  it("ordena las sesiones por inicio y conserva la fecha lógica y capitalización natural de Córdoba", () => {
     const ordered = orderTrainingDaySessions([
       session({ id: "later", startedAt: "2026-08-27T19:00:00.000Z" }),
       session({ id: "earlier", startedAt: "2026-08-27T17:00:00.000Z" }),
     ]);
 
     expect(ordered.map((item) => item.id)).toEqual(["earlier", "later"]);
-    expect(formatTrainingDayHeading("2026-08-27")).toBe("jueves, 27 de agosto");
+    expect(formatTrainingDayHeading("2026-08-27")).toBe("Jueves, 27 de agosto");
+    expect(formatTrainingDayHeading("2026-08-28")).toBe("Viernes, 28 de agosto");
+    expect(formatTrainingDayHeading("2026-08-31")).toBe("Lunes, 31 de agosto");
   });
 });
