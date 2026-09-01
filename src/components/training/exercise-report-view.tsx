@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartDetail } from "@/components/ui/chart-detail";
-import { chartDomain, chartTickIndexes, chartX, chartY, chartYAxisTicks, formatChartValue, lineSegments, type ChartUnit } from "@/lib/chart-core";
+import { chartTickIndexes, chartX, chartY, chartYAxisTicks, formatChartValue, lineSegments, nonNegativeChartDomain, type ChartUnit } from "@/lib/chart-core";
 import {
   buildExerciseReportPoints,
   completedExerciseSets,
@@ -18,7 +19,7 @@ import {
 type ChartMetric = "weight" | "reps" | "volume";
 
 const ADJUSTMENT_LABELS = { maintain: "Mantener", increase_weight: "+ Peso", increase_reps: "+ Repeticiones", custom: "Personalizado" };
-const PERIOD_OPTIONS = [{ value: "30d", label: "30 días" }, { value: "90d", label: "90 días" }, { value: "6m", label: "6 meses" }, { value: "all", label: "Todo" }];
+const PERIOD_OPTIONS = [{ value: "4w", label: "4 semanas" }, { value: "8w", label: "8 semanas" }, { value: "3m", label: "3 meses" }, { value: "6m", label: "6 meses" }, { value: "1y", label: "1 año" }, { value: "all", label: "Todo" }];
 
 function number(value: number | null, suffix = "") { return value === null ? "—" : `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(value)}${suffix}`; }
 function date(value: string, year = true) { return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}), timeZone: "America/Argentina/Cordoba" }).format(new Date(`${value}T12:00:00Z`)).replace(".", ""); }
@@ -31,7 +32,7 @@ function EvolutionChart({ points, metric }: { points: ExerciseReportPoint[]; met
   const [selected, setSelected] = useState(0);
   const visible = points.filter((point) => metricValue(point, metric) !== null);
   if (visible.length === 0) return <div className="flex h-48 items-center justify-center rounded-xl border border-dashed px-5 text-center text-sm text-muted-foreground">No hay datos de {metricLabel(metric).toLocaleLowerCase("es-AR")} para este período.</div>;
-  const values = visible.map((point) => metricValue(point, metric)!); const unit = chartUnit(metric); const domain = chartDomain(values); const selectedIndex = Math.min(selected, visible.length - 1);
+  const values = visible.map((point) => metricValue(point, metric)!); const unit = chartUnit(metric); const domain = nonNegativeChartDomain(values); const selectedIndex = Math.min(selected, visible.length - 1);
   const coordinates = lineSegments(values, domain, 320, 160, 46, 12, 12, 28)[0] ?? [];
   const maximum = Math.max(...values); const summary = `Evolución de ${metricLabel(metric).toLocaleLowerCase("es-AR")}. Eje horizontal: fecha. Eje vertical: ${unit}. Primera: ${metricDisplay(values[0]!, metric)}. Última: ${metricDisplay(values.at(-1) ?? null, metric)}. Máxima: ${metricDisplay(maximum, metric)}.`;
   return <div className="space-y-2"><p className="text-xs text-muted-foreground">Fecha · {unit}</p><p className="sr-only">{summary}</p><svg viewBox="0 0 320 160" role="group" aria-label={summary} className="h-48 w-full overflow-visible lg:h-64">{chartYAxisTicks(domain, 4).map((value) => { const y = chartY(value, domain, 160, 12, 28); return <g key={value}><line x1="46" x2="308" y1={y} y2={y} className="stroke-border" strokeDasharray="2 3"/><text x="40" y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">{formatChartValue(value, unit)}</text></g>; })}<polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" className="stroke-primary" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />{coordinates.map(({ index, x, y }) => <g key={visible[index]!.sessionId}><circle cx={x} cy={y} r="10" fill="transparent" role="button" tabIndex={0} aria-label={`${date(visible[index]!.logDate)}. ${metricLabel(metric)}: ${metricDisplay(values[index]!, metric)}.`} onClick={() => setSelected(index)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(index); } }} /><circle cx={x} cy={y} r={selectedIndex === index ? 4.5 : 3} className="fill-primary stroke-background" strokeWidth="1.4" pointerEvents="none" /></g>)}</svg><div className="relative h-4 text-[10px] text-muted-foreground" aria-hidden>{chartTickIndexes(visible.length).map((index) => <span key={visible[index]!.sessionId} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${(chartX(index, visible.length, 320, 46, 12) / 320) * 100}%` }}>{date(visible[index]!.logDate, false)}</span>)}</div><ChartDetail title={date(visible[selectedIndex]!.logDate)} items={[{ label: metric === "reps" ? "Repeticiones" : metricLabel(metric), value: metricDisplay(values[selectedIndex]!, metric) }]} /></div>;
@@ -51,19 +52,25 @@ function ReportSessions({ sessions }: { sessions: ExerciseReportSession[] }) {
 }
 
 export function ExerciseReportView({
-  exerciseName, muscleLabel, period, routineId, routines, sessions, backHref, backLabel, source,
+  exerciseName, muscleLabel, period, routineId, routines, sessions, backHref, backLabel, source, progressContext,
 }: {
-  exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history";
+  exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; progressContext?: { view: string; routineId: string | null; muscleKey: string | null };
 }) {
   const summary = useMemo(() => summarizeExerciseReport(sessions), [sessions]);
   const points = useMemo(() => buildExerciseReportPoints(sessions), [sessions]);
+  const router = useRouter();
   const [metric, setMetric] = useState<ChartMetric>(points.some((point) => point.bestWeightKg !== null) ? "weight" : "reps");
   const currentRoutine = routineId ?? "all";
   const updateFilter = (nextPeriod: string, nextRoutine: string) => {
     const params = new URLSearchParams({ period: nextPeriod });
     if (nextRoutine !== "all") params.set("routine_id", nextRoutine);
     params.set("from", source);
-    window.location.assign(`?${params.toString()}`);
+    if (source === "progress" && progressContext) {
+      params.set("view", progressContext.view);
+      if (progressContext.routineId) params.set("routine", progressContext.routineId);
+      if (progressContext.muscleKey) params.set("muscle", progressContext.muscleKey);
+    }
+    router.push(`?${params.toString()}`);
   };
   const latest = points.at(-1);
   const previous = points.at(-2);
