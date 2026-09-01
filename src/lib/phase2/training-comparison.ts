@@ -1,4 +1,10 @@
 import {
+  buildExerciseReportPoints,
+  completedExerciseSets,
+  summarizeExerciseReport,
+  type ExerciseReportSession,
+} from "./exercise-insights";
+import {
   trainingAnalysisMetricValue,
   type TrainingAnalysis,
   type TrainingAnalysisExercise,
@@ -8,8 +14,10 @@ import {
   type TrainingAnalysisTimelinePoint,
 } from "./training-analysis";
 
-export const TRAINING_COMPARISON_KINDS = ["periods", "routines", "muscles", "exercises"] as const;
+export const TRAINING_COMPARISON_KINDS = ["previous", "routines", "muscles", "exercises"] as const;
 export type TrainingComparisonKind = (typeof TRAINING_COMPARISON_KINDS)[number];
+export type TrainingComparisonMode = "self" | "cross";
+export type TrainingComparisonSubjectType = "general" | "routine" | "muscle" | "exercise";
 export type TrainingComparisonMetric = TrainingAnalysisMetric | "averageSets" | "exerciseCount" | "bestWeight" | "bestReps";
 
 export type TrainingComparisonDelta = {
@@ -38,7 +46,11 @@ export type TrainingComparisonTimelinePoint = {
 
 export type TrainingComparison = {
   kind: TrainingComparisonKind;
+  mode: TrainingComparisonMode;
   title: string;
+  subjectLabel: string | null;
+  subjectType: TrainingComparisonSubjectType | null;
+  subjectId: string | null;
   metrics: TrainingComparisonMetric[];
   chartMetrics: TrainingComparisonMetric[];
   a: TrainingComparisonSubject | null;
@@ -53,11 +65,8 @@ export function isTrainingComparisonKind(value: string | null | undefined): valu
   return TRAINING_COMPARISON_KINDS.some((kind) => kind === value);
 }
 
-export function trainingComparisonKindForView(view: "general" | "routines" | "muscles" | "exercises"): TrainingComparisonKind {
-  if (view === "general") return "periods";
-  if (view === "routines") return "routines";
-  if (view === "muscles") return "muscles";
-  return "exercises";
+export function isTrainingComparisonSubjectType(value: string | null | undefined): value is TrainingComparisonSubjectType {
+  return value === "general" || value === "routine" || value === "muscle" || value === "exercise";
 }
 
 export function comparisonDelta(a: number | null | undefined, b: number | null | undefined): TrainingComparisonDelta {
@@ -92,6 +101,10 @@ function timelineMetricValue(
   return trainingAnalysisMetricValue(point, metric);
 }
 
+function subjectForGeneral(analysis: TrainingAnalysis): TrainingComparisonSubject {
+  return { id: "general", label: "Entrenamiento", summary: analysis.summary, timeline: analysis.timeline };
+}
+
 function subjectForRoutine(analysis: TrainingAnalysis, routineId: string): TrainingComparisonSubject | null {
   const routine = analysis.routines.find((item) => item.id === routineId);
   return routine ? { id: routine.id, label: routine.name, summary: routine.summary, timeline: routine.timeline } : null;
@@ -120,6 +133,54 @@ function subjectForExercise(analysis: TrainingAnalysis, exerciseId: string): Tra
     : null;
 }
 
+function emptySummary(): TrainingAnalysisSummary {
+  return { sessions: 0, sets: 0, minutes: 0, volumeKg: 0, exerciseCount: 0, hasData: false };
+}
+
+function emptyExerciseTimeline(analysis: TrainingAnalysis): TrainingAnalysisExerciseTimelinePoint[] {
+  return analysis.timeline.map((point) => ({ ...point, ...emptySummary(), bestWeightKg: null, bestReps: null }));
+}
+
+function emptySubject(
+  analysis: TrainingAnalysis,
+  subjectType: TrainingComparisonSubjectType,
+  subjectId: string,
+  label: string,
+): TrainingComparisonSubject {
+  return {
+    id: subjectId,
+    label,
+    summary: emptySummary(),
+    timeline: subjectType === "exercise"
+      ? emptyExerciseTimeline(analysis)
+      : analysis.timeline.map((point) => ({ ...point, ...emptySummary() })),
+    bestWeightKg: subjectType === "exercise" ? null : undefined,
+    bestReps: subjectType === "exercise" ? null : undefined,
+  };
+}
+
+function subjectForType(
+  analysis: TrainingAnalysis,
+  subjectType: TrainingComparisonSubjectType,
+  subjectId?: string | null,
+): TrainingComparisonSubject | null {
+  if (subjectType === "general") return subjectForGeneral(analysis);
+  if (!subjectId) return null;
+  if (subjectType === "routine") return subjectForRoutine(analysis, subjectId);
+  if (subjectType === "muscle") return subjectForMuscle(analysis, subjectId);
+  return subjectForExercise(analysis, subjectId);
+}
+
+function metricsForSubject(subjectType: TrainingComparisonSubjectType): {
+  metrics: TrainingComparisonMetric[];
+  chartMetrics: TrainingComparisonMetric[];
+} {
+  if (subjectType === "general") return { metrics: ["sessions", "sets", "minutes", "volume"], chartMetrics: ["volume", "sets", "sessions", "minutes"] };
+  if (subjectType === "routine") return { metrics: ["sessions", "sets", "minutes", "volume"], chartMetrics: ["volume", "sets", "minutes"] };
+  if (subjectType === "muscle") return { metrics: ["sets", "sessions", "averageSets", "exerciseCount"], chartMetrics: ["sets"] };
+  return { metrics: ["sessions", "bestWeight", "bestReps", "volume"], chartMetrics: ["bestWeight", "bestReps", "volume"] };
+}
+
 function uniqueSubjects(subjects: Array<TrainingComparisonSubject | null>): TrainingComparisonSubject[] {
   const seen = new Set<string>();
   const unique: TrainingComparisonSubject[] = [];
@@ -143,10 +204,26 @@ function selectPair(
   return { a, b };
 }
 
+function timelineLabel(
+  point: TrainingAnalysisTimelinePoint | TrainingAnalysisExerciseTimelinePoint | undefined,
+  index: number,
+  prefix?: string,
+): string {
+  if (prefix) return `${prefix} ${index + 1}`;
+  if (!point) return `Tramo ${index + 1}`;
+  const start = new Date(`${point.start}T12:00:00Z`).getTime();
+  const end = new Date(`${point.end}T12:00:00Z`).getTime();
+  const days = Math.round((end - start) / 86_400_000) + 1;
+  if (days === 1) return `Día ${index + 1}`;
+  if (days === 7) return `Semana ${index + 1}`;
+  return `Tramo ${index + 1}`;
+}
+
 function comparisonTimeline(
   a: TrainingComparisonSubject | null,
   b: TrainingComparisonSubject | null,
   metrics: TrainingComparisonMetric[],
+  labelPrefix?: string,
 ): TrainingComparisonTimelinePoint[] {
   if (!a || !b) return [];
   const count = Math.max(a.timeline.length, b.timeline.length);
@@ -155,19 +232,21 @@ function comparisonTimeline(
     const bPoint = b.timeline[index];
     return {
       id: `${aPoint?.id ?? "a"}-${bPoint?.id ?? "b"}-${index}`,
-      label: `Tramo ${index + 1}`,
+      label: timelineLabel(aPoint ?? bPoint, index, labelPrefix),
       rangeA: { start: aPoint?.start ?? "", end: aPoint?.end ?? "" },
       rangeB: { start: bPoint?.start ?? "", end: bPoint?.end ?? "" },
-      a: Object.fromEntries(metrics.map((metric) => [metric, timelineMetricValue(aPoint, metric)])) as Record<TrainingComparisonMetric, number | null>,
-      b: Object.fromEntries(metrics.map((metric) => [metric, timelineMetricValue(bPoint, metric)])) as Record<TrainingComparisonMetric, number | null>,
+      a: Object.fromEntries(metrics.map((metric) => [metric, !aPoint && labelPrefix ? null : timelineMetricValue(aPoint, metric)])) as Record<TrainingComparisonMetric, number | null>,
+      b: Object.fromEntries(metrics.map((metric) => [metric, !bPoint && labelPrefix ? null : timelineMetricValue(bPoint, metric)])) as Record<TrainingComparisonMetric, number | null>,
     };
   });
 }
 
 function comparisonFromSubjects(input: {
-  kind: Exclude<TrainingComparisonKind, "periods">;
+  kind: Exclude<TrainingComparisonKind, "previous">;
   title: string;
+  subjectType: Exclude<TrainingComparisonSubjectType, "general">;
   metrics: TrainingComparisonMetric[];
+  chartMetrics: TrainingComparisonMetric[];
   subjects: TrainingComparisonSubject[];
   requestedA?: string | null;
   requestedB?: string | null;
@@ -176,9 +255,13 @@ function comparisonFromSubjects(input: {
   const { a, b } = selectPair(input.subjects, input.requestedA, input.requestedB);
   return {
     kind: input.kind,
+    mode: "cross",
     title: input.title,
+    subjectLabel: null,
+    subjectType: input.subjectType,
+    subjectId: null,
     metrics: input.metrics,
-    chartMetrics: input.metrics.filter((metric) => metric !== "sessions" && metric !== "averageSets" && metric !== "exerciseCount"),
+    chartMetrics: input.chartMetrics,
     a,
     b,
     options: input.subjects,
@@ -188,34 +271,120 @@ function comparisonFromSubjects(input: {
   };
 }
 
-export function buildTrainingComparison(input: {
-  kind: TrainingComparisonKind;
+export function buildTrainingSelfComparison(input: {
   analysis: TrainingAnalysis;
-  previousAnalysis?: TrainingAnalysis;
+  previousAnalysis: TrainingAnalysis;
+  subjectType: TrainingComparisonSubjectType;
+  subjectId?: string | null;
+  subjectLabel?: string | null;
+}): TrainingComparison {
+  const fallbackId = input.subjectId ?? input.subjectType;
+  const currentSource = subjectForType(input.analysis, input.subjectType, input.subjectId);
+  const previousSource = subjectForType(input.previousAnalysis, input.subjectType, input.subjectId);
+  const subjectLabel = input.subjectLabel ?? currentSource?.label ?? previousSource?.label ?? "Sin datos";
+  const current = currentSource ?? emptySubject(input.analysis, input.subjectType, fallbackId, subjectLabel);
+  const previous = previousSource ?? emptySubject(input.previousAnalysis, input.subjectType, fallbackId, subjectLabel);
+  const { metrics, chartMetrics } = metricsForSubject(input.subjectType);
+  const a = { ...current, id: `${fallbackId}:current`, label: "Actual" };
+  const b = { ...previous, id: `${fallbackId}:previous`, label: "Anterior" };
+  return {
+    kind: "previous",
+    mode: "self",
+    title: "Comparar evolución",
+    subjectLabel,
+    subjectType: input.subjectType,
+    subjectId: fallbackId,
+    metrics,
+    chartMetrics,
+    a,
+    b,
+    options: [],
+    timeline: comparisonTimeline(a, b, metrics),
+    rangeA: input.analysis.range,
+    rangeB: input.previousAnalysis.range,
+  };
+}
+
+function exerciseSessionSubject(id: string, label: string, sessions: readonly ExerciseReportSession[]): TrainingComparisonSubject {
+  const report = summarizeExerciseReport(sessions);
+  const points = buildExerciseReportPoints(sessions);
+  const bestReps = points.reduce<number | null>((best, point) => point.bestReps !== null && (best === null || point.bestReps > best) ? point.bestReps : best, null);
+  return {
+    id,
+    label,
+    summary: {
+      sessions: sessions.length,
+      sets: sessions.reduce((total, session) => total + completedExerciseSets(session.sets).length, 0),
+      minutes: 0,
+      volumeKg: report.totalVolumeKg,
+      exerciseCount: sessions.length > 0 ? 1 : 0,
+      hasData: sessions.length > 0,
+    },
+    timeline: points.map((point) => ({
+      id: point.sessionId,
+      start: point.logDate,
+      end: point.logDate,
+      sessions: 1,
+      sets: sessions.find((session) => session.sessionId === point.sessionId)?.sets.filter((set) => set.is_completed).length ?? 0,
+      minutes: 0,
+      volumeKg: point.volumeKg,
+      exerciseCount: 1,
+      hasData: true,
+      bestWeightKg: point.bestWeightKg,
+      bestReps: point.bestReps,
+    })),
+    bestWeightKg: report.bestWeightKg,
+    bestReps,
+  };
+}
+
+export function buildExerciseSessionSelfComparison(input: {
+  exerciseId: string;
+  exerciseName: string;
+  currentSessions: readonly ExerciseReportSession[];
+  previousSessions: readonly ExerciseReportSession[];
+  rangeA: { start: string; end: string };
+  rangeB: { start: string; end: string };
+}): TrainingComparison {
+  const { metrics, chartMetrics } = metricsForSubject("exercise");
+  const a = exerciseSessionSubject(`${input.exerciseId}:current`, "Actual", input.currentSessions);
+  const b = exerciseSessionSubject(`${input.exerciseId}:previous`, "Anterior", input.previousSessions);
+  return {
+    kind: "previous",
+    mode: "self",
+    title: "Comparar evolución",
+    subjectLabel: input.exerciseName,
+    subjectType: "exercise",
+    subjectId: input.exerciseId,
+    metrics,
+    chartMetrics,
+    a,
+    b,
+    options: [],
+    timeline: comparisonTimeline(a, b, metrics, "Sesión"),
+    rangeA: input.rangeA,
+    rangeB: input.rangeB,
+  };
+}
+
+export function buildTrainingComparison(input: {
+  kind: Exclude<TrainingComparisonKind, "previous">;
+  analysis: TrainingAnalysis;
   requestedA?: string | null;
   requestedB?: string | null;
   exerciseIds?: string[];
 }): TrainingComparison {
-  if (input.kind === "periods") {
-    const a: TrainingComparisonSubject = { id: "current", label: "Actual", summary: input.analysis.summary, timeline: input.analysis.timeline };
-    const b: TrainingComparisonSubject | null = input.previousAnalysis
-      ? { id: "previous", label: "Anterior", summary: input.previousAnalysis.summary, timeline: input.previousAnalysis.timeline }
-      : null;
-    const metrics: TrainingComparisonMetric[] = ["sessions", "sets", "minutes", "volume"];
-    return { kind: "periods", title: "Comparar períodos", metrics, chartMetrics: ["volume", "sets", "sessions", "minutes"], a, b, options: b ? [a, b] : [a], timeline: comparisonTimeline(a, b, metrics), rangeA: input.analysis.range, rangeB: input.previousAnalysis?.range ?? null };
-  }
-
   if (input.kind === "routines") {
     const subjects = uniqueSubjects(input.analysis.activeRoutineIds.map((id) => subjectForRoutine(input.analysis, id)));
-    return comparisonFromSubjects({ kind: "routines", title: "Comparar rutinas", metrics: ["sessions", "sets", "minutes", "volume"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
+    return comparisonFromSubjects({ kind: "routines", title: "Comparar rutinas", subjectType: "routine", metrics: ["sessions", "sets", "minutes", "volume"], chartMetrics: ["volume", "sets", "minutes"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
   }
 
   if (input.kind === "muscles") {
     const subjects = uniqueSubjects(input.analysis.muscles.map((muscle) => subjectForMuscle(input.analysis, muscle.key)));
-    return comparisonFromSubjects({ kind: "muscles", title: "Comparar músculos", metrics: ["sets", "sessions", "averageSets", "exerciseCount"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
+    return comparisonFromSubjects({ kind: "muscles", title: "Comparar músculos", subjectType: "muscle", metrics: ["sets", "sessions", "averageSets", "exerciseCount"], chartMetrics: ["sets"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
   }
 
   const exerciseIds = input.exerciseIds ?? input.analysis.exercises.map((exercise) => exercise.id);
   const subjects = uniqueSubjects(exerciseIds.map((id) => subjectForExercise(input.analysis, id)));
-  return comparisonFromSubjects({ kind: "exercises", title: "Comparar ejercicios", metrics: ["sessions", "bestWeight", "bestReps", "volume"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
+  return comparisonFromSubjects({ kind: "exercises", title: "Comparar ejercicios", subjectType: "exercise", metrics: ["sessions", "bestWeight", "bestReps", "volume"], chartMetrics: ["bestWeight", "bestReps", "volume"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
 }

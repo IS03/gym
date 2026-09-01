@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildTrainingAnalysis } from "./training-analysis";
-import { buildTrainingComparison, comparisonDelta } from "./training-comparison";
+import { buildExerciseSessionSelfComparison, buildTrainingComparison, buildTrainingSelfComparison, comparisonDelta } from "./training-comparison";
 import { todayInCordoba } from "./cordoba-date";
+import type { ExerciseReportSession } from "./exercise-insights";
 import type { MuscleGroup, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 function session(id: string, dayLogId: string, routineId: string, routineName: string): WorkoutSession {
@@ -75,14 +76,46 @@ describe("training comparisons", () => {
   it("compares equal historical periods by relative bucket and keeps Córdoba-style ISO date boundaries", () => {
     const current = analysis();
     const previous = analysis("2026-08-02");
-    const comparison = buildTrainingComparison({ kind: "periods", analysis: current, previousAnalysis: previous });
+    const comparison = buildTrainingSelfComparison({ analysis: current, previousAnalysis: previous, subjectType: "general" });
     expect(comparison.rangeA).toMatchObject({ start: "2026-08-03", end: "2026-08-30" });
     expect(comparison.rangeB).toMatchObject({ start: "2026-07-06", end: "2026-08-02" });
+    expect(comparison.mode).toBe("self");
+    expect(comparison.subjectType).toBe("general");
+    expect(comparison.a?.label).toBe("Actual");
+    expect(comparison.b?.label).toBe("Anterior");
     expect(comparison.a?.summary.sessions).toBe(3);
     expect(comparison.b?.summary.sessions).toBe(1);
     expect(comparison.timeline).toHaveLength(current.timeline.length);
-    expect(comparison.timeline[0]?.label).toBe("Tramo 1");
+    expect(comparison.timeline[0]?.label).toBe("Semana 1");
     expect(comparison.timeline[0]?.rangeA.start).not.toBe(comparison.timeline[0]?.rangeB.start);
+  });
+
+  it("compares a routine, muscle and exercise only with that same snapshot identity in the previous period", () => {
+    const current = analysis();
+    const previous = analysis("2026-08-02");
+    const routine = buildTrainingSelfComparison({ analysis: current, previousAnalysis: previous, subjectType: "routine", subjectId: "push" });
+    expect(routine.subjectId).toBe("push");
+    expect(routine.subjectLabel).toBe("PUSH snapshot");
+    expect(routine.a?.summary.sessions).toBe(1);
+    expect(routine.b?.summary.sessions).toBe(1);
+
+    const muscle = buildTrainingSelfComparison({ analysis: current, previousAnalysis: previous, subjectType: "muscle", subjectId: "pecho" });
+    expect(muscle.subjectId).toBe("pecho");
+    expect(muscle.metrics).toEqual(["sets", "sessions", "averageSets", "exerciseCount"]);
+    expect(muscle.chartMetrics).toEqual(["sets"]);
+
+    const exerciseComparison = buildTrainingSelfComparison({ analysis: current, previousAnalysis: previous, subjectType: "exercise", subjectId: "press" });
+    expect(exerciseComparison.subjectId).toBe("press");
+    expect(exerciseComparison.a?.bestWeightKg).toBe(90);
+    expect(exerciseComparison.b?.bestWeightKg).toBe(80);
+    expect(exerciseComparison.options).toEqual([]);
+  });
+
+  it("does not fall back to a different object when the same subject has no previous data", () => {
+    const comparison = buildTrainingSelfComparison({ analysis: analysis(), previousAnalysis: analysis("2026-08-02"), subjectType: "routine", subjectId: "pull", subjectLabel: "PULL" });
+    expect(comparison.a?.summary.sessions).toBe(1);
+    expect(comparison.b?.summary).toMatchObject({ sessions: 0, sets: 0, hasData: false });
+    expect(comparison.b?.id).toBe("pull:previous");
   });
 
   it("calculates deltas without infinity, NaN or null-to-zero coercion", () => {
@@ -117,5 +150,28 @@ describe("training comparisons", () => {
     expect(comparison.metrics).toEqual(["sessions", "bestWeight", "bestReps", "volume"]);
     expect(comparison.timeline.some((point) => point.a.bestWeight === null)).toBe(true);
     expect(comparison.timeline.some((point) => point.a.bestWeight === 90)).toBe(true);
+  });
+
+  it("preserves real exercise-session points in short temporal comparisons", () => {
+    const reportSession = (sessionId: string, logDate: string, weight: number | null, reps: number | null): ExerciseReportSession => ({
+      sessionId,
+      logDate,
+      routineId: "push",
+      routineName: "PUSH snapshot",
+      decision: "maintain",
+      sets: [{ id: `${sessionId}-set`, set_number: 1, target_reps: 10, target_weight_kg: 80, target_rir: 2, actual_reps: reps, actual_weight_kg: weight, is_completed: true }],
+    });
+    const comparison = buildExerciseSessionSelfComparison({
+      exerciseId: "press",
+      exerciseName: "Press histórico",
+      currentSessions: [reportSession("current-1", "2026-08-25", 85, 10), reportSession("current-2", "2026-08-29", 90, 8)],
+      previousSessions: [reportSession("previous-1", "2026-08-18", 80, 12)],
+      rangeA: { start: "2026-08-24", end: "2026-08-30" },
+      rangeB: { start: "2026-08-17", end: "2026-08-23" },
+    });
+    expect(comparison.timeline).toHaveLength(2);
+    expect(comparison.timeline[0]).toMatchObject({ label: "Sesión 1", a: { bestWeight: 85, bestReps: 10 }, b: { bestWeight: 80, bestReps: 12 } });
+    expect(comparison.timeline[1]).toMatchObject({ label: "Sesión 2", a: { bestWeight: 90, bestReps: 8 }, b: { bestWeight: null, bestReps: null, volume: null } });
+    expect(comparison.timeline[1]?.rangeA).toEqual({ start: "2026-08-29", end: "2026-08-29" });
   });
 });

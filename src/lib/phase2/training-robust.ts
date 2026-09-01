@@ -709,6 +709,7 @@ export type RobustExerciseHistoryItem = {
 export async function listRobustExerciseHistory(input: {
   exerciseId: string;
   fromDate?: string;
+  toDate?: string;
   routineId?: string;
   limit?: number;
 }): Promise<RobustExerciseHistoryItem[]> {
@@ -721,6 +722,7 @@ export async function listRobustExerciseHistory(input: {
     .order("log_date", { ascending: false })
     .limit(500);
   if (input.fromDate) daysQuery = daysQuery.gte("log_date", input.fromDate);
+  if (input.toDate) daysQuery = daysQuery.lte("log_date", input.toDate);
   const { data: rawDays, error: daysError } = await daysQuery;
   if (daysError) throw new Error(`Leer fechas históricas: ${daysError.message}`);
   const days = (rawDays ?? []) as Array<{ id: string; log_date: string }>;
