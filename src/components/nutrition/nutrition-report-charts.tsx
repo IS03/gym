@@ -8,7 +8,9 @@ import { chartY, formatChartValue, type ChartUnit } from "@/lib/chart-core";
 import type { NutritionReportDay } from "@/lib/nutrition/reports-core";
 import {
   averageBucketValue,
+  balanceChartTicks,
   bucketNutritionChartDays,
+  chartBandGeometry,
   chartDomain,
   chartTickIndexes,
   chartX,
@@ -86,21 +88,38 @@ function yTicks(domain: ReturnType<typeof chartDomain>) {
   return [0, 1 / 3, 2 / 3, 1].map((step) => domain.max - (domain.max - domain.min) * step);
 }
 
-function ChartGrid({ domain, unit }: { domain: ReturnType<typeof chartDomain>; unit: ChartUnit }) {
-  return <>{yTicks(domain).map((value) => {
+function ChartGrid({
+  domain,
+  unit,
+  ticks = yTicks(domain),
+  skipZeroGridLine = false,
+}: {
+  domain: ReturnType<typeof chartDomain>;
+  unit: ChartUnit;
+  ticks?: number[];
+  skipZeroGridLine?: boolean;
+}) {
+  return <>{ticks.map((value) => {
     const y = chartY(value, domain, HEIGHT, TOP, BOTTOM);
+    const isZero = Math.abs(value) < 1e-9;
     return <g key={value}>
-      <line x1={LEFT} x2={WIDTH - RIGHT} y1={y} y2={y} className="stroke-border" strokeDasharray="2 3" />
+      {skipZeroGridLine && isZero ? null : <line x1={LEFT} x2={WIDTH - RIGHT} y1={y} y2={y} className="stroke-border" strokeDasharray="2 3" />}
       <text x={LEFT - 6} y={y + 3} textAnchor="end" className="fill-muted-foreground text-[9px]">{formatChartValue(value, unit)}</text>
     </g>;
   })}</>;
 }
 
-function DateTicks({ buckets }: { buckets: NutritionChartBucket<NutritionReportDay>[] }) {
+function DateTicks({
+  buckets,
+  position = (index) => chartX(index, buckets.length, WIDTH, LEFT, RIGHT),
+}: {
+  buckets: NutritionChartBucket<NutritionReportDay>[];
+  position?: (index: number) => number;
+}) {
   const indexes = chartTickIndexes(buckets.length, buckets.length > 100 ? 3 : 4);
   return <>{indexes.map((index) => <text
     key={buckets[index]!.end}
-    x={chartX(index, buckets.length, WIDTH, LEFT, RIGHT)}
+    x={position(index)}
     y={HEIGHT - 5}
     textAnchor="middle"
     className="fill-muted-foreground text-[9px]"
@@ -183,12 +202,12 @@ function LineChart({
 function BalanceChart({ buckets, values }: { buckets: NutritionChartBucket<NutritionReportDay>[]; values: Array<number | null> }) {
   const known = values.some((value) => value !== null);
   const [selected, setSelected] = useState(() => firstSelectableIndex(values));
+  const [focused, setFocused] = useState<number | null>(null);
   if (!known) return <p className="py-8 text-sm text-muted-foreground">No hay días con balance energético comparable.</p>;
   const domain = chartDomain(values, true);
   const selectedIndex = Math.min(selected, buckets.length - 1);
   const selectedBucket = buckets[selectedIndex]!;
   const zeroY = chartY(0, domain, HEIGHT, TOP, BOTTOM);
-  const barWidth = Math.max(3, Math.min(18, (WIDTH - LEFT - RIGHT) / Math.max(buckets.length, 1) - 2));
   const value = values[selectedIndex];
   const semantic = value === null ? "Sin dato" : value < 0 ? `Déficit estimado: ${formatChartValue(Math.abs(value), "kcal")}` : value > 0 ? `Superávit estimado: ${formatChartValue(value, "kcal")}` : "Balance estimado: 0 kcal";
   const bucketed = buckets.some((bucket) => bucket.start !== bucket.end);
@@ -196,20 +215,22 @@ function BalanceChart({ buckets, values }: { buckets: NutritionChartBucket<Nutri
   return <div className="space-y-3">
     <p className="text-xs text-muted-foreground">Fecha · balance energético (kcal){bucketed ? " · promedio diario por período" : ""}</p>
     <svg className="block h-auto w-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label="Balance diario. Debajo de cero es déficit estimado y arriba es superávit estimado." style={{ touchAction: "pan-y" }}>
-      <ChartGrid domain={domain} unit="kcal" />
+      <ChartGrid domain={domain} unit="kcal" ticks={balanceChartTicks(domain)} skipZeroGridLine />
       <line x1={LEFT} x2={WIDTH - RIGHT} y1={zeroY} y2={zeroY} className="stroke-foreground/55" strokeDasharray="3 3" />
-      <line x1={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} x2={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" />
+      <line x1={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" />
+      {focused === null ? null : <line x1={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP + 2} y2={HEIGHT - BOTTOM - 2} className="stroke-primary" strokeWidth="2" pointerEvents="none" />}
       {values.map((item, index) => {
         if (item === null) return null;
-        const x = chartX(index, buckets.length, WIDTH, LEFT, RIGHT) - barWidth / 2;
+        const band = chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT);
+        const barWidth = Math.max(3, Math.min(18, band.width - 2));
+        const x = band.center - barWidth / 2;
         const y = chartY(item, domain, HEIGHT, TOP, BOTTOM);
-        const hit = dateHitBounds(index, buckets.length);
         return <g key={buckets[index]!.end}>
           <rect x={x} y={Math.min(y, zeroY)} width={barWidth} height={Math.max(1, Math.abs(y - zeroY))} rx="1" className={buckets[index]?.includesToday ? item < 0 ? "fill-primary/45" : "fill-foreground/30" : item < 0 ? "fill-primary" : "fill-foreground/55"} pointerEvents="none" />
-          <rect x={hit.x} y="0" width={hit.width} height={HEIGHT} fill="transparent" role="button" tabIndex={0} aria-label={`${bucketLabel(buckets[index]!, true)}. ${item < 0 ? "Déficit" : "Superávit"} estimado: ${formatChartValue(Math.abs(item), "kcal")}.`} onClick={() => setSelected(index)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
+          <rect x={band.start} y={TOP} width={band.width} height={HEIGHT - TOP - BOTTOM} fill="transparent" role="button" tabIndex={0} className="outline-none focus:outline-none" style={{ outline: "none" }} aria-label={`${bucketLabel(buckets[index]!, true)}. ${item < 0 ? "Déficit" : "Superávit"} estimado: ${formatChartValue(Math.abs(item), "kcal")}.`} onClick={() => setSelected(index)} onFocus={() => setFocused(index)} onBlur={() => setFocused(null)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
         </g>;
       })}
-      <DateTicks buckets={buckets} />
+      <DateTicks buckets={buckets} position={(index) => chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT).center} />
     </svg>
     <ChartDetail title={bucketLabel(selectedBucket, true)} items={[{ label: "Balance", value: semantic }]} description={`${selectedBucket.includesToday ? "Hoy · En curso. " : ""}${bucketed ? "Promedio diario del período. " : ""}Balance = consumo − gasto; no es la desviación contra el objetivo.`} className="min-h-24" />
   </div>;
@@ -218,28 +239,30 @@ function BalanceChart({ buckets, values }: { buckets: NutritionChartBucket<Nutri
 function StepsChart({ buckets, values }: { buckets: NutritionChartBucket<NutritionReportDay>[]; values: Array<number | null> }) {
   const known = values.some((value) => value !== null);
   const [selected, setSelected] = useState(() => firstSelectableIndex(values));
+  const [focused, setFocused] = useState<number | null>(null);
   if (!known) return <p className="py-8 text-sm text-muted-foreground">Registrá pasos algunos días para ver la tendencia.</p>;
   const domain = chartDomain(values, { nonNegative: true });
   const selectedIndex = Math.min(selected, buckets.length - 1);
   const selectedBucket = buckets[selectedIndex]!;
   const baseline = chartY(0, domain, HEIGHT, TOP, BOTTOM);
-  const barWidth = Math.max(3, Math.min(18, (WIDTH - LEFT - RIGHT) / Math.max(buckets.length, 1) - 2));
   const bucketed = buckets.some((bucket) => bucket.start !== bucket.end);
 
   return <div className="space-y-3">
     <p className="text-xs text-muted-foreground">Fecha · pasos{bucketed ? " · promedio diario por período" : ""}</p>
     <svg className="block h-auto w-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label="Pasos registrados por fecha." style={{ touchAction: "pan-y" }}>
       <ChartGrid domain={domain} unit="pasos" />
-      <line x1={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} x2={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" />
+      <line x1={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" />
+      {focused === null ? null : <line x1={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP + 2} y2={HEIGHT - BOTTOM - 2} className="stroke-primary" strokeWidth="2" pointerEvents="none" />}
       {values.map((value, index) => {
         if (value === null) return null;
-        const hit = dateHitBounds(index, buckets.length);
+        const band = chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT);
+        const barWidth = Math.max(3, Math.min(18, band.width - 2));
         return <g key={buckets[index]!.end}>
-          <rect x={chartX(index, buckets.length, WIDTH, LEFT, RIGHT) - barWidth / 2} y={chartY(value, domain, HEIGHT, TOP, BOTTOM)} width={barWidth} height={Math.max(1, baseline - chartY(value, domain, HEIGHT, TOP, BOTTOM))} rx="1" className={buckets[index]?.includesToday ? "fill-primary/45" : "fill-primary/75"} pointerEvents="none" />
-          <rect x={hit.x} y="0" width={hit.width} height={HEIGHT} fill="transparent" role="button" tabIndex={0} aria-label={`${bucketLabel(buckets[index]!, true)}. ${formatChartValue(value, "pasos")}.`} onClick={() => setSelected(index)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
+          <rect x={band.center - barWidth / 2} y={chartY(value, domain, HEIGHT, TOP, BOTTOM)} width={barWidth} height={Math.max(1, baseline - chartY(value, domain, HEIGHT, TOP, BOTTOM))} rx="1" className={buckets[index]?.includesToday ? "fill-primary/45" : "fill-primary/75"} pointerEvents="none" />
+          <rect x={band.start} y={TOP} width={band.width} height={HEIGHT - TOP - BOTTOM} fill="transparent" role="button" tabIndex={0} className="outline-none focus:outline-none" style={{ outline: "none" }} aria-label={`${bucketLabel(buckets[index]!, true)}. ${formatChartValue(value, "pasos")}.`} onClick={() => setSelected(index)} onFocus={() => setFocused(index)} onBlur={() => setFocused(null)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
         </g>;
       })}
-      <DateTicks buckets={buckets} />
+      <DateTicks buckets={buckets} position={(index) => chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT).center} />
     </svg>
     <ChartDetail title={bucketLabel(selectedBucket, true)} items={[{ label: "Pasos", value: values[selectedIndex] === null ? "Sin dato" : formatChartValue(values[selectedIndex]!, "pasos") }]} description={selectedBucket.includesToday ? "Hoy · En curso. No modifica los resúmenes de días terminados." : bucketed ? "Cada barra muestra el promedio diario del período." : undefined} className="min-h-24" />
   </div>;

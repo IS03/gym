@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   averageBucketValue,
+  balanceChartTicks,
   bucketNutritionChartDays,
+  chartBandGeometry,
   chartDomain,
   chartTickIndexes,
   lineSegments,
@@ -42,6 +44,36 @@ describe("nutrition report chart helpers", () => {
     const domain = chartDomain([-300, 200], true);
     expect(domain.min).toBeLessThanOrEqual(0);
     expect(domain.max).toBeGreaterThanOrEqual(0);
+  });
+
+  it.each([
+    [-500, 1_000],
+    [-1_000, -100],
+    [100, 1_000],
+    [0, 0],
+  ])("incluye un tick cero explícito en balance para el dominio %s a %s", (min, max) => {
+    expect(balanceChartTicks({ min, max })).toContain(0);
+  });
+
+  it.each([1, 2, 7, 14, 31])("mantiene cada banda de barras dentro del plot para %s buckets", (count) => {
+    const width = 320;
+    const left = 48;
+    const right = 12;
+    const first = chartBandGeometry(0, count, width, left, right);
+    const last = chartBandGeometry(count - 1, count, width, left, right);
+
+    expect(first.start).toBe(left);
+    expect(first.center).toBeGreaterThan(left);
+    expect(last.end).toBe(width - right);
+    expect(last.center).toBeLessThan(width - right);
+    expect(first.width).toBe(last.width);
+  });
+
+  it("crea hit areas contiguas, sin huecos ni solapamientos", () => {
+    const bands = Array.from({ length: 7 }, (_, index) => chartBandGeometry(index, 7, 320, 48, 12));
+    for (let index = 1; index < bands.length; index += 1) {
+      expect(bands[index]!.start).toBe(bands[index - 1]!.end);
+    }
   });
 
   it("usa días para rangos cortos, semanas para rangos medios y meses aproximados para un año", () => {

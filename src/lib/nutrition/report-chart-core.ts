@@ -2,6 +2,13 @@ export type ChartDomain = { min: number; max: number };
 
 export type ChartCoordinate = { index: number; x: number; y: number };
 
+export type ChartBandGeometry = {
+  start: number;
+  center: number;
+  end: number;
+  width: number;
+};
+
 export type NutritionChartBucket<T> = {
   start: string;
   end: string;
@@ -52,6 +59,38 @@ export function chartX(index: number, count: number, width: number, padding = 18
   const usable = width - padding - right;
   if (count <= 1) return padding + usable / 2;
   return padding + (index / (count - 1)) * usable;
+}
+
+/**
+ * Category charts use slots, unlike line charts whose first and last points
+ * intentionally sit on the plot edges. Keeping the full band inside the plot
+ * gives bars, hit areas, selection guides and x labels one shared geometry.
+ */
+export function chartBandGeometry(index: number, count: number, width: number, left = 18, right = left): ChartBandGeometry {
+  const safeCount = Math.max(count, 1);
+  const plotWidth = width - left - right;
+  const bandWidth = plotWidth / safeCount;
+  const safeIndex = Math.max(0, Math.min(index, safeCount - 1));
+  const start = left + safeIndex * bandWidth;
+  const end = safeIndex === safeCount - 1 ? width - right : left + (safeIndex + 1) * bandWidth;
+  return {
+    start,
+    center: (start + end) / 2,
+    end,
+    width: bandWidth,
+  };
+}
+
+/** Balance has a semantic zero reference, not just evenly-spaced grid math. */
+export function balanceChartTicks(domain: ChartDomain) {
+  const normalizeZero = (value: number) => Math.abs(value) < 1e-9 ? 0 : value;
+  return [...new Set([
+    normalizeZero(domain.max),
+    normalizeZero(domain.max / 2),
+    0,
+    normalizeZero(domain.min / 2),
+    normalizeZero(domain.min),
+  ])].sort((left, right) => right - left);
 }
 
 export function chartY(value: number, domain: ChartDomain, height: number, padding = 16, bottom = padding) {

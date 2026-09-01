@@ -48,7 +48,8 @@ export function chartYAxisTicks(domain: ChartDomain, count = 4): number[] {
 
 export function formatChartValue(value: number, unit: ChartUnit): string {
   const decimals = unit === "L" || unit === "kg" || unit === "cm" ? 2 : 0;
-  const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: decimals }).format(value);
+  const normalized = Object.is(value, -0) || Math.abs(value) < 1e-9 ? 0 : value;
+  const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: decimals }).format(normalized);
   if (unit === "pasos" || unit === "reps") return `${formatted} ${unit === "reps" ? "reps" : "pasos"}`;
   if (unit === "sesiones") return `${formatted} sesiones`;
   if (unit === "min") return `${formatted} min`;
