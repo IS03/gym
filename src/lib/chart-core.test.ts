@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chartDomain, chartTickIndexes, chartYAxisTicks, formatChartValue, lineSegments, nonNegativeChartDomain } from "./chart-core";
+import { chartDomain, chartTickIndexes, chartYAxisTicks, fittedNonNegativeChartDomain, formatChartValue, lineSegments, nonNegativeChartDomain } from "./chart-core";
 
 describe("chart display helpers", () => {
   it("creates a small, ordered Y scale for positive, mixed and constant data", () => {
@@ -30,5 +30,10 @@ describe("chart display helpers", () => {
     expect(nonNegativeChartDomain([10, 30])).toMatchObject({ min: 0 });
     expect(nonNegativeChartDomain([0, 0])).toEqual({ min: 0, max: 1 });
     expect(nonNegativeChartDomain([-20, 4])).toMatchObject({ min: 0 });
+  });
+
+  it("fits an individual weight scale around observed weights without becoming negative", () => {
+    expect(fittedNonNegativeChartDomain([80, 90])).toEqual({ min: 75, max: 95 });
+    expect(fittedNonNegativeChartDomain([0.5])).toMatchObject({ min: 0 });
   });
 });

@@ -1,5 +1,6 @@
 import { ExerciseReportView } from "@/components/training/exercise-report-view";
 import { listExercises } from "@/lib/phase2/training";
+import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
 import {
   listRobustExerciseHistory,
   listRobustExerciseHistoryRoutineOptions,
@@ -57,9 +58,22 @@ export default async function ExerciseHistoryPage({
   const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
   const progressRoutine = typeof sp.routine === "string" ? sp.routine : null;
   const progressMuscle = typeof sp.muscle === "string" ? sp.muscle : null;
+  const progressQuery = typeof sp.query === "string" ? sp.query : null;
+  const progressRoutineFilter = typeof sp.routine_filter === "string" ? sp.routine_filter : null;
+  const progressMuscleFilter = typeof sp.muscle_filter === "string" ? sp.muscle_filter : null;
   const progressParams = new URLSearchParams({ view: progressView, period });
   if (progressRoutine) progressParams.set("routine", progressRoutine);
   if (progressMuscle) progressParams.set("muscle", progressMuscle);
+  if (progressQuery) progressParams.set("query", progressQuery);
+  if (progressRoutineFilter) progressParams.set("routine_filter", progressRoutineFilter);
+  if (progressMuscleFilter) progressParams.set("muscle_filter", progressMuscleFilter);
+  const progressBackLabel = progressView === "routines"
+    ? routineOptions.find((routine) => routine.id === progressRoutine)?.nombre ?? "Rutinas"
+    : progressView === "muscles"
+      ? MUSCLE_GROUP_OPTIONS.find((option) => option.value === progressMuscle)?.label ?? "Músculos"
+      : progressView === "exercises"
+        ? "Ejercicios"
+        : "Entrenamiento";
   const latestSnapshot = items[0]?.exercise ?? null;
 
   return <ExerciseReportView
@@ -69,9 +83,9 @@ export default async function ExerciseHistoryPage({
     routineId={routineId}
     routines={routineOptions}
     backHref={cameFromProgress ? `/train/progress?${progressParams.toString()}` : "/train/history?view=exercises"}
-    backLabel={cameFromProgress ? "Progreso" : "Historial"}
+    backLabel={cameFromProgress ? progressBackLabel : "Historial"}
     source={cameFromProgress ? "progress" : "history"}
-    progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle } : undefined}
+    progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter } : undefined}
     sessions={items.map((item) => ({
       sessionId: item.session.id,
       logDate: item.logDate,

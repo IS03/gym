@@ -149,6 +149,19 @@ export function buildExerciseReportPoints(
     }));
 }
 
+/** The report opens on the most recent available historical point, not the oldest. */
+export function selectedExerciseReportPointIndex(
+  points: readonly ExerciseReportPoint[],
+  selectedSessionId: string | null,
+): number {
+  if (points.length === 0) return -1;
+  if (selectedSessionId) {
+    const selectedIndex = points.findIndex((point) => point.sessionId === selectedSessionId);
+    if (selectedIndex >= 0) return selectedIndex;
+  }
+  return points.length - 1;
+}
+
 export function summarizeExerciseReport(sessions: readonly ExerciseReportSession[]) {
   const points = buildExerciseReportPoints(sessions);
   const allSets = sessions.flatMap((session) => session.sets);

@@ -20,7 +20,7 @@ describe("getActiveBottomNavIndex", () => {
   it.each([
     ["/home", 0],
     ["/train", 1],
-    ["/train/progress", 1],
+    ["/train/progress", 3],
     ["/train/history", 1],
     ["/today", 2],
     ["/today/meal", 2],
@@ -33,6 +33,11 @@ describe("getActiveBottomNavIndex", () => {
     ["/history/day", 3],
   ])("selecciona la sección correcta para %s", (pathname, expected) => {
     expect(getActiveBottomNavIndex(pathname)).toBe(expected);
+  });
+
+  it("marca Progreso únicamente para el reporte individual abierto desde ese flujo", () => {
+    expect(getActiveBottomNavIndex("/train/history/press-machine", { fromProgress: true })).toBe(3);
+    expect(getActiveBottomNavIndex("/train/history/press-machine")).toBe(1);
   });
 
   it.each(["/settings", "/settings/profile", "/", "/unknown"])(

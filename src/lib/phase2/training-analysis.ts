@@ -72,9 +72,12 @@ export type TrainingAnalysis = {
   weekComparison: {
     current: TrainingAnalysisSummary & { start: string; end: string };
     previous: TrainingAnalysisSummary & { start: string; end: string };
+    isCurrentWeekComplete: boolean;
   } | null;
   timeline: TrainingAnalysisTimelinePoint[];
   routines: TrainingAnalysisRoutine[];
+  /** Current catalog routines only. Historical routine analysis remains in `routines`. */
+  activeRoutineIds: string[];
   muscles: TrainingAnalysisMuscle[];
   exercises: TrainingAnalysisExercise[];
 };
@@ -104,6 +107,8 @@ type SessionRecord = {
 };
 
 const FREE_ROUTINE_ID = "__free__";
+
+export const TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT = 6;
 
 function finite(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -149,7 +154,13 @@ function weeklySummary(week: ReturnType<typeof buildWeeklyTrainingSummaries>[num
   };
 }
 
-function addSummary(target: TrainingAnalysisSummary, session: SessionRecord, exercises: ExerciseRecord[], countSession: boolean) {
+function addSummary(
+  target: TrainingAnalysisSummary,
+  session: SessionRecord,
+  exercises: ExerciseRecord[],
+  countSession: boolean,
+  exerciseIds: Set<string>,
+) {
   if (countSession) {
     target.sessions += 1;
     target.minutes += session.minutes;
@@ -157,7 +168,10 @@ function addSummary(target: TrainingAnalysisSummary, session: SessionRecord, exe
   }
   for (const exercise of exercises) {
     if (exercise.sets.length === 0) continue;
-    target.exerciseCount += 1;
+    if (!exerciseIds.has(exercise.id)) {
+      target.exerciseCount += 1;
+      exerciseIds.add(exercise.id);
+    }
     target.sets += exercise.sets.length;
     target.volumeKg += exercise.sets.reduce((total, set) => total + (set.reps ?? 0) * (set.weightKg ?? 0), 0);
   }
@@ -165,10 +179,11 @@ function addSummary(target: TrainingAnalysisSummary, session: SessionRecord, exe
 
 function summarize(records: readonly SessionRecord[], selector?: (record: SessionRecord) => ExerciseRecord[]): TrainingAnalysisSummary {
   const summary = emptySummary();
+  const exerciseIds = new Set<string>();
   for (const record of records) {
     const exercises = selector ? selector(record) : record.exercises;
     const countSession = selector ? exercises.some((exercise) => exercise.sets.length > 0) : true;
-    addSummary(summary, record, exercises, countSession);
+    addSummary(summary, record, exercises, countSession, exerciseIds);
   }
   return summary;
 }
@@ -193,15 +208,21 @@ export function trainingAnalysisMetricValue(summary: TrainingAnalysisSummary, me
   return summary.minutes;
 }
 
+export function formatTrainingVolumeKg(value: number, options?: { compactAxis?: boolean }): string {
+  const normalized = Number.isFinite(value) ? value : 0;
+  const sign = normalized < 0 ? "−" : "";
+  const absolute = Math.abs(normalized);
+  if (absolute >= 1_000) {
+    const digits = options?.compactAxis ? 0 : 1;
+    const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: digits }).format(absolute / 1_000);
+    return `${sign}${formatted} mil kg`;
+  }
+  return `${sign}${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(absolute)} kg`;
+}
+
 export function formatTrainingAnalysisMetric(value: number, metric: TrainingAnalysisMetric): string {
   if (metric === "minutes") return formatTrainingMinutes(value);
-  if (metric === "volume") {
-    const formatted = new Intl.NumberFormat("es-AR", {
-      notation: value >= 1_000 ? "compact" : "standard",
-      maximumFractionDigits: value >= 1_000 ? 1 : 0,
-    }).format(Math.max(0, value)).replace("K", "k");
-    return `${formatted} kg`;
-  }
+  if (metric === "volume") return formatTrainingVolumeKg(value);
   return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.max(0, value))} ${metric === "sets" ? "series" : "sesiones"}`;
 }
 
@@ -319,7 +340,7 @@ function exerciseSummaries(
 
 export function buildTrainingAnalysis(
   source: TrainingAnalysisSource,
-  input: { today: string; period: TrainingAnalysisPeriod; routines?: Array<Pick<Routine, "id" | "nombre">> },
+  input: { today: string; period: TrainingAnalysisPeriod; routines?: Array<Pick<Routine, "id" | "nombre"> & { is_active?: boolean }> },
 ): TrainingAnalysis {
   const start = dateForPeriod(input.period, input.today);
   const config = TRAINING_ANALYSIS_PERIODS.find((item) => item.value === input.period)!;
@@ -336,7 +357,7 @@ export function buildTrainingAnalysis(
   const currentWeek = weekly[0];
   const previousWeek = weekly[1];
   const weekComparison = currentWeek && previousWeek && previousWeek.sessions > 0
-    ? { current: weeklySummary(currentWeek), previous: weeklySummary(previousWeek) }
+    ? { current: weeklySummary(currentWeek), previous: weeklySummary(previousWeek), isCurrentWeekComplete: currentWeek.weekEnd === input.today }
     : null;
   const routines = [...allRoutineNames.entries()]
     .map(([id, name]) => {
@@ -374,5 +395,6 @@ export function buildTrainingAnalysis(
     })
     .sort((left, right) => Number(right.summary.hasData) - Number(left.summary.hasData) || right.summary.sets - left.summary.sets || left.label.localeCompare(right.label, "es-AR"));
 
-  return { period: input.period, range, summary, weekComparison, timeline, routines, muscles, exercises: exerciseSummaries(records) };
+  const activeRoutineIds = (input.routines ?? []).filter((routine) => routine.is_active !== false).map((routine) => routine.id);
+  return { period: input.period, range, summary, weekComparison, timeline, routines, activeRoutineIds, muscles, exercises: exerciseSummaries(records) };
 }
