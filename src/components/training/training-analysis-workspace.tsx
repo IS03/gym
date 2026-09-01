@@ -51,7 +51,7 @@ function rangeLabel(point: TrainingAnalysisTimelinePoint): string {
 
 function metricAxisValue(value: number, metric: TrainingAnalysisMetric): string {
   if (metric === "volume") {
-    return `${new Intl.NumberFormat("es-AR", { notation: value >= 10_000 ? "compact" : "standard", maximumFractionDigits: value >= 1_000 ? 1 : 0 }).format(Math.max(0, value))} kg`;
+    return formatTrainingAnalysisMetric(value, metric);
   }
   if (metric === "minutes") return value >= 60 ? `${Math.round(value / 60)} h` : `${Math.round(value)} min`;
   return formatNumber(Math.max(0, value));
