@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getNutritionReport } from "@/lib/nutrition/reports";
-import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+
+import { Card, CardContent } from "@/components/ui/card";
 import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-charts";
 import { NutritionReportDailyBreakdown } from "@/components/nutrition/nutrition-report-daily-breakdown";
 import { NutritionReportPeriodSelector } from "@/components/nutrition/nutrition-report-period-selector";
 import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
+import { getNutritionReport } from "@/lib/nutrition/reports";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,17 @@ function targetDeviationLabel(value: number | null) {
 function energyBalanceLabel(value: number | null) {
   if (value === null) return "Sin días comparables";
   const rounded = Math.round(value);
-  if (rounded < 0) return `Déficit estimado: ${Math.abs(rounded)} kcal`;
-  if (rounded > 0) return `Superávit estimado: ${rounded} kcal`;
-  return "Balance estimado: 0 kcal";
+  if (rounded < 0) return `Déficit estimado ${Math.abs(rounded)} kcal`;
+  if (rounded > 0) return `Superávit estimado ${rounded} kcal`;
+  return "Balance estimado 0 kcal";
+}
+
+function SummaryStat({ label, value, detail, className = "" }: { label: string; value: string; detail?: string; className?: string }) {
+  return <div className={`min-w-0 ${className}`}>
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="metric-number mt-1 text-lg font-semibold tracking-tight sm:text-xl">{value}</p>
+    {detail ? <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p> : null}
+  </div>;
 }
 
 export default async function NutritionReportsPage({
@@ -48,83 +57,63 @@ export default async function NutritionReportsPage({
     to: value("to"),
   }, today);
 
-  return (
-    <div className="space-y-6">
-      <header className="space-y-3">
-        <Link href="/today" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-          <ArrowLeft className="size-4" aria-hidden /> Nutrición
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Reportes de nutrición</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Solo lectura</p>
-        </div>
-      </header>
+  return <div className="space-y-6">
+    <header className="space-y-3">
+      <Link href="/today" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <ArrowLeft className="size-4" aria-hidden /> Nutrición
+      </Link>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Reportes de nutrición</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Solo lectura</p>
+      </div>
+    </header>
 
-      <Card>
-        <CardContent className="space-y-4 pt-1">
-          <NutritionReportPeriodSelector
-            preset={range.preset}
-            start={range.start}
-            end={range.end}
-            today={today}
-            rangeLabel={formatNutritionReportRange(range.start, range.end)}
-          />
-          {range.error ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
+    <Card>
+      <CardContent className="p-3 sm:p-4">
+        <NutritionReportPeriodSelector
+          preset={range.preset}
+          start={range.start}
+          end={range.end}
+          today={today}
+          rangeLabel={formatNutritionReportRange(range.start, range.end)}
+        />
+        {range.error ? <p className="mt-2 rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
+      </CardContent>
+    </Card>
+
+    <section className="space-y-3" aria-labelledby="nutrition-summary-title">
+      <div>
+        <h2 id="nutrition-summary-title" className="text-lg font-semibold tracking-tight">Resumen</h2>
+        <p className="text-xs text-muted-foreground">Promedios y totales de días terminados.</p>
+      </div>
+      <Card className="surface-elevated">
+        <CardContent className="space-y-4 p-3 sm:p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:divide-x">
+            <SummaryStat label="Calorías promedio" value={formatValue(summary.calories.averageConsumed, "kcal", true)} detail={`Objetivo: ${formatValue(summary.calories.averageTarget, "kcal", true)}`} className="sm:pr-3" />
+            <SummaryStat label="Balance acumulado" value={energyBalanceLabel(summary.energy.accumulatedBalance)} detail={`Gasto promedio: ${formatValue(summary.energy.averageExpenditure, "kcal", true)}`} className="sm:px-3" />
+            <SummaryStat label="Proteína promedio" value={formatValue(summary.protein.averageConsumed, "g")} detail={`Objetivo: ${formatValue(summary.protein.averageTarget, "g")} · ${summary.protein.hitDays}/${summary.protein.comparableDays} días`} className="sm:pl-3" />
+          </div>
+          <div className="flex flex-wrap gap-1.5 border-t pt-3 text-xs">
+            <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">Bajo {summary.calories.belowTargetDays}</span>
+            <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">Exacto {summary.calories.exactTargetDays}</span>
+            <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">Sobre {summary.calories.aboveTargetDays}</span>
+            <span className="px-1 py-1 text-muted-foreground">{targetDeviationLabel(summary.calories.averageTargetDeviation)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-4 lg:grid-cols-6">
+            <SummaryStat label="Agua" value={formatValue(summary.hydration.averageWaterL, "L")} detail={`${summary.hydration.hitDays}/${summary.hydration.comparableDays} con meta`} />
+            <SummaryStat label="Pasos" value={formatValue(summary.activity.averageSteps, "pasos", true)} detail={`${summary.activity.stepDays} días con dato`} />
+            <SummaryStat label="Entrenamientos" value={integerFormatter.format(summary.activity.completedWorkoutDays)} detail="sesiones terminadas" />
+            <SummaryStat label="Trabajo" value={integerFormatter.format(summary.activity.workedDays)} detail="días trabajados" />
+            <SummaryStat label="Carbos" value={formatValue(summary.carbs.averageConsumed, "g")} detail="promedio" />
+            <SummaryStat label="Grasas" value={formatValue(summary.fat.averageConsumed, "g")} detail="promedio" />
+          </div>
+          <p className="text-xs text-muted-foreground">Balance = consumo − gasto. No es la desviación contra el objetivo. El mate se mantiene separado del agua.</p>
         </CardContent>
       </Card>
+    </section>
 
-      <section className="grid gap-4 lg:grid-cols-2" aria-label="Resumen del período">
-        <Card className="surface-elevated">
-          <CardHeader className="pb-1"><CardTitle>Calorías y objetivo</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div><p className="text-xs text-muted-foreground">Promedio consumido</p><p className="metric-number text-3xl font-semibold tracking-tight">{formatValue(summary.calories.averageConsumed, "kcal", true)}</p></div>
-            <div className="grid grid-cols-2 gap-4 border-t pt-3">
-              <div><p className="text-xs text-muted-foreground">Objetivo promedio</p><p className="metric-number mt-1 font-semibold">{formatValue(summary.calories.averageTarget, "kcal", true)}</p></div>
-              <div><p className="text-xs text-muted-foreground">Desviación promedio</p><p className="mt-1 font-semibold">{targetDeviationLabel(summary.calories.averageTargetDeviation)}</p></div>
-            </div>
-            <p className="text-xs text-muted-foreground">Bajo: {summary.calories.belowTargetDays} · Exacto: {summary.calories.exactTargetDays} · Sobre: {summary.calories.aboveTargetDays} · {summary.calories.comparableDays} días comparables</p>
-          </CardContent>
-        </Card>
+    <NutritionReportCharts days={days} />
 
-        <Card className="surface-elevated">
-          <CardHeader className="pb-1"><CardTitle>Gasto y balance energético</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div><p className="text-xs text-muted-foreground">Balance acumulado estimado</p><p className="metric-number text-2xl font-semibold tracking-tight">{energyBalanceLabel(summary.energy.accumulatedBalance)}</p></div>
-            <div className="border-t pt-3"><p className="text-xs text-muted-foreground">Gasto estimado promedio</p><p className="metric-number mt-1 font-semibold">{formatValue(summary.energy.averageExpenditure, "kcal", true)}</p></div>
-            <p className="text-xs text-muted-foreground">Balance = consumo − gasto. No es la desviación contra el objetivo. {summary.energy.comparableDays} días comparables.</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card>
-        <CardHeader className="pb-1"><CardTitle>Macros, hidratación y actividad</CardTitle></CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Macros</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="min-w-0"><p className="text-xs text-muted-foreground">Proteína</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.protein.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">/ {formatValue(summary.protein.averageTarget, "g")}</p></div>
-              <div className="min-w-0"><p className="text-xs text-muted-foreground">Carbos</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.carbs.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">promedio</p></div>
-              <div className="min-w-0"><p className="text-xs text-muted-foreground">Grasas</p><p className="metric-number mt-1 text-lg font-semibold">{formatValue(summary.fat.averageConsumed, "g")}</p><p className="text-xs text-muted-foreground">promedio</p></div>
-            </div>
-            <p className="text-xs text-muted-foreground">{summary.protein.comparableDays > 0 ? `${summary.protein.hitDays} de ${summary.protein.comparableDays} días alcanzaron el objetivo de proteína.` : "No hay días comparables para el objetivo de proteína."}</p>
-          </section>
-          <section className="space-y-3 border-t pt-4 sm:border-t-0 sm:border-l sm:pl-5 sm:pt-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Hidratación</p>
-            <div><p className="text-xs text-muted-foreground">Agua promedio / objetivo</p><p className="metric-number font-semibold">{formatValue(summary.hydration.averageWaterL, "L")} / {formatValue(summary.hydration.averageTargetL, "L")}</p></div>
-            <p className="text-xs text-muted-foreground">{summary.hydration.hitDays} de {summary.hydration.comparableDays} días con datos alcanzaron el objetivo. El mate se mantiene separado.</p>
-          </section>
-          <section className="space-y-3 border-t pt-4 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Actividad</p>
-            <div><p className="text-xs text-muted-foreground">Pasos promedio</p><p className="metric-number font-semibold">{formatValue(summary.activity.averageSteps, "pasos", true)}</p><p className="text-xs text-muted-foreground">Sólo {summary.activity.stepDays} días con dato</p></div>
-            <Link href="/today/steps" className="inline-flex text-sm font-medium text-primary hover:underline">Ver detalle de pasos →</Link>
-            <div className="grid grid-cols-2 gap-3"><div><p className="text-xs text-muted-foreground">Entrenamientos</p><p className="metric-number text-lg font-semibold">{summary.activity.completedWorkoutDays}</p></div><div><p className="text-xs text-muted-foreground">Días trabajados</p><p className="metric-number text-lg font-semibold">{summary.activity.workedDays}</p></div></div>
-          </section>
-        </CardContent>
-      </Card>
-
-      <NutritionReportCharts days={days} />
-
-      <NutritionReportDailyBreakdown days={days} summary={summary} />
-    </div>
-  );
+    <NutritionReportDailyBreakdown days={days} summary={summary} />
+  </div>;
 }

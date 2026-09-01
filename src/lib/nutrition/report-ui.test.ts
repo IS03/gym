@@ -14,10 +14,11 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(reportsPage).not.toContain("{range.start} al {range.end}");
   });
 
-  it("deja los presets equilibrados y el personalizado en una isla responsive", () => {
+  it("mantiene los presets en una fila compacta y el personalizado en una isla responsive", () => {
     expect(reportsPage).toContain("<NutritionReportPeriodSelector");
-    expect(periodSelector).toContain("grid-cols-3");
-    expect(periodSelector).toContain("lg:grid-cols-6");
+    expect(periodSelector).toContain("overflow-x-auto");
+    expect(periodSelector).toContain("shrink-0");
+    expect(periodSelector).toContain('aria-label="Período del reporte"');
     expect(periodSelector).toContain("ResponsiveDialog");
     expect(periodSelector).toContain("<DateRangePicker");
     expect(periodSelector).not.toContain("<DateField");
@@ -40,7 +41,10 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(periodSelector).toContain('NUTRITION_REPORT_MAX_DAYS');
     expect(periodSelector).toContain('disabled={!customRange.start || !customRange.end}');
     expect(periodSelector).toContain('basePath = "/today/reports"');
-    expect(periodSelector).toContain('action={basePath}');
+    expect(periodSelector).toContain("useTransition");
+    expect(periodSelector).toContain("router.push");
+    expect(periodSelector).toContain("URLSearchParams");
+    expect(periodSelector).toContain("Actualizando…");
     expect(periodSelector).toContain('name="period" value="custom"');
     expect(rangePicker).toContain('name={fromName}');
     expect(rangePicker).toContain('name={toName}');
@@ -50,15 +54,14 @@ describe("PR 10.7 — jerarquía de reportes", () => {
   it("permite reutilizar los presets y el rango personalizado para Pasos", () => {
     const stepsPage = source("src/app/(app)/today/steps/page.tsx");
     expect(stepsPage).toContain('basePath="/today/steps"');
-    expect(periodSelector).toContain('href={`${basePath}?period=${option.period}`}');
+    expect(periodSelector).toContain('navigate(`${basePath}?period=${option.period}`)');
   });
 
-  it("presenta proteína, carbos y grasas en la misma grilla", () => {
-    expect(reportsPage).toContain("grid-cols-3");
-    expect(reportsPage).toContain(">Proteína<");
-    expect(reportsPage).toContain(">Carbos<");
-    expect(reportsPage).toContain(">Grasas<");
-    expect(reportsPage).toContain("objetivo de proteína");
+  it("preserva proteína, carbos y grasas dentro del resumen compacto", () => {
+    expect(reportsPage).toContain('label="Proteína promedio"');
+    expect(reportsPage).toContain('label="Carbos"');
+    expect(reportsPage).toContain('label="Grasas"');
+    expect(reportsPage).toContain("summary.protein.hitDays");
   });
 
   it("delega el desglose a una isla local con expansión accesible", () => {
@@ -66,5 +69,16 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(breakdown).toContain("getVisibleNutritionReportDays");
     expect(breakdown).toContain("aria-expanded={expanded}");
     expect(breakdown).toContain("/history?date=${day.date}");
+    expect(breakdown).not.toContain("<Card");
+  });
+
+  it("concentra tendencias en una única superficie y conserva sus cinco métricas", () => {
+    const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
+    expect(charts).toContain('role="tablist"');
+    for (const label of ["Energía", "Balance", "Proteína", "Agua", "Pasos"]) {
+      expect(charts).toContain(label);
+    }
+    expect(charts).toContain("bucketNutritionChartDays");
+    expect(charts).toContain('touchAction: "pan-y"');
   });
 });

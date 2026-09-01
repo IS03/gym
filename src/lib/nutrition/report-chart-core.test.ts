@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chartDomain, chartTickIndexes, lineSegments } from "./report-chart-core";
+import {
+  averageBucketValue,
+  bucketNutritionChartDays,
+  chartDomain,
+  chartTickIndexes,
+  lineSegments,
+} from "./report-chart-core";
 
 describe("nutrition report chart helpers", () => {
   it("corta la línea en gaps en lugar de dibujarlos como cero", () => {
@@ -22,5 +28,39 @@ describe("nutrition report chart helpers", () => {
     expect(indexes.at(-1)).toBe(count - 1);
     expect(new Set(indexes).size).toBe(indexes.length);
     expect(indexes.length).toBeLessThanOrEqual(5);
+  });
+
+  it("mantiene el dominio de métricas no negativas desde cero", () => {
+    for (const values of [[748, 1_900], [0, 8_100], [53.2, 130], [1, 2]]) {
+      const domain = chartDomain(values, { nonNegative: true });
+      expect(domain.min).toBe(0);
+      expect(domain.max).toBeGreaterThanOrEqual(Math.max(...values));
+    }
+  });
+
+  it("conserva el cero y ambos lados para balance", () => {
+    const domain = chartDomain([-300, 200], true);
+    expect(domain.min).toBeLessThanOrEqual(0);
+    expect(domain.max).toBeGreaterThanOrEqual(0);
+  });
+
+  it("usa días para rangos cortos, semanas para rangos medios y meses aproximados para un año", () => {
+    const days = (count: number) => Array.from({ length: count }, (_, index) => ({
+      date: `2026-01-${String(index + 1).padStart(2, "0")}`,
+      isToday: index === count - 1,
+      value: index + 1,
+    }));
+    expect(bucketNutritionChartDays(days(7))).toHaveLength(7);
+    expect(bucketNutritionChartDays(days(90))).toHaveLength(Math.ceil(90 / 7));
+    expect(bucketNutritionChartDays(days(366))).toHaveLength(Math.ceil(366 / 31));
+  });
+
+  it("calcula el promedio diario del bucket sin convertir huecos en cero", () => {
+    const bucket = bucketNutritionChartDays(Array.from({ length: 32 }, (_, index) => ({
+      date: `2026-08-${String(index + 1).padStart(2, "0")}`,
+      isToday: false,
+      value: index === 0 ? 1_800 : index === 1 ? null : index === 2 ? 2_000 : null,
+    })))[0]!;
+    expect(averageBucketValue(bucket, (day) => day.value)).toBe(1_900);
   });
 });

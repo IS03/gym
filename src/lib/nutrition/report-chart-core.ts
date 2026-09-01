@@ -2,21 +2,50 @@ export type ChartDomain = { min: number; max: number };
 
 export type ChartCoordinate = { index: number; x: number; y: number };
 
-export function chartDomain(values: Array<number | null | undefined>, includeZero = false): ChartDomain {
+export type NutritionChartBucket<T> = {
+  start: string;
+  end: string;
+  values: readonly T[];
+  includesToday: boolean;
+};
+
+type ChartDomainOptions = {
+  includeZero?: boolean;
+  nonNegative?: boolean;
+};
+
+function average(values: Array<number | null | undefined>) {
+  const known = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (known.length === 0) return null;
+  return known.reduce((sum, value) => sum + value, 0) / known.length;
+}
+
+export function chartDomain(
+  values: Array<number | null | undefined>,
+  options: boolean | ChartDomainOptions = false,
+): ChartDomain {
+  const { includeZero = false, nonNegative = false } = typeof options === "boolean"
+    ? { includeZero: options, nonNegative: false }
+    : options;
   const finite = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   if (finite.length === 0) return { min: 0, max: 1 };
   let min = Math.min(...finite);
   let max = Math.max(...finite);
-  if (includeZero) {
+  if (includeZero || nonNegative) {
     min = Math.min(min, 0);
     max = Math.max(max, 0);
   }
   if (min === max) {
     const padding = Math.max(Math.abs(min) * 0.1, 1);
-    return { min: min - padding, max: max + padding };
+    return nonNegative
+      ? { min: 0, max: Math.max(max + padding, 1) }
+      : { min: min - padding, max: max + padding };
   }
   const padding = (max - min) * 0.08;
-  return { min: min - padding, max: max + padding };
+  return {
+    min: nonNegative ? 0 : min - padding,
+    max: max + padding,
+  };
 }
 
 export function chartX(index: number, count: number, width: number, padding = 18, right = padding) {
@@ -55,4 +84,35 @@ export function chartTickIndexes(count: number, maxLabels = 5) {
     indexes.add(Math.round((point / (maxLabels - 1)) * last));
   }
   return [...indexes].sort((left, right) => left - right);
+}
+
+/**
+ * Keeps short report ranges daily, then reduces only the chart read model.
+ * The daily report data remains untouched for the breakdown below the chart.
+ */
+export function bucketNutritionChartDays<T extends { date: string; isToday: boolean }>(
+  days: readonly T[],
+): NutritionChartBucket<T>[] {
+  const bucketSize = days.length <= 31 ? 1 : days.length <= 100 ? 7 : 31;
+  const result: NutritionChartBucket<T>[] = [];
+
+  for (let index = 0; index < days.length; index += bucketSize) {
+    const values = days.slice(index, index + bucketSize);
+    if (values.length === 0) continue;
+    result.push({
+      start: values[0]!.date,
+      end: values.at(-1)!.date,
+      values,
+      includesToday: values.some((day) => day.isToday),
+    });
+  }
+
+  return result;
+}
+
+export function averageBucketValue<T>(
+  bucket: NutritionChartBucket<T>,
+  value: (item: T) => number | null | undefined,
+) {
+  return average(bucket.values.map(value));
 }
