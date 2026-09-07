@@ -10,7 +10,6 @@ import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
 import {
   getTrainingAnalysis,
   listRobustExerciseHistory,
-  listRobustExerciseHistoryRoutineOptions,
   todayInCordoba,
   type RobustExerciseHistoryItem,
 } from "@/lib/phase2/training-robust";
@@ -24,6 +23,7 @@ function serializeSessions(items: RobustExerciseHistoryItem[]): ExerciseReportSe
   return items.map((item) => ({
     sessionId: item.session.id,
     logDate: item.logDate,
+    completedAt: item.session.ended_at,
     routineId: item.session.routine_id,
     routineName: item.session.routine_name_snapshot ?? item.session.session_name ?? "Sesión libre",
     decision: item.exercise.decision,
@@ -59,16 +59,24 @@ export default async function ExerciseHistoryPage({
   const previousRange = compare === "previous" && analysisPeriod ? previousTrainingAnalysisPeriodRange(analysisPeriod, today) : null;
   const requestedA = typeof sp.a === "string" ? sp.a : exerciseId;
   const requestedB = typeof sp.b === "string" ? sp.b : null;
-  const [allExercises, items, previousItems, routineOptions, crossAnalysis] = await Promise.all([
+  const [allExercises, items, previousItems, allHistoryItems, crossAnalysis] = await Promise.all([
     listExercises({ includeArchived: true }),
     listRobustExerciseHistory({ exerciseId, fromDate: currentRange?.start, toDate: currentRange?.end, routineId: routineId ?? undefined, limit: 100 }),
     previousRange
       ? listRobustExerciseHistory({ exerciseId, fromDate: previousRange.start, toDate: previousRange.end, routineId: routineId ?? undefined, limit: 100 })
       : Promise.resolve([]),
-    listRobustExerciseHistoryRoutineOptions(exerciseId),
+    listRobustExerciseHistory({ exerciseId, limit: 500 }),
     compare === "exercises" && analysisPeriod ? getTrainingAnalysis(analysisPeriod) : Promise.resolve(null),
   ]);
   const exercise = allExercises.find((item) => item.id === exerciseId) ?? null;
+  const routineOptions = [...new Map(
+    allHistoryItems
+      .filter((item) => item.session.routine_id)
+      .map((item) => [item.session.routine_id!, {
+        id: item.session.routine_id!,
+        nombre: item.session.routine_name_snapshot ?? item.session.session_name ?? "Rutina",
+      }]),
+  ).values()].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
   const cameFromProgress = sp.from === "progress";
   const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
   const progressRoutine = typeof sp.routine === "string" ? sp.routine : null;
@@ -119,5 +127,6 @@ export default async function ExerciseHistoryPage({
     comparison={comparison}
     progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter } : undefined}
     sessions={sessions}
+    performanceSessions={serializeSessions(allHistoryItems)}
   />;
 }

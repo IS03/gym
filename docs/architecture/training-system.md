@@ -236,6 +236,13 @@ Para métricas globales, de rutina y de músculo se usan períodos acotados y
 buckets temporales legibles. Series, sesiones, duración y volumen nunca usan un
 dominio visual negativo.
 
+El rendimiento se deriva en lectura desde los sets completados de snapshots
+históricos: mejor peso, mejor volumen de sesión y mejores repeticiones siempre
+asociadas a su carga. Los empates muestran la ocurrencia más reciente y los
+eventos de marca sólo se generan ante una mejora estricta. No se persiste una
+tabla paralela de récords. e1RM queda fuera mientras el modelo no diferencie
+sets de calentamiento ni la semántica de carga de todos los ejercicios.
+
 El peso cargado por mancuerna se conserva como fue registrado; no se multiplica implícitamente por dos.
 
 ## ABS y cardio
