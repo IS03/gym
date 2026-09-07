@@ -11,6 +11,41 @@ export type NutritionReportRange = {
   error: string | null;
 };
 
+export type NutritionReportDateRange = Pick<NutritionReportRange, "start" | "end">;
+
+export type NutritionReportComparisonMetric =
+  | "calories"
+  | "targetCalories"
+  | "energyBalance"
+  | "expenditure"
+  | "protein"
+  | "carbs"
+  | "fat"
+  | "water"
+  | "mate"
+  | "steps"
+  | "workouts";
+
+export type NutritionReportComparisonRow = {
+  metric: NutritionReportComparisonMetric;
+  label: string;
+  aggregation: "average" | "total";
+  unit: "kcal" | "g" | "L" | "pasos" | "entrenamientos";
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+};
+
+export type NutritionReportComparison = {
+  currentRange: NutritionReportDateRange;
+  previousRange: NutritionReportDateRange;
+  currentDays: NutritionReportDay[];
+  previousDays: NutritionReportDay[];
+  currentSummary: NutritionReportSummary;
+  previousSummary: NutritionReportSummary;
+  rows: NutritionReportComparisonRow[];
+};
+
 export type NutritionReportMealFact = {
   day_log_id: string;
   entry_kind: MealEntryKind;
@@ -104,6 +139,8 @@ export type NutritionReportSummary = {
   hydration: {
     averageWaterL: number | null;
     averageTargetL: number | null;
+    averageMateL: number | null;
+    mateDays: number;
     hitDays: number;
     comparableDays: number;
   };
@@ -146,6 +183,17 @@ function inclusiveDays(start: string, end: string) {
     (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime())
       / 86_400_000,
   ) + 1;
+}
+
+export function nutritionReportRangeDays(range: NutritionReportDateRange) {
+  return inclusiveDays(range.start, range.end);
+}
+
+/** Returns the immediately preceding inclusive range with exactly the same duration. */
+export function previousNutritionReportRange(range: NutritionReportDateRange): NutritionReportDateRange {
+  const duration = nutritionReportRangeDays(range);
+  const end = addIsoDays(range.start, -1);
+  return { start: addIsoDays(end, -(duration - 1)), end };
 }
 
 function fallbackRange(today: string, error: string | null = null): NutritionReportRange {
@@ -314,6 +362,7 @@ export function aggregateNutritionReport(days: NutritionReportDay[]): NutritionR
   const proteinComparable = proteinDays.filter((day) => day.targetProteinG !== null);
   const waterDays = days.filter((day) => day.isComplete && day.waterL !== null);
   const waterComparable = waterDays.filter((day) => day.targetWaterL !== null);
+  const mateDays = days.filter((day) => day.isComplete && day.mateL !== null);
   const stepDays = days.filter((day) => day.isComplete && day.steps !== null);
 
   return {
@@ -353,6 +402,8 @@ export function aggregateNutritionReport(days: NutritionReportDay[]): NutritionR
     hydration: {
       averageWaterL: average(waterDays.map((day) => day.waterL)),
       averageTargetL: average(waterComparable.map((day) => day.targetWaterL)),
+      averageMateL: average(mateDays.map((day) => day.mateL)),
+      mateDays: mateDays.length,
       hitDays: waterComparable.filter((day) => (day.waterL ?? 0) >= (day.targetWaterL ?? 0)).length,
       comparableDays: waterComparable.length,
     },
@@ -362,5 +413,74 @@ export function aggregateNutritionReport(days: NutritionReportDay[]): NutritionR
       completedWorkoutDays: days.filter((day) => day.hasCompletedWorkout).length,
       workedDays: days.filter((day) => day.workEffective === true).length,
     },
+  };
+}
+
+function comparableNutritionDays(
+  currentDays: NutritionReportDay[],
+  previousDays: NutritionReportDay[],
+) {
+  const current: NutritionReportDay[] = [];
+  const previous: NutritionReportDay[] = [];
+  const count = Math.min(currentDays.length, previousDays.length);
+
+  // Both arrays are newest-first. If the current relative position is still in
+  // progress (normally today), exclude the matching previous position too.
+  for (let index = 0; index < count; index += 1) {
+    const currentDay = currentDays[index]!;
+    if (!currentDay.isComplete) continue;
+    current.push(currentDay);
+    previous.push(previousDays[index]!);
+  }
+  return { current, previous };
+}
+
+function comparisonRow(
+  metric: NutritionReportComparisonMetric,
+  label: string,
+  aggregation: NutritionReportComparisonRow["aggregation"],
+  unit: NutritionReportComparisonRow["unit"],
+  current: number | null,
+  previous: number | null,
+): NutritionReportComparisonRow {
+  return {
+    metric,
+    label,
+    aggregation,
+    unit,
+    current,
+    previous,
+    delta: current === null || previous === null ? null : current - previous,
+  };
+}
+
+export function buildNutritionReportComparison(input: {
+  currentRange: NutritionReportDateRange;
+  previousRange: NutritionReportDateRange;
+  currentDays: NutritionReportDay[];
+  previousDays: NutritionReportDay[];
+}): NutritionReportComparison {
+  const comparable = comparableNutritionDays(input.currentDays, input.previousDays);
+  const currentSummary = aggregateNutritionReport(comparable.current);
+  const previousSummary = aggregateNutritionReport(comparable.previous);
+  const rows = [
+    comparisonRow("calories", "Calorías", "average", "kcal", currentSummary.calories.averageConsumed, previousSummary.calories.averageConsumed),
+    comparisonRow("targetCalories", "Objetivo", "average", "kcal", currentSummary.calories.averageTarget, previousSummary.calories.averageTarget),
+    comparisonRow("energyBalance", "Balance", "total", "kcal", currentSummary.energy.accumulatedBalance, previousSummary.energy.accumulatedBalance),
+    comparisonRow("expenditure", "Gasto", "average", "kcal", currentSummary.energy.averageExpenditure, previousSummary.energy.averageExpenditure),
+    comparisonRow("protein", "Proteína", "average", "g", currentSummary.protein.averageConsumed, previousSummary.protein.averageConsumed),
+    comparisonRow("carbs", "Carbos", "average", "g", currentSummary.carbs.averageConsumed, previousSummary.carbs.averageConsumed),
+    comparisonRow("fat", "Grasas", "average", "g", currentSummary.fat.averageConsumed, previousSummary.fat.averageConsumed),
+    comparisonRow("water", "Agua", "average", "L", currentSummary.hydration.averageWaterL, previousSummary.hydration.averageWaterL),
+    comparisonRow("mate", "Mate", "average", "L", currentSummary.hydration.averageMateL, previousSummary.hydration.averageMateL),
+    comparisonRow("steps", "Pasos", "average", "pasos", currentSummary.activity.averageSteps, previousSummary.activity.averageSteps),
+    comparisonRow("workouts", "Entrenamientos", "total", "entrenamientos", currentSummary.activity.completedWorkoutDays, previousSummary.activity.completedWorkoutDays),
+  ];
+
+  return {
+    ...input,
+    currentSummary,
+    previousSummary,
+    rows,
   };
 }

@@ -6,7 +6,12 @@ import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-c
 import { NutritionReportDailyBreakdown } from "@/components/nutrition/nutrition-report-daily-breakdown";
 import { NutritionReportPeriodSelector } from "@/components/nutrition/nutrition-report-period-selector";
 import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
-import { getNutritionReport } from "@/lib/nutrition/reports";
+import {
+  nutritionReportComparisonMode,
+  nutritionReportCurrentPath,
+  nutritionReportPreviousPath,
+} from "@/lib/nutrition/report-navigation";
+import { getNutritionReport, getNutritionReportWithPrevious } from "@/lib/nutrition/reports";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
@@ -51,11 +56,18 @@ export default async function NutritionReportsPage({
   const sp = (await searchParams) ?? {};
   const value = (key: string) => typeof sp[key] === "string" ? sp[key] as string : undefined;
   const today = todayInCordoba();
-  const { range, days, summary } = await getNutritionReport({
+  const comparisonMode = nutritionReportComparisonMode(value("compare"));
+  const reportInput = {
     period: value("period"),
     from: value("from"),
     to: value("to"),
-  }, today);
+  };
+  const comparisonReport = comparisonMode === "previous"
+    ? await getNutritionReportWithPrevious(reportInput, today)
+    : null;
+  const report = comparisonReport ?? await getNutritionReport(reportInput, today);
+  const { range, days, summary } = report;
+  const comparison = comparisonReport?.comparison ?? null;
 
   return <div className="space-y-6">
     <header className="space-y-3">
@@ -76,6 +88,7 @@ export default async function NutritionReportsPage({
           end={range.end}
           today={today}
           rangeLabel={formatNutritionReportRange(range.start, range.end)}
+          comparison={comparisonMode}
         />
         {range.error ? <p className="mt-2 rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
       </CardContent>
@@ -112,7 +125,13 @@ export default async function NutritionReportsPage({
       </Card>
     </section>
 
-    <NutritionReportCharts days={days} />
+    <NutritionReportCharts
+      days={days}
+      comparison={comparison}
+      comparisonMode={comparisonMode}
+      currentHref={nutritionReportCurrentPath(range)}
+      previousHref={nutritionReportPreviousPath(range)}
+    />
 
     <NutritionReportDailyBreakdown days={days} summary={summary} />
   </div>;

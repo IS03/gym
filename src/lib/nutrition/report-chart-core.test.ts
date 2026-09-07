@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  alignNutritionComparisonBuckets,
   averageBucketValue,
   balanceChartTicks,
   bucketNutritionChartDays,
@@ -94,5 +95,23 @@ describe("nutrition report chart helpers", () => {
       value: index === 0 ? 1_800 : index === 1 ? null : index === 2 ? 2_000 : null,
     })))[0]!;
     expect(averageBucketValue(bucket, (day) => day.value)).toBe(1_900);
+  });
+
+  it("alinea actual y anterior por posición relativa conservando sus fechas reales", () => {
+    const current = Array.from({ length: 7 }, (_, index) => ({
+      date: `2026-09-0${index + 1}`,
+      isToday: index === 6,
+      value: index === 1 ? null : index + 1,
+    }));
+    const previous = Array.from({ length: 7 }, (_, index) => ({
+      date: `2026-08-${String(index + 25).padStart(2, "0")}`,
+      isToday: false,
+      value: index + 10,
+    }));
+    const buckets = alignNutritionComparisonBuckets(current, previous);
+    expect(buckets).toHaveLength(7);
+    expect(buckets[0]).toMatchObject({ label: "Día 1", current: { start: "2026-09-01" }, previous: { start: "2026-08-25" } });
+    expect(buckets.at(-1)).toMatchObject({ label: "Día 7", current: { end: "2026-09-07" }, previous: { end: "2026-08-31" } });
+    expect(averageBucketValue(buckets[1]!.current, (day) => day.value)).toBeNull();
   });
 });

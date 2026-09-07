@@ -3,8 +3,11 @@ import "server-only";
 import { createClient, type AuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
   aggregateNutritionReport,
+  buildNutritionReportComparison,
   buildNutritionReportDays,
+  previousNutritionReportRange,
   resolveNutritionReportRange,
+  type NutritionReportDateRange,
   type NutritionReportDayLogFact,
   type NutritionReportMealFact,
   type NutritionReportWorkoutFact,
@@ -18,12 +21,10 @@ async function getAuthedContext() {
   return { supabase, userId: user.id };
 }
 
-export async function getNutritionReport(
-  input: { period?: string; from?: string; to?: string },
-  today: string,
+async function readNutritionReportFacts(
+  range: NutritionReportDateRange,
   context?: AuthenticatedRequestContext,
 ) {
-  const range = resolveNutritionReportRange(input, today);
   const { supabase, userId } = context ?? await getAuthedContext();
   const { data: rawDays, error: daysError } = await supabase
     .from("day_logs")
@@ -67,6 +68,42 @@ export async function getNutritionReport(
     workouts = (workoutResult.data ?? []) as NutritionReportWorkoutFact[];
   }
 
+  return { dayLogs, meals, workouts };
+}
+
+export async function getNutritionReport(
+  input: { period?: string; from?: string; to?: string },
+  today: string,
+  context?: AuthenticatedRequestContext,
+) {
+  const range = resolveNutritionReportRange(input, today);
+  const { dayLogs, meals, workouts } = await readNutritionReportFacts(range, context);
+
   const days = buildNutritionReportDays({ range, today, dayLogs, meals, workouts });
   return { range, days, summary: aggregateNutritionReport(days) };
+}
+
+export async function getNutritionReportWithPrevious(
+  input: { period?: string; from?: string; to?: string },
+  today: string,
+  context?: AuthenticatedRequestContext,
+) {
+  const range = resolveNutritionReportRange(input, today);
+  const previousRange = previousNutritionReportRange(range);
+  const combinedRange = { start: previousRange.start, end: range.end };
+  const facts = await readNutritionReportFacts(combinedRange, context);
+  const currentDays = buildNutritionReportDays({ range, today, ...facts });
+  const previousDays = buildNutritionReportDays({ range: previousRange, today, ...facts });
+
+  return {
+    range,
+    days: currentDays,
+    summary: aggregateNutritionReport(currentDays),
+    comparison: buildNutritionReportComparison({
+      currentRange: range,
+      previousRange,
+      currentDays,
+      previousDays,
+    }),
+  };
 }

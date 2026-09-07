@@ -5,6 +5,9 @@ const source = (path: string) => readFileSync(path, "utf8");
 const reportsPage = source("src/app/(app)/today/reports/page.tsx");
 const breakdown = source("src/components/nutrition/nutrition-report-daily-breakdown.tsx");
 const periodSelector = source("src/components/nutrition/nutrition-report-period-selector.tsx");
+const comparisonSummary = source("src/components/nutrition/nutrition-report-comparison.tsx");
+const reportCore = source("src/lib/nutrition/reports-core.ts");
+const reportNavigation = source("src/lib/nutrition/report-navigation.ts");
 const rangePicker = source("src/components/ui/date-range-picker.tsx");
 
 describe("PR 10.7 — jerarquía de reportes", () => {
@@ -43,7 +46,7 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(periodSelector).toContain('basePath = "/today/reports"');
     expect(periodSelector).toContain("useTransition");
     expect(periodSelector).toContain("router.push");
-    expect(periodSelector).toContain("URLSearchParams");
+    expect(reportNavigation).toContain("URLSearchParams");
     expect(periodSelector).toContain("Actualizando…");
     expect(periodSelector).toContain('name="period" value="custom"');
     expect(rangePicker).toContain('name={fromName}');
@@ -54,7 +57,8 @@ describe("PR 10.7 — jerarquía de reportes", () => {
   it("permite reutilizar los presets y el rango personalizado para Pasos", () => {
     const stepsPage = source("src/app/(app)/today/steps/page.tsx");
     expect(stepsPage).toContain('basePath="/today/steps"');
-    expect(periodSelector).toContain('navigate(`${basePath}?period=${option.period}`)');
+    expect(periodSelector).toContain("nutritionReportPath({");
+    expect(periodSelector).toContain("basePath,");
   });
 
   it("preserva proteína, carbos y grasas dentro del resumen compacto", () => {
@@ -80,5 +84,34 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     }
     expect(charts).toContain("bucketNutritionChartDays");
     expect(charts).toContain('touchAction: "pan-y"');
+  });
+
+  it("integra Actual y Vs anterior dentro de Tendencias sin crear otra página", () => {
+    const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
+    expect(charts).toContain('aria-label="Modo de tendencias"');
+    expect(charts).toContain(">Actual<");
+    expect(charts).toContain(">Vs anterior<");
+    expect(charts).toContain("scroll={false}");
+    expect(reportsPage).toContain("nutritionReportComparisonMode");
+    expect(reportsPage).toContain("getNutritionReportWithPrevious");
+    expect(reportsPage).not.toContain("Comparar período");
+  });
+
+  it("muestra una sola tabla compacta Actual/Anterior/Cambio y deltas neutrales", () => {
+    for (const label of ["Actual", "Anterior", "Cambio"]) {
+      expect(comparisonSummary).toContain(label);
+    }
+    for (const label of ["Calorías", "Balance", "Proteína", "Carbos", "Grasas", "Agua", "Mate", "Pasos", "Entrenamientos"]) {
+      expect(reportCore).toContain(label);
+    }
+    expect(comparisonSummary).toContain("table-fixed");
+    expect(comparisonSummary).not.toContain("text-emerald");
+    expect(comparisonSummary).not.toContain("text-destructive");
+  });
+
+  it("preserva el reporte normal y sólo carga comparación cuando se solicita", () => {
+    expect(reportsPage).toContain('comparisonMode === "previous"');
+    expect(reportsPage).toContain("comparisonReport ?? await getNutritionReport");
+    expect(reportsPage).toContain("<NutritionReportDailyBreakdown days={days} summary={summary}");
   });
 });

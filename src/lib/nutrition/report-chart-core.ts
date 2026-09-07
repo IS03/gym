@@ -16,6 +16,13 @@ export type NutritionChartBucket<T> = {
   includesToday: boolean;
 };
 
+export type NutritionComparisonChartBucket<T> = {
+  id: string;
+  label: string;
+  current: NutritionChartBucket<T>;
+  previous: NutritionChartBucket<T>;
+};
+
 type ChartDomainOptions = {
   includeZero?: boolean;
   nonNegative?: boolean;
@@ -154,4 +161,30 @@ export function averageBucketValue<T>(
   value: (item: T) => number | null | undefined,
 ) {
   return average(bucket.values.map(value));
+}
+
+function relativeBucketLabel<T>(bucket: NutritionChartBucket<T>, index: number) {
+  const duration = Math.floor(
+    (new Date(`${bucket.end}T00:00:00Z`).getTime() - new Date(`${bucket.start}T00:00:00Z`).getTime())
+      / 86_400_000,
+  ) + 1;
+  if (duration === 1) return `Día ${index + 1}`;
+  if (duration === 7) return `Semana ${index + 1}`;
+  return `Tramo ${index + 1}`;
+}
+
+/** Aligns equal-duration report ranges by their relative bucket position. */
+export function alignNutritionComparisonBuckets<T extends { date: string; isToday: boolean }>(
+  currentDays: readonly T[],
+  previousDays: readonly T[],
+): NutritionComparisonChartBucket<T>[] {
+  const current = bucketNutritionChartDays(currentDays);
+  const previous = bucketNutritionChartDays(previousDays);
+  const count = Math.min(current.length, previous.length);
+  return Array.from({ length: count }, (_, index) => ({
+    id: `nutrition-comparison-${index}`,
+    label: relativeBucketLabel(current[index]!, index),
+    current: current[index]!,
+    previous: previous[index]!,
+  }));
 }

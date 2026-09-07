@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { NutritionReportComparisonSummary } from "@/components/nutrition/nutrition-report-comparison";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartDetail } from "@/components/ui/chart-detail";
 import { chartY, formatChartValue, type ChartUnit } from "@/lib/chart-core";
-import type { NutritionReportDay } from "@/lib/nutrition/reports-core";
+import type { NutritionReportComparisonMode } from "@/lib/nutrition/report-navigation";
+import type { NutritionReportComparison, NutritionReportDay } from "@/lib/nutrition/reports-core";
 import {
+  alignNutritionComparisonBuckets,
   averageBucketValue,
   balanceChartTicks,
   bucketNutritionChartDays,
@@ -15,6 +19,7 @@ import {
   chartTickIndexes,
   chartX,
   lineSegments,
+  type NutritionComparisonChartBucket,
   type NutritionChartBucket,
 } from "@/lib/nutrition/report-chart-core";
 import { cn } from "@/lib/utils";
@@ -135,6 +140,192 @@ function ChartLegend({ series }: { series: LineSeries[] }) {
       {item.label}{item.dash ? " (línea discontinua)" : ""}
     </li>)}
   </ul>;
+}
+
+function ComparisonLegend({ bars = false }: { bars?: boolean }) {
+  return <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Leyenda comparativa">
+    <li className="flex items-center gap-1.5">
+      <svg className="h-3 w-5 text-primary" viewBox="0 0 20 12" aria-hidden>
+        {bars ? <rect x="3" y="1" width="14" height="10" rx="1" fill="currentColor" /> : <path d="M1 6h18" fill="none" stroke="currentColor" strokeWidth="2.5" />}
+      </svg>
+      Actual
+    </li>
+    <li className="flex items-center gap-1.5">
+      <svg className="h-3 w-5 text-muted-foreground" viewBox="0 0 20 12" aria-hidden>
+        {bars
+          ? <rect x="3" y="1" width="14" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" />
+          : <path d="M1 6h18" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" />}
+      </svg>
+      Anterior {bars ? "(borde discontinuo)" : "(línea discontinua)"}
+    </li>
+  </ul>;
+}
+
+function comparisonBucketValues(
+  buckets: NutritionComparisonChartBucket<NutritionReportDay>[],
+  metric: Metric,
+) {
+  const value = (day: NutritionReportDay) => {
+    if (metric === "energy") return day.hasNutrition ? day.calories : null;
+    if (metric === "balance") return day.hasNutrition ? day.energyBalanceKcal : null;
+    if (metric === "protein") return day.hasNutrition ? day.proteinG : null;
+    if (metric === "water") return day.waterL;
+    return day.steps;
+  };
+  return {
+    current: buckets.map((bucket) => averageBucketValue(bucket.current, value)),
+    previous: buckets.map((bucket) => averageBucketValue(bucket.previous, value)),
+  };
+}
+
+function comparisonUnit(metric: Metric): ChartUnit {
+  if (metric === "protein") return "g";
+  if (metric === "water") return "L";
+  if (metric === "steps") return "pasos";
+  return "kcal";
+}
+
+function relativeTicks(
+  buckets: NutritionComparisonChartBucket<NutritionReportDay>[],
+  position: (index: number) => number,
+) {
+  const indexes = chartTickIndexes(buckets.length, buckets.length > 100 ? 3 : 4);
+  return indexes.map((index) => <text
+    key={buckets[index]!.id}
+    x={position(index)}
+    y={HEIGHT - 5}
+    textAnchor="middle"
+    className="fill-muted-foreground text-[9px]"
+  >{buckets[index]!.label.replace("Día ", "D").replace("Semana ", "S").replace("Tramo ", "T")}</text>);
+}
+
+function comparisonDetailValue(
+  value: number | null,
+  unit: ChartUnit,
+  bucket: NutritionChartBucket<NutritionReportDay>,
+) {
+  return `${value === null ? "Sin dato" : formatChartValue(value, unit)} · ${bucketLabel(bucket, true)}`;
+}
+
+function ComparisonLineChart({
+  buckets,
+  values,
+  unit,
+  description,
+}: {
+  buckets: NutritionComparisonChartBucket<NutritionReportDay>[];
+  values: { current: Array<number | null>; previous: Array<number | null> };
+  unit: ChartUnit;
+  description: string;
+}) {
+  const domain = chartDomain([...values.current, ...values.previous], { nonNegative: true });
+  const [selected, setSelected] = useState(() => firstSeriesSelectionIndex([
+    { label: "Actual", values: values.current, className: "text-primary" },
+    { label: "Anterior", values: values.previous, className: "text-muted-foreground" },
+  ]));
+  const [focused, setFocused] = useState<number | null>(null);
+  const selectedIndex = Math.min(selected, Math.max(buckets.length - 1, 0));
+  const selectedBucket = buckets[selectedIndex];
+
+  if (!values.current.some((item) => item !== null) && !values.previous.some((item) => item !== null)) {
+    return <p className="py-8 text-sm text-muted-foreground">No hay datos comparables para esta métrica.</p>;
+  }
+
+  return <div className="space-y-3">
+    <ComparisonLegend />
+    <svg className="block h-auto w-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label={description} style={{ touchAction: "pan-y" }}>
+      <ChartGrid domain={domain} unit={unit} />
+      {selectedBucket ? <line x1={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} x2={chartX(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT)} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" /> : null}
+      {focused === null ? null : <line x1={chartX(focused, buckets.length, WIDTH, LEFT, RIGHT)} x2={chartX(focused, buckets.length, WIDTH, LEFT, RIGHT)} y1={TOP + 2} y2={HEIGHT - BOTTOM - 2} className="stroke-primary" strokeWidth="2" pointerEvents="none" />}
+      {lineSegments(values.current, domain, WIDTH, HEIGHT, LEFT, RIGHT, TOP, BOTTOM).map((segment, index) => <polyline key={`current-${index}`} points={points(segment)} className="text-primary" fill="none" stroke="currentColor" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />)}
+      {lineSegments(values.previous, domain, WIDTH, HEIGHT, LEFT, RIGHT, TOP, BOTTOM).map((segment, index) => <polyline key={`previous-${index}`} points={points(segment)} className="text-muted-foreground" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />)}
+      {buckets.map((bucket, index) => {
+        if (values.current[index] === null && values.previous[index] === null) return null;
+        const hit = dateHitBounds(index, buckets.length);
+        return <rect key={bucket.id} x={hit.x} y="0" width={hit.width} height={HEIGHT} fill="transparent" role="button" tabIndex={0} className="outline-none focus:outline-none" aria-label={`${bucket.label}. Ver valores de Actual y Anterior.`} onClick={() => setSelected(index)} onFocus={() => setFocused(index)} onBlur={() => setFocused(null)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />;
+      })}
+      {values.current.map((value, index) => value === null ? null : <circle key={`current-${index}`} cx={chartX(index, buckets.length, WIDTH, LEFT, RIGHT)} cy={chartY(value, domain, HEIGHT, TOP, BOTTOM)} r={selectedIndex === index ? 4.5 : 2.5} className="text-primary" fill="currentColor" pointerEvents="none" />)}
+      {values.previous.map((value, index) => value === null ? null : <circle key={`previous-${index}`} cx={chartX(index, buckets.length, WIDTH, LEFT, RIGHT)} cy={chartY(value, domain, HEIGHT, TOP, BOTTOM)} r={selectedIndex === index ? 4 : 2.5} className="text-muted-foreground" fill="var(--card)" stroke="currentColor" strokeWidth="1.5" pointerEvents="none" />)}
+      {relativeTicks(buckets, (index) => chartX(index, buckets.length, WIDTH, LEFT, RIGHT))}
+    </svg>
+    <ChartDetail
+      title={selectedBucket?.label ?? "Sin dato"}
+      items={selectedBucket ? [
+        { label: "Actual", value: comparisonDetailValue(values.current[selectedIndex] ?? null, unit, selectedBucket.current) },
+        { label: "Anterior", value: comparisonDetailValue(values.previous[selectedIndex] ?? null, unit, selectedBucket.previous) },
+      ] : []}
+      description={selectedBucket?.current.includesToday ? "Hoy está en curso y no modifica el resumen comparativo." : undefined}
+      className="min-h-24"
+    />
+  </div>;
+}
+
+function ComparisonBarChart({
+  buckets,
+  values,
+  unit,
+  balance = false,
+  description,
+}: {
+  buckets: NutritionComparisonChartBucket<NutritionReportDay>[];
+  values: { current: Array<number | null>; previous: Array<number | null> };
+  unit: ChartUnit;
+  balance?: boolean;
+  description: string;
+}) {
+  const allValues = [...values.current, ...values.previous];
+  const domain = chartDomain(allValues, balance ? true : { nonNegative: true });
+  const [selected, setSelected] = useState(() => firstSeriesSelectionIndex([
+    { label: "Actual", values: values.current, className: "text-primary" },
+    { label: "Anterior", values: values.previous, className: "text-muted-foreground" },
+  ]));
+  const [focused, setFocused] = useState<number | null>(null);
+  const selectedIndex = Math.min(selected, Math.max(buckets.length - 1, 0));
+  const selectedBucket = buckets[selectedIndex];
+  const baseline = chartY(0, domain, HEIGHT, TOP, BOTTOM);
+
+  if (!allValues.some((item) => item !== null)) {
+    return <p className="py-8 text-sm text-muted-foreground">No hay datos comparables para esta métrica.</p>;
+  }
+
+  return <div className="space-y-3">
+    <ComparisonLegend bars />
+    <svg className="block h-auto w-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label={description} style={{ touchAction: "pan-y" }}>
+      <ChartGrid domain={domain} unit={unit} ticks={balance ? balanceChartTicks(domain) : undefined} skipZeroGridLine={balance} />
+      {balance ? <line x1={LEFT} x2={WIDTH - RIGHT} y1={baseline} y2={baseline} className="stroke-foreground/55" strokeDasharray="3 3" /> : null}
+      {selectedBucket ? <line x1={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" /> : null}
+      {focused === null ? null : <line x1={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP + 2} y2={HEIGHT - BOTTOM - 2} className="stroke-primary" strokeWidth="2" pointerEvents="none" />}
+      {buckets.map((bucket, index) => {
+        const band = chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT);
+        const groupWidth = Math.max(6, Math.min(24, band.width - 2));
+        const gap = Math.min(2, groupWidth * 0.12);
+        const barWidth = Math.max(2, (groupWidth - gap) / 2);
+        const start = band.center - groupWidth / 2;
+        const bars = [
+          { key: "current", value: values.current[index], x: start, className: bucket.current.includesToday ? "fill-primary/45" : "fill-primary", dashed: false },
+          { key: "previous", value: values.previous[index], x: start + barWidth + gap, className: "fill-muted/40 stroke-muted-foreground", dashed: true },
+        ] as const;
+        return <g key={bucket.id}>
+          {bars.map((bar) => {
+            if (bar.value === null) return null;
+            const y = chartY(bar.value, domain, HEIGHT, TOP, BOTTOM);
+            return <rect key={bar.key} x={bar.x} y={Math.min(y, baseline)} width={barWidth} height={Math.max(1, Math.abs(y - baseline))} rx="1" className={bar.className} strokeWidth={bar.dashed ? "1" : undefined} strokeDasharray={bar.dashed ? "2 2" : undefined} pointerEvents="none" />;
+          })}
+          <rect x={band.start} y={TOP} width={band.width} height={HEIGHT - TOP - BOTTOM} fill="transparent" role="button" tabIndex={0} className="outline-none focus:outline-none" aria-label={`${bucket.label}. Ver valores de Actual y Anterior.`} onClick={() => setSelected(index)} onFocus={() => setFocused(index)} onBlur={() => setFocused(null)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
+        </g>;
+      })}
+      {relativeTicks(buckets, (index) => chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT).center)}
+    </svg>
+    <ChartDetail
+      title={selectedBucket?.label ?? "Sin dato"}
+      items={selectedBucket ? [
+        { label: "Actual", value: comparisonDetailValue(values.current[selectedIndex] ?? null, unit, selectedBucket.current) },
+        { label: "Anterior", value: comparisonDetailValue(values.previous[selectedIndex] ?? null, unit, selectedBucket.previous) },
+      ] : []}
+      description={balance ? "Balance = consumo − gasto; no es la desviación contra el objetivo." : selectedBucket?.current.includesToday ? "Hoy está en curso y no modifica el resumen comparativo." : undefined}
+      className="min-h-24"
+    />
+  </div>;
 }
 
 function provisionalValues(values: Array<number | null>, buckets: NutritionChartBucket<NutritionReportDay>[]) {
@@ -268,10 +459,29 @@ function StepsChart({ buckets, values }: { buckets: NutritionChartBucket<Nutriti
   </div>;
 }
 
-export function NutritionReportCharts({ days }: { days: NutritionReportDay[] }) {
+export function NutritionReportCharts({
+  days,
+  comparison,
+  comparisonMode,
+  currentHref,
+  previousHref,
+}: {
+  days: NutritionReportDay[];
+  comparison: NutritionReportComparison | null;
+  comparisonMode: NutritionReportComparisonMode;
+  currentHref: string;
+  previousHref: string;
+}) {
   const [metric, setMetric] = useState<Metric>("energy");
   const chronological = useMemo(() => [...days].reverse(), [days]);
   const buckets = useMemo(() => bucketNutritionChartDays(chronological), [chronological]);
+  const comparisonBuckets = useMemo(() => comparison
+    ? alignNutritionComparisonBuckets([...comparison.currentDays].reverse(), [...comparison.previousDays].reverse())
+    : [], [comparison]);
+  const comparisonValues = useMemo(
+    () => comparisonBucketValues(comparisonBuckets, metric),
+    [comparisonBuckets, metric],
+  );
   const energy = useMemo<LineSeries[]>(() => [
     { label: "Consumido", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.calories : null)), className: "text-primary", width: 2.5 },
     { label: "Objetivo", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.targetCalories : null)), className: "text-muted-foreground", dash: "5 4" },
@@ -287,8 +497,12 @@ export function NutritionReportCharts({ days }: { days: NutritionReportDay[] }) 
   ], [buckets]);
   const balance = useMemo(() => buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.energyBalanceKcal : null)), [buckets]);
   const steps = useMemo(() => buckets.map((bucket) => averageBucketValue(bucket, (day) => day.steps)), [buckets]);
-  const waterKnown = water.some((series) => series.values.some((value) => value !== null));
+  const isPrevious = comparisonMode === "previous" && comparison !== null;
+  const waterKnown = isPrevious
+    ? comparisonValues.current.some((value) => value !== null) || comparisonValues.previous.some((value) => value !== null)
+    : water.some((series) => series.values.some((value) => value !== null));
   const includesToday = buckets.some((bucket) => bucket.includesToday);
+  const comparisonUnitValue = comparisonUnit(metric);
 
   return <section className="space-y-3" aria-labelledby="nutrition-trends-title">
     <div className="flex flex-wrap items-end justify-between gap-2">
@@ -298,16 +512,31 @@ export function NutritionReportCharts({ days }: { days: NutritionReportDay[] }) 
       </div>
       {includesToday ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Hoy · En curso</span> : null}
     </div>
+    <div className="mx-auto grid w-full max-w-xs grid-cols-2 rounded-lg border bg-muted/25 p-1" aria-label="Modo de tendencias">
+      <Link scroll={false} href={currentHref} className={cn("flex h-9 items-center justify-center rounded-md px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", !isPrevious ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={!isPrevious ? "page" : undefined}>Actual</Link>
+      <Link scroll={false} href={previousHref} className={cn("flex h-9 items-center justify-center rounded-md px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", isPrevious ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={isPrevious ? "page" : undefined}>Vs anterior</Link>
+    </div>
+    {isPrevious ? <NutritionReportComparisonSummary comparison={comparison} /> : null}
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Métrica de tendencias">
       {metricOptions.map((option) => <button key={option.id} type="button" role="tab" id={`nutrition-trend-tab-${option.id}`} aria-controls="nutrition-trend-workspace" aria-selected={metric === option.id} className={cn("h-10 shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", metric === option.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:bg-muted")} onClick={() => setMetric(option.id)}>{option.label}</button>)}
     </div>
     <Card id="nutrition-trend-workspace" role="tabpanel" aria-labelledby={`nutrition-trend-tab-${metric}`} className="surface-elevated">
       <CardContent className="space-y-3 p-3 sm:p-4">
-        {metric === "energy" ? <><ChartLegend series={energy} /><LineChart buckets={buckets} series={energy} unit="kcal" description="Tendencia de energía. Eje horizontal: fecha. Eje vertical: calorías." /></> : null}
-        {metric === "balance" ? <BalanceChart buckets={buckets} values={balance} /> : null}
-        {metric === "protein" ? <><ChartLegend series={protein} /><LineChart buckets={buckets} series={protein} unit="g" description="Tendencia de proteína. Eje horizontal: fecha. Eje vertical: gramos." /></> : null}
-        {metric === "water" ? waterKnown ? <><ChartLegend series={water} /><LineChart buckets={buckets} series={water} unit="L" description="Tendencia de agua. Eje horizontal: fecha. Eje vertical: litros." /><p className="text-xs text-muted-foreground">El mate se mantiene separado del agua.</p></> : <p className="py-8 text-sm text-muted-foreground">Registrá agua algunos días para ver la tendencia.</p> : null}
-        {metric === "steps" ? <StepsChart buckets={buckets} values={steps} /> : null}
+        {isPrevious ? <>
+          {metric === "balance" || metric === "steps"
+            ? <ComparisonBarChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} balance={metric === "balance"} description={`Comparación de ${metric === "balance" ? "balance energético" : "pasos"} entre el período actual y el anterior.`} />
+            : metric === "water" && !waterKnown
+              ? <p className="py-8 text-sm text-muted-foreground">No hay agua registrada en estos períodos.</p>
+              : <ComparisonLineChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} description={`Comparación de ${metric === "energy" ? "calorías consumidas" : metric === "protein" ? "proteína" : "agua"} entre el período actual y el anterior.`} />}
+          {metric === "energy" ? <p className="text-xs text-muted-foreground">El resumen compara también objetivo y gasto. El gráfico prioriza el consumo para mantener la lectura clara.</p> : null}
+          {metric === "water" ? <p className="text-xs text-muted-foreground">El mate se mantiene separado del agua.</p> : null}
+        </> : <>
+          {metric === "energy" ? <><ChartLegend series={energy} /><LineChart buckets={buckets} series={energy} unit="kcal" description="Tendencia de energía. Eje horizontal: fecha. Eje vertical: calorías." /></> : null}
+          {metric === "balance" ? <BalanceChart buckets={buckets} values={balance} /> : null}
+          {metric === "protein" ? <><ChartLegend series={protein} /><LineChart buckets={buckets} series={protein} unit="g" description="Tendencia de proteína. Eje horizontal: fecha. Eje vertical: gramos." /></> : null}
+          {metric === "water" ? waterKnown ? <><ChartLegend series={water} /><LineChart buckets={buckets} series={water} unit="L" description="Tendencia de agua. Eje horizontal: fecha. Eje vertical: litros." /><p className="text-xs text-muted-foreground">El mate se mantiene separado del agua.</p></> : <p className="py-8 text-sm text-muted-foreground">Registrá agua algunos días para ver la tendencia.</p> : null}
+          {metric === "steps" ? <StepsChart buckets={buckets} values={steps} /> : null}
+        </>}
       </CardContent>
     </Card>
   </section>;

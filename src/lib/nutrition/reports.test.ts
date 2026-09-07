@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { todayInCordoba } from "../phase2/cordoba-date";
 import {
+  addIsoDays,
   aggregateNutritionReport,
+  buildNutritionReportComparison,
   buildNutritionReportDays,
   completedWorkoutDayLogIds,
   nutritionMealCoverage,
+  nutritionReportRangeDays,
+  previousNutritionReportRange,
   resolveNutritionReportRange,
   subtractCalendarMonthsClamped,
   type NutritionReportDayLogFact,
@@ -112,6 +117,35 @@ describe("nutrition report ranges", () => {
   it("vuelve de forma segura a siete días ante presets inválidos", () => {
     expect(resolveNutritionReportRange({ period: "14" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
     expect(resolveNutritionReportRange({ period: "month" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
+  });
+
+  it.each([
+    [{ start: "2026-09-01", end: "2026-09-07" }, { start: "2026-08-25", end: "2026-08-31" }],
+    [{ start: "2026-01-01", end: "2026-01-15" }, { start: "2025-12-17", end: "2025-12-31" }],
+    [{ start: "2028-03-01", end: "2028-03-03" }, { start: "2028-02-27", end: "2028-02-29" }],
+  ])("crea un período anterior contiguo, sin overlap y de igual duración", (current, previous) => {
+    const result = previousNutritionReportRange(current);
+    expect(result).toEqual(previous);
+    expect(nutritionReportRangeDays(result)).toBe(nutritionReportRangeDays(current));
+    expect(addIsoDays(result.end, 1)).toBe(current.start);
+  });
+
+  it("aplica la misma regla a un rango personalizado recortado a la fecha lógica de Córdoba", () => {
+    const current = resolveNutritionReportRange({
+      period: "custom",
+      from: "2026-08-29",
+      to: "2026-09-12",
+    }, "2026-09-07");
+    expect(current).toMatchObject({ start: "2026-08-29", end: "2026-09-07" });
+    expect(previousNutritionReportRange(current)).toEqual({ start: "2026-08-19", end: "2026-08-28" });
+  });
+
+  it("resuelve el corte diario con America/Argentina/Cordoba antes de armar ambos períodos", () => {
+    const logicalToday = todayInCordoba(new Date("2026-09-07T02:30:00.000Z"));
+    const current = resolveNutritionReportRange({ period: "7" }, logicalToday);
+    expect(logicalToday).toBe("2026-09-06");
+    expect(current).toMatchObject({ start: "2026-08-31", end: "2026-09-06" });
+    expect(previousNutritionReportRange(current)).toEqual({ start: "2026-08-24", end: "2026-08-30" });
   });
 });
 
@@ -250,5 +284,76 @@ describe("nutrition report aggregation", () => {
     });
     expect(aggregateNutritionReport(days).activity.completedWorkoutDays).toBe(1);
     expect(days[1].gymEffective).toBe(true);
+  });
+});
+
+describe("nutrition report temporal comparison", () => {
+  function periodFacts(start: string, end: string, calories: number, balance: number) {
+    const dates: string[] = [];
+    for (let date = start; date <= end; date = addIsoDays(date, 1)) dates.push(date);
+    return {
+      dayLogs: dates.map((date) => day(date, {
+        total_calories_consumed: calories,
+        total_protein_g: calories / 10,
+        total_carbs_g: calories / 8,
+        total_fat_g: calories / 40,
+        energy_balance_kcal: balance,
+        water_l: 2,
+        mate_l: 0.75,
+      })),
+      meals: dates.map((date) => meal(date, {
+        final_calories: calories,
+        final_protein_g: calories / 10,
+        final_carbs_g: calories / 8,
+        final_fat_g: calories / 40,
+      })),
+      dates,
+    };
+  }
+
+  it("compara promedios con promedios, totales con totales y mantiene agua separada de mate", () => {
+    const currentRange = { start: "2026-09-01", end: "2026-09-07" };
+    const previousRange = previousNutritionReportRange(currentRange);
+    const current = periodFacts(currentRange.start, currentRange.end, 2_000, -100);
+    const previous = periodFacts(previousRange.start, previousRange.end, 1_800, -200);
+    const currentDays = buildNutritionReportDays({ ...current, range: currentRange, today: "2026-09-07", workouts: [workout("2026-09-06", "completed")] });
+    const previousDays = buildNutritionReportDays({ ...previous, range: previousRange, today: "2026-09-07", workouts: [] });
+    const comparison = buildNutritionReportComparison({ currentRange, previousRange, currentDays, previousDays });
+    const rows = new Map(comparison.rows.map((row) => [row.metric, row]));
+
+    expect(rows.get("calories")).toMatchObject({ aggregation: "average", current: 2_000, previous: 1_800, delta: 200 });
+    expect(rows.get("energyBalance")).toMatchObject({ aggregation: "total", current: -600, previous: -1_200, delta: 600 });
+    expect(rows.get("water")).toMatchObject({ current: 2, previous: 2 });
+    expect(rows.get("mate")).toMatchObject({ current: 0.75, previous: 0.75 });
+    expect(rows.get("workouts")).toMatchObject({ current: 1, previous: 0, delta: 1 });
+  });
+
+  it("compara un período en curso sólo contra las mismas posiciones finalizadas del anterior", () => {
+    const currentRange = { start: "2026-09-01", end: "2026-09-07" };
+    const previousRange = previousNutritionReportRange(currentRange);
+    const current = periodFacts(currentRange.start, currentRange.end, 2_000, -100);
+    const previous = periodFacts(previousRange.start, previousRange.end, 1_800, -200);
+    const currentDays = buildNutritionReportDays({ ...current, range: currentRange, today: "2026-09-07", workouts: [workout("2026-09-07", "completed")] });
+    const previousDays = buildNutritionReportDays({ ...previous, range: previousRange, today: "2026-09-07", workouts: [workout("2026-08-31", "completed")] });
+    const comparison = buildNutritionReportComparison({ currentRange, previousRange, currentDays, previousDays });
+
+    expect(comparison.currentSummary.completedRegisteredDays).toBe(6);
+    expect(comparison.previousSummary.completedRegisteredDays).toBe(6);
+    expect(comparison.currentSummary.activity.completedWorkoutDays).toBe(0);
+    expect(comparison.previousSummary.activity.completedWorkoutDays).toBe(0);
+    expect(comparison.currentDays).toHaveLength(7);
+    expect(comparison.previousDays).toHaveLength(7);
+  });
+
+  it("conserva null como ausencia y no fabrica deltas", () => {
+    const currentRange = { start: "2026-08-19", end: "2026-08-19" };
+    const previousRange = previousNutritionReportRange(currentRange);
+    const currentDays = buildNutritionReportDays({ range: currentRange, today, dayLogs: [], meals: [], workouts: [] });
+    const previousDays = buildNutritionReportDays({ range: previousRange, today, dayLogs: [], meals: [], workouts: [] });
+    const comparison = buildNutritionReportComparison({ currentRange, previousRange, currentDays, previousDays });
+    const calories = comparison.rows.find((row) => row.metric === "calories");
+    const water = comparison.rows.find((row) => row.metric === "water");
+    expect(calories).toMatchObject({ current: null, previous: null, delta: null });
+    expect(water).toMatchObject({ current: null, previous: null, delta: null });
   });
 });
