@@ -1,6 +1,10 @@
 import "server-only";
 
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
+import {
+  buildHomeActiveSessionSummary,
+  type HomeActiveSessionSummary,
+} from "@/lib/home-dashboard";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 import { todayInCordoba } from "./cordoba-date";
@@ -844,6 +848,16 @@ export type HomeTrainingSnapshot = {
   todaySessions: CompletedSessionSummary[];
 };
 
+type HomeActiveSessionQueryRow = Pick<
+  WorkoutSession,
+  "id" | "routine_name_snapshot" | "session_name" | "started_at"
+> & {
+  day_log: { log_date: string } | Array<{ log_date: string }> | null;
+  exercises: Array<{
+    sets: Array<{ is_completed: boolean }> | null;
+  }> | null;
+};
+
 type HomeTrainingSession = Pick<
   WorkoutSession,
   | "id"
@@ -932,6 +946,36 @@ export function buildHomeTrainingSnapshot(
     currentWeek: weeks[0],
     todaySessions: summarizeCompletedSessions(source, today),
   };
+}
+
+/** Una única proyección acotada aporta el CTA y el progreso de la sesión activa. */
+export async function getHomeActiveTrainingSnapshot(
+  context: AuthenticatedRequestContext,
+): Promise<HomeActiveSessionSummary | null> {
+  const { data, error } = await context.supabase
+    .from("workout_sessions")
+    .select(
+      "id, routine_name_snapshot, session_name, started_at, day_log:day_logs(log_date), exercises:workout_session_exercises(sets:workout_sets(is_completed))",
+    )
+    .eq("user_id", context.userId)
+    .eq("status", "in_progress")
+    .maybeSingle();
+  if (error) throw new Error(`Leer sesión activa de Home: ${error.message}`);
+  if (!data) return null;
+
+  const row = data as HomeActiveSessionQueryRow;
+  const day = firstRelation(row.day_log);
+  if (!day) throw new Error("Leer día de la sesión activa de Home: relación ausente.");
+
+  return buildHomeActiveSessionSummary({
+    session: row,
+    logDate: day.log_date,
+    exercises: (row.exercises ?? []).map((exercise) => ({
+      sets: (exercise.sets ?? []).map((set) => ({
+        isCompleted: set.is_completed,
+      })),
+    })),
+  });
 }
 
 /**

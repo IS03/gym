@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = (path: string) => readFileSync(path, "utf8");
-const home = source("src/app/(app)/home/page.tsx");
+const homeDashboard = source("src/components/home/home-dashboard.tsx");
 const library = source("src/app/(app)/train/exercises/exercise-library.tsx");
 const today = source("src/app/(app)/today/page.tsx");
 const mealComposer = source("src/app/(app)/today/meal-composer.tsx");
@@ -13,23 +13,27 @@ const responsiveDialog = source("src/app/(app)/today/responsive-dialog.tsx");
 
 describe("PR 9.6 — UX diaria mobile", () => {
   it("alinea todos los accesos rápidos mediante el componente común", () => {
-    const quickAccess = home.slice(home.indexOf("function QuickAccess"), home.indexOf("function plural"));
-    expect(quickAccess).toContain("grid-rows-[2.25rem_1fr]");
-    expect(quickAccess).toContain("pt-2.5");
-    expect(quickAccess).toContain("mt-1.5");
-    expect(quickAccess).toContain("text-[11px]");
-    expect(quickAccess).toContain("sm:text-xs");
+    const quickAccess = homeDashboard.slice(
+      homeDashboard.indexOf("function QuickAccess("),
+      homeDashboard.indexOf("function QuickAccesses"),
+    );
+    expect(quickAccess).toContain("flex min-h-24");
+    expect(quickAccess).toContain("items-start gap-3");
+    expect(quickAccess).toContain("text-xs leading-snug");
     expect(quickAccess).not.toContain("Nutrición");
   });
 
   it("conserva los cuatro accesos, sus destinos y su contenido", () => {
-    const quickAccess = home.slice(home.indexOf("function QuickAccess"), home.indexOf("function plural"));
+    const quickAccess = homeDashboard.slice(
+      homeDashboard.indexOf("function QuickAccess("),
+      homeDashboard.indexOf("function QuickAccesses"),
+    );
 
     expect(quickAccess).toContain("<Icon");
     expect(quickAccess).toContain("{title}");
     expect(quickAccess).toContain("{description}");
-    for (const href of ["/today", "/train/routines", "/train/calendar", "/progress"]) {
-      expect(home).toContain(`href=\"${href}\"`);
+    for (const href of ["/train/routines", "/calendar", "/train/body", "/history"]) {
+      expect(homeDashboard).toContain(`href=\"${href}\"`);
     }
   });
 

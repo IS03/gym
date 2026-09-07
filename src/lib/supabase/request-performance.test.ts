@@ -17,7 +17,7 @@ describe("request-scoped authenticated reads", () => {
     expect(home).toContain("const auth = await requireAuthenticatedRequestContext()");
     expect(home).toContain("getMyProfile(auth)");
     expect(home).toContain("getNutritionDaySummary(today, auth)");
-    expect(home).toContain("getInProgressSessionForUser(auth)");
+    expect(home).toContain("getHomeActiveTrainingSnapshot(auth)");
     expect(home).toContain("getHomeTrainingSnapshot(today, auth)");
     expect(home).toContain("listWorkoutStartRoutines(auth)");
     expect(home).not.toContain("getTrainingProgress(");
@@ -49,6 +49,9 @@ describe("request-scoped authenticated reads", () => {
     expect(nutritionDay).toContain('.select("id", { count: "exact", head: true })');
     expect(robustTraining).toContain(
       '"id, day_log_id, routine_id, routine_name_snapshot, session_name, status, started_at, ended_at, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(id, workout_session_id, is_completed, muscle_group_label_snapshot, grupo_muscular_snapshot, sets:workout_sets(workout_session_exercise_id, actual_reps, actual_weight_kg, is_completed))"',
+    );
+    expect(robustTraining).toContain(
+      '"id, routine_name_snapshot, session_name, started_at, day_log:day_logs(log_date), exercises:workout_session_exercises(sets:workout_sets(is_completed))"',
     );
     expect(robustTraining).not.toContain(
       '"*, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(*, sets:workout_sets(*))"',
