@@ -1,6 +1,7 @@
 import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "./muscle-groups";
 import { addUtcDays, buildWeeklyTrainingSummaries, formatTrainingMinutes } from "./training-progress-summary";
 import { normalizeExerciseSearch } from "./exercise-library";
+import { normalizeDisplayZero } from "../chart-core";
 import type { Routine, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 export const TRAINING_ANALYSIS_PERIODS = [
@@ -229,21 +230,32 @@ export function trainingAnalysisMetricValue(summary: TrainingAnalysisSummary, me
 }
 
 export function formatTrainingVolumeKg(value: number, options?: { compactAxis?: boolean }): string {
-  const normalized = Number.isFinite(value) ? value : 0;
-  const sign = normalized < 0 ? "−" : "";
-  const absolute = Math.abs(normalized);
+  const finite = Number.isFinite(value) ? value : 0;
+  const absolute = Math.abs(finite);
   if (absolute >= 1_000) {
     const digits = options?.compactAxis ? 0 : 1;
-    const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: digits }).format(absolute / 1_000);
+    const normalized = normalizeDisplayZero(finite / 1_000, digits);
+    const sign = normalized < 0 ? "−" : "";
+    const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: digits }).format(Math.abs(normalized));
     return `${sign}${formatted} mil kg`;
   }
-  return `${sign}${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(absolute)} kg`;
+  const normalized = normalizeDisplayZero(finite);
+  const sign = normalized < 0 ? "−" : "";
+  return `${sign}${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.abs(normalized))} kg`;
+}
+
+export function formatTrainingSessions(value: number): string {
+  const normalized = normalizeDisplayZero(value);
+  const sign = normalized < 0 ? "−" : "";
+  const absolute = Math.abs(normalized);
+  return `${sign}${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(absolute)} ${absolute === 1 ? "sesión" : "sesiones"}`;
 }
 
 export function formatTrainingAnalysisMetric(value: number, metric: TrainingAnalysisMetric): string {
   if (metric === "minutes") return formatTrainingMinutes(value);
   if (metric === "volume") return formatTrainingVolumeKg(value);
-  return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.max(0, value))} ${metric === "sets" ? "series" : "sesiones"}`;
+  if (metric === "sessions") return formatTrainingSessions(value);
+  return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Math.max(0, value))} series`;
 }
 
 export function filterTrainingAnalysisExercises(

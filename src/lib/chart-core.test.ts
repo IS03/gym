@@ -18,6 +18,9 @@ describe("chart display helpers", () => {
     expect(formatChartValue(2.25, "L")).toBe("2,25 L");
     expect(formatChartValue(9000, "pasos")).toBe("9.000 pasos");
     expect(formatChartValue(-0, "kcal")).toBe("0 kcal");
+    expect(formatChartValue(-0.001, "kg")).toBe("0 kg");
+    expect(formatChartValue(0.001, "kg")).toBe("0 kg");
+    expect(formatChartValue(-0.01, "kg")).toBe("-0,01 kg");
   });
 
   it("samples long X axes and preserves null gaps instead of turning them into zero", () => {
