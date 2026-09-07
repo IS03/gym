@@ -10,7 +10,7 @@ const preview = source("src/components/training/training-month-preview.tsx");
 
 describe("navegación del calendario global", () => {
   it("mantiene el calendario global como navegación temporal hacia History", () => {
-    expect(page).toContain('href={`/history?date=${day.date}`}');
+    expect(page).toContain('dailyHistoryDetailHref(day.date, { source: "calendar", month })');
     expect(loader).toContain("buildMonthGrid");
     expect(page).toContain("aria-disabled=\"true\"");
   });

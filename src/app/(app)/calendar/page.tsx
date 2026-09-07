@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { getGlobalCalendar } from "@/lib/calendar/global-calendar";
 import { addMonths, formatMonthLabel, isoMonth, resolveCalendarMonth } from "@/lib/calendar/month";
+import { dailyHistoryDetailHref } from "@/lib/history/daily-history-navigation";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { getVerifiedRequestContext } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -67,7 +68,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
               const aria = `${formatAriaDate(day.date)}${isToday ? ", hoy" : ""}${isFuture ? ". Fecha futura." : present.length ? `. ${present.join(", ")}.` : ". Sin registros."}`;
               const contents = <><span>{day.date.slice(8, 10)}</span><span className="mt-1 flex h-1.5 items-center justify-center gap-0.5" aria-hidden>{signals.filter((signal) => day[signal.key]).map((signal) => <span key={signal.key} className={cn("size-1.5 rounded-full", signal.className)} />)}</span></>;
               const classes = cn("flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg text-xs font-medium leading-none outline-none transition-colors sm:min-h-14", !day.inMonth && "text-muted-foreground/45", day.inMonth && !isToday && !isFuture && "hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring", isToday && "bg-primary/10 text-primary ring-1 ring-primary/50", isFuture && "cursor-not-allowed text-muted-foreground/35");
-              return isFuture ? <span key={day.date} aria-disabled="true" aria-label={aria} className={classes}>{contents}</span> : <Link key={day.date} href={`/history?date=${day.date}`} aria-label={aria} className={classes}>{contents}</Link>;
+              return isFuture ? <span key={day.date} aria-disabled="true" aria-label={aria} className={classes}>{contents}</span> : <Link key={day.date} href={dailyHistoryDetailHref(day.date, { source: "calendar", month })} aria-label={aria} className={classes}>{contents}</Link>;
             })}
           </div>
           <p className="text-center text-xs text-muted-foreground">Tocá un día para ver el historial completo.</p>
