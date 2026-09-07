@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, previousTrainingAnalysisPeriodRange, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT, trainingAnalysisPeriodRange, type TrainingAnalysisPeriod } from "./training-analysis";
+import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingSessions, formatTrainingVolumeKg, isTrainingAnalysisPeriod, previousTrainingAnalysisPeriodRange, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT, trainingAnalysisPeriodRange, type TrainingAnalysisPeriod } from "./training-analysis";
 import { trainingAnalysisComparisonPath, trainingAnalysisCurrentPath, trainingAnalysisExercisePath, trainingAnalysisSelfComparisonPath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
 import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
@@ -187,8 +187,22 @@ describe("training analysis", () => {
     expect(formatTrainingVolumeKg(67_500)).toBe("67,5 mil kg");
     expect(formatTrainingVolumeKg(163_900)).toBe("163,9 mil kg");
     expect(formatTrainingVolumeKg(-41_900)).toBe("−41,9 mil kg");
+    expect(formatTrainingVolumeKg(0)).toBe("0 kg");
+    expect(formatTrainingVolumeKg(-0)).toBe("0 kg");
+    expect(formatTrainingVolumeKg(-0.4)).toBe("0 kg");
+    expect(formatTrainingVolumeKg(0.4)).toBe("0 kg");
+    expect(formatTrainingVolumeKg(-5)).toBe("−5 kg");
     expect(formatTrainingAnalysisMetric(12_900, "volume")).toBe("12,9 mil kg");
     expect(formatTrainingAnalysisMetric(0, "sets")).toBe("0 series");
+  });
+
+  it("pluralizes sessions by absolute value, including comparison deltas", () => {
+    expect(formatTrainingSessions(1)).toBe("1 sesión");
+    expect(formatTrainingSessions(-1)).toBe("−1 sesión");
+    expect(formatTrainingSessions(0)).toBe("0 sesiones");
+    expect(formatTrainingSessions(2)).toBe("2 sesiones");
+    expect(formatTrainingSessions(-2)).toBe("−2 sesiones");
+    expect(formatTrainingAnalysisMetric(-1, "sessions")).toBe("−1 sesión");
   });
 
   it("filters the exercise finder by normalized search, routine and muscle without changing historical data", () => {

@@ -76,9 +76,19 @@ export function chartYAxisTicks(domain: ChartDomain, count = 4): number[] {
   return Array.from({ length: count }, (_, index) => domain.max - ((domain.max - domain.min) * index) / (count - 1));
 }
 
+/**
+ * Keeps display rounding from leaking a negative zero into labels. It only
+ * normalizes a value when the configured formatter would render it as zero.
+ */
+export function normalizeDisplayZero(value: number, maximumFractionDigits = 0): number {
+  if (!Number.isFinite(value)) return value;
+  const scale = 10 ** maximumFractionDigits;
+  return Math.round(value * scale) === 0 ? 0 : value;
+}
+
 export function formatChartValue(value: number, unit: ChartUnit): string {
   const decimals = unit === "L" || unit === "kg" || unit === "cm" ? 2 : 0;
-  const normalized = Object.is(value, -0) || Math.abs(value) < 1e-9 ? 0 : value;
+  const normalized = normalizeDisplayZero(value, decimals);
   const formatted = new Intl.NumberFormat("es-AR", { maximumFractionDigits: decimals }).format(normalized);
   if (unit === "pasos" || unit === "reps") return `${formatted} ${unit === "reps" ? "reps" : "pasos"}`;
   if (unit === "sesiones") return `${formatted} sesiones`;
