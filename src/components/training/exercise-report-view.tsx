@@ -23,9 +23,11 @@ import { formatTrainingVolumeKg } from "@/lib/phase2/training-analysis";
 import type { TrainingComparison } from "@/lib/phase2/training-comparison";
 import {
   buildExerciseReportPoints,
+  buildExercisePerformance,
   completedExerciseSets,
   selectedExerciseReportPointIndex,
   summarizeExerciseReport,
+  type ExercisePerformanceMark,
   type ExerciseReportPoint,
   type ExerciseReportSession,
 } from "@/lib/phase2/exercise-insights";
@@ -43,6 +45,39 @@ function metricValue(point: ExerciseReportPoint, metric: ChartMetric) { return m
 function metricLabel(metric: ChartMetric) { return metric === "weight" ? "Peso" : metric === "reps" ? "Reps" : "Volumen"; }
 function metricDisplay(value: number | null, metric: ChartMetric) { return value === null ? "—" : metric === "weight" ? number(value, " kg") : metric === "volume" ? formatTrainingVolumeKg(value) : number(value); }
 function chartUnit(metric: ChartMetric): ChartUnit { return metric === "weight" || metric === "volume" ? "kg" : "reps"; }
+
+function performanceValue(mark: ExercisePerformanceMark): string {
+  if (mark.kind === "weight") return number(mark.weightKg, " kg");
+  if (mark.kind === "volume") return formatTrainingVolumeKg(mark.value);
+  return mark.reps === null || mark.weightKg === null ? "—" : `${number(mark.reps)} reps × ${number(mark.weightKg)} kg`;
+}
+
+function performanceDescription(mark: ExercisePerformanceMark): string {
+  const when = date(mark.logDate);
+  if (mark.kind === "weight") return mark.reps === null ? when : `${number(mark.reps)} reps · ${when}`;
+  if (mark.kind === "volume") return `${mark.completedSets ?? 0} ${(mark.completedSets ?? 0) === 1 ? "serie" : "series"} · ${when}`;
+  return when;
+}
+
+function performanceLabel(mark: ExercisePerformanceMark): string {
+  if (mark.kind === "weight") return "Mejor peso";
+  if (mark.kind === "volume") return "Mejor volumen";
+  return "Mejores reps con carga";
+}
+
+function ExercisePerformanceSection({ sessions }: { sessions: ExerciseReportSession[] }) {
+  const performance = useMemo(() => buildExercisePerformance(sessions), [sessions]);
+  const marks = [performance.bestWeight, performance.bestVolume, performance.bestReps].filter((mark): mark is ExercisePerformanceMark => mark !== null);
+  if (marks.length === 0) return null;
+
+  return <section className="space-y-3" aria-labelledby="exercise-performance-title">
+    <div><h2 id="exercise-performance-title" className="text-lg font-semibold">Rendimiento</h2><p className="mt-1 text-sm text-muted-foreground">Marcas personales de sesiones finalizadas.</p></div>
+    <dl className="overflow-hidden rounded-xl border divide-y divide-border/70">
+      {marks.map((mark) => <div key={mark.kind} className="flex min-h-14 items-center justify-between gap-4 px-3 py-3"><dt className="min-w-0 text-sm text-muted-foreground">{performanceLabel(mark)}<span className="mt-0.5 block text-xs">{performanceDescription(mark)}</span></dt><dd className="metric-number shrink-0 text-right text-sm font-semibold">{performanceValue(mark)}</dd></div>)}
+    </dl>
+    {performance.recentMarks.length > 0 && <div className="space-y-1"><h3 className="text-sm font-semibold">Marcas recientes</h3><ul className="divide-y divide-border/70">{performance.recentMarks.map((mark) => <li key={`${mark.kind}-${mark.sessionId}`} className="flex min-h-10 items-center justify-between gap-3 py-2 text-sm"><span className="min-w-0 truncate text-muted-foreground">{date(mark.logDate)} · {performanceLabel(mark)}</span><span className="metric-number shrink-0 font-medium">{performanceValue(mark)}</span></li>)}</ul></div>}
+  </section>;
+}
 
 function EvolutionChart({ points, metric }: { points: ExerciseReportPoint[]; metric: ChartMetric }) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -81,9 +116,9 @@ function EvolutionMode({ isPrevious, currentHref, previousHref }: { isPrevious: 
 }
 
 export function ExerciseReportView({
-  exerciseId, exerciseName, muscleLabel, period, routineId, routines, sessions, backHref, backLabel, source, progressContext, range, comparison,
+  exerciseId, exerciseName, muscleLabel, period, routineId, routines, sessions, performanceSessions, backHref, backLabel, source, progressContext, range, comparison,
 }: {
-  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null };
+  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; performanceSessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null };
 }) {
   const summary = useMemo(() => summarizeExerciseReport(sessions), [sessions]);
   const points = useMemo(() => buildExerciseReportPoints(sessions), [sessions]);
@@ -129,6 +164,7 @@ export function ExerciseReportView({
   return <div className="space-y-5 lg:mx-auto lg:max-w-6xl">
     <div className="space-y-3"><Link href={backHref} className="inline-flex items-center text-sm font-medium text-primary hover:underline">← {backLabel}</Link><div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">{exerciseName}</h1><p className="mt-1 text-sm text-muted-foreground">{muscleLabel ?? "Sin grupo"}</p><p className="mt-1 text-sm font-medium text-muted-foreground">{rangeLabel(range) ? `${periodLabel} · ${rangeLabel(range)}` : periodLabel}</p></div><div className="grid gap-2 sm:grid-cols-2"><label className="space-y-1 text-xs font-medium text-muted-foreground">Período<select value={period} onChange={(event) => updateFilter(event.target.value, currentRoutine)} className="mt-1 h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">{PERIOD_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>{!crossComparison && <label className="space-y-1 text-xs font-medium text-muted-foreground">Rutina histórica<select value={currentRoutine} onChange={(event) => updateFilter(period, event.target.value)} className="mt-1 h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="all">Todas las rutinas</option>{routines.map((routine) => <option key={routine.id} value={routine.id}>{routine.nombre}</option>)}</select></label>}</div></div>
     {crossComparison ? <TrainingComparisonWorkspace comparison={crossComparison} backLabel={exerciseName} exitHref={comparisonExitHref} selectionPath={comparisonSelectionPath} /> : <>{sessions.length === 0 ? <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No hay sesiones completadas para este período.</CardContent></Card> : <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen del ejercicio">{[{ label: "Sesiones", value: String(summary.sessions) }, { label: "Mejor peso", value: number(summary.bestWeightKg, " kg") }, { label: "Mejor última sesión", value: number(summary.latestBestWeightKg, " kg") }, { label: "Volumen del período", value: formatTrainingVolumeKg(summary.totalVolumeKg) }].map((item) => <Card key={item.label}><CardContent className="py-4"><p className="text-xs text-muted-foreground">{item.label}</p><p className="metric-number mt-1 text-lg font-semibold">{item.value}</p></CardContent></Card>)}</section>}
+      <ExercisePerformanceSection sessions={performanceSessions} />
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]"><Card><CardContent className="space-y-4 pt-5"><div className="space-y-3"><div><h2 className="text-lg font-semibold">Evolución</h2><p className="text-sm text-muted-foreground">Mejor peso, máximas reps o volumen por sesión.</p></div><EvolutionMode isPrevious={Boolean(selfComparison)} currentHref={comparisonExitHref} previousHref={selfComparisonHref} /></div>{selfComparison ? <TrainingSelfComparisonContent comparison={selfComparison} /> : <><div className="mx-auto grid w-full max-w-sm grid-cols-3 rounded-lg border bg-muted/25 p-1" aria-label="Métrica del gráfico">{(["weight", "reps", "volume"] as ChartMetric[]).map((value) => <Button key={value} type="button" size="sm" className="h-9 min-w-0 px-1 text-[11px] sm:text-xs" variant={metric === value ? "default" : "ghost"} onClick={() => setMetric(value)}>{metricLabel(value)}</Button>)}</div><EvolutionChart points={points} metric={metric} /></>}</CardContent></Card><Card><CardContent className="pt-5"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Próxima sesión</p><p className="mt-2 text-lg font-semibold">{summary.latestDecision ? ADJUSTMENT_LABELS[summary.latestDecision] : "—"}</p>{summary.latestDecision && <p className="mt-1 text-xs text-muted-foreground">Según la decisión registrada en la última sesión.</p>}{difference !== null && <p className="metric-number mt-3 text-sm text-muted-foreground">{difference > 0 ? `+${number(difference)} kg` : difference < 0 ? `${number(difference)} kg` : "Mismo peso"} vs sesión anterior</p>}</CardContent></Card></section>
       {sessions.length > 0 && <section className="space-y-3"><div><h2 className="text-lg font-semibold">Sesiones</h2><p className="text-sm text-muted-foreground">La más reciente queda abierta; los objetivos son el snapshot de cada día.</p></div><ReportSessions sessions={sessions} /></section>}
       {crossComparisonHref && <section className="space-y-1 border-t border-border/70 pt-4"><h2 className="text-base font-semibold tracking-tight">Otras comparaciones</h2><Link href={crossComparisonHref} className="inline-flex min-h-10 items-center text-sm font-medium text-primary hover:underline">Comparar con otro ejercicio</Link></section>}</>}

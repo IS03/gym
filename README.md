@@ -19,7 +19,7 @@ OWNLEVEL es una PWA personal de seguimiento físico que centraliza entrenamiento
 - Registro de peso, repeticiones, RIR objetivo, descansos y series completadas.
 - Draft local y autosave no bloqueante durante el entrenamiento.
 - Historial de sesiones y corrección controlada de registros completados.
-- Historial y progreso por ejercicio.
+- Historial, progreso y marcas personales por ejercicio.
 - Calendario de entrenamiento, continuidad y reportes semanales.
 - Recordatorios de progresión para la próxima sesión.
 

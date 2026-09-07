@@ -714,7 +714,7 @@ export async function listRobustExerciseHistory(input: {
   limit?: number;
 }): Promise<RobustExerciseHistoryItem[]> {
   const { supabase, userId } = await getAuthedContext();
-  const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 500);
   let daysQuery = supabase
     .from("day_logs")
     .select("id, log_date")

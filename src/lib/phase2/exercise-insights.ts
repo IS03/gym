@@ -73,6 +73,8 @@ export type ExerciseReportSet = Pick<
 export type ExerciseReportSession = {
   sessionId: string;
   logDate: string;
+  /** Stable chronological tie-breaker when two sessions share the same logical day. */
+  completedAt?: string | null;
   routineId: string | null;
   routineName: string;
   decision: TrainingAdjustment;
@@ -87,12 +89,136 @@ export type ExerciseReportPoint = {
   volumeKg: number;
 };
 
+export type ExercisePerformanceMarkKind = "weight" | "volume" | "reps";
+
+/**
+ * A mark is always derived from a completed historical session. Repetitions
+ * intentionally retain their associated load so a high-rep, low-load set is
+ * never presented without context.
+ */
+export type ExercisePerformanceMark = {
+  kind: ExercisePerformanceMarkKind;
+  sessionId: string;
+  logDate: string;
+  completedAt: string | null;
+  value: number;
+  weightKg: number | null;
+  reps: number | null;
+  completedSets: number | null;
+};
+
+export type ExercisePerformance = {
+  bestWeight: ExercisePerformanceMark | null;
+  bestVolume: ExercisePerformanceMark | null;
+  bestReps: ExercisePerformanceMark | null;
+  /** Strict improvements only; tied marks do not create duplicate events. */
+  recentMarks: ExercisePerformanceMark[];
+};
+
 function finiteNumber(value: number | null): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function completedExerciseSets(sets: readonly ExerciseReportSet[]): ExerciseReportSet[] {
   return sets.filter((set) => set.is_completed);
+}
+
+function chronologicalSessions(sessions: readonly ExerciseReportSession[]): ExerciseReportSession[] {
+  return [...sessions].sort((left, right) => {
+    const leftKey = left.completedAt ?? `${left.logDate}T12:00:00.000Z`;
+    const rightKey = right.completedAt ?? `${right.logDate}T12:00:00.000Z`;
+    return leftKey.localeCompare(rightKey) || left.sessionId.localeCompare(right.sessionId);
+  });
+}
+
+type LoadedSet = { reps: number; weightKg: number };
+
+function loadedCompletedSets(sets: readonly ExerciseReportSet[]): LoadedSet[] {
+  return completedExerciseSets(sets).flatMap((set) => {
+    const reps = finiteNumber(set.actual_reps);
+    const weightKg = finiteNumber(set.actual_weight_kg);
+    // PR39 deliberately avoids records from bodyweight/assisted or incomplete
+    // data until the model can distinguish their semantics reliably.
+    return reps !== null && reps > 0 && weightKg !== null && weightKg > 0
+      ? [{ reps, weightKg }]
+      : [];
+  });
+}
+
+function markForSession(
+  session: ExerciseReportSession,
+  kind: ExercisePerformanceMarkKind,
+): ExercisePerformanceMark | null {
+  const loaded = loadedCompletedSets(session.sets);
+  if (loaded.length === 0) return null;
+
+  if (kind === "weight") {
+    const best = [...loaded].sort((left, right) => right.weightKg - left.weightKg || right.reps - left.reps)[0]!;
+    return { kind, sessionId: session.sessionId, logDate: session.logDate, completedAt: session.completedAt ?? null, value: best.weightKg, weightKg: best.weightKg, reps: best.reps, completedSets: loaded.length };
+  }
+
+  if (kind === "reps") {
+    const best = [...loaded].sort((left, right) => right.reps - left.reps || right.weightKg - left.weightKg)[0]!;
+    return { kind, sessionId: session.sessionId, logDate: session.logDate, completedAt: session.completedAt ?? null, value: best.reps, weightKg: best.weightKg, reps: best.reps, completedSets: loaded.length };
+  }
+
+  const value = loaded.reduce((total, set) => total + set.reps * set.weightKg, 0);
+  return value > 0
+    ? { kind, sessionId: session.sessionId, logDate: session.logDate, completedAt: session.completedAt ?? null, value, weightKg: null, reps: null, completedSets: loaded.length }
+    : null;
+}
+
+function markSortKey(mark: ExercisePerformanceMark): string {
+  return `${mark.completedAt ?? `${mark.logDate}T12:00:00.000Z`}:${mark.sessionId}`;
+}
+
+function newestBest(
+  current: ExercisePerformanceMark | null,
+  candidate: ExercisePerformanceMark,
+): ExercisePerformanceMark {
+  if (!current || candidate.value > current.value) return candidate;
+  if (candidate.value < current.value) return current;
+  return markSortKey(candidate) >= markSortKey(current) ? candidate : current;
+}
+
+/**
+ * Deterministic performance read model for one exercise. It uses completed
+ * snapshot sets only. Ties display the most recent occurrence; PR events are
+ * emitted solely for strict all-time improvements.
+ */
+export function buildExercisePerformance(
+  sessions: readonly ExerciseReportSession[],
+): ExercisePerformance {
+  const best: Record<ExercisePerformanceMarkKind, ExercisePerformanceMark | null> = {
+    weight: null,
+    volume: null,
+    reps: null,
+  };
+  const eventMaximum: Record<ExercisePerformanceMarkKind, number | null> = {
+    weight: null,
+    volume: null,
+    reps: null,
+  };
+  const events: ExercisePerformanceMark[] = [];
+
+  for (const session of chronologicalSessions(sessions)) {
+    for (const kind of ["weight", "volume", "reps"] as const) {
+      const candidate = markForSession(session, kind);
+      if (!candidate) continue;
+      best[kind] = newestBest(best[kind], candidate);
+      if (eventMaximum[kind] === null || candidate.value > eventMaximum[kind]) {
+        eventMaximum[kind] = candidate.value;
+        events.push(candidate);
+      }
+    }
+  }
+
+  return {
+    bestWeight: best.weight,
+    bestVolume: best.volume,
+    bestReps: best.reps,
+    recentMarks: events.sort((left, right) => markSortKey(right).localeCompare(markSortKey(left))).slice(0, 3),
+  };
 }
 
 export function bestWeightForSession(sets: readonly ExerciseReportSet[]): number | null {
@@ -138,8 +264,7 @@ export function summarizeLatestExercisePerformance(
 export function buildExerciseReportPoints(
   sessions: readonly ExerciseReportSession[],
 ): ExerciseReportPoint[] {
-  return [...sessions]
-    .sort((left, right) => left.logDate.localeCompare(right.logDate))
+  return chronologicalSessions(sessions)
     .map((session) => ({
       sessionId: session.sessionId,
       logDate: session.logDate,
