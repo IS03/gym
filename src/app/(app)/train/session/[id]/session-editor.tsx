@@ -16,6 +16,7 @@ import {
   Check,
   ChevronDown,
   Clock3,
+  History,
   Info,
   LoaderCircle,
   Minus,
@@ -96,6 +97,8 @@ import {
 import { AddExerciseSheet } from "./add-exercise-sheet";
 import { CompletedSessionActions } from "./completed-session-actions";
 import { WorkoutFinishedDialog } from "./workout-finished-dialog";
+import { QuickExerciseHistorySheet } from "./quick-exercise-history-sheet";
+import type { ExerciseReportSession } from "@/lib/phase2/exercise-insights";
 
 const NEXT_SESSION_DECISIONS: Array<{
   value: SelectableTrainingDecision;
@@ -378,6 +381,7 @@ function metadataInput(
 export function SessionEditor({
   detail,
   libraryExercises,
+  recentHistoryByExerciseId,
 }: {
   detail: WorkoutSessionClientDetail;
   libraryExercises: Array<{
@@ -388,6 +392,7 @@ export function SessionEditor({
     implement: string | null;
     weight_mode: string | null;
   }>;
+  recentHistoryByExerciseId: Record<string, ExerciseReportSession[]>;
 }) {
   const router = useRouter();
   const readOnly = detail.session.status !== "in_progress";
@@ -453,6 +458,7 @@ export function SessionEditor({
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
   const [editingNoteExerciseId, setEditingNoteExerciseId] = useState<string | null>(null);
+  const [quickHistoryExerciseId, setQuickHistoryExerciseId] = useState<string | null>(null);
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const autosaveRef = useRef<ExerciseAutosaveQueue<WorkoutExercisePayload> | null>(null);
@@ -569,6 +575,9 @@ export function SessionEditor({
       exercise.id === selectedExerciseId &&
       !sessionExerciseLibraryIds.has(exercise.id),
   );
+  const quickHistoryExercise = detail.exercises.find(
+    (exercise) => exercise.id === quickHistoryExerciseId,
+  ) ?? null;
 
   const baseMetadata = useMemo(
     () => sessionMetadataFromSession(detail.session),
@@ -1144,6 +1153,16 @@ export function SessionEditor({
           pending={globalPending}
         />
       ) : null}
+      {quickHistoryExercise ? (
+        <QuickExerciseHistorySheet
+          open
+          onOpenChange={(open) => {
+            if (!open) setQuickHistoryExerciseId(null);
+          }}
+          exerciseName={quickHistoryExercise.nombre_snapshot}
+          sessions={recentHistoryByExerciseId[quickHistoryExercise.exercise_id] ?? []}
+        />
+      ) : null}
 
       <section className="space-y-3">
         <div className="flex min-h-9 items-center justify-between gap-3">
@@ -1394,6 +1413,24 @@ export function SessionEditor({
                       />
                     ))}
                   </div>
+
+                  {!readOnly ? (
+                    <Button
+                      className="h-9 self-start"
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={interactionLocked}
+                      onClick={() => {
+                        const activeElement = document.activeElement;
+                        if (activeElement instanceof HTMLElement) activeElement.blur();
+                        setQuickHistoryExerciseId(exercise.id);
+                      }}
+                    >
+                      <History className="size-3.5" aria-hidden />
+                      Últimas veces
+                    </Button>
+                  ) : null}
 
                   {restLabel ? (
                     <div className="flex min-h-9 items-center justify-between gap-3 px-1">

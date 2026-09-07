@@ -40,6 +40,8 @@ describe("request-scoped authenticated reads", () => {
     expect(session).toContain("const [detail, exercises] = await Promise.all([");
     expect(session).toContain("getWorkoutSessionDetail(id, auth)");
     expect(session).toContain("listExercises({ includeArchived: false }, auth)");
+    expect(session).toContain("listRecentRobustExerciseHistoryByExercise({");
+    expect(session).toContain("}, auth)");
   });
 
   it("keeps Home payloads bounded to a meal count and summary columns", () => {

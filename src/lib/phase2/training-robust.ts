@@ -706,15 +706,20 @@ export type RobustExerciseHistoryItem = {
   exercise: WorkoutSessionExerciseDetail;
 };
 
-export async function listRobustExerciseHistory(input: {
-  exerciseId: string;
+type RobustExerciseHistoryQuery = {
+  exerciseIds: readonly string[];
   fromDate?: string;
   toDate?: string;
   routineId?: string;
-  limit?: number;
-}): Promise<RobustExerciseHistoryItem[]> {
-  const { supabase, userId } = await getAuthedContext();
-  const limit = Math.min(Math.max(input.limit ?? 20, 1), 500);
+};
+
+async function queryRobustExerciseHistory(
+  input: RobustExerciseHistoryQuery,
+  context?: AuthenticatedRequestContext,
+): Promise<RobustExerciseHistoryItem[]> {
+  const exerciseIds = [...new Set(input.exerciseIds)];
+  if (exerciseIds.length === 0) return [];
+  const { supabase, userId } = context ?? await getAuthedContext();
   let daysQuery = supabase
     .from("day_logs")
     .select("id, log_date")
@@ -746,7 +751,7 @@ export async function listRobustExerciseHistory(input: {
     .from("workout_session_exercises")
     .select("*, sets:workout_sets(*)")
     .eq("user_id", userId)
-    .eq("exercise_id", input.exerciseId)
+    .in("exercise_id", exerciseIds)
     .eq("is_completed", true)
     .in("workout_session_id", sessions.map((session) => session.id));
   if (exerciseError) throw new Error(`Leer historial del ejercicio: ${exerciseError.message}`);
@@ -768,8 +773,49 @@ export async function listRobustExerciseHistory(input: {
       if (!logDate) return [];
       return [{ session, logDate, exercise }];
     })
-    .sort((left, right) => right.logDate.localeCompare(left.logDate))
-    .slice(0, limit);
+    .sort(
+      (left, right) =>
+        (right.session.ended_at ?? right.logDate).localeCompare(left.session.ended_at ?? left.logDate) ||
+        right.session.id.localeCompare(left.session.id),
+    );
+}
+
+export async function listRobustExerciseHistory(input: {
+  exerciseId: string;
+  fromDate?: string;
+  toDate?: string;
+  routineId?: string;
+  limit?: number;
+}): Promise<RobustExerciseHistoryItem[]> {
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 500);
+  const items = await queryRobustExerciseHistory({
+    exerciseIds: [input.exerciseId],
+    fromDate: input.fromDate,
+    toDate: input.toDate,
+    routineId: input.routineId,
+  });
+  return items.slice(0, limit);
+}
+
+/**
+ * Read the recent completed snapshot sessions for every exercise in an active
+ * workout with three database reads, rather than one history query per card.
+ */
+export async function listRecentRobustExerciseHistoryByExercise(input: {
+  exerciseIds: readonly string[];
+  limitPerExercise?: number;
+}, context?: AuthenticatedRequestContext): Promise<Record<string, RobustExerciseHistoryItem[]>> {
+  const exerciseIds = [...new Set(input.exerciseIds)];
+  const result = Object.fromEntries(exerciseIds.map((exerciseId) => [exerciseId, [] as RobustExerciseHistoryItem[]]));
+  if (exerciseIds.length === 0) return result;
+
+  const limit = Math.min(Math.max(input.limitPerExercise ?? 5, 1), 5);
+  const items = await queryRobustExerciseHistory({ exerciseIds }, context);
+  for (const item of items) {
+    const bucket = result[item.exercise.exercise_id];
+    if (bucket && bucket.length < limit) bucket.push(item);
+  }
+  return result;
 }
 
 export async function listRobustExerciseHistoryRoutineOptions(exerciseId: string) {

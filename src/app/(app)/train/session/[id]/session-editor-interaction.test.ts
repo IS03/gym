@@ -9,6 +9,10 @@ const addExerciseSheet = readFileSync(
   "src/app/(app)/train/session/[id]/add-exercise-sheet.tsx",
   "utf8",
 );
+const quickHistorySheet = readFileSync(
+  "src/app/(app)/train/session/[id]/quick-exercise-history-sheet.tsx",
+  "utf8",
+);
 
 describe("PR 14 — interacción de sesión", () => {
   it("ancla la card con layout effect y compensación, sin scrollIntoView", () => {
@@ -83,6 +87,21 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).toContain("bg-destructive/80");
     expect(editor).toContain('variant="destructive"');
     expect(editor).toContain("Cancelar entrenamiento");
+  });
+
+  it("abre últimas veces como una consulta local sin convertirla en otro ejercicio abierto", () => {
+    expect(editor).toContain("<QuickExerciseHistorySheet");
+    expect(editor).toContain("setQuickHistoryExerciseId(exercise.id)");
+    expect(editor).toContain("Últimas veces");
+    expect(editor).not.toContain("toggleExercise(exercise.id);\n                        setQuickHistoryExerciseId");
+  });
+
+  it("presenta snapshots compactos, sets realizados y un vacío honesto dentro de un sheet", () => {
+    expect(quickHistorySheet).toContain("Dialog.Root");
+    expect(quickHistorySheet).toContain("quickHistoryCompletedSets(session)");
+    expect(quickHistorySheet).toContain("set.target_rir");
+    expect(quickHistorySheet).toContain("Todavía no hay sesiones finalizadas con este ejercicio.");
+    expect(quickHistorySheet).not.toContain("0 kg");
   });
 });
 
