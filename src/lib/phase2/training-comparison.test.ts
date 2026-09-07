@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTrainingAnalysis } from "./training-analysis";
-import { buildExerciseSessionSelfComparison, buildTrainingComparison, buildTrainingSelfComparison, comparisonDelta } from "./training-comparison";
+import { buildExerciseSessionSelfComparison, buildTrainingComparison, buildTrainingSelfComparison, comparisonDelta, trainingComparisonChartKind } from "./training-comparison";
 import { todayInCordoba } from "./cordoba-date";
 import type { ExerciseReportSession } from "./exercise-insights";
 import type { MuscleGroup, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
@@ -123,6 +123,15 @@ describe("training comparisons", () => {
     expect(comparisonDelta(80, 100)).toMatchObject({ absolute: -20, percentage: -20, hasComparableBaseline: true });
     expect(comparisonDelta(5, 0)).toEqual({ absolute: 5, percentage: null, hasComparableBaseline: false });
     expect(comparisonDelta(null, 0)).toEqual({ absolute: null, percentage: null, hasComparableBaseline: false });
+  });
+
+  it("uses bars for discrete activity and lines only for real exercise weight or reps", () => {
+    expect(trainingComparisonChartKind("volume")).toBe("bars");
+    expect(trainingComparisonChartKind("sets")).toBe("bars");
+    expect(trainingComparisonChartKind("sessions")).toBe("bars");
+    expect(trainingComparisonChartKind("minutes")).toBe("bars");
+    expect(trainingComparisonChartKind("bestWeight")).toBe("line");
+    expect(trainingComparisonChartKind("bestReps")).toBe("line");
   });
 
   it("compares only active routine selectors by default and never normalizes A and B to the same routine", () => {
