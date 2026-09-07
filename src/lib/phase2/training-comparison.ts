@@ -19,6 +19,15 @@ export type TrainingComparisonKind = (typeof TRAINING_COMPARISON_KINDS)[number];
 export type TrainingComparisonMode = "self" | "cross";
 export type TrainingComparisonSubjectType = "general" | "routine" | "muscle" | "exercise";
 export type TrainingComparisonMetric = TrainingAnalysisMetric | "averageSets" | "exerciseCount" | "bestWeight" | "bestReps";
+export type TrainingComparisonChartKind = "bars" | "line";
+
+/**
+ * Aggregated training activity is discrete per day/tramo, while the best
+ * weight and reps of one exercise describe successive real sessions.
+ */
+export function trainingComparisonChartKind(metric: TrainingComparisonMetric): TrainingComparisonChartKind {
+  return metric === "bestWeight" || metric === "bestReps" ? "line" : "bars";
+}
 
 export type TrainingComparisonDelta = {
   absolute: number | null;
@@ -290,7 +299,7 @@ export function buildTrainingSelfComparison(input: {
   return {
     kind: "previous",
     mode: "self",
-    title: "Comparar evolución",
+    title: "Evolución",
     subjectLabel,
     subjectType: input.subjectType,
     subjectId: fallbackId,
@@ -352,7 +361,7 @@ export function buildExerciseSessionSelfComparison(input: {
   return {
     kind: "previous",
     mode: "self",
-    title: "Comparar evolución",
+    title: "Evolución",
     subjectLabel: input.exerciseName,
     subjectType: "exercise",
     subjectId: input.exerciseId,

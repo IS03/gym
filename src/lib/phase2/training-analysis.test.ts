@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTrainingAnalysis, filterTrainingAnalysisExercises, formatTrainingAnalysisMetric, formatTrainingVolumeKg, isTrainingAnalysisPeriod, previousTrainingAnalysisPeriodRange, TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT, trainingAnalysisPeriodRange, type TrainingAnalysisPeriod } from "./training-analysis";
-import { trainingAnalysisComparisonPath, trainingAnalysisExercisePath, trainingAnalysisSelfComparisonPath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
+import { trainingAnalysisComparisonPath, trainingAnalysisCurrentPath, trainingAnalysisExercisePath, trainingAnalysisSelfComparisonPath, trainingAnalysisWorkspacePath } from "./training-analysis-navigation";
 import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
 function session(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
@@ -207,5 +207,6 @@ describe("training analysis", () => {
     expect(trainingAnalysisExercisePath("press-machine", exercisesState)).toContain("query=pecho&routine_filter=routine-push&muscle_filter=pecho");
     expect(trainingAnalysisComparisonPath(exercisesState, "exercises", { a: "press-machine", b: "pec-deck" })).toBe("/train/progress?view=exercises&period=8w&query=pecho&routine_filter=routine-push&muscle_filter=pecho&compare=exercises&a=press-machine&b=pec-deck");
     expect(trainingAnalysisSelfComparisonPath(state, { subjectType: "muscle", subject: "pecho" })).toBe("/train/progress?view=muscles&period=8w&muscle=pecho&compare=previous&subject_type=muscle&subject=pecho");
+    expect(trainingAnalysisCurrentPath({ ...exercisesState, comparison: "previous", comparisonSubjectType: "exercise", comparisonSubject: "press-machine" })).toBe("/train/progress?view=exercises&period=8w&query=pecho&routine_filter=routine-push&muscle_filter=pecho");
   });
 });

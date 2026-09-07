@@ -115,6 +115,7 @@ export default async function ExerciseHistoryPage({
     backHref={cameFromProgress ? `/train/progress?${progressParams.toString()}` : "/train/history?view=exercises"}
     backLabel={cameFromProgress ? progressBackLabel : "Historial"}
     source={cameFromProgress ? "progress" : "history"}
+    range={currentRange}
     comparison={comparison}
     progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter } : undefined}
     sessions={sessions}

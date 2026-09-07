@@ -42,6 +42,18 @@ export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationS
   return `/train/progress?${params.toString()}`;
 }
 
+/** Leaves the self-comparison mode without losing the analysis context. */
+export function trainingAnalysisCurrentPath(state: TrainingAnalysisNavigationState): string {
+  return trainingAnalysisWorkspacePath({
+    ...state,
+    comparison: undefined,
+    comparisonA: null,
+    comparisonB: null,
+    comparisonSubjectType: null,
+    comparisonSubject: null,
+  });
+}
+
 export function trainingAnalysisComparisonPath(
   state: TrainingAnalysisNavigationState,
   comparison: Exclude<TrainingComparisonKind, "previous">,
