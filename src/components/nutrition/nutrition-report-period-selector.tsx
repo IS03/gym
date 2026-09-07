@@ -7,6 +7,7 @@ import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRangeValue } from "@/lib/calendar/date-range";
+import { nutritionReportPath, type NutritionReportComparisonMode } from "@/lib/nutrition/report-navigation";
 import { NUTRITION_REPORT_MAX_DAYS, type NutritionReportPreset } from "@/lib/nutrition/reports-core";
 
 const presets: Array<{ period: Exclude<NutritionReportPreset, "custom">; label: string }> = [
@@ -24,9 +25,10 @@ type Props = {
   today: string;
   rangeLabel: string;
   basePath?: string;
+  comparison?: NutritionReportComparisonMode;
 };
 
-export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel, basePath = "/today/reports" }: Props) {
+export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel, basePath = "/today/reports", comparison = null }: Props) {
   const [customOpen, setCustomOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRangeValue>({ start, end });
   const [isPending, startTransition] = useTransition();
@@ -39,13 +41,14 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
   function submitCustomRange(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!customRange.start || !customRange.end) return;
-    const params = new URLSearchParams({
-      period: "custom",
-      from: customRange.start,
-      to: customRange.end,
-    });
     setCustomOpen(false);
-    navigate(`${basePath}?${params.toString()}`);
+    navigate(nutritionReportPath({
+      preset: "custom",
+      start: customRange.start,
+      end: customRange.end,
+      comparison,
+      basePath,
+    }));
   }
 
   return (
@@ -61,7 +64,13 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
             className="h-10 shrink-0 px-3 text-[13px]"
             aria-pressed={preset === option.period}
             disabled={isPending}
-            onClick={() => navigate(`${basePath}?period=${option.period}`)}
+            onClick={() => navigate(nutritionReportPath({
+              preset: option.period,
+              start,
+              end,
+              comparison,
+              basePath,
+            }))}
           >
             {option.label}
           </Button>

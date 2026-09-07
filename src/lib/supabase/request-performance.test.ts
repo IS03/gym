@@ -10,6 +10,7 @@ const train = readFileSync("src/app/(app)/train/page.tsx", "utf8");
 const session = readFileSync("src/app/(app)/train/session/[id]/page.tsx", "utf8");
 const nutritionDay = readFileSync("src/lib/nutrition/day.ts", "utf8");
 const robustTraining = readFileSync("src/lib/phase2/training-robust.ts", "utf8");
+const nutritionReports = readFileSync("src/lib/nutrition/reports.ts", "utf8");
 
 describe("request-scoped authenticated reads", () => {
   it("shares one verified context across Home loaders and uses its bounded training read model", () => {
@@ -52,6 +53,12 @@ describe("request-scoped authenticated reads", () => {
     expect(robustTraining).not.toContain(
       '"*, day_log:day_logs!inner(log_date), exercises:workout_session_exercises(*, sets:workout_sets(*))"',
     );
+  });
+
+  it("loads nutrition comparison through one combined range instead of duplicating the report reads", () => {
+    expect(nutritionReports).toContain("const combinedRange = { start: previousRange.start, end: range.end }");
+    expect(nutritionReports).toContain("const facts = await readNutritionReportFacts(combinedRange, context)");
+    expect(nutritionReports.match(/readNutritionReportFacts\(combinedRange, context\)/g)).toHaveLength(1);
   });
 
   it("installs the Data API transport retry without changing middleware auth", () => {
