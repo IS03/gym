@@ -111,7 +111,7 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
     <div className="space-y-5">
       <section className="space-y-3" aria-labelledby="daily-activity-inputs">
         <h3 id="daily-activity-inputs" className="text-sm font-semibold">Registrar</h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border bg-background/35 p-3">
           <div className="min-w-0 space-y-1">
             <Label htmlFor="daily-steps" className="text-xs">Pasos</Label>
             <Input className="h-10 px-2" id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />

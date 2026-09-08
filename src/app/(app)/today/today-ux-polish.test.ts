@@ -5,8 +5,10 @@ import { stepsFromInput } from "./steps-card-core";
 const source = (path: string) => readFileSync(path, "utf8");
 const todayActivity = source("src/app/(app)/today/today-activity.tsx");
 const activityPanel = source("src/app/(app)/today/day-activity-panel.tsx");
+const closedActivityPanel = activityPanel.slice(activityPanel.indexOf("export function DayActivityPanel"));
 const activityEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const stepsCard = source("src/app/(app)/today/steps-card.tsx");
+const todayPage = source("src/app/(app)/today/page.tsx");
 
 describe("PR20 — Today UX polish", () => {
   it("renders a compact activity summary and moves editing into its responsive detail", () => {
@@ -22,13 +24,24 @@ describe("PR20 — Today UX polish", () => {
     expect(activityPanel).not.toContain('href="/today/steps"');
   });
 
-  it("keeps one closed-state representation for context, steps, water and mate", () => {
+  it("keeps the closed state focused on balance and daily activity", () => {
     expect(activityPanel).not.toContain("<details");
-    for (const label of ["Trabajo", "Entrenamiento", "Gasto", "Balance"]) {
-      expect(activityPanel).toContain(`\"${label}\"`);
-    }
-    for (const label of ["Pasos", "Agua", "Mate"]) expect(activityPanel).toContain(`>${label}<`);
+    expect(activityPanel).toContain('"Gasto"');
+    expect(activityPanel).toContain('"Balance parcial"');
+    for (const label of ["Pasos", "Agua", "Mate"]) expect(activityPanel).toContain(`["${label}"`);
     expect(activityPanel).not.toContain("<DayContextEditor");
+    expect(closedActivityPanel).not.toContain('["Trabajo"');
+    expect(closedActivityPanel).not.toContain('["Entrenamiento"');
+    expect(todayActivity).toContain("<ActivityContextSummary");
+  });
+
+  it("orders mobile Today as summary, add, activity and meals", () => {
+    const add = todayPage.indexOf("<MealComposer");
+    const activity = todayPage.indexOf("<TodayActivity");
+    const meals = todayPage.indexOf("<MealList");
+    expect(add).toBeGreaterThan(0);
+    expect(activity).toBeGreaterThan(add);
+    expect(meals).toBeGreaterThan(activity);
   });
 
   it("keeps the three daily inputs, the water target and a stable autosave slot in detail", () => {

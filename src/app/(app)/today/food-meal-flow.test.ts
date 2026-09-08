@@ -9,11 +9,13 @@ const actions = source("src/app/(app)/today/actions.ts");
 const entry = source("src/lib/nutrition/food-entry.ts");
 
 describe("PR29 — registrar alimento por cantidad", () => {
-  it("carga Foods activos en paralelo y mantiene Manual junto a Desde alimento", () => {
+  it("carga Foods activos en paralelo y separa Nueva comida de Alimento por cantidad", () => {
     expect(page).toContain("listActiveFoods(auth)");
     expect(page).toContain("Promise.all");
-    expect(composer).toContain(">Manual<");
-    expect(composer).toContain(">Desde alimento<");
+    expect(composer).toContain("Nueva comida");
+    expect(composer).toContain("Alimento por cantidad");
+    expect(composer).not.toContain(">Manual<");
+    expect(composer).not.toContain(">Desde alimento<");
     expect(composer).toContain("<CreateMealForm");
     expect(composer).toContain("<FoodMealForm");
   });

@@ -10,16 +10,20 @@ describe("PR28 — lista y edición de comidas", () => {
   it("mantiene los registros cerrados y abre un único editor responsive", () => {
     expect(mealList).toContain("<ResponsiveDialog");
     expect(mealList).toContain("Editar comida");
-    expect(mealList).toContain("line-clamp-2");
+    expect(mealList).toContain("truncate text-xs text-muted-foreground");
     expect(mealList).not.toContain("<form action={updateMealAction}");
     expect(mealList).not.toContain("Confirmada (todas las comidas cuentan en el día)");
   });
 
-  it("presenta título, calorías, macros, descripción y una acción de edición", () => {
+  it("presenta todos los datos en una lista agrupada cuya fila completa abre edición", () => {
     expect(mealList).toContain("formatKcal(meal.final_calories)");
     expect(mealList).toContain("formatMealMacros(meal)");
     expect(mealList).toContain("meal.description");
-    expect(mealList).toContain("<Pencil");
+    expect(mealList).toContain('className="divide-y divide-border/70 overflow-hidden rounded-xl border bg-card shadow-sm"');
+    expect(mealList).toContain('aria-label={`Editar ${meal.title || "comida"}`}');
+    expect(mealList).toContain("<Utensils");
+    expect(mealList).toContain("<ChevronRight");
+    expect(mealList).not.toContain("<Pencil");
   });
 
   it("mantiene el estado vacío sin duplicar la CTA de creación", () => {

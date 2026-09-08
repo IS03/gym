@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Trash2, Utensils } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -128,11 +128,29 @@ export function MealList({ meals, date }: { meals: TodayMeal[]; date: string }) 
   return (
     <section className="space-y-3" aria-labelledby="meals-heading">
       <div className="flex items-center justify-between gap-3"><h2 id="meals-heading" className="text-lg font-semibold tracking-tight">Comidas</h2><p className="text-xs text-muted-foreground">{meals.length === 1 ? "1 registro" : `${meals.length} registros`}</p></div>
-      <div className="min-h-5" aria-live="polite">{notice ? <p className="text-sm text-emerald-700 dark:text-emerald-400" role="status">{notice}</p> : null}</div>
+      <div aria-live="polite">{notice ? <p className="text-sm text-emerald-700 dark:text-emerald-400" role="status">{notice}</p> : null}</div>
       {meals.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no cargaste comidas.</p> : (
-        <ul className="space-y-2">
-          {meals.map((meal) => <li key={meal.id} className="rounded-xl border bg-card px-4 py-3 shadow-sm">
-            <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold">{meal.title || "Comida"}</h3><p className="mt-1 text-sm font-medium">{formatKcal(meal.final_calories)}</p><p className="metric-number mt-0.5 text-xs text-muted-foreground">{formatMealMacros(meal)}</p>{meal.description ? <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{meal.description}</p> : null}</div><Button type="button" variant="ghost" size="sm" className="min-h-10 shrink-0 px-2" onClick={() => { setNotice(null); setEditingMeal(meal); }}><Pencil className="size-3.5" aria-hidden /> Editar</Button></div>
+        <ul className="divide-y divide-border/70 overflow-hidden rounded-xl border bg-card shadow-sm">
+          {meals.map((meal) => <li key={meal.id}>
+            <button
+              type="button"
+              className="flex min-h-[5.25rem] w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              aria-label={`Editar ${meal.title || "comida"}`}
+              onClick={() => { setNotice(null); setEditingMeal(meal); }}
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Utensils className="size-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-start justify-between gap-3">
+                  <span className="truncate text-sm font-semibold">{meal.title || "Comida"}</span>
+                  <span className="metric-number shrink-0 text-sm font-semibold">{formatKcal(meal.final_calories)}</span>
+                </span>
+                <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">{formatMealMacros(meal)}</span>
+                {meal.description ? <span className="mt-1 block truncate text-xs text-muted-foreground">{meal.description}</span> : null}
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
           </li>)}
         </ul>
       )}

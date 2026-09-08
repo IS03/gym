@@ -12,13 +12,16 @@ describe("PR30.1 — Agregar rápido compacto", () => {
   const quickCore = read("src/lib/nutrition/quick-meals-core.ts");
   const todayPage = read("src/app/(app)/today/page.tsx");
 
-  it("mantiene Agregar comida y muestra Agregar rápido como acceso compacto", () => {
-    expect(composer).toContain("Agregar comida");
+  it("usa una sola entrada Agregar y conserva los tres flujos en el mismo sheet", () => {
+    expect(composer).toContain('/> Agregar');
+    expect(composer.match(/aria-haspopup="dialog"/g)).toHaveLength(1);
+    expect(composer).toContain("Nueva comida");
+    expect(composer).toContain("Agregar rápido");
+    expect(composer).toContain("Alimento por cantidad");
+    expect(composer).toContain("onBack={mode === \"menu\" ? undefined : () => setMode(\"menu\")}");
     expect(composer).toContain("<QuickAddMeals");
-    expect(quickAdd).toContain("Agregar rápido");
-    expect(quickAdd).toContain('aria-haspopup="dialog"');
-    expect(quickAdd).toContain("<ResponsiveDialog open={quickAddOpen}");
-    expect(quickAdd).not.toContain("return <section");
+    expect(composer).toContain("embedded");
+    expect(quickAdd).toContain("if (embedded)");
     expect(quickAdd).toContain('tabButton("saved", "Habituales")');
     expect(quickAdd).toContain('tabButton("suggested", "Sugeridas")');
   });
