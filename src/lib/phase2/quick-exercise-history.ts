@@ -60,6 +60,18 @@ export function quickHistoryLatestSummary(session: ExerciseReportSession | null)
 export function quickHistoryUniformLoadSummary(
   session: ExerciseReportSession | null,
 ): string | null {
+  const details = quickHistoryUniformLoadDetails(session);
+  return details ? `${details.weight} · ${details.reps} reps` : null;
+}
+
+/**
+ * The mini metric layout is only available when a session has one truthful
+ * recorded load across every completed set. It keeps reps and RIR separate
+ * without implying that mixed loads are a single number.
+ */
+export function quickHistoryUniformLoadDetails(
+  session: ExerciseReportSession | null,
+): { weight: string; reps: string; rir: string | null } | null {
   if (!session) return null;
   const completed = quickHistoryCompletedSets(session);
   if (completed.length === 0) return null;
@@ -84,7 +96,15 @@ export function quickHistoryUniformLoadSummary(
     return null;
   }
 
-  return `${firstWeight} kg · ${reps.join(" / ")} reps`;
+  const rirs = completed.map((set) => set.target_rir);
+  return {
+    weight: `${String(firstWeight).replace(".", ",")} kg`,
+    reps: reps.join(" / "),
+    rir:
+      rirs.every((value) => typeof value === "number" && Number.isFinite(value))
+        ? rirs.join(" / ")
+        : null,
+  };
 }
 
 /** The highlighted latest session is intentionally removed from the list below it. */

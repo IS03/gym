@@ -133,8 +133,8 @@ type SetRowProps = {
 };
 
 const SET_GRID_LAYOUT =
-  "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem]";
-const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1 px-1`;
+  "grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.75rem]";
+const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-2 px-2`;
 const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
 const REST_TIMER_STORAGE_KEY_PREFIX = "ownlevel:workout-rest-timer:";
 const EXERCISE_AUTOSAVE_DEBOUNCE_MS = 850;
@@ -235,21 +235,21 @@ function SetRow({
     <div
       className={cn(
         SET_GRID_SHARED,
-        "items-center border-b border-border/60 py-2.5 transition-colors duration-150 last:border-b-0",
+        "items-center rounded-xl border border-border/70 px-2 py-2.5 transition-colors duration-150",
         set.is_completed
-          ? "bg-emerald-500/[0.06]"
-          : "bg-transparent",
+          ? "border-emerald-500/20 bg-emerald-500/[0.07]"
+          : "bg-background/35",
       )}
     >
       <div className="flex min-w-0 items-center justify-center">
-        <span className="metric-number text-sm font-semibold text-muted-foreground">
+        <span className="metric-number flex size-9 items-center justify-center rounded-xl bg-muted/70 text-sm font-semibold text-muted-foreground">
           {setIndex + 1}
         </span>
       </div>
       <div className="min-w-0 space-y-0.5">
         <LocalizedDecimalInput
           aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-10 px-1 text-center text-base font-semibold"
+          className="metric-number h-11 rounded-xl border-border/80 bg-background px-1 text-center text-base font-semibold"
           min={0}
           max={9999.99}
           readOnly={readOnly}
@@ -268,7 +268,7 @@ function SetRow({
       <div className="min-w-0 space-y-0.5">
         <Input
           aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-10 px-1 text-center text-base font-semibold"
+          className="metric-number h-11 rounded-xl border-border/80 bg-background px-1 text-center text-base font-semibold"
           type="number"
           min={0}
           max={1000}
@@ -289,7 +289,7 @@ function SetRow({
       </div>
       <div className="flex min-w-0 items-center justify-center">
         <span
-          className="metric-number text-sm font-semibold"
+          className="metric-number flex h-11 w-full items-center justify-center rounded-xl border border-border/80 bg-background px-1 text-center text-base font-semibold"
           aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
         >
           {compactNumber(set.target_rir)}
@@ -399,6 +399,44 @@ function RatingPicker({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function PainSlider({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number | null;
+  disabled: boolean;
+  onChange: (next: number) => void;
+}) {
+  const currentValue = value ?? 0;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="session-pain-level">Dolor</Label>
+        <output htmlFor="session-pain-level" className="metric-number text-sm font-semibold">
+          {currentValue}/10
+        </output>
+      </div>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+        <span className="metric-number text-xs text-muted-foreground">0</span>
+        <input
+          id="session-pain-level"
+          aria-label="Dolor, de 0 a 10"
+          className="h-8 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={currentValue}
+          disabled={disabled}
+          onChange={(event) => onChange(Number(event.target.value))}
+        />
+        <span className="metric-number text-xs text-muted-foreground">10</span>
       </div>
     </div>
   );
@@ -1119,7 +1157,7 @@ export function SessionEditor({
     <div className="space-y-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
       <header
         className={cn(
-          "sticky top-[max(0.5rem,env(safe-area-inset-top))] z-30 -mx-1 space-y-2 rounded-2xl border border-border/70 bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85",
+          "relative space-y-2 rounded-2xl border border-border/70 bg-background px-3 py-3 shadow-sm",
           hasRoutineAccent && "pl-3",
         )}
       >
@@ -1446,16 +1484,16 @@ export function SessionEditor({
                       </Button>
                     ) : null}
                   </div>
-                  <div className="overflow-hidden rounded-xl border border-border/75 bg-background/35">
+                  <div className="space-y-2">
                     <div
                       className={cn(
-                        "border-b border-border/60 bg-muted/35 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                        "py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
                         SET_GRID_SHARED,
                       )}
                     >
-                      <div className="flex min-w-0 items-center justify-center">Serie</div>
-                      <div className="flex min-w-0 items-center justify-center">kg</div>
-                      <div className="flex min-w-0 items-center justify-center">reps</div>
+                      <div className="flex min-w-0 items-center justify-center">#</div>
+                      <div className="flex min-w-0 items-center justify-center">KG</div>
+                      <div className="flex min-w-0 items-center justify-center">REPS</div>
                       <div className="flex min-w-0 items-center justify-center">RIR</div>
                       <div className="flex min-w-0 items-center justify-center" aria-label="Completada">✓</div>
                     </div>
@@ -1602,40 +1640,33 @@ export function SessionEditor({
                       <span className="text-xs text-muted-foreground">Opcional</span>
                     </div>
                     <div className="space-y-3 pb-1">
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
-                          {NEXT_SESSION_DECISIONS.map((adjustment) => (
-                            <Button
-                              key={adjustment.value}
-                              type="button"
-                              size="sm"
-                              variant={payload.decision === adjustment.value ? "secondary" : "outline"}
-                              disabled={interactionLocked}
-                              aria-pressed={payload.decision === adjustment.value}
-                              onClick={() =>
-                                updateExercise(
-                                  exercise.id,
-                                  (current) => ({
-                                    ...current,
-                                    decision: toggleTrainingDecision(
-                                      current.decision,
-                                      adjustment.value,
-                                    ),
-                                    decision_note: "",
-                                  }),
-                                  { immediate: true },
-                                )
-                              }
-                            >
-                              {adjustment.label}
-                            </Button>
-                          ))}
-                        </div>
-                        {payload.decision === "maintain" ? (
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            Dejá todo sin marcar para mantener el objetivo actual.
-                          </p>
-                        ) : null}
+                      <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
+                        {NEXT_SESSION_DECISIONS.map((adjustment) => (
+                          <Button
+                            key={adjustment.value}
+                            type="button"
+                            size="sm"
+                            variant={payload.decision === adjustment.value ? "secondary" : "outline"}
+                            disabled={interactionLocked}
+                            aria-pressed={payload.decision === adjustment.value}
+                            onClick={() =>
+                              updateExercise(
+                                exercise.id,
+                                (current) => ({
+                                  ...current,
+                                  decision: toggleTrainingDecision(
+                                    current.decision,
+                                    adjustment.value,
+                                  ),
+                                  decision_note: "",
+                                }),
+                                { immediate: true },
+                              )
+                            }
+                          >
+                            {adjustment.label}
+                          </Button>
+                        ))}
                       </div>
 
                       {payload.decision === "custom" ? (
@@ -1674,30 +1705,14 @@ export function SessionEditor({
                       ) : null}
 
                       {exercise.routine_exercise_id ? (
-                        <label
+                        <div
                           className={cn(
-                            "flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-within:ring-3 focus-within:ring-ring/50",
+                            "flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
                             payload.apply_to_routine
                               ? "border-primary/40 bg-primary/5"
                               : "border-border/75 bg-background/35 hover:bg-muted/35",
                           )}
                         >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={payload.apply_to_routine}
-                            disabled={interactionLocked}
-                            onChange={(event) =>
-                              updateExercise(
-                                exercise.id,
-                                (current) => ({
-                                  ...current,
-                                  apply_to_routine: event.target.checked,
-                                }),
-                                { immediate: true },
-                              )
-                            }
-                          />
                           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden>
                             <Target className="size-4" />
                           </span>
@@ -1707,20 +1722,38 @@ export function SessionEditor({
                               Usa las series completadas como base.
                             </span>
                           </span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-label="Tomar resultado de hoy"
+                            aria-checked={payload.apply_to_routine}
+                            disabled={interactionLocked}
+                            className={cn(
+                              "relative flex h-7 w-12 shrink-0 touch-manipulation items-center rounded-full p-0.5 outline-none transition-colors duration-200 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
+                              payload.apply_to_routine ? "bg-primary" : "bg-muted-foreground/35",
+                            )}
+                            onClick={() =>
+                              updateExercise(
+                                exercise.id,
+                                (current) => ({
+                                  ...current,
+                                  apply_to_routine: !current.apply_to_routine,
+                                }),
+                                { immediate: true },
+                              )
+                            }
+                          >
                           <span
                             className={cn(
-                              "flex size-6 shrink-0 items-center justify-center rounded-full border",
+                              "size-6 rounded-full bg-white shadow-sm transition-transform duration-200",
                               payload.apply_to_routine
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-input bg-background",
+                                ? "translate-x-5"
+                                : "translate-x-0",
                             )}
                             aria-hidden
-                          >
-                            {payload.apply_to_routine ? (
-                              <Check className="size-3.5" strokeWidth={3} />
-                            ) : null}
-                          </span>
-                        </label>
+                          />
+                          </button>
+                        </div>
                       ) : null}
 
                       <div className="space-y-2 rounded-xl border border-border/75 bg-muted/20 px-3 py-2.5">
@@ -1764,16 +1797,13 @@ export function SessionEditor({
                               }))
                             }
                           />
-                        ) : (
+                        ) : quickNote ? (
                           <p
-                            className={cn(
-                              "line-clamp-1 text-sm",
-                              quickNote ? "text-muted-foreground" : "text-muted-foreground/80",
-                            )}
+                            className="line-clamp-1 text-sm text-muted-foreground"
                           >
-                            {quickNote || "Sin nota"}
+                            {quickNote}
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </section>
@@ -1846,11 +1876,8 @@ export function SessionEditor({
             disabled={interactionLocked}
             onChange={(value) => updateMetadata((current) => ({ ...current, performance_level: value }))}
           />
-          <RatingPicker
-            label="Dolor (0–10)"
+          <PainSlider
             value={metadata.pain_level}
-            minimum={0}
-            maximum={10}
             disabled={interactionLocked}
             onChange={(value) => updateMetadata((current) => ({ ...current, pain_level: value }))}
           />

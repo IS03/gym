@@ -63,13 +63,15 @@ describe("PR 14 — interacción de sesión", () => {
   it("mantiene la actualización de targets compacta y limitada a series completas", () => {
     expect(editor).toContain("Tomar resultado de hoy");
     expect(editor).toContain("Usa las series completadas como base.");
+    expect(editor).toContain('role="switch"');
+    expect(editor).toContain('aria-checked={payload.apply_to_routine}');
     expect(editor).not.toContain(': "Sin cambios"');
   });
 
   it("deja la nota en lectura compacta hasta que se solicita editar", () => {
     expect(editor).toContain("editingNoteExerciseId");
     expect(editor).toContain('{noteEditorOpen ? "Listo" : quickNote ? "Editar" : "Agregar"}');
-    expect(editor).toContain('{quickNote || "Sin nota"}');
+    expect(editor).not.toContain('quickNote || "Sin nota"');
     expect(editor).toContain("noteEditorOpen ? (");
     expect(editor).toContain('className="min-h-20 w-full rounded-lg border bg-background');
   });
@@ -78,7 +80,7 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).toContain('<Label>Próxima vez</Label>');
     expect(editor).not.toContain("Progresión y próxima vez");
     expect(editor).toContain('aria-label="Decisión para la próxima vez"');
-    expect(editor).toContain("Dejá todo sin marcar para mantener el objetivo actual.");
+    expect(editor).not.toContain("Dejá todo sin marcar para mantener el objetivo actual.");
   });
 
   it("mantiene cancelar detrás del disclosure destructivo", () => {
@@ -114,11 +116,20 @@ describe("PR 14 — interacción de sesión", () => {
 
   it("usa controles táctiles discretos para el resumen sin editar identidad histórica", () => {
     expect(editor).toContain("function RatingPicker");
+    expect(editor).toContain("function PainSlider");
     expect(editor).toContain('label="Energía (1–5)"');
     expect(editor).toContain('label="Rendimiento (1–5)"');
-    expect(editor).toContain('label="Dolor (0–10)"');
+    expect(editor).toContain('type="range"');
+    expect(editor).toContain('aria-label="Dolor, de 0 a 10"');
     expect(editor).not.toContain('htmlFor="session-name"');
     expect(editor).not.toContain('htmlFor="pain-note"');
+  });
+
+  it("mantiene el encabezado de sesión en su posición natural y simplifica las filas de series", () => {
+    expect(editor).not.toContain('"sticky top-[max(0.5rem,env(safe-area-inset-top))]');
+    expect(editor).toContain('"space-y-2"');
+    expect(editor).toContain('rounded-xl border border-border/70 px-2 py-2.5');
+    expect(editor).toContain("grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.75rem]");
   });
 });
 
