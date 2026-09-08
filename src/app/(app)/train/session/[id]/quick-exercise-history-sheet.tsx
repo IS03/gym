@@ -93,7 +93,7 @@ function PreviousHistoryEntry({ session }: { session: ExerciseReportSession }) {
       render={
         <Link
           href={`/train/session/${session.sessionId}`}
-          className="group flex min-h-16 items-center gap-3 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+          className="group flex min-h-14 items-center gap-3 py-2.5 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
         />
       }
     >
@@ -154,7 +154,7 @@ export function QuickExerciseHistorySheet({
                 </div>
               ) : (
                 <div className="space-y-5">
-                  <section className="rounded-2xl border border-primary/20 bg-primary/[0.06] px-3 py-3">
+                  <section className="rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-2.5">
                     <p className="text-xs font-medium text-primary">Última sesión</p>
                     <div className="mt-1 flex items-baseline justify-between gap-3">
                       <p className="text-sm font-semibold">{formatSessionDate(latest.logDate)}</p>
@@ -165,7 +165,7 @@ export function QuickExerciseHistorySheet({
 
                   {previous.length > 0 ? (
                     <section aria-label="Sesiones anteriores">
-                      <div className="mb-1 flex items-center gap-2">
+                      <div className="mb-0.5 flex items-center gap-2">
                         <History className="size-4 text-primary" aria-hidden />
                         <h3 className="text-sm font-semibold">Historial</h3>
                       </div>
@@ -188,7 +188,7 @@ export function QuickExerciseHistorySheet({
                   render={
                     <Link
                       href={`/train/history/${exerciseId}?from=history`}
-                      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/35 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary/5 focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/35 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary/5 focus-visible:ring-3 focus-visible:ring-ring/50"
                     />
                   }
                 >
