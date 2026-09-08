@@ -23,6 +23,7 @@ function formatSteps(value: string) {
 }
 
 function formatLiters(value: string) {
+  if (!value.trim()) return "—";
   const parsed = Number(value.trim().replace(",", "."));
   return Number.isFinite(parsed) ? `${formatter.format(parsed)} L` : "—";
 }
@@ -71,7 +72,6 @@ export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps) {
               workSourceLabel={props.workSourceLabel}
               gymLabel={props.gymLabel}
               gymSourceLabel={props.gymSourceLabel}
-              className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg bg-muted/35 px-3 py-3 text-sm"
             />
           </section>
 

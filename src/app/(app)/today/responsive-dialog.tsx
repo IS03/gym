@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 
 type Props = {
   open: boolean;
@@ -9,10 +9,12 @@ type Props = {
   title: string;
   description: string;
   closeLabel: string;
+  backLabel?: string;
+  onBack?: () => void;
   children: React.ReactNode;
 };
 
-export function ResponsiveDialog({ open, onOpenChange, title, description, closeLabel, children }: Props) {
+export function ResponsiveDialog({ open, onOpenChange, title, description, closeLabel, backLabel, onBack, children }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -21,12 +23,24 @@ export function ResponsiveDialog({ open, onOpenChange, title, description, close
           <Dialog.Popup className="flex max-h-[calc(100dvh-0.75rem-env(safe-area-inset-top))] w-full min-w-0 flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full motion-reduce:transition-none lg:max-h-[min(80dvh,46rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]">
             <header className="relative shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5 lg:pt-5">
               <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
-              <Dialog.Title className="text-xl font-semibold tracking-tight">{title}</Dialog.Title>
-              <Dialog.Description className="mt-1 pr-10 text-sm text-muted-foreground">{description}</Dialog.Description>
+              <div className="flex min-h-10 items-center gap-1 pr-11">
+                {onBack ? (
+                  <button
+                    type="button"
+                    aria-label={backLabel ?? "Volver"}
+                    onClick={onBack}
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ArrowLeft className="size-5" aria-hidden />
+                  </button>
+                ) : null}
+                <Dialog.Title className="text-xl font-semibold tracking-tight">{title}</Dialog.Title>
+              </div>
+              <Dialog.Description className={onBack ? "mt-1 pl-11 pr-10 text-sm text-muted-foreground" : "mt-1 pr-10 text-sm text-muted-foreground"}>{description}</Dialog.Description>
               <Dialog.Close
                 type="button"
                 aria-label={closeLabel}
-                className="absolute right-3 top-7 flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring lg:top-4"
+                className="absolute right-3 top-7 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground outline-none transition-colors hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-ring lg:top-4"
               >
                 <X className="size-4" aria-hidden />
               </Dialog.Close>

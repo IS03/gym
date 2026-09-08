@@ -38,9 +38,8 @@ function formatLiters(n: number | null | undefined) {
 
 function formatBalance(value: number | null) {
   if (value === null) return "Sin gasto configurado";
-  if (value < 0) return `Déficit ${Math.abs(value)} kcal`;
-  if (value > 0) return `Superávit ${value} kcal`;
-  return "Balance 0 kcal";
+  if (value > 0) return `+${value} kcal`;
+  return `${value} kcal`;
 }
 
 function formatProteinProgress(consumed: number, target: number | null) {
@@ -101,20 +100,20 @@ export default async function TodayPage() {
               <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t pt-3">
-            <div>
+          <div className="grid grid-cols-3 divide-x border-t pt-3">
+            <div className="pr-2">
               <p className="text-xs text-muted-foreground">Proteína</p>
               <p className="metric-number mt-0.5 text-sm font-semibold">
                 {formatProteinProgress(dayLog.total_protein_g, context.targets.proteinG)}
               </p>
             </div>
-            <div>
+            <div className="px-2">
               <p className="text-xs text-muted-foreground">Carbos</p>
               <p className="metric-number mt-0.5 text-sm font-semibold">
                 {formatGrams(dayLog.total_carbs_g)}
               </p>
             </div>
-            <div>
+            <div className="pl-2">
               <p className="text-xs text-muted-foreground">Grasas</p>
               <p className="metric-number mt-0.5 text-sm font-semibold">
                 {formatGrams(dayLog.total_fat_g)}

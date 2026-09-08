@@ -58,7 +58,7 @@ function SuggestedRows({ meals, pendingKey, savedSourceId, onAdd, onSave, framed
       return <li key={meal.key} className="flex min-w-0 items-center gap-1 px-3 py-2.5">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{meal.label}</p><p className="truncate text-xs text-muted-foreground">{suggestedMacroText(meal)}{meal.useCount > 1 ? ` · ${meal.useCount} veces` : ""}</p></div>
         <Button type="button" size="icon" variant="ghost" className="size-9 shrink-0" disabled={pendingKey !== null} aria-label={`Guardar ${meal.label} como habitual`} onClick={() => onSave(meal)}>{saving ? <span className="text-[11px]">…</span> : savedSourceId === meal.sourceMealId ? <Check className="size-4 text-emerald-600" aria-hidden /> : <BookmarkPlus className="size-4" aria-hidden />}</Button>
-        <Button type="button" size="icon" variant="outline" className="size-9 shrink-0" disabled={pendingKey !== null} aria-label={`Agregar ${meal.label}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
+        <Button type="button" size="icon" variant="ghost" className="size-10 shrink-0 rounded-full bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" disabled={pendingKey !== null} aria-label={`Agregar ${meal.label}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
       </li>;
     })}
   </ul>;
@@ -78,7 +78,7 @@ function SavedRows({ meals, pendingKey, onAdd, onAdjust, framed = false }: {
       return <li key={meal.id} className="flex min-w-0 items-center gap-1 px-3 py-2.5">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{meal.name}</p><p className="truncate text-xs text-muted-foreground">{savedMacroText(meal)}{meal.itemCount > 0 ? ` · ${meal.itemCount} ingredientes` : ""}</p>{reason ? <p className="mt-0.5 truncate text-xs font-medium text-amber-700 dark:text-amber-400">{reason}</p> : null}</div>
         {meal.itemCount > 0 ? <Button type="button" size="sm" variant="ghost" className="min-h-9 shrink-0 px-2" disabled={pendingKey !== null || reason !== null} onClick={() => onAdjust(meal)}><SlidersHorizontal className="size-3.5" aria-hidden />Ajustar</Button> : null}
-        <Button type="button" size="icon" variant="outline" className="size-9 shrink-0" disabled={pendingKey !== null || reason !== null} aria-label={`Agregar ${meal.name}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
+        <Button type="button" size="icon" variant="ghost" className="size-10 shrink-0 rounded-full bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" disabled={pendingKey !== null || reason !== null} aria-label={`Agregar ${meal.name}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
       </li>;
     })}
   </ul>;
@@ -107,10 +107,11 @@ function AdjustSavedMeal({ meal, pending, error, quantities, onQuantityChange, o
   </div>;
 }
 
-export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
+export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedded = false }: {
   date: string;
   suggestedMeals: QuickMealCandidate[];
   initialSavedMeals: SavedMealSummary[];
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const [savedMeals, setSavedMeals] = useState(initialSavedMeals);
@@ -197,28 +198,36 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals }: {
     ? "No encontramos comidas sugeridas con esa búsqueda."
     : "Todavía no hay suficientes comidas anteriores para sugerir.";
 
+  const quickContent = (
+    <div className="space-y-3">
+      <div className="space-y-3 border-b border-border/70 bg-card pb-3">
+        <div className="relative">
+          <Label className="sr-only" htmlFor="quick-add-search">Buscar comida</Label>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input id="quick-add-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar comida..." className="h-11 pl-9 pr-10" />
+          {search ? <Button type="button" size="icon" variant="ghost" className="absolute right-0 top-0 size-11" aria-label="Limpiar búsqueda" onClick={() => setSearch("")}><X className="size-4" aria-hidden /></Button> : null}
+        </div>
+        <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div>
+      </div>
+      <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`}>
+        {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
+      </div>
+      <div className="min-h-5 text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
+    </div>
+  );
+
+  const adjustmentDialog = <ResponsiveDialog open={adjustOpen} onOpenChange={(open) => { if (!pendingRef.current) setAdjustOpen(open); }} title={adjustMeal?.name ?? "Ajustar comida"} description="Cambiá cantidades sólo para esta vez." closeLabel="Cerrar ajuste">{adjustMeal ? <AdjustSavedMeal meal={adjustMeal} pending={pendingKey === `adjust-add:${adjustMeal.id}`} error={error} quantities={quantities} onQuantityChange={(itemId, value) => setQuantities((current) => ({ ...current, [itemId]: value }))} onAdd={() => void addAdjusted()} /> : null}</ResponsiveDialog>;
+
+  if (embedded) return <>{quickContent}{adjustmentDialog}</>;
+
   return <>
     <Button type="button" variant="outline" className="h-11 w-full justify-between bg-card px-3 shadow-sm" aria-haspopup="dialog" onClick={() => handleQuickAddOpenChange(true)}>
       <span className="flex items-center gap-2 text-sm font-medium"><Zap className="size-4 text-primary" aria-hidden />Agregar rápido</span>
       <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
     </Button>
     <ResponsiveDialog open={quickAddOpen} onOpenChange={handleQuickAddOpenChange} title="Agregar rápido" description="Elegí una comida habitual o una sugerencia para agregar hoy." closeLabel="Cerrar agregado rápido">
-      <div className="space-y-3">
-        <div className="sticky -top-4 z-10 -mx-4 space-y-3 border-b border-border/70 bg-card px-4 pb-3 pt-4 sm:-mx-5 sm:px-5">
-          <div className="relative">
-            <Label className="sr-only" htmlFor="quick-add-search">Buscar comida</Label>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input id="quick-add-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar comida..." className="h-10 pl-9 pr-10" />
-            {search ? <Button type="button" size="icon" variant="ghost" className="absolute right-0 top-0 size-10" aria-label="Limpiar búsqueda" onClick={() => setSearch("")}><X className="size-4" aria-hidden /></Button> : null}
-          </div>
-          <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div>
-        </div>
-        <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`}>
-          {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
-        </div>
-        <div className="min-h-5 text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
-      </div>
+      {quickContent}
     </ResponsiveDialog>
-    <ResponsiveDialog open={adjustOpen} onOpenChange={(open) => { if (!pendingRef.current) setAdjustOpen(open); }} title={adjustMeal?.name ?? "Ajustar comida"} description="Cambiá cantidades sólo para esta vez." closeLabel="Cerrar ajuste">{adjustMeal ? <AdjustSavedMeal meal={adjustMeal} pending={pendingKey === `adjust-add:${adjustMeal.id}`} error={error} quantities={quantities} onQuantityChange={(itemId, value) => setQuantities((current) => ({ ...current, [itemId]: value }))} onAdd={() => void addAdjusted()} /> : null}</ResponsiveDialog>
+    {adjustmentDialog}
   </>;
 }

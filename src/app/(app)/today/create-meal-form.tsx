@@ -144,11 +144,13 @@ export function CreateMealForm({ date, onSuccess }: Props) {
         </div>
         <div className="space-y-1">
           <Label htmlFor="new-meal-desc">Descripción</Label>
-          <Input
+          <textarea
             id="new-meal-desc"
             name="description"
             placeholder="Opcional"
             disabled={saving}
+            rows={3}
+            className="min-h-24 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-[color,border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
           />
         </div>
         <div>
