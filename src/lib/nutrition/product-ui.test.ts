@@ -103,7 +103,8 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(profilePage).toContain("<ProfileOverview");
     expect(profileOverview).toContain("<ProfileForm");
     expect(profileForm).not.toContain("Para seguir el historial");
-    expect(settingsRoot).toContain("getNutritionConfigurationHub");
+    expect(settingsRoot).toContain("getNutritionPlanEditor");
+    expect(settingsRoot).toContain("<NutritionPlanEditor");
     expect(settingsRoot).not.toContain("FoodsCatalog");
     expect(settingsRoot).not.toContain("listIntegrationApiTokens");
     expect(goalSettings).toContain("Objetivo actual");

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(path, "utf8");
-const hub = read("src/app/(app)/settings/nutrition/page.tsx");
+const hub = read("src/app/(app)/settings/library/page.tsx");
 const page = read("src/app/(app)/settings/nutrition/meals/page.tsx");
 const catalog = read("src/app/(app)/settings/nutrition/saved-meals-catalog.tsx");
 const actions = read("src/app/(app)/settings/nutrition/actions.ts");
@@ -11,7 +11,7 @@ describe("PR30 — gestión de Comidas habituales", () => {
   it("agrega una sección propia sin confundirla con Alimentos", () => {
     expect(hub).toContain('href="/settings/nutrition/foods"');
     expect(hub).toContain('href="/settings/nutrition/meals"');
-    expect(hub).toContain('title="Comidas habituales"');
+    expect(hub).toContain('title="Comidas guardadas"');
     expect(page).toContain("<SavedMealsCatalog");
   });
 

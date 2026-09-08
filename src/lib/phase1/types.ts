@@ -29,6 +29,8 @@ export type DayLog = {
   nutrition_goal_period_id: string | null;
   expenditure_rule_period_id: string | null;
   work_schedule_period_id: string | null;
+  nutrition_plan_period_id: string | null;
+  energy_config_period_id: string | null;
   nutrition_target_kcal_snapshot: number | null;
   protein_target_g_snapshot: number | null;
   water_target_l_snapshot: number | null;
@@ -125,6 +127,41 @@ export type WorkSchedulePeriod = {
   friday: boolean;
   saturday: boolean;
   sunday: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NutritionPlanPeriod = {
+  id: string;
+  user_id: string;
+  effective_from: string;
+  name: string;
+  base_water_l: number;
+  training_calorie_delta_kcal: number;
+  training_water_delta_l: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NutritionPlanWeekday = {
+  id: string;
+  plan_id: string;
+  user_id: string;
+  weekday: number;
+  calorie_target_kcal: number;
+  protein_target_g: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EnergyConfigPeriod = {
+  id: string;
+  user_id: string;
+  effective_from: string;
+  activity_level: "low" | "moderate" | "high";
+  activity_factor: number;
+  training_expenditure_delta_kcal: number;
+  formula_version: "harris_benedict_product_v1";
   created_at: string;
   updated_at: string;
 };
