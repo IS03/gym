@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
@@ -11,13 +11,18 @@ import { initialProfileSaveState } from "./profile-state";
 
 type ProfileFormProps = {
   profile: Profile | null;
+  onSaved?: () => void;
 };
 
-export function ProfileForm({ profile }: ProfileFormProps) {
+export function ProfileForm({ profile, onSaved }: ProfileFormProps) {
   const [state, formAction, pending] = useActionState(
     saveProfileAction,
     initialProfileSaveState,
   );
+
+  useEffect(() => {
+    if (state.status === "success") onSaved?.();
+  }, [onSaved, state.status]);
 
   return (
     <form action={formAction} className="space-y-4">

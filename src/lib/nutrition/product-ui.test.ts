@@ -18,6 +18,7 @@ const settings = source("src/app/(app)/settings/nutrition/nutrition-settings-for
 const settingsRoot = source("src/app/(app)/settings/nutrition/page.tsx");
 const settingsProfile = source("src/app/(app)/settings/page.tsx");
 const profilePage = source("src/app/(app)/settings/profile/page.tsx");
+const profileOverview = source("src/app/(app)/settings/profile/profile-overview.tsx");
 const profileForm = source("src/app/(app)/settings/profile-form.tsx");
 const goalSettings = source("src/app/(app)/settings/nutrition/goals/page.tsx");
 const foodsPage = source("src/app/(app)/settings/nutrition/foods/page.tsx");
@@ -99,7 +100,8 @@ describe("PR 7 — experiencia nutricional", () => {
   it("separa perfil, hub de nutrición y pantallas especializadas", () => {
     expect(settingsProfile).not.toContain("<ProfileForm");
     expect(settingsProfile).toContain('href="/settings/profile"');
-    expect(profilePage).toContain("<ProfileForm");
+    expect(profilePage).toContain("<ProfileOverview");
+    expect(profileOverview).toContain("<ProfileForm");
     expect(profileForm).not.toContain("Para seguir el historial");
     expect(settingsRoot).toContain("getNutritionConfigurationHub");
     expect(settingsRoot).not.toContain("FoodsCatalog");
