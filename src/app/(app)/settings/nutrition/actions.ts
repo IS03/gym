@@ -23,13 +23,25 @@ import {
   setSavedMealActive,
   type SavedMealMutationInput,
 } from "@/lib/nutrition/saved-meals";
+import {
+  saveEnergyConfigV2,
+  saveNutritionPlanV2,
+} from "@/lib/nutrition/plan-v2";
 
 export type SettingsActionState = { ok: boolean; error?: string };
 
 function refresh() {
-  for (const path of ["/settings", "/settings/nutrition", "/settings/nutrition/goals", "/settings/nutrition/expenditure", "/settings/nutrition/schedule", "/settings/nutrition/foods", "/settings/nutrition/meals", "/settings/nutrition/integrations", "/today", "/home", "/history"]) {
+  for (const path of ["/settings", "/settings/nutrition", "/settings/nutrition/energy", "/settings/nutrition/goals", "/settings/nutrition/expenditure", "/settings/nutrition/schedule", "/settings/nutrition/foods", "/settings/nutrition/meals", "/settings/nutrition/integrations", "/today", "/today/reports", "/home", "/history"]) {
     revalidatePath(path);
   }
+}
+
+export async function saveNutritionPlanV2Action(input: Parameters<typeof saveNutritionPlanV2>[0]) {
+  return run(() => saveNutritionPlanV2(input));
+}
+
+export async function saveEnergyConfigV2Action(input: Parameters<typeof saveEnergyConfigV2>[0]) {
+  return run(() => saveEnergyConfigV2(input));
 }
 
 async function run(task: () => Promise<unknown>): Promise<SettingsActionState> {
