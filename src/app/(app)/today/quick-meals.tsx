@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BookmarkPlus, Check, ChevronRight, Plus, Search, SlidersHorizontal, X, Zap } from "lucide-react";
-import { useRef, useState } from "react";
+import { BookmarkPlus, Check, ChevronRight, LoaderCircle, Plus, Search, SlidersHorizontal, X, Zap } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,46 @@ function savedMacroText(meal: SavedMealSummary) {
   return `${shown(meal.calories, " kcal")} · P ${shown(meal.protein_g)} · C ${shown(meal.carbs_g)} · G ${shown(meal.fat_g)}`;
 }
 
-function SuggestedRows({ meals, pendingKey, savedSourceId, onAdd, onSave, framed = false }: {
+type QuickAddState = "idle" | "pending" | "success";
+
+function QuickAddButton({ label, state, disabled, onClick }: {
+  label: string;
+  state: QuickAddState;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const ariaLabel = state === "pending"
+    ? `Agregando ${label}`
+    : state === "success"
+      ? `${label} agregada`
+      : `Agregar ${label}`;
+
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-10 shrink-0 rounded-full bg-primary/10 text-primary transition-colors duration-150 hover:bg-primary/15 hover:text-primary motion-reduce:transition-none"
+      disabled={disabled}
+      aria-label={ariaLabel}
+      aria-busy={state === "pending"}
+      onClick={onClick}
+    >
+      {state === "pending" ? (
+        <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+      ) : state === "success" ? (
+        <Check className="size-4" aria-hidden />
+      ) : (
+        <Plus className="size-4" aria-hidden />
+      )}
+    </Button>
+  );
+}
+
+function SuggestedRows({ meals, pendingKey, successKey, savedSourceId, onAdd, onSave, framed = false }: {
   meals: QuickMealCandidate[];
   pendingKey: string | null;
+  successKey: string | null;
   savedSourceId: string | null;
   onAdd: (meal: QuickMealCandidate) => void;
   onSave: (meal: QuickMealCandidate) => void;
@@ -53,20 +90,23 @@ function SuggestedRows({ meals, pendingKey, savedSourceId, onAdd, onSave, framed
 }) {
   return <ul className={cn("divide-y divide-border/70", framed && "rounded-xl border bg-card")}>
     {meals.map((meal) => {
-      const adding = pendingKey === `suggested-add:${meal.sourceMealId}`;
+      const addKey = `suggested-add:${meal.sourceMealId}`;
+      const adding = pendingKey === addKey;
+      const added = successKey === addKey;
       const saving = pendingKey === `suggested-save:${meal.sourceMealId}`;
       return <li key={meal.key} className="flex min-w-0 items-center gap-1 px-3 py-2.5">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{meal.label}</p><p className="truncate text-xs text-muted-foreground">{suggestedMacroText(meal)}{meal.useCount > 1 ? ` · ${meal.useCount} veces` : ""}</p></div>
         <Button type="button" size="icon" variant="ghost" className="size-9 shrink-0" disabled={pendingKey !== null} aria-label={`Guardar ${meal.label} como habitual`} onClick={() => onSave(meal)}>{saving ? <span className="text-[11px]">…</span> : savedSourceId === meal.sourceMealId ? <Check className="size-4 text-emerald-600" aria-hidden /> : <BookmarkPlus className="size-4" aria-hidden />}</Button>
-        <Button type="button" size="icon" variant="ghost" className="size-10 shrink-0 rounded-full bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" disabled={pendingKey !== null} aria-label={`Agregar ${meal.label}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
+        <QuickAddButton label={meal.label} state={adding ? "pending" : added ? "success" : "idle"} disabled={pendingKey !== null || added} onClick={() => onAdd(meal)} />
       </li>;
     })}
   </ul>;
 }
 
-function SavedRows({ meals, pendingKey, onAdd, onAdjust, framed = false }: {
+function SavedRows({ meals, pendingKey, successKey, onAdd, onAdjust, framed = false }: {
   meals: SavedMealSummary[];
   pendingKey: string | null;
+  successKey: string | null;
   onAdd: (meal: SavedMealSummary) => void;
   onAdjust: (meal: SavedMealSummary) => void;
   framed?: boolean;
@@ -74,11 +114,13 @@ function SavedRows({ meals, pendingKey, onAdd, onAdjust, framed = false }: {
   return <ul className={cn("divide-y divide-border/70", framed && "rounded-xl border bg-card")}>
     {meals.map((meal) => {
       const reason = savedMealRegistrability(meal);
-      const adding = pendingKey === `saved-add:${meal.id}`;
+      const addKey = `saved-add:${meal.id}`;
+      const adding = pendingKey === addKey;
+      const added = successKey === addKey;
       return <li key={meal.id} className="flex min-w-0 items-center gap-1 px-3 py-2.5">
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{meal.name}</p><p className="truncate text-xs text-muted-foreground">{savedMacroText(meal)}{meal.itemCount > 0 ? ` · ${meal.itemCount} ingredientes` : ""}</p>{reason ? <p className="mt-0.5 truncate text-xs font-medium text-amber-700 dark:text-amber-400">{reason}</p> : null}</div>
         {meal.itemCount > 0 ? <Button type="button" size="sm" variant="ghost" className="min-h-9 shrink-0 px-2" disabled={pendingKey !== null || reason !== null} onClick={() => onAdjust(meal)}><SlidersHorizontal className="size-3.5" aria-hidden />Ajustar</Button> : null}
-        <Button type="button" size="icon" variant="ghost" className="size-10 shrink-0 rounded-full bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary" disabled={pendingKey !== null || reason !== null} aria-label={`Agregar ${meal.name}`} onClick={() => onAdd(meal)}>{adding ? <span className="text-[11px]">…</span> : <Plus className="size-4" aria-hidden />}</Button>
+        <QuickAddButton label={meal.name} state={adding ? "pending" : added ? "success" : "idle"} disabled={pendingKey !== null || reason !== null || added} onClick={() => onAdd(meal)} />
       </li>;
     })}
   </ul>;
@@ -118,6 +160,9 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
   const [tab, setTab] = useState<QuickAddTab>(() => defaultQuickAddTab(initialSavedMeals.length, suggestedMeals.length));
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const pendingRef = useRef(false);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [successKey, setSuccessKey] = useState<string | null>(null);
+  const [successAnnouncement, setSuccessAnnouncement] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savedSourceId, setSavedSourceId] = useState<string | null>(null);
@@ -129,24 +174,52 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
   const filteredSavedMeals = filterQuickAddItems(savedMeals, search, (meal) => meal.name);
   const filteredSuggestedMeals = filterQuickAddItems(suggestedMeals, search, (meal) => meal.label);
 
-  async function run(key: string, task: () => Promise<{ ok: boolean; error?: string }>, success: string) {
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
+
+  function clearLocalSuccess() {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = null;
+    setSuccessKey(null);
+    setSuccessAnnouncement("");
+  }
+
+  function showLocalSuccess(key: string, label: string) {
+    clearLocalSuccess();
+    setSuccessKey(key);
+    setSuccessAnnouncement(`${label} agregada`);
+    successTimerRef.current = setTimeout(() => {
+      setSuccessKey((current) => current === key ? null : current);
+      setSuccessAnnouncement("");
+      successTimerRef.current = null;
+    }, 900);
+  }
+
+  async function run(key: string, task: () => Promise<{ ok: boolean; error?: string }>, success?: string) {
     if (pendingRef.current) return false;
     pendingRef.current = true;
+    clearLocalSuccess();
     setPendingKey(key); setError(null); setNotice(null);
     try {
       const result = await task();
       if (!result.ok) { setError(result.error ?? "No pudimos completar la acción."); return false; }
-      setNotice(success); router.refresh(); return true;
+      if (success) setNotice(success);
+      router.refresh(); return true;
     } catch { setError("No pudimos completar la acción. Intentá nuevamente."); return false; }
     finally { pendingRef.current = false; setPendingKey(null); }
   }
 
   async function addSaved(meal: SavedMealSummary) {
-    await run(`saved-add:${meal.id}`, () => quickAddSavedMealAction({ savedMealId: meal.id, date }), "Agregada");
+    const key = `saved-add:${meal.id}`;
+    const added = await run(key, () => quickAddSavedMealAction({ savedMealId: meal.id, date }));
+    if (added) showLocalSuccess(key, meal.name);
   }
 
   async function addSuggested(meal: QuickMealCandidate) {
-    await run(`suggested-add:${meal.sourceMealId}`, () => quickAddMealAction(meal.sourceMealId), "Agregada");
+    const key = `suggested-add:${meal.sourceMealId}`;
+    const added = await run(key, () => quickAddMealAction(meal.sourceMealId));
+    if (added) showLocalSuccess(key, meal.label);
   }
 
   async function saveSuggested(meal: QuickMealCandidate) {
@@ -210,9 +283,10 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
         <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div>
       </div>
       <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`}>
-        {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
+        {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} successKey={successKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} successKey={successKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
       </div>
-      <div className="min-h-5 text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
+      <p className="sr-only" aria-live="polite" role="status">{successAnnouncement}</p>
+      {notice || error ? <div className="text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-primary" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div> : null}
     </div>
   );
 

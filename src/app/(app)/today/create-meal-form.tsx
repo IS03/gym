@@ -4,12 +4,16 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   checkRecentDuplicateMealAction,
   createMealAction,
 } from "./actions";
+import {
+  MealField,
+  mealFieldControlClass,
+  mealTextareaClass,
+} from "./meal-field";
 
 type Props = {
   date: string;
@@ -67,28 +71,26 @@ export function CreateMealForm({ date, onSuccess }: Props) {
           }
         }}
       >
-        <div className="min-w-0 space-y-1">
-          <Label htmlFor="new-meal-date">Fecha</Label>
+        <MealField id="new-meal-date" label="Fecha">
           <DateField
             id="new-meal-date"
             name="date"
             required
             defaultValue={date}
             disabled={saving}
-            className="min-w-0 max-w-full [min-inline-size:0]"
+            className={`${mealFieldControlClass} min-w-0 max-w-full [min-inline-size:0]`}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="new-meal-title">Título</Label>
+        </MealField>
+        <MealField id="new-meal-title" label="Título">
           <Input
             id="new-meal-title"
             name="title"
             placeholder="Ej: Yogur + granola"
             disabled={saving}
+            className={mealFieldControlClass}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="new-meal-final_calories">Calorías</Label>
+        </MealField>
+        <MealField id="new-meal-final_calories" label="Calorías">
           <Input
             id="new-meal-final_calories"
             name="final_calories"
@@ -99,11 +101,11 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             inputMode="numeric"
             placeholder="Ej: 420"
             disabled={saving}
+            className={mealFieldControlClass}
           />
-        </div>
+        </MealField>
         <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="new-meal-protein">Proteína (g)</Label>
+          <MealField id="new-meal-protein" label="Proteína (g)">
             <Input
               id="new-meal-protein"
               name="final_protein_g"
@@ -113,10 +115,10 @@ export function CreateMealForm({ date, onSuccess }: Props) {
               pattern="[0-9]*[.,]?[0-9]*"
               placeholder="Ej: 30"
               disabled={saving}
+              className={mealFieldControlClass}
             />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="new-meal-carbs">Carbohidratos (g)</Label>
+          </MealField>
+          <MealField id="new-meal-carbs" label="Carbohidratos (g)">
             <Input
               id="new-meal-carbs"
               name="final_carbs_g"
@@ -126,11 +128,11 @@ export function CreateMealForm({ date, onSuccess }: Props) {
               pattern="[0-9]*[.,]?[0-9]*"
               placeholder="Ej: 45"
               disabled={saving}
+              className={mealFieldControlClass}
             />
-          </div>
+          </MealField>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="new-meal-fat">Grasas (g)</Label>
+        <MealField id="new-meal-fat" label="Grasas (g)">
           <Input
             id="new-meal-fat"
             name="final_fat_g"
@@ -140,19 +142,19 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             pattern="[0-9]*[.,]?[0-9]*"
             placeholder="Ej: 12"
             disabled={saving}
+            className={mealFieldControlClass}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="new-meal-desc">Descripción</Label>
+        </MealField>
+        <MealField id="new-meal-desc" label="Descripción">
           <textarea
             id="new-meal-desc"
             name="description"
             placeholder="Opcional"
             disabled={saving}
             rows={3}
-            className="min-h-24 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-[color,border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
+            className={mealTextareaClass}
           />
-        </div>
+        </MealField>
         <div>
           <Button className="h-11 w-full" type="submit" disabled={saving}>
             {saving ? "Guardando…" : "Agregar comida"}
