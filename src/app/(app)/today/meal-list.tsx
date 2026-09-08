@@ -7,9 +7,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { MealEntry } from "@/lib/phase1/types";
 import { softDeleteMealAction, updateMealAction } from "./actions";
+import {
+  MealField,
+  mealFieldControlClass,
+  mealTextareaClass,
+} from "./meal-field";
 import { ResponsiveDialog } from "./responsive-dialog";
 
 const gramFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
@@ -73,17 +77,93 @@ function MealEditorForm({ meal, date, onSaved, onRequestDelete }: { meal: TodayM
   }
 
   return (
-    <form className="min-w-0 space-y-4" onSubmit={save}>
+    <form className="min-w-0 space-y-3" onSubmit={save}>
       <input type="hidden" name="id" value={meal.id} />
-      <div className="min-w-0 space-y-1"><Label htmlFor="edit-meal-date">Fecha</Label><DateField id="edit-meal-date" name="date" required defaultValue={date} disabled={saving} /></div>
-      <div className="space-y-1"><Label htmlFor="edit-meal-title">Título</Label><Input id="edit-meal-title" name="title" defaultValue={meal.title ?? ""} disabled={saving} /></div>
-      <div className="space-y-1"><Label htmlFor="edit-meal-calories">Calorías</Label><Input id="edit-meal-calories" name="final_calories" type="number" min={1} step={1} required inputMode="numeric" defaultValue={meal.final_calories === null ? "" : String(meal.final_calories)} disabled={saving} /></div>
+      <MealField id="edit-meal-date" label="Fecha">
+        <DateField
+          id="edit-meal-date"
+          name="date"
+          required
+          defaultValue={date}
+          disabled={saving}
+          className={mealFieldControlClass}
+        />
+      </MealField>
+      <MealField id="edit-meal-title" label="Título">
+        <Input
+          id="edit-meal-title"
+          name="title"
+          defaultValue={meal.title ?? ""}
+          disabled={saving}
+          className={mealFieldControlClass}
+        />
+      </MealField>
+      <MealField id="edit-meal-calories" label="Calorías">
+        <Input
+          id="edit-meal-calories"
+          name="final_calories"
+          type="number"
+          min={1}
+          step={1}
+          required
+          inputMode="numeric"
+          defaultValue={meal.final_calories === null ? "" : String(meal.final_calories)}
+          disabled={saving}
+          className={mealFieldControlClass}
+        />
+      </MealField>
       <div className="grid grid-cols-2 gap-2">
-        <div className="min-w-0 space-y-1"><Label htmlFor="edit-meal-protein">Proteína (g)</Label><Input id="edit-meal-protein" name="final_protein_g" type="text" min={0} inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" defaultValue={meal.final_protein_g === null ? "" : String(meal.final_protein_g)} disabled={saving} /></div>
-        <div className="min-w-0 space-y-1"><Label htmlFor="edit-meal-carbs">Carbohidratos (g)</Label><Input id="edit-meal-carbs" name="final_carbs_g" type="text" min={0} inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" defaultValue={meal.final_carbs_g === null ? "" : String(meal.final_carbs_g)} disabled={saving} /></div>
+        <MealField id="edit-meal-protein" label="Proteína (g)">
+          <Input
+            id="edit-meal-protein"
+            name="final_protein_g"
+            type="text"
+            min={0}
+            inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
+            defaultValue={meal.final_protein_g === null ? "" : String(meal.final_protein_g)}
+            disabled={saving}
+            className={mealFieldControlClass}
+          />
+        </MealField>
+        <MealField id="edit-meal-carbs" label="Carbohidratos (g)">
+          <Input
+            id="edit-meal-carbs"
+            name="final_carbs_g"
+            type="text"
+            min={0}
+            inputMode="decimal"
+            pattern="[0-9]*[.,]?[0-9]*"
+            defaultValue={meal.final_carbs_g === null ? "" : String(meal.final_carbs_g)}
+            disabled={saving}
+            className={mealFieldControlClass}
+          />
+        </MealField>
       </div>
-      <div className="space-y-1"><Label htmlFor="edit-meal-fat">Grasas (g)</Label><Input id="edit-meal-fat" name="final_fat_g" type="text" min={0} inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" defaultValue={meal.final_fat_g === null ? "" : String(meal.final_fat_g)} disabled={saving} /></div>
-      <div className="space-y-1"><Label htmlFor="edit-meal-description">Descripción</Label><textarea id="edit-meal-description" name="description" defaultValue={meal.description ?? ""} disabled={saving} rows={3} className="min-h-24 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-[color,border-color,box-shadow] duration-150 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30" /></div>
+      <MealField id="edit-meal-fat" label="Grasas (g)">
+        <Input
+          id="edit-meal-fat"
+          name="final_fat_g"
+          type="text"
+          min={0}
+          inputMode="decimal"
+          pattern="[0-9]*[.,]?[0-9]*"
+          defaultValue={meal.final_fat_g === null ? "" : String(meal.final_fat_g)}
+          disabled={saving}
+          className={mealFieldControlClass}
+        />
+      </MealField>
+      <MealField id="edit-meal-description" label="Descripción">
+        <textarea
+          id="edit-meal-description"
+          name="description"
+          defaultValue={meal.description ?? ""}
+          placeholder="Opcional"
+          disabled={saving}
+          rows={3}
+          className={mealTextareaClass}
+        />
+      </MealField>
       <div className="min-h-5" aria-live="polite">{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div>
       <Button className="h-11 w-full" type="submit" disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
       <details className="group border-t pt-3">

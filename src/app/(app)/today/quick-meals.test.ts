@@ -33,7 +33,19 @@ describe("PR30.1 — Agregar rápido compacto", () => {
     expect(quickAdd).not.toContain("Ver más");
     expect(quickAdd).toContain('aria-live="polite"');
     expect(quickAdd).toContain("pendingRef.current");
-    expect(quickAdd).toContain("Agregada");
+  });
+
+  it("muestra pending y éxito en el botón de la fila sin feedback global visible", () => {
+    expect(quickAdd).toContain("function QuickAddButton");
+    expect(quickAdd).toContain("LoaderCircle");
+    expect(quickAdd).toContain('state === "success"');
+    expect(quickAdd).toContain('`saved-add:${meal.id}`');
+    expect(quickAdd).toContain('`suggested-add:${meal.sourceMealId}`');
+    expect(quickAdd).toContain("showLocalSuccess(key, meal.name)");
+    expect(quickAdd).toContain("showLocalSuccess(key, meal.label)");
+    expect(quickAdd).toContain("}, 900)");
+    expect(quickAdd).toContain('className="sr-only" aria-live="polite"');
+    expect(quickAdd).not.toContain('text-emerald-700 dark:text-emerald-400" role="status"><Check className="size-3.5" aria-hidden />{notice}');
   });
 
   it("busca en la pestaña abierta sin pedir datos por tecla y permite limpiar", () => {
