@@ -8,6 +8,7 @@ import { formatSessionDate } from "@/lib/phase2/session-history";
 import {
   quickHistoryCompletedSets,
   quickHistorySetLabel,
+  quickHistoryUniformLoadDetails,
   quickHistoryUniformLoadSummary,
   splitQuickExerciseHistory,
 } from "@/lib/phase2/quick-exercise-history";
@@ -23,13 +24,23 @@ type QuickExerciseHistorySheetProps = {
 function HistorySets({ session }: { session: ExerciseReportSession }) {
   const completedSets = quickHistoryCompletedSets(session);
   const uniformSummary = quickHistoryUniformLoadSummary(session);
+  const uniformDetails = quickHistoryUniformLoadDetails(session);
 
   if (completedSets.length === 0) {
     return <p className="mt-2 text-sm text-muted-foreground">No hay series completadas.</p>;
   }
 
   if (uniformSummary) {
-    return <p className="metric-number mt-2 text-sm font-medium">{uniformSummary}</p>;
+    return (
+      <div className="mt-2">
+        <p className="metric-number text-sm font-medium">{uniformSummary}</p>
+        {uniformDetails?.rir ? (
+          <p className="metric-number mt-0.5 text-xs text-muted-foreground">
+            RIR {uniformDetails.rir}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -48,6 +59,31 @@ function HistorySets({ session }: { session: ExerciseReportSession }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function LatestMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-r border-primary/15 px-2 first:pl-0 last:border-r-0 last:pr-0">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="metric-number mt-1 truncate text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function LatestSessionSummary({ session }: { session: ExerciseReportSession }) {
+  const details = quickHistoryUniformLoadDetails(session);
+
+  if (!details) return <HistorySets session={session} />;
+
+  return (
+    <div className="mt-3 grid grid-cols-3 rounded-xl border border-primary/15 bg-background/45 px-3 py-2.5">
+      <LatestMetric label="Peso" value={details.weight} />
+      <LatestMetric label="Reps" value={details.reps} />
+      <LatestMetric label="RIR" value={details.rir ?? "—"} />
+    </div>
   );
 }
 
@@ -124,7 +160,7 @@ export function QuickExerciseHistorySheet({
                       <p className="text-sm font-semibold">{formatSessionDate(latest.logDate)}</p>
                       <p className="truncate text-xs text-muted-foreground">{latest.routineName}</p>
                     </div>
-                    <HistorySets session={latest} />
+                    <LatestSessionSummary session={latest} />
                   </section>
 
                   {previous.length > 0 ? (

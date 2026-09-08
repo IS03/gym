@@ -4,6 +4,7 @@ import {
   quickHistoryCompletedSets,
   quickHistoryLatestSummary,
   quickHistorySetLabel,
+  quickHistoryUniformLoadDetails,
   quickHistoryUniformLoadSummary,
   recentExerciseHistorySessions,
   splitQuickExerciseHistory,
@@ -96,6 +97,29 @@ describe("historial rápido de ejercicio", () => {
     ).toBe("90 kg · 10 / 9 reps");
     expect(
       quickHistoryUniformLoadSummary(
+        session({
+          sets: [
+            set({ id: "one", actual_weight_kg: 90, actual_reps: 10 }),
+            set({ id: "two", actual_weight_kg: 85, actual_reps: 8 }),
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("expone peso, reps y RIR separados para la tarjeta destacada sin falsear cargas mixtas", () => {
+    expect(
+      quickHistoryUniformLoadDetails(
+        session({
+          sets: [
+            set({ id: "one", actual_weight_kg: 17.5, actual_reps: 10, target_rir: 2 }),
+            set({ id: "two", actual_weight_kg: 17.5, actual_reps: 8, target_rir: 1 }),
+          ],
+        }),
+      ),
+    ).toEqual({ weight: "17,5 kg", reps: "10 / 8", rir: "2 / 1" });
+    expect(
+      quickHistoryUniformLoadDetails(
         session({
           sets: [
             set({ id: "one", actual_weight_kg: 90, actual_reps: 10 }),
