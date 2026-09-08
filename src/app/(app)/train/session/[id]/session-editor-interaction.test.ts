@@ -134,10 +134,12 @@ describe("PR 14 — interacción de sesión", () => {
 
   it("mantiene el encabezado de sesión en su posición natural y simplifica las filas de series", () => {
     expect(editor).not.toContain('"sticky top-[max(0.5rem,env(safe-area-inset-top))]');
-    expect(editor).toContain('"space-y-2"');
-    expect(editor).toContain('rounded-lg border border-border/55 px-2 py-2');
+    expect(editor).toContain('overflow-hidden rounded-lg border border-border/55 bg-background/20');
+    expect(editor).toContain('items-center border-b border-border/50 px-2 py-2 last:border-b-0');
+    expect(editor).not.toContain('items-center rounded-lg border border-border/55 px-2 py-2');
     expect(editor).toContain("grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_2.5rem]");
-    expect(editor).toContain('h-9 w-full rounded-lg border border-dashed');
+    expect(editor).toContain('h-8 w-full rounded-md border border-dashed');
+    expect(editor).not.toContain("Este resumen se guarda al finalizar.");
   });
 });
 
