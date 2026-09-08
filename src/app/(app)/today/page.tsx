@@ -5,6 +5,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { formatDateFieldValue } from "@/lib/date-field-display";
 import { cn } from "@/lib/utils";
 import { getNutritionDay } from "@/lib/nutrition/day";
+import { getEnergyConfigEditor } from "@/lib/nutrition/plan-v2";
+import { resolveV2EnergyBreakdown, type ActivityLevel } from "@/lib/nutrition/plan-v2-core";
 import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { getStepsOverview } from "@/lib/nutrition/steps-report";
 import { listActiveFoods } from "@/lib/nutrition/product";
@@ -47,16 +49,33 @@ function formatProteinProgress(consumed: number, target: number | null) {
   return target === null ? `${value} g` : `${value} / ${formatGrams(target)}`;
 }
 
+function activityLevelLabel(value: ActivityLevel) {
+  if (value === "low") return "Baja";
+  if (value === "high") return "Alta";
+  return "Moderada";
+}
+
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods, savedMeals] = await Promise.all([
+  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods, savedMeals, energyConfig] = await Promise.all([
     getNutritionDay(today, undefined, auth),
     getStepsOverview(today, auth),
     getQuickMealCandidates(today, auth),
     listActiveFoods(auth),
     listActiveSavedMeals(auth),
+    getEnergyConfigEditor(today),
   ]);
+  const energyBreakdown = dayLog.energy_config_period_id && energyConfig.source === "v2"
+    ? resolveV2EnergyBreakdown({
+        bmrKcal: dayLog.bmr_kcal_snapshot,
+        activityLevel: energyConfig.activityLevel,
+        baseExpenditureMode: energyConfig.baseExpenditureMode,
+        customBaseExpenditureKcal: energyConfig.customBaseExpenditureKcal,
+        trainingExpenditureDeltaKcal: energyConfig.trainingExpenditureDeltaKcal,
+        workoutStatuses: context.gym.effective ? ["completed"] : [],
+      })
+    : null;
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
@@ -144,6 +163,12 @@ export default async function TodayPage() {
           workSourceLabel={context.work.source === "override" ? "corrección" : context.work.source === "schedule" ? "horario" : "sin regla"}
           gymLabel={context.gym.effective ? "Sí" : "No"}
           gymSourceLabel={context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}
+          v2EnergyContext={energyBreakdown ? {
+            activityLevelLabel: activityLevelLabel(energyConfig.activityLevel),
+            trainingLabel: energyBreakdown.completedTraining ? "Completado" : "Sin completar",
+            baseExpenditureLabel: formatKcal(energyBreakdown.baseUsedKcal),
+            dailyExpenditureLabel: formatKcal(context.expenditureKcal),
+          } : null}
           waterTargetLabel={context.targets.waterL == null ? null : formatLiters(context.targets.waterL)}
           stepsSummary={stepsOverview.summary}
         />

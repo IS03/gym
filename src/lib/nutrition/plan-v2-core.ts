@@ -5,6 +5,7 @@ export const ACTIVITY_FACTORS = {
 } as const;
 
 export type ActivityLevel = keyof typeof ACTIVITY_FACTORS;
+export type BaseExpenditureMode = "automatic" | "custom";
 
 export const WEEKDAYS = [
   { value: 1, short: "Lun", label: "Lunes" },
@@ -36,16 +37,66 @@ export function estimateBaseExpenditure(bmrKcal: number, activityLevel: Activity
   return Math.round(bmrKcal * ACTIVITY_FACTORS[activityLevel]);
 }
 
+export function resolveV2EnergyBreakdown(input: {
+  bmrKcal: number | null;
+  activityLevel: ActivityLevel;
+  baseExpenditureMode: BaseExpenditureMode;
+  customBaseExpenditureKcal: number | null;
+  trainingExpenditureDeltaKcal: number;
+  workoutStatuses: string[];
+}) {
+  if (input.bmrKcal == null) return null;
+  const automaticBaseKcal = estimateBaseExpenditure(input.bmrKcal, input.activityLevel);
+  const baseUsedKcal = input.baseExpenditureMode === "custom"
+    ? input.customBaseExpenditureKcal
+    : automaticBaseKcal;
+  if (baseUsedKcal == null) return null;
+  const completedTraining = input.workoutStatuses.some((status) => status === "completed");
+  const trainingDeltaAppliedKcal = completedTraining
+    ? input.trainingExpenditureDeltaKcal
+    : 0;
+  return {
+    automaticBaseKcal,
+    baseUsedKcal,
+    completedTraining,
+    trainingDeltaAppliedKcal,
+    dailyExpenditureKcal: baseUsedKcal + trainingDeltaAppliedKcal,
+  };
+}
+
 export function resolveV2Energy(input: {
   bmrKcal: number | null;
   activityLevel: ActivityLevel;
+  baseExpenditureMode?: BaseExpenditureMode;
+  customBaseExpenditureKcal?: number | null;
   trainingExpenditureDeltaKcal: number;
   workoutStatuses: string[];
 }): number | null {
-  if (input.bmrKcal == null) return null;
-  const completed = input.workoutStatuses.some((status) => status === "completed");
-  return estimateBaseExpenditure(input.bmrKcal, input.activityLevel)
-    + (completed ? input.trainingExpenditureDeltaKcal : 0);
+  return resolveV2EnergyBreakdown({
+    ...input,
+    baseExpenditureMode: input.baseExpenditureMode ?? "automatic",
+    customBaseExpenditureKcal: input.customBaseExpenditureKcal ?? null,
+  })?.dailyExpenditureKcal ?? null;
+}
+
+export type WeekdayPropagationScope = "day" | "weekdays" | "all";
+
+export function applyWeekdayTargets(
+  weekdays: Array<{
+    weekday: WeekdayNumber;
+    calorieTargetKcal: number | null;
+    proteinTargetG: number | null;
+  }>,
+  selectedDay: WeekdayNumber,
+  values: Pick<NutritionWeekdayTarget, "calorieTargetKcal" | "proteinTargetG">,
+  scope: WeekdayPropagationScope,
+) {
+  return weekdays.map((day) => {
+    const applies = scope === "all"
+      || (scope === "weekdays" && day.weekday <= 5)
+      || (scope === "day" && day.weekday === selectedDay);
+    return applies ? { ...day, ...values } : day;
+  });
 }
 
 export function resolveV2Targets(input: {

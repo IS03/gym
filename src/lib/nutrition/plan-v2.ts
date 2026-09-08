@@ -13,6 +13,7 @@ import {
   ACTIVITY_FACTORS,
   WEEKDAYS,
   type ActivityLevel,
+  type BaseExpenditureMode,
   type WeekdayNumber,
 } from "./plan-v2-core";
 
@@ -35,6 +36,8 @@ export type EnergyConfigEditor = {
   id: string | null;
   effectiveFrom: string | null;
   activityLevel: ActivityLevel;
+  baseExpenditureMode: BaseExpenditureMode;
+  customBaseExpenditureKcal: number | null;
   trainingExpenditureDeltaKcal: number;
   source: "v2" | "legacy" | "default";
 };
@@ -152,6 +155,8 @@ export async function getEnergyConfigEditor(date: string): Promise<EnergyConfigE
       id: config.id,
       effectiveFrom: config.effective_from,
       activityLevel: config.activity_level,
+      baseExpenditureMode: config.base_expenditure_mode,
+      customBaseExpenditureKcal: config.custom_base_expenditure_kcal,
       trainingExpenditureDeltaKcal: config.training_expenditure_delta_kcal,
       source: "v2",
     };
@@ -161,6 +166,8 @@ export async function getEnergyConfigEditor(date: string): Promise<EnergyConfigE
     id: null,
     effectiveFrom: legacy?.effective_from ?? null,
     activityLevel: "moderate",
+    baseExpenditureMode: "automatic",
+    customBaseExpenditureKcal: null,
     trainingExpenditureDeltaKcal: legacyTrainingDelta(legacy),
     source: legacy ? "legacy" : "default",
   };
@@ -200,12 +207,22 @@ export async function saveNutritionPlanV2(input: {
 
 export async function saveEnergyConfigV2(input: {
   activityLevel: string;
+  baseExpenditureMode: string;
+  customBaseExpenditureKcal: unknown;
   trainingExpenditureDeltaKcal: unknown;
 }) {
   if (!(input.activityLevel in ACTIVITY_FACTORS)) throw new Error("Actividad cotidiana inválida.");
+  if (input.baseExpenditureMode !== "automatic" && input.baseExpenditureMode !== "custom") {
+    throw new Error("Modo de gasto base inválido.");
+  }
+  const customBaseExpenditureKcal = input.baseExpenditureMode === "custom"
+    ? parseRequiredNumber(input.customBaseExpenditureKcal, "Gasto base personalizado", { integer: true, min: 1, max: 20_000 })
+    : null;
   const { supabase } = await requireAuthenticatedRequestContext();
   const { data, error } = await supabase.rpc("save_energy_config_v2", {
     p_activity_level: input.activityLevel,
+    p_base_expenditure_mode: input.baseExpenditureMode,
+    p_custom_base_expenditure_kcal: customBaseExpenditureKcal,
     p_training_expenditure_delta_kcal: parseRequiredNumber(
       input.trainingExpenditureDeltaKcal,
       "Ajuste por entrenamiento",
