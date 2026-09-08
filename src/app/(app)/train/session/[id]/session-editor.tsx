@@ -235,21 +235,21 @@ function SetRow({
     <div
       className={cn(
         SET_GRID_SHARED,
-        "items-center rounded-lg border border-border/55 px-2 py-2 transition-colors duration-150",
+        "items-center border-b border-border/50 px-2 py-2 last:border-b-0 transition-colors duration-150",
         set.is_completed
-          ? "border-emerald-500/15 bg-emerald-500/[0.055]"
-          : "bg-background/20",
+          ? "bg-emerald-500/[0.055]"
+          : "bg-transparent",
       )}
     >
       <div className="flex min-w-0 items-center justify-center">
-        <span className="metric-number flex size-8 items-center justify-center rounded-lg bg-muted/55 text-sm font-semibold text-muted-foreground">
+        <span className="metric-number flex size-7 items-center justify-center rounded-md bg-muted/35 text-xs font-semibold text-muted-foreground">
           {setIndex + 1}
         </span>
       </div>
       <div className="min-w-0 space-y-0.5">
         <LocalizedDecimalInput
           aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-10 rounded-lg border-border/65 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
           min={0}
           max={9999.99}
           readOnly={readOnly}
@@ -268,7 +268,7 @@ function SetRow({
       <div className="min-w-0 space-y-0.5">
         <Input
           aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-10 rounded-lg border-border/65 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
           type="number"
           min={0}
           max={1000}
@@ -289,7 +289,7 @@ function SetRow({
       </div>
       <div className="flex min-w-0 items-center justify-center">
         <span
-          className="metric-number flex h-10 w-full items-center justify-center rounded-lg border border-border/65 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number flex h-9 w-full items-center justify-center rounded-md border border-border/55 bg-background px-1 text-center text-sm font-semibold"
           aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
         >
           {compactNumber(set.target_rir)}
@@ -1347,7 +1347,7 @@ export function SessionEditor({
                   size="sm"
                   className={cn(
                     "relative gap-0 overflow-hidden py-0 transition-[box-shadow,border-color] duration-200 motion-reduce:transition-none",
-                    expanded && "border-primary/25 shadow-sm",
+                    expanded && "border-primary/20",
                     completion.isComplete && !expanded && "border-emerald-500/25",
                   )}
                 >
@@ -1484,10 +1484,10 @@ export function SessionEditor({
                       </Button>
                     ) : null}
                   </div>
-                  <div className="space-y-2">
+                  <div className="overflow-hidden rounded-lg border border-border/55 bg-background/20">
                     <div
                       className={cn(
-                        "py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                        "border-b border-border/50 bg-muted/15 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
                         SET_GRID_SHARED,
                       )}
                     >
@@ -1523,7 +1523,7 @@ export function SessionEditor({
 
                   {!readOnly ? (
                     <Button
-                      className="h-9 w-full rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5"
+                      className="h-8 w-full rounded-md border border-dashed border-primary/35 text-primary hover:bg-primary/5"
                       type="button"
                       size="sm"
                       variant="outline"
@@ -1556,7 +1556,7 @@ export function SessionEditor({
                   ) : null}
 
                   {restLabel ? (
-                    <div className="flex min-h-10 items-center justify-between gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-2.5">
+                    <div className="flex min-h-9 items-center justify-between gap-2 rounded-md border border-border/55 bg-muted/15 px-2">
                       <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                         <Clock3 className="size-4 shrink-0 text-primary" aria-hidden />
                         <span className="truncate">
@@ -1901,10 +1901,7 @@ export function SessionEditor({
             />
           </div>
           {!readOnly && metadataDirty ? (
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="text-muted-foreground">
-                Este resumen se guarda al finalizar.
-              </span>
+            <div className="flex justify-end">
               <Button
                 type="button"
                 size="sm"
