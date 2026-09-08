@@ -160,6 +160,8 @@ export type EnergyConfigPeriod = {
   effective_from: string;
   activity_level: "low" | "moderate" | "high";
   activity_factor: number;
+  base_expenditure_mode: "automatic" | "custom";
+  custom_base_expenditure_kcal: number | null;
   training_expenditure_delta_kcal: number;
   formula_version: "harris_benedict_product_v1";
   created_at: string;

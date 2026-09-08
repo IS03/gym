@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Sex } from "@/lib/phase1/profile";
 import type { EnergyConfigEditor as EnergyConfigEditorModel } from "@/lib/nutrition/plan-v2";
-import { estimateBaseExpenditure, type ActivityLevel } from "@/lib/nutrition/plan-v2-core";
+import {
+  estimateBaseExpenditure,
+  type ActivityLevel,
+  type BaseExpenditureMode,
+} from "@/lib/nutrition/plan-v2-core";
 import { cn } from "@/lib/utils";
 import { saveEnergyConfigV2Action } from "../actions";
 
@@ -34,16 +38,27 @@ export function EnergyConfigEditor({ initial, profile }: {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activityLevel, setActivityLevel] = useState(initial.activityLevel);
+  const [baseMode, setBaseMode] = useState<BaseExpenditureMode>(initial.baseExpenditureMode);
+  const [customBase, setCustomBase] = useState(initial.customBaseExpenditureKcal == null ? "" : String(initial.customBaseExpenditureKcal));
   const [trainingDelta, setTrainingDelta] = useState(String(initial.trainingExpenditureDeltaKcal));
   const [trainingDialog, setTrainingDialog] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const complete = profile.age != null && profile.sex != null && profile.heightCm != null && profile.weightKg != null && profile.bmrKcal != null;
-  const base = profile.bmrKcal == null ? null : estimateBaseExpenditure(profile.bmrKcal, activityLevel);
+  const automaticBase = profile.bmrKcal == null ? null : estimateBaseExpenditure(profile.bmrKcal, activityLevel);
+  const parsedCustomBase = Number(customBase);
+  const baseUsed = baseMode === "custom" && Number.isFinite(parsedCustomBase) && parsedCustomBase > 0
+    ? parsedCustomBase
+    : automaticBase;
 
   function save() {
     setMessage(null);
     startTransition(async () => {
-      const result = await saveEnergyConfigV2Action({ activityLevel, trainingExpenditureDeltaKcal: trainingDelta });
+      const result = await saveEnergyConfigV2Action({
+        activityLevel,
+        baseExpenditureMode: baseMode,
+        customBaseExpenditureKcal: customBase,
+        trainingExpenditureDeltaKcal: trainingDelta,
+      });
       if (!result.ok) {
         setMessage({ ok: false, text: result.error ?? "No se pudo guardar el cálculo." });
         return;
@@ -86,21 +101,33 @@ export function EnergyConfigEditor({ initial, profile }: {
       </section>
 
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/8">
-        <div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Flame className="size-5" aria-hidden /></span><h2 className="text-sm font-semibold">Base estimada</h2></div>
-        <p className="metric-number mt-3 text-3xl font-semibold tracking-tight text-primary">{base == null ? "—" : `${base} kcal`}</p>
-        <p className="mt-1 text-xs text-muted-foreground">No incluye la sesión de entrenamiento.</p>
+        <div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Flame className="size-5" aria-hidden /></span><div><h2 className="text-sm font-semibold">Estimación automática</h2><p className="text-xs text-muted-foreground">Metabolismo basal + actividad cotidiana</p></div></div>
+        <p className="metric-number mt-3 text-3xl font-semibold tracking-tight text-primary">{automaticBase == null ? "—" : `${automaticBase} kcal`}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Referencia calculada por OWNLEVEL. No incluye entrenamiento.</p>
+      </section>
+
+      <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/8">
+        <div><h2 className="text-sm font-semibold">Gasto base usado</h2><p className="mt-0.5 text-xs text-muted-foreground">Es la base canónica para Today, historial y balance.</p></div>
+        <div className="mt-3 grid grid-cols-2 rounded-xl bg-muted p-1" aria-label="Modo de gasto base">
+          {([{ value: "automatic", label: "Automático" }, { value: "custom", label: "Personalizado" }] as const).map(({ value, label }) => {
+            return <button key={value} type="button" aria-pressed={baseMode === value} onClick={() => { setBaseMode(value); if (value === "custom" && !customBase && automaticBase != null) setCustomBase(String(automaticBase)); }} className={cn("min-h-10 rounded-lg px-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", baseMode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{label}</button>;
+          })}
+        </div>
+        {baseMode === "custom" ? <label className="mt-4 block space-y-1.5 text-sm font-medium"><span>Gasto base personalizado</span><span className="flex items-center gap-2"><Input type="number" inputMode="numeric" min="1" step="1" value={customBase} onChange={(event) => setCustomBase(event.target.value)} className="text-base" /><span className="w-10 text-sm text-muted-foreground">kcal</span></span></label> : null}
+        <p className="metric-number mt-4 text-xl font-semibold">{baseUsed == null ? "—" : `${baseUsed} kcal`}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{baseMode === "automatic" ? "Se actualiza con tus datos físicos y tu actividad cotidiana." : "La estimación automática permanece visible como referencia."}</p>
       </section>
 
       <button type="button" onClick={() => setTrainingDialog(true)} className="flex min-h-20 w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left shadow-sm outline-none ring-1 ring-foreground/8 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Dumbbell className="size-5" aria-hidden /></span>
-        <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Ajuste por entrenamiento</span><span className="block text-xs text-muted-foreground">Si completás una sesión</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Extra de gasto por entrenamiento</span><span className="block text-xs text-muted-foreground">Se suma al gasto base usado</span></span>
         <span className="metric-number text-sm font-semibold">+{trainingDelta || 0} kcal</span><ChevronRight className="size-4 text-muted-foreground" aria-hidden />
       </button>
 
       {message ? <p role="status" className={message.ok ? "text-sm text-emerald-700 dark:text-emerald-400" : "text-sm text-destructive"}>{message.text}</p> : null}
-      <Button type="button" className="h-12 w-full" disabled={pending || !complete} onClick={save}>{pending ? "Guardando…" : "Guardar cálculo"}</Button>
+      <Button type="button" className="h-12 w-full" disabled={pending || !complete || (baseMode === "custom" && (!Number.isFinite(parsedCustomBase) || parsedCustomBase <= 0))} onClick={save}>{pending ? "Guardando…" : "Guardar cálculo"}</Button>
 
-      <ResponsiveDialog open={trainingDialog} onOpenChange={setTrainingDialog} title="Ajuste por entrenamiento" description="Se suma una sola vez cuando completás al menos una sesión." closeLabel="Cerrar ajuste">
+      <ResponsiveDialog open={trainingDialog} onOpenChange={setTrainingDialog} title="Extra de gasto por entrenamiento" description="Se suma una sola vez al gasto base usado cuando completás al menos una sesión." closeLabel="Cerrar ajuste">
         <label className="space-y-1.5 text-sm font-medium"><span>Extra de gasto</span><span className="flex items-center gap-2"><Input type="number" inputMode="numeric" min="0" step="1" value={trainingDelta} onChange={(event) => setTrainingDelta(event.target.value)} className="text-base" /><span className="w-10 text-sm text-muted-foreground">kcal</span></span></label>
         <Button type="button" className="mt-4 w-full" onClick={() => setTrainingDialog(false)}>Aplicar</Button>
       </ResponsiveDialog>

@@ -18,7 +18,7 @@ export default async function EnergySettingsPage() {
   const age = profile?.birth_date ? calculateAgeOnDate(profile.birth_date, today) : null;
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 pb-16 lg:pb-0">
+    <div className="mx-auto h-[calc(100dvh-7.75rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-2xl space-y-5 overflow-y-auto overscroll-contain pb-16 [-webkit-overflow-scrolling:touch] lg:h-auto lg:overflow-visible lg:pb-0">
       <NutritionFeatureHeader
         title="Cálculo energético"
         description="Estimamos tu gasto base según tus datos y tu actividad diaria."

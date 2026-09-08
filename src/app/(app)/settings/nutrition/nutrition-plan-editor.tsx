@@ -2,16 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, ChevronRight, Copy, Droplet, Dumbbell, Flame, Target } from "lucide-react";
+import { CalendarDays, ChevronRight, Droplet, Dumbbell, Flame, Target } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { NutritionPlanEditor as NutritionPlanEditorModel } from "@/lib/nutrition/plan-v2";
-import { WEEKDAYS, type WeekdayNumber } from "@/lib/nutrition/plan-v2-core";
+import {
+  applyWeekdayTargets,
+  WEEKDAYS,
+  type WeekdayNumber,
+  type WeekdayPropagationScope,
+} from "@/lib/nutrition/plan-v2-core";
 import { saveNutritionPlanV2Action } from "./actions";
 
-type DialogMode = "day" | "copy" | "weekdays" | "training" | "water" | null;
+type DialogMode = "objective" | "day" | "training" | "water" | null;
 type DayDraft = NutritionPlanEditorModel["weekdays"][number];
 
 const dateFormatter = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium", timeZone: "America/Argentina/Cordoba" });
@@ -41,6 +46,8 @@ function Field({ label, value, onChange, unit, integer = false }: {
 export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorModel }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [name, setName] = useState(initial.name);
+  const [objectiveDraft, setObjectiveDraft] = useState(initial.name);
   const [weekdays, setWeekdays] = useState(initial.weekdays);
   const [baseWater, setBaseWater] = useState(initial.baseWaterL == null ? "" : String(initial.baseWaterL));
   const [trainingCalories, setTrainingCalories] = useState(String(initial.trainingCalorieDeltaKcal));
@@ -49,7 +56,7 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
   const [selectedDay, setSelectedDay] = useState<WeekdayNumber>(1);
   const [draftCalories, setDraftCalories] = useState("");
   const [draftProtein, setDraftProtein] = useState("");
-  const [copySource, setCopySource] = useState<WeekdayNumber>(1);
+  const [propagationScope, setPropagationScope] = useState<WeekdayPropagationScope>("day");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const calories = weekdays.map((day) => day.calorieTargetKcal).filter((value): value is number => value != null);
@@ -66,31 +73,27 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
     setSelectedDay(day.weekday);
     setDraftCalories(day.calorieTargetKcal == null ? "" : String(day.calorieTargetKcal));
     setDraftProtein(day.proteinTargetG == null ? "" : String(day.proteinTargetG));
+    setPropagationScope("day");
     setDialog("day");
   }
 
-  function applyTargets(scope: "day" | "weekdays") {
+  function applyTargets() {
     const calorieTargetKcal = Number(draftCalories);
     const proteinTargetG = Number(draftProtein);
     if (!Number.isFinite(calorieTargetKcal) || !Number.isFinite(proteinTargetG)) return;
-    setWeekdays((current) => current.map((day) => {
-      const applies = scope === "day" ? day.weekday === selectedDay : day.weekday <= 5;
-      return applies ? { ...day, calorieTargetKcal, proteinTargetG } : day;
-    }));
+    setWeekdays((current) => applyWeekdayTargets(
+      current,
+      selectedDay,
+      { calorieTargetKcal, proteinTargetG },
+      propagationScope,
+    ));
     setDialog(null);
   }
 
-  function openWeekdays() {
-    const monday = weekdays.find((day) => day.weekday === 1) ?? weekdays[0];
-    setDraftCalories(monday.calorieTargetKcal == null ? "" : String(monday.calorieTargetKcal));
-    setDraftProtein(monday.proteinTargetG == null ? "" : String(monday.proteinTargetG));
-    setDialog("weekdays");
-  }
-
-  function copyToAll() {
-    const source = weekdays.find((day) => day.weekday === copySource);
-    if (!source) return;
-    setWeekdays((current) => current.map((day) => ({ ...day, calorieTargetKcal: source.calorieTargetKcal, proteinTargetG: source.proteinTargetG })));
+  function applyObjective() {
+    const nextName = objectiveDraft.trim();
+    if (!nextName) return;
+    setName(nextName);
     setDialog(null);
   }
 
@@ -98,7 +101,7 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
     setMessage(null);
     startTransition(async () => {
       const result = await saveNutritionPlanV2Action({
-        name: initial.name,
+        name,
         baseWaterL: baseWater,
         trainingCalorieDeltaKcal: trainingCalories,
         trainingWaterDeltaL: trainingWater,
@@ -113,16 +116,17 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
     });
   }
 
-  const dialogTitle = dialog === "day" ? WEEKDAYS.find((day) => day.value === selectedDay)?.label ?? "Día" : dialog === "copy" ? "Copiar a todos" : dialog === "weekdays" ? "Aplicar Lun–Vie" : dialog === "training" ? "Entrenamiento" : "Agua";
-  const dialogDescription = dialog === "copy" ? "Elegí el día cuyos objetivos querés usar en toda la semana." : dialog === "weekdays" ? "Aplicá las mismas calorías y proteína de lunes a viernes." : dialog === "training" ? "Extra del objetivo en días con entrenamiento finalizado." : dialog === "water" ? "Definí el objetivo base y el extra de entrenamiento." : "Editá los objetivos base de este día.";
+  const dialogTitle = dialog === "objective" ? "Objetivo nutricional" : dialog === "day" ? WEEKDAYS.find((day) => day.value === selectedDay)?.label ?? "Día" : dialog === "training" ? "Extra por entrenamiento" : "Agua";
+  const dialogDescription = dialog === "objective" ? "Nombrá la etapa que querés aplicar desde hoy." : dialog === "training" ? "Extra del objetivo nutricional en días con entrenamiento finalizado." : dialog === "water" ? "Definí el objetivo base y el extra de entrenamiento." : "Editá los objetivos base y elegí dónde aplicarlos.";
 
   return (
     <div className="space-y-4">
       <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/8">
-        <div className="flex items-center gap-3 border-b border-border/70 pb-4">
+        <button type="button" onClick={() => { setObjectiveDraft(name); setDialog("objective"); }} className="flex w-full items-center gap-3 border-b border-border/70 pb-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Target className="size-5" aria-hidden /></span>
-          <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Objetivo actual</p><h2 className="truncate text-base font-semibold">{initial.name}</h2><p className="text-xs text-muted-foreground">Desde {dateLabel(initial.effectiveFrom)}</p></div>
-        </div>
+          <span className="min-w-0 flex-1"><span className="block text-xs text-muted-foreground">Objetivo actual</span><span className="block truncate text-base font-semibold">{name}</span><span className="block text-xs text-muted-foreground">Desde {dateLabel(initial.effectiveFrom)}</span></span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
         <dl className="grid grid-cols-3 divide-x divide-border/70 pt-4 text-center">
           <div className="px-1"><dt className="text-xs text-muted-foreground">Calorías</dt><dd className="metric-number mt-1 text-sm font-semibold">{calorieRange}</dd></div>
           <div className="px-1"><dt className="text-xs text-muted-foreground">Proteína</dt><dd className="metric-number mt-1 text-sm font-semibold">{proteinRange} g</dd></div>
@@ -131,11 +135,9 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
       </section>
 
       <section className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/8">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="size-4" aria-hidden /></span>
-          <div className="mr-auto"><h2 className="text-sm font-semibold">Semana base</h2><p className="text-xs text-muted-foreground">Calorías y proteína por día.</p></div>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setDialog("copy")}><Copy aria-hidden />Copiar a todos</Button>
-          <Button type="button" variant="secondary" size="sm" onClick={openWeekdays}>Aplicar Lun–Vie</Button>
+          <div><h2 className="text-sm font-semibold">Semana base</h2><p className="text-xs text-muted-foreground">Calorías y proteína por día.</p></div>
         </div>
         <div className="divide-y divide-border/70">
           {WEEKDAYS.map((label) => {
@@ -149,7 +151,7 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
 
       <section className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/8">
         <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3"><span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Target className="size-4" aria-hidden /></span><div><h2 className="text-sm font-semibold">Ajustes automáticos</h2><p className="text-xs text-muted-foreground">Se aplican con una sesión finalizada.</p></div></div>
-        <button type="button" onClick={() => setDialog("training")} className="flex min-h-16 w-full items-center gap-3 border-b border-border/70 px-4 py-3 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><Dumbbell className="size-5 shrink-0 text-primary" aria-hidden /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Entrenamiento</span><span className="block text-xs text-muted-foreground">En días con entrenamiento</span></span><span className="metric-number text-sm font-medium">+{trainingCalories || 0} kcal</span><ChevronRight className="size-4 text-muted-foreground" aria-hidden /></button>
+        <button type="button" onClick={() => setDialog("training")} className="flex min-h-16 w-full items-center gap-3 border-b border-border/70 px-4 py-3 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><Dumbbell className="size-5 shrink-0 text-primary" aria-hidden /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Extra de objetivo por entrenamiento</span><span className="block text-xs text-muted-foreground">Se suma al objetivo del día</span></span><span className="metric-number text-sm font-medium">+{trainingCalories || 0} kcal</span><ChevronRight className="size-4 text-muted-foreground" aria-hidden /></button>
         <button type="button" onClick={() => setDialog("water")} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><Droplet className="size-5 shrink-0 text-primary" aria-hidden /><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Agua</span><span className="block text-xs text-muted-foreground">En días con entrenamiento</span></span><span className="metric-number text-sm font-medium">+{trainingWater || 0} L</span><ChevronRight className="size-4 text-muted-foreground" aria-hidden /></button>
       </section>
 
@@ -160,8 +162,12 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
 
       <ResponsiveDialog open={dialog !== null} onOpenChange={(open) => { if (!open) setDialog(null); }} title={dialogTitle} description={dialogDescription} closeLabel="Cerrar edición">
         <div className="space-y-4">
-          {dialog === "day" || dialog === "weekdays" ? <><Field label="Calorías" value={draftCalories} onChange={setDraftCalories} unit="kcal" integer /><Field label="Proteína" value={draftProtein} onChange={setDraftProtein} unit="g" /><Button type="button" className="w-full" onClick={() => applyTargets(dialog)}>Aplicar</Button></> : null}
-          {dialog === "copy" ? <><label className="space-y-1.5 text-sm font-medium"><span>Día de referencia</span><select value={copySource} onChange={(event) => setCopySource(Number(event.target.value) as WeekdayNumber)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">{WEEKDAYS.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select></label><Button type="button" className="w-full" onClick={copyToAll}>Copiar a los siete días</Button></> : null}
+          {dialog === "objective" ? <><label className="space-y-1.5 text-sm font-medium"><span>Nombre de la etapa</span><Input value={objectiveDraft} onChange={(event) => setObjectiveDraft(event.target.value)} maxLength={80} className="text-base" placeholder="Ej: Volumen controlado" /></label><p className="text-xs text-muted-foreground">Al guardar el plan, este nombre queda vigente desde hoy. El historial anterior no cambia.</p><Button type="button" className="w-full" disabled={!objectiveDraft.trim()} onClick={applyObjective}>Aplicar</Button></> : null}
+          {dialog === "day" ? <><Field label="Calorías" value={draftCalories} onChange={setDraftCalories} unit="kcal" integer /><Field label="Proteína" value={draftProtein} onChange={setDraftProtein} unit="g" /><fieldset className="space-y-2"><legend className="text-sm font-medium">Aplicar estos valores a</legend><div className="grid gap-2">{([
+            ["day", `Solo ${WEEKDAYS.find((day) => day.value === selectedDay)?.label.toLowerCase() ?? "este día"}`],
+            ["weekdays", "Lunes a viernes"],
+            ["all", "Todos los días"],
+          ] as const).map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-sm"><input type="radio" name="propagation-scope" value={value} checked={propagationScope === value} onChange={() => setPropagationScope(value)} className="size-4 accent-primary" /><span>{label}</span></label>)}</div></fieldset><Button type="button" className="w-full" onClick={applyTargets}>Aplicar</Button></> : null}
           {dialog === "training" ? <><Field label="Extra de calorías" value={trainingCalories} onChange={setTrainingCalories} unit="kcal" integer /><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></> : null}
           {dialog === "water" ? <><Field label="Objetivo base" value={baseWater} onChange={setBaseWater} unit="L" /><Field label="Extra con entrenamiento" value={trainingWater} onChange={setTrainingWater} unit="L" /><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></> : null}
         </div>

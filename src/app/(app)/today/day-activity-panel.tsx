@@ -1,4 +1,5 @@
 import {
+  Activity,
   BriefcaseBusiness,
   ChevronRight,
   Coffee,
@@ -18,11 +19,22 @@ export type ActivityContextValues = {
   workSourceLabel: string;
   gymLabel: string;
   gymSourceLabel: string;
+  v2EnergyContext: {
+    activityLevelLabel: string;
+    trainingLabel: string;
+    baseExpenditureLabel: string;
+    dailyExpenditureLabel: string;
+  } | null;
 };
 
 type LabelValue = [label: string, value: string, icon: LucideIcon];
 
-export const getActivityContextItems = (values: ActivityContextValues): LabelValue[] => [
+export const getActivityContextItems = (values: ActivityContextValues): LabelValue[] => values.v2EnergyContext ? [
+  ["Actividad cotidiana", values.v2EnergyContext.activityLevelLabel, Activity],
+  ["Entrenamiento", values.v2EnergyContext.trainingLabel, Dumbbell],
+  ["Gasto base", values.v2EnergyContext.baseExpenditureLabel, Flame],
+  ["Gasto del día", values.v2EnergyContext.dailyExpenditureLabel, Scale],
+] : [
   ["Trabajo", `${values.workLabel} · ${values.workSourceLabel}`, BriefcaseBusiness],
   ["Entrenamiento", `${values.gymLabel} · ${values.gymSourceLabel}`, Dumbbell],
   ["Gasto", values.expenditureLabel, Flame],

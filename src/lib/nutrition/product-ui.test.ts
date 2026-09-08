@@ -52,6 +52,9 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(today).toContain("if (value > 0) return `+${value} kcal`");
     expect(today).toContain("return `${value} kcal`");
     expect(todayActivity).toContain('["Gasto", values.expenditureLabel, Flame]');
+    expect(todayActivity).toContain('["Actividad cotidiana", values.v2EnergyContext.activityLevelLabel, Activity]');
+    expect(todayActivity).toContain('["Gasto base", values.v2EnergyContext.baseExpenditureLabel, Flame]');
+    expect(today).toContain("context.expenditureKcal");
     expect(today).not.toContain("dayLog.target_kcal_snapshot");
     expect(todayEditor).toContain("Usar horario habitual");
     expect(todayEditor).toContain("Registrar que entrené sin sesión");
@@ -102,6 +105,9 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(settingsProfile).toContain('href="/settings/profile"');
     expect(profilePage).toContain("<ProfileOverview");
     expect(profileOverview).toContain("<ProfileForm");
+    expect(profileOverview).toContain("Metabolismo basal");
+    expect(profileOverview).toContain('href="/settings/nutrition/energy"');
+    expect(profileOverview).not.toContain("Calorías basales");
     expect(profileForm).not.toContain("Para seguir el historial");
     expect(settingsRoot).toContain("getNutritionPlanEditor");
     expect(settingsRoot).toContain("<NutritionPlanEditor");

@@ -9,10 +9,21 @@ const actions = read("src/app/(app)/settings/nutrition/actions.ts");
 describe("PR71 — Plan nutricional y Cálculo energético", () => {
   it("presenta siete días y ediciones rápidas sin guardar cada tecla", () => {
     expect(plan).toContain("WEEKDAYS.map");
-    expect(plan).toContain("Copiar a todos");
-    expect(plan).toContain("Aplicar Lun–Vie");
+    expect(plan).not.toContain("Copiar a todos");
+    expect(plan).not.toContain("Aplicar Lun–Vie");
+    expect(plan).toContain("Aplicar estos valores a");
+    expect(plan).toContain("Solo ${WEEKDAYS.find");
+    expect(plan).toContain("Lunes a viernes");
+    expect(plan).toContain("Todos los días");
     expect(plan).toContain("Guardar plan");
     expect(plan).toContain("saveNutritionPlanV2Action");
+  });
+
+  it("permite versionar el objetivo sin hardcodear una etapa", () => {
+    expect(plan).toContain("Objetivo nutricional");
+    expect(plan).toContain("Nombre de la etapa");
+    expect(plan).toContain("name,");
+    expect(plan).not.toContain('name: "Recomposición suave"');
   });
 
   it("separa ajustes nutricionales de gasto energético", () => {
@@ -29,6 +40,9 @@ describe("PR71 — Plan nutricional y Cálculo energético", () => {
     expect(energy).toContain('value: "moderate"');
     expect(energy).toContain('value: "high"');
     expect(energy).toContain("Guardar cálculo");
+    expect(energy).toContain("Estimación automática");
+    expect(energy).toContain("Gasto base usado");
+    expect(energy).toContain("Personalizado");
     expect(actions).toContain("saveEnergyConfigV2Action");
   });
 });

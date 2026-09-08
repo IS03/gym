@@ -51,6 +51,7 @@ export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps) {
         workSourceLabel={props.workSourceLabel}
         gymLabel={props.gymLabel}
         gymSourceLabel={props.gymSourceLabel}
+        v2EnergyContext={props.v2EnergyContext}
         activityValuesLabel={activityValuesLabel}
         onOpen={() => setOpen(true)}
       />
@@ -72,6 +73,7 @@ export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps) {
               workSourceLabel={props.workSourceLabel}
               gymLabel={props.gymLabel}
               gymSourceLabel={props.gymSourceLabel}
+              v2EnergyContext={props.v2EnergyContext}
             />
           </section>
 

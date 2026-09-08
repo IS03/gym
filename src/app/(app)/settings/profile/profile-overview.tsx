@@ -138,10 +138,13 @@ export function ProfileOverview({ profile, email, latestWaistCm }: {
               <Flame className="size-5" aria-hidden />
             </span>
             <div>
-              <h2 className="text-sm font-semibold">Calorías basales</h2>
-              <p className="text-xs text-muted-foreground">Tu gasto energético en reposo.</p>
+              <h2 className="text-sm font-semibold">Metabolismo basal</h2>
+              <p className="text-xs text-muted-foreground">Estimación en reposo a partir de tus datos físicos.</p>
               <p className="metric-number mt-2 text-xl font-semibold">{profile.bmr_kcal_current} kcal</p>
-              <p className="mt-1 text-xs text-muted-foreground">Estimadas con Harris–Benedict según tus datos actuales.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Alimenta la estimación automática; no es tu gasto diario ni tu objetivo.</p>
+              <Link href="/settings/nutrition/energy" className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                Ver cálculo energético <ChevronRight className="size-4" aria-hidden />
+              </Link>
             </div>
           </div>
         </section>
