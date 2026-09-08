@@ -133,8 +133,8 @@ type SetRowProps = {
 };
 
 const SET_GRID_LAYOUT =
-  "grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.75rem]";
-const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-2 px-2`;
+  "grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_2.5rem]";
+const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1.5 px-2`;
 const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
 const REST_TIMER_STORAGE_KEY_PREFIX = "ownlevel:workout-rest-timer:";
 const EXERCISE_AUTOSAVE_DEBOUNCE_MS = 850;
@@ -235,21 +235,21 @@ function SetRow({
     <div
       className={cn(
         SET_GRID_SHARED,
-        "items-center rounded-xl border border-border/70 px-2 py-2.5 transition-colors duration-150",
+        "items-center rounded-lg border border-border/55 px-2 py-2 transition-colors duration-150",
         set.is_completed
-          ? "border-emerald-500/20 bg-emerald-500/[0.07]"
-          : "bg-background/35",
+          ? "border-emerald-500/15 bg-emerald-500/[0.055]"
+          : "bg-background/20",
       )}
     >
       <div className="flex min-w-0 items-center justify-center">
-        <span className="metric-number flex size-9 items-center justify-center rounded-xl bg-muted/70 text-sm font-semibold text-muted-foreground">
+        <span className="metric-number flex size-8 items-center justify-center rounded-lg bg-muted/55 text-sm font-semibold text-muted-foreground">
           {setIndex + 1}
         </span>
       </div>
       <div className="min-w-0 space-y-0.5">
         <LocalizedDecimalInput
           aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-11 rounded-xl border-border/80 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number h-10 rounded-lg border-border/65 bg-background px-1 text-center text-base font-semibold"
           min={0}
           max={9999.99}
           readOnly={readOnly}
@@ -268,7 +268,7 @@ function SetRow({
       <div className="min-w-0 space-y-0.5">
         <Input
           aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-11 rounded-xl border-border/80 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number h-10 rounded-lg border-border/65 bg-background px-1 text-center text-base font-semibold"
           type="number"
           min={0}
           max={1000}
@@ -289,7 +289,7 @@ function SetRow({
       </div>
       <div className="flex min-w-0 items-center justify-center">
         <span
-          className="metric-number flex h-11 w-full items-center justify-center rounded-xl border border-border/80 bg-background px-1 text-center text-base font-semibold"
+          className="metric-number flex h-10 w-full items-center justify-center rounded-lg border border-border/65 bg-background px-1 text-center text-base font-semibold"
           aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
         >
           {compactNumber(set.target_rir)}
@@ -1347,7 +1347,7 @@ export function SessionEditor({
                   size="sm"
                   className={cn(
                     "relative gap-0 overflow-hidden py-0 transition-[box-shadow,border-color] duration-200 motion-reduce:transition-none",
-                    expanded && "border-primary/35 shadow-md",
+                    expanded && "border-primary/25 shadow-sm",
                     completion.isComplete && !expanded && "border-emerald-500/25",
                   )}
                 >
@@ -1385,7 +1385,7 @@ export function SessionEditor({
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {collapsedSubtitle}
                       </p>
-                      {!expanded && receivedReminder ? (
+                      {receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
                           <ArrowUpRight className="size-3 shrink-0" aria-hidden />
                           <span className="truncate">{receivedReminder}</span>
@@ -1444,7 +1444,7 @@ export function SessionEditor({
                 {expanded ? (
                   <CardContent
                     id={exerciseContentId}
-                    className="space-y-3 border-t border-border/70 px-3 pb-3 pt-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200"
+                    className="space-y-2.5 border-t border-border/70 px-3 pb-3 pt-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200"
                   >
                   {staleDraftIds.has(exercise.id) ? (
                     <div className="space-y-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-sm">
@@ -1463,11 +1463,11 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <div className="flex min-h-10 items-center justify-between gap-3 px-1">
+                  <div className="flex min-h-9 items-center justify-between gap-3 px-1">
                     <h4 className="text-base font-semibold tracking-tight">Series</h4>
                     {!readOnly ? (
                       <Button
-                        className="h-10 px-2 text-sm"
+                        className="h-9 px-2 text-sm"
                         type="button"
                         size="sm"
                         variant="ghost"
@@ -1523,7 +1523,7 @@ export function SessionEditor({
 
                   {!readOnly ? (
                     <Button
-                      className="h-11 w-full border border-dashed border-primary/45 text-primary hover:bg-primary/5"
+                      className="h-9 w-full rounded-lg border border-dashed border-primary/40 text-primary hover:bg-primary/5"
                       type="button"
                       size="sm"
                       variant="outline"
@@ -1556,7 +1556,7 @@ export function SessionEditor({
                   ) : null}
 
                   {restLabel ? (
-                    <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-border/75 bg-muted/25 px-3">
+                    <div className="flex min-h-10 items-center justify-between gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-2.5">
                       <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
                         <Clock3 className="size-4 shrink-0 text-primary" aria-hidden />
                         <span className="truncate">
@@ -1576,6 +1576,7 @@ export function SessionEditor({
                             type="button"
                             size="sm"
                             variant="ghost"
+                            className="h-8 rounded-md px-2"
                             onClick={() => setRestTimer(null)}
                           >
                             Saltar
@@ -1585,6 +1586,7 @@ export function SessionEditor({
                             type="button"
                             size="sm"
                             variant="outline"
+                            className="h-8 rounded-md px-2.5"
                             onClick={() => startRestTimer(exercise)}
                             aria-label={`Iniciar temporizador de descanso para ${exercise.nombre_snapshot}`}
                           >
@@ -1634,12 +1636,12 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  <section className="space-y-3 border-t border-border/60 pt-3">
+                  <section className="space-y-2.5 border-t border-border/60 pt-2.5">
                     <div className="flex min-h-8 items-center justify-between gap-3 px-1">
                       <Label>Próxima vez</Label>
                       <span className="text-xs text-muted-foreground">Opcional</span>
                     </div>
-                    <div className="space-y-3 pb-1">
+                    <div className="space-y-2.5 pb-0.5">
                       <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Decisión para la próxima vez">
                         {NEXT_SESSION_DECISIONS.map((adjustment) => (
                           <Button
@@ -1647,6 +1649,7 @@ export function SessionEditor({
                             type="button"
                             size="sm"
                             variant={payload.decision === adjustment.value ? "secondary" : "outline"}
+                            className="h-9 rounded-lg"
                             disabled={interactionLocked}
                             aria-pressed={payload.decision === adjustment.value}
                             onClick={() =>
@@ -1707,13 +1710,13 @@ export function SessionEditor({
                       {exercise.routine_exercise_id ? (
                         <div
                           className={cn(
-                            "flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                            "flex min-h-14 items-center gap-3 rounded-lg border px-2.5 py-2 text-sm transition-colors",
                             payload.apply_to_routine
                               ? "border-primary/40 bg-primary/5"
                               : "border-border/75 bg-background/35 hover:bg-muted/35",
                           )}
                         >
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden>
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>
                             <Target className="size-4" />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -1756,7 +1759,10 @@ export function SessionEditor({
                         </div>
                       ) : null}
 
-                      <div className="space-y-2 rounded-xl border border-border/75 bg-muted/20 px-3 py-2.5">
+                      <div className={cn(
+                        "rounded-lg border border-border/60 bg-muted/15 px-2.5",
+                        noteEditorOpen || quickNote ? "space-y-2 py-2" : "py-1.5",
+                      )}>
                         <div className="flex min-h-8 items-center justify-between gap-3">
                           {noteEditorOpen ? (
                             <Label htmlFor={`exercise-notes-${exercise.id}`}>{noteLabel}</Label>
@@ -1858,10 +1864,10 @@ export function SessionEditor({
             </span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
           </summary>
-          <CardContent className="border-t border-border/70 px-3 pb-3 pt-4">
-          <fieldset className="space-y-4 disabled:opacity-80" disabled={interactionLocked}>
+          <CardContent className="border-t border-border/70 px-3 pb-3 pt-3">
+          <fieldset className="space-y-3.5 disabled:opacity-80" disabled={interactionLocked}>
           <RatingPicker
-            label="Energía (1–5)"
+            label="Energía"
             value={metadata.energy_level}
             minimum={1}
             maximum={5}
@@ -1869,7 +1875,7 @@ export function SessionEditor({
             onChange={(value) => updateMetadata((current) => ({ ...current, energy_level: value }))}
           />
           <RatingPicker
-            label="Rendimiento (1–5)"
+            label="Rendimiento"
             value={metadata.performance_level}
             minimum={1}
             maximum={5}
@@ -1882,10 +1888,10 @@ export function SessionEditor({
             onChange={(value) => updateMetadata((current) => ({ ...current, pain_level: value }))}
           />
           <div className="space-y-1">
-            <Label htmlFor="session-notes">Notas (opcional)</Label>
+            <Label htmlFor="session-notes">Notas</Label>
             <textarea
               id="session-notes"
-              className="min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm disabled:opacity-60"
+              className="min-h-24 w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
               value={metadata.notes}
               disabled={readOnly}
               placeholder="¿Cómo te sentiste? Algo para recordar para la próxima sesión…"

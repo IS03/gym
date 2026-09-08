@@ -60,6 +60,11 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).not.toContain("completedExerciseSummary(payload)");
   });
 
+  it("mantiene la recomendación real al abrir el ejercicio", () => {
+    expect(editor).toContain("{receivedReminder ? (");
+    expect(editor).not.toContain("!expanded && receivedReminder");
+  });
+
   it("mantiene la actualización de targets compacta y limitada a series completas", () => {
     expect(editor).toContain("Tomar resultado de hoy");
     expect(editor).toContain("Usa las series completadas como base.");
@@ -117,8 +122,10 @@ describe("PR 14 — interacción de sesión", () => {
   it("usa controles táctiles discretos para el resumen sin editar identidad histórica", () => {
     expect(editor).toContain("function RatingPicker");
     expect(editor).toContain("function PainSlider");
-    expect(editor).toContain('label="Energía (1–5)"');
-    expect(editor).toContain('label="Rendimiento (1–5)"');
+    expect(editor).toContain('label="Energía"');
+    expect(editor).toContain('label="Rendimiento"');
+    expect(editor).toContain('htmlFor="session-notes">Notas</Label>');
+    expect(editor).not.toContain("Notas (opcional)");
     expect(editor).toContain('type="range"');
     expect(editor).toContain('aria-label="Dolor, de 0 a 10"');
     expect(editor).not.toContain('htmlFor="session-name"');
@@ -128,8 +135,9 @@ describe("PR 14 — interacción de sesión", () => {
   it("mantiene el encabezado de sesión en su posición natural y simplifica las filas de series", () => {
     expect(editor).not.toContain('"sticky top-[max(0.5rem,env(safe-area-inset-top))]');
     expect(editor).toContain('"space-y-2"');
-    expect(editor).toContain('rounded-xl border border-border/70 px-2 py-2.5');
-    expect(editor).toContain("grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.75rem]");
+    expect(editor).toContain('rounded-lg border border-border/55 px-2 py-2');
+    expect(editor).toContain("grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_2.5rem]");
+    expect(editor).toContain('h-9 w-full rounded-lg border border-dashed');
   });
 });
 
