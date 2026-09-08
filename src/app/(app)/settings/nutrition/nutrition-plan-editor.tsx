@@ -168,8 +168,8 @@ export function NutritionPlanEditor({ initial }: { initial: NutritionPlanEditorM
             ["weekdays", "Lunes a viernes"],
             ["all", "Todos los días"],
           ] as const).map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-sm"><input type="radio" name="propagation-scope" value={value} checked={propagationScope === value} onChange={() => setPropagationScope(value)} className="size-4 accent-primary" /><span>{label}</span></label>)}</div></fieldset><Button type="button" className="w-full" onClick={applyTargets}>Aplicar</Button></> : null}
-          {dialog === "training" ? <><Field label="Extra de calorías" value={trainingCalories} onChange={setTrainingCalories} unit="kcal" integer /><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></> : null}
-          {dialog === "water" ? <><Field label="Objetivo base" value={baseWater} onChange={setBaseWater} unit="L" /><Field label="Extra con entrenamiento" value={trainingWater} onChange={setTrainingWater} unit="L" /><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></> : null}
+          {dialog === "training" ? <div className="grid gap-5"><Field label="Extra de calorías" value={trainingCalories} onChange={setTrainingCalories} unit="kcal" integer /><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></div> : null}
+          {dialog === "water" ? <div className="grid gap-5"><div className="grid gap-4"><Field label="Objetivo base" value={baseWater} onChange={setBaseWater} unit="L" /><Field label="Extra con entrenamiento" value={trainingWater} onChange={setTrainingWater} unit="L" /></div><Button type="button" className="w-full" onClick={() => setDialog(null)}>Aplicar</Button></div> : null}
         </div>
       </ResponsiveDialog>
     </div>
