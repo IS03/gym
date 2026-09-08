@@ -15,7 +15,7 @@ export function ThemeSettings() {
 
   if (!mounted) {
     return (
-      <div className="h-10 rounded-lg border bg-muted/40" aria-hidden />
+      <div className="h-11 rounded-lg border bg-muted/40" aria-hidden />
     );
   }
 
@@ -33,7 +33,7 @@ export function ThemeSettings() {
             key={id}
             type="button"
             aria-pressed={theme === id}
-            className={`h-10 rounded-md px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${theme === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}
+            className={`h-11 rounded-md px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${theme === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}
             onClick={() => setTheme(id)}
           >
             {label}

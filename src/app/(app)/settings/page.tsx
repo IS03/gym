@@ -1,10 +1,7 @@
-import { signOut } from "./actions";
-import { ThemeSettings } from "./theme-settings";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
 import Link from "next/link";
-import { ChevronRight, Mail, Palette, ShieldCheck, UserRound, Utensils } from "lucide-react";
+import { BookOpen, ChartNoAxesColumnIncreasing, ChevronRight, KeyRound, Palette, ShieldCheck, Utensils } from "lucide-react";
+import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
+import { ProfileInitial, SettingsHeader, SettingsRow, SettingsSection } from "./settings-components";
 
 export const dynamic = "force-dynamic";
 
@@ -12,97 +9,72 @@ export default async function SettingsPage() {
   const user = await getAuthedUser();
   const profile = await getProfileForUser(user.id);
   const displayName = profile?.display_name?.trim() || "Tu perfil";
-  const initial = displayName.slice(0, 1).toUpperCase();
 
   return (
-    <div className="space-y-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-1 motion-safe:duration-[180ms] motion-safe:ease-out">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Ajustes</h1>
-        <p className="text-sm text-muted-foreground">
-          Tu cuenta, información personal y preferencias de OWNLEVEL.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-2xl space-y-6">
+      <SettingsHeader
+        title="Ajustes"
+        description="Tu cuenta, tu plan y tus preferencias de OWNLEVEL."
+      />
 
-      <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:space-y-0">
-      <div className="space-y-6 lg:col-span-8">
-      <section className="space-y-3" aria-labelledby="settings-profile">
-        <div className="flex items-center gap-2">
-          <UserRound className="size-4 text-primary" aria-hidden />
-          <h2 id="settings-profile" className="text-base font-semibold tracking-tight">
-            Perfil
-          </h2>
-        </div>
-        <Link href="/settings/profile" className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        <Card className="transition-colors hover:bg-muted/45">
-          <CardContent className="flex min-h-20 items-center gap-3 py-3">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-semibold text-primary-foreground">
-              {initial}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{displayName}</p>
-              <p className="truncate text-sm text-muted-foreground">{user.email ?? "—"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Datos personales y referencia física</p>
-            </div>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          </CardContent>
-        </Card>
-        </Link>
-      </section>
+      <Link
+        href="/settings/profile"
+        className="flex min-h-28 items-center gap-3 rounded-2xl bg-card px-4 py-4 shadow-sm ring-1 ring-foreground/8 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ProfileInitial name={displayName} className="size-16" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold">{displayName}</span>
+          <span className="block truncate text-sm text-muted-foreground">{user.email ?? "—"}</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Perfil y datos físicos</span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      </Link>
 
-      <section className="space-y-3" aria-labelledby="settings-nutrition">
-        <div className="flex items-center gap-2">
-          <Utensils className="size-4 text-primary" aria-hidden />
-          <h2 id="settings-nutrition" className="text-base font-semibold tracking-tight">Nutrición</h2>
-        </div>
-        <Link href="/settings/nutrition" className="flex min-h-20 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm transition-colors hover:bg-muted/45">
-          <span><span className="block text-sm font-medium">Objetivos y configuración</span><span className="mt-1 block text-xs text-muted-foreground">Objetivos versionados, gasto, horario y alimentos habituales.</span></span>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        </Link>
-      </section>
-      </div>
+      <SettingsSection title="Tu plan">
+        <SettingsRow
+          href="/settings/nutrition"
+          icon={Utensils}
+          title="Plan nutricional"
+          description="Objetivos, calorías, cálculo y ajustes"
+        />
+        <SettingsRow
+          href="/settings/library"
+          icon={BookOpen}
+          title="Biblioteca"
+          description="Alimentos y comidas guardadas"
+        />
+        <SettingsRow
+          icon={ChartNoAxesColumnIncreasing}
+          title="Métricas diarias"
+          description="Configurá qué querés registrar cada día"
+          trailing={<span className="text-xs font-medium text-muted-foreground">Próximamente</span>}
+          disabled
+        />
+      </SettingsSection>
 
-      <div className="space-y-6 lg:col-span-4">
-      <section className="space-y-3" aria-labelledby="settings-app-data">
-        <div className="flex items-center gap-2">
-          <Palette className="size-4 text-primary" aria-hidden />
-          <h2 id="settings-app-data" className="text-base font-semibold tracking-tight">
-            Apariencia
-          </h2>
-        </div>
-        <Card>
-          <CardContent className="space-y-2 py-3">
-            <p className="text-sm font-medium">Tema</p>
-            <ThemeSettings />
-          </CardContent>
-        </Card>
-      </section>
+      <SettingsSection title="Preferencias">
+        <SettingsRow
+          href="/settings/application#theme"
+          icon={Palette}
+          title="Apariencia"
+          description="Tema del sistema"
+        />
+        <SettingsRow
+          href="/settings/application#integrations"
+          icon={KeyRound}
+          title="Integraciones"
+          description="ChatGPT"
+        />
+      </SettingsSection>
 
-      <section className="space-y-3" aria-labelledby="settings-security">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-4 text-primary" aria-hidden />
-          <h2 id="settings-security" className="text-base font-semibold tracking-tight">
-            Cuenta y seguridad
-          </h2>
-        </div>
-        <Card>
-          <CardContent className="space-y-4 pt-4">
-            <div className="flex items-center gap-3 rounded-xl border bg-muted/30 px-3 py-3">
-              <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Cuenta conectada</p>
-                <p className="truncate text-sm text-muted-foreground">{user.email ?? "—"}</p>
-              </div>
-            </div>
-            <form action={signOut}>
-              <Button type="submit" variant="outline" className="h-11 w-full">
-                Cerrar sesión en este dispositivo
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </section>
-      </div>
-      </div>
+      <SettingsSection title="Cuenta">
+        <SettingsRow
+          href="/settings/account"
+          icon={ShieldCheck}
+          title="Cuenta y seguridad"
+          description="Cuenta conectada"
+        />
+      </SettingsSection>
     </div>
   );
 }

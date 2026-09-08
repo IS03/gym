@@ -127,6 +127,19 @@ export async function listBodyMeasurements(limit = 366): Promise<BodyMeasurement
   return (data ?? []) as BodyMeasurement[];
 }
 
+export async function getLatestBodyMeasurement(): Promise<BodyMeasurement | null> {
+  const { supabase, userId } = await getAuthedContext();
+  const { data, error } = await supabase
+    .from("body_measurements")
+    .select("*")
+    .eq("user_id", userId)
+    .order("measured_on", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Leer última medida corporal: ${error.message}`);
+  return (data as BodyMeasurement | null) ?? null;
+}
+
 export async function upsertBodyMeasurement(input: BodyMeasurementInput): Promise<BodyMeasurement> {
   const { supabase, userId } = await getAuthedContext();
   const { data, error } = await supabase
