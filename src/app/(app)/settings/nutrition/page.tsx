@@ -11,7 +11,7 @@ export default async function NutritionSettingsPage() {
   const plan = await getNutritionPlanEditor(today);
 
   return (
-    <div className="mx-auto h-[calc(100dvh-7.75rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-2xl space-y-5 overflow-y-auto overscroll-contain pb-16 [-webkit-overflow-scrolling:touch] lg:h-auto lg:overflow-visible lg:pb-0">
+    <div className="mx-auto w-full max-w-2xl space-y-5">
       <NutritionFeatureHeader
         title="Plan nutricional"
         description="Objetivos, calorías y ajustes de tu semana."
