@@ -32,10 +32,9 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).toContain('aria-controls={exerciseContentId}');
   });
 
-  it("mantiene una nota breve arriba de las series sólo cuando tiene contenido", () => {
+  it("mantiene una nota breve y editable dentro del workspace del ejercicio", () => {
     expect(editor).toContain("const quickNote = payload.notes.trim()");
-    expect(editor).toContain("{quickNote ? (");
-    expect(editor).toContain("line-clamp-2");
+    expect(editor).toContain("line-clamp-1");
     expect(editor).toContain("Nota para próximas sesiones");
     expect(editor).toContain("Nota del ejercicio en esta sesión");
   });
@@ -52,19 +51,19 @@ describe("PR 14 — interacción de sesión", () => {
   });
 
   it("reserva un rail derecho para progreso y controles antes de truncar el contenido", () => {
-    expect(editor).toContain("grid-cols-[minmax(0,1fr)_auto]");
+    expect(editor).toContain("grid-cols-[2.75rem_minmax(0,1fr)_auto]");
     expect(editor).toContain('className="flex shrink-0 items-center gap-2"');
     expect(editor).toContain("exerciseProgressLabel(payload)");
-    expect(editor).toContain("min-w-[4.25rem]");
+    expect(editor).toContain("min-w-[3.75rem]");
     expect(editor).toContain("tabular-nums");
     expect(editor).toContain("const collapsedSubtitle = exerciseMeta;");
     expect(editor).not.toContain("completedExerciseSummary(payload)");
   });
 
-  it("usa un único indicador para recordatorios y actualización de targets", () => {
-    expect(editor).toContain("hasFutureExerciseAction(payload.decision, payload.apply_to_routine)");
-    expect(editor).toContain("Usar lo realizado hoy como nuevo objetivo");
-    expect(editor).toContain("Al finalizar, sólo toma las series completadas.");
+  it("mantiene la actualización de targets compacta y limitada a series completas", () => {
+    expect(editor).toContain("Tomar resultado de hoy");
+    expect(editor).toContain("Usa las series completadas como base.");
+    expect(editor).not.toContain(': "Sin cambios"');
   });
 
   it("deja la nota en lectura compacta hasta que se solicita editar", () => {
@@ -79,7 +78,7 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).toContain('<Label>Próxima vez</Label>');
     expect(editor).not.toContain("Progresión y próxima vez");
     expect(editor).toContain('aria-label="Decisión para la próxima vez"');
-    expect(editor).toContain("hasFutureExerciseAction(payload.decision, payload.apply_to_routine)");
+    expect(editor).toContain("Dejá todo sin marcar para mantener el objetivo actual.");
   });
 
   it("mantiene cancelar detrás del disclosure destructivo", () => {
@@ -99,9 +98,27 @@ describe("PR 14 — interacción de sesión", () => {
   it("presenta snapshots compactos, sets realizados y un vacío honesto dentro de un sheet", () => {
     expect(quickHistorySheet).toContain("Dialog.Root");
     expect(quickHistorySheet).toContain("quickHistoryCompletedSets(session)");
+    expect(quickHistorySheet).toContain("splitQuickExerciseHistory");
+    expect(quickHistorySheet).toContain("Ver más historial");
+    expect(quickHistorySheet).toContain("/train/session/${session.sessionId}");
     expect(quickHistorySheet).toContain("set.target_rir");
     expect(quickHistorySheet).toContain("Todavía no hay sesiones finalizadas con este ejercicio.");
     expect(quickHistorySheet).not.toContain("0 kg");
+  });
+
+  it("mantiene el descanso como estado local persistible y no lo mezcla con autosave", () => {
+    expect(editor).toContain("REST_TIMER_STORAGE_KEY_PREFIX");
+    expect(editor).toContain("restTimerStorageKey(detail.session.id)");
+    expect(editor).toContain("autosaveRef.current?.change");
+  });
+
+  it("usa controles táctiles discretos para el resumen sin editar identidad histórica", () => {
+    expect(editor).toContain("function RatingPicker");
+    expect(editor).toContain('label="Energía (1–5)"');
+    expect(editor).toContain('label="Rendimiento (1–5)"');
+    expect(editor).toContain('label="Dolor (0–10)"');
+    expect(editor).not.toContain('htmlFor="session-name"');
+    expect(editor).not.toContain('htmlFor="pain-note"');
   });
 });
 

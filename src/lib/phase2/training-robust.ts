@@ -813,7 +813,7 @@ export async function listRecentRobustExerciseHistoryByExercise(input: {
   const result = Object.fromEntries(exerciseIds.map((exerciseId) => [exerciseId, [] as RobustExerciseHistoryItem[]]));
   if (exerciseIds.length === 0) return result;
 
-  const limit = Math.min(Math.max(input.limitPerExercise ?? 5, 1), 5);
+  const limit = Math.min(Math.max(input.limitPerExercise ?? 5, 1), 6);
   const items = await queryRobustExerciseHistory({ exerciseIds }, context);
   for (const item of items) {
     const bucket = result[item.exercise.exercise_id];

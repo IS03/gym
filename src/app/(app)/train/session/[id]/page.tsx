@@ -55,7 +55,7 @@ export default async function SessionPage({
   const recentHistory = detail.session.status === "in_progress"
     ? await listRecentRobustExerciseHistoryByExercise({
         exerciseIds: detail.exercises.map((exercise) => exercise.exercise_id),
-        limitPerExercise: 5,
+        limitPerExercise: 6,
       }, auth)
     : {};
   const clientDetail = clientDetailFromWorkoutDetail(detail);

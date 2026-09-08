@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowLeft, Check, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, Check, Dumbbell, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +122,7 @@ export function AddExerciseSheet({
                       aria-label="Buscar ejercicio"
                       className="pl-9"
                       value={search}
-                      placeholder="Buscar ejercicio"
+                      placeholder="Buscar ejercicio…"
                       onChange={(event) => onSearchChange(event.target.value)}
                     />
                   </div>
@@ -138,7 +138,10 @@ export function AddExerciseSheet({
                           type="button"
                           size="sm"
                           variant={selected ? "secondary" : "outline"}
-                          className="shrink-0"
+                          className={cn(
+                            "shrink-0",
+                            selected && "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+                          )}
                           aria-pressed={selected}
                           onClick={() => onMuscleGroupChange(group.value)}
                         >
@@ -168,7 +171,7 @@ export function AddExerciseSheet({
                             key={exercise.id}
                             type="button"
                             className={cn(
-                              "flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left outline-none transition-[background-color,border-color] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50",
+                              "flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border px-2.5 py-2 text-left outline-none transition-[background-color,border-color] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50",
                               selected
                                 ? "border-primary/35 bg-primary/[0.07]"
                                 : "border-transparent hover:bg-muted/60",
@@ -176,12 +179,17 @@ export function AddExerciseSheet({
                             aria-pressed={selected}
                             onClick={() => onSelectExercise(exercise.id)}
                           >
-                            <span className="min-w-0">
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-primary" aria-hidden>
+                                <Dumbbell className="size-4" strokeWidth={1.8} />
+                              </span>
+                              <span className="min-w-0">
                               <span className="block truncate text-sm font-medium">
                                 {exercise.nombre}
                               </span>
                               <span className="block truncate text-xs text-muted-foreground">
                                 {exerciseIdentityLabel(exercise)}
+                              </span>
                               </span>
                             </span>
                             <span

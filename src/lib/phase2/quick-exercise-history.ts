@@ -4,7 +4,9 @@ import {
   type ExerciseReportSet,
 } from "./exercise-insights";
 
-export const QUICK_EXERCISE_HISTORY_LIMIT = 5;
+/** One highlighted latest session plus five previous sessions in the quick sheet. */
+export const QUICK_EXERCISE_HISTORY_LIMIT = 6;
+export const QUICK_EXERCISE_HISTORY_PREVIOUS_LIMIT = 5;
 
 function sessionSortKey(session: ExerciseReportSession) {
   return session.completedAt ?? `${session.logDate}T12:00:00.000Z`;
@@ -48,4 +50,53 @@ export function quickHistoryLatestSummary(session: ExerciseReportSession | null)
   if (!session) return null;
   const values = quickHistoryCompletedSets(session).map(quickHistorySetLabel);
   return values.length > 0 ? values.join(" · ") : null;
+}
+
+/**
+ * A compact "weight · reps" summary is only truthful when every completed set
+ * used the same recorded positive load. Mixed loads must stay rendered set by
+ * set so the sheet never implies a weight that was not actually used.
+ */
+export function quickHistoryUniformLoadSummary(
+  session: ExerciseReportSession | null,
+): string | null {
+  if (!session) return null;
+  const completed = quickHistoryCompletedSets(session);
+  if (completed.length === 0) return null;
+
+  const weights = completed.map((set) => set.actual_weight_kg);
+  const firstWeight = weights[0];
+  if (
+    typeof firstWeight !== "number" ||
+    !Number.isFinite(firstWeight) ||
+    firstWeight <= 0 ||
+    weights.some((weight) => weight !== firstWeight)
+  ) {
+    return null;
+  }
+
+  const reps = completed.map((set) => set.actual_reps);
+  if (
+    reps.some(
+      (value) => typeof value !== "number" || !Number.isFinite(value),
+    )
+  ) {
+    return null;
+  }
+
+  return `${firstWeight} kg · ${reps.join(" / ")} reps`;
+}
+
+/** The highlighted latest session is intentionally removed from the list below it. */
+export function splitQuickExerciseHistory(
+  sessions: readonly ExerciseReportSession[],
+): {
+  latest: ExerciseReportSession | null;
+  previous: ExerciseReportSession[];
+} {
+  const ordered = recentExerciseHistorySessions(sessions);
+  return {
+    latest: ordered[0] ?? null,
+    previous: ordered.slice(1, QUICK_EXERCISE_HISTORY_PREVIOUS_LIMIT + 1),
+  };
 }
