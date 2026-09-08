@@ -16,11 +16,13 @@ import {
   Check,
   ChevronDown,
   Clock3,
+  Dumbbell,
+  FileText,
   History,
-  Info,
   LoaderCircle,
   Minus,
   Plus,
+  Target,
   X,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -85,10 +87,8 @@ import {
   formatWorkoutDuration,
   formatWorkoutTimeRange,
   getWorkoutElapsedMilliseconds,
-  hasFutureExerciseAction,
   nextSessionReminder,
   renumberWorkoutPayload,
-  sessionHasCardioExercise,
   sessionMetadataFromSession,
   toggleTrainingDecision,
   workoutPayloadFromDetail,
@@ -116,6 +116,7 @@ type ExerciseStatus = {
 };
 
 type RestTimerState = {
+  exerciseId: string;
   exerciseName: string;
   endAt: number;
 };
@@ -135,10 +136,15 @@ const SET_GRID_LAYOUT =
   "grid-cols-[2rem_minmax(0,1fr)_3.75rem_2.5rem_2.75rem]";
 const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1 px-1`;
 const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
+const REST_TIMER_STORAGE_KEY_PREFIX = "ownlevel:workout-rest-timer:";
 const EXERCISE_AUTOSAVE_DEBOUNCE_MS = 850;
 
 function finishConfirmationKey(sessionId: string) {
   return `${FINISH_CONFIRMATION_KEY_PREFIX}${sessionId}`;
+}
+
+function restTimerStorageKey(sessionId: string) {
+  return `${REST_TIMER_STORAGE_KEY_PREFIX}${sessionId}`;
 }
 
 function compactNumber(value: number | null) {
@@ -348,33 +354,53 @@ function snapshotRecord(snapshot: string): Record<string, string | null> {
   }
 }
 
-function metadataInput(
-  value: number | null,
-  onChange: (next: number | null) => void,
-  props: { min: number; max: number; step?: number | string; label: string },
-) {
-  if (props.step && props.step !== 1) {
-    return (
-      <LocalizedDecimalInput
-        aria-label={props.label}
-        min={props.min}
-        max={props.max}
-        value={value}
-        onValueChange={onChange}
-      />
-    );
-  }
+function RatingPicker({
+  label,
+  value,
+  minimum,
+  maximum,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  minimum: number;
+  maximum: number;
+  disabled: boolean;
+  onChange: (next: number | null) => void;
+}) {
+  const values = Array.from({ length: maximum - minimum + 1 }, (_, index) => minimum + index);
   return (
-    <Input
-      aria-label={props.label}
-      type="number"
-      min={props.min}
-      max={props.max}
-      step={props.step ?? 1}
-      inputMode="numeric"
-      value={value ?? ""}
-      onChange={(event) => onChange(nullableNumberFromInput(event.target.value))}
-    />
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div
+        className={cn(
+          "grid overflow-hidden rounded-xl border border-border/80 bg-background/40",
+          maximum - minimum >= 10 ? "grid-cols-6" : "grid-cols-5",
+        )}
+        role="group"
+        aria-label={label}
+      >
+        {values.map((option) => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              disabled={disabled}
+              aria-pressed={selected}
+              className={cn(
+                "metric-number flex h-11 touch-manipulation items-center justify-center border-r border-border/70 text-sm font-medium outline-none transition-colors last:border-r-0 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60",
+                selected ? "bg-primary text-primary-foreground" : "hover:bg-muted/60 active:bg-muted",
+              )}
+              onClick={() => onChange(selected ? null : option)}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -460,6 +486,7 @@ export function SessionEditor({
   const [editingNoteExerciseId, setEditingNoteExerciseId] = useState<string | null>(null);
   const [quickHistoryExerciseId, setQuickHistoryExerciseId] = useState<string | null>(null);
   const [restTimer, setRestTimer] = useState<RestTimerState | null>(null);
+  const [restTimerHydrated, setRestTimerHydrated] = useState(readOnly);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const autosaveRef = useRef<ExerciseAutosaveQueue<WorkoutExercisePayload> | null>(null);
   if (autosaveRef.current === null) {
@@ -590,11 +617,6 @@ export function SessionEditor({
   const metadata = readOnly
     ? baseMetadata
     : metadataOverride ?? metadataDraft?.metadata ?? baseMetadata;
-  const hasCardioExercise = useMemo(
-    () => sessionHasCardioExercise(detail.exercises),
-    [detail.exercises],
-  );
-
   const draftById = useMemo(
     () =>
       Object.fromEntries(
@@ -748,6 +770,42 @@ export function SessionEditor({
   }, [restTimer]);
 
   useEffect(() => {
+    if (readOnly) return;
+    try {
+      const raw = window.sessionStorage.getItem(restTimerStorageKey(detail.session.id));
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (
+          typeof parsed === "object" &&
+          parsed !== null &&
+          typeof (parsed as RestTimerState).exerciseId === "string" &&
+          typeof (parsed as RestTimerState).exerciseName === "string" &&
+          typeof (parsed as RestTimerState).endAt === "number" &&
+          Number.isFinite((parsed as RestTimerState).endAt) &&
+          (parsed as RestTimerState).endAt > Date.now() - 60_000
+        ) {
+          setRestTimer(parsed as RestTimerState);
+        }
+      }
+    } catch {
+      // The rest timer remains an optional local convenience when storage is unavailable.
+    } finally {
+      setRestTimerHydrated(true);
+    }
+  }, [detail.session.id, readOnly]);
+
+  useEffect(() => {
+    if (readOnly || !restTimerHydrated) return;
+    const key = restTimerStorageKey(detail.session.id);
+    try {
+      if (restTimer) window.sessionStorage.setItem(key, JSON.stringify(restTimer));
+      else window.sessionStorage.removeItem(key);
+    } catch {
+      // The visual timer still works during this visit if browser storage is unavailable.
+    }
+  }, [detail.session.id, readOnly, restTimer, restTimerHydrated]);
+
+  useEffect(() => {
     if (!hasUnsavedWork) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -809,6 +867,7 @@ export function SessionEditor({
     const now = Date.now();
     setTimerNow(now);
     setRestTimer({
+      exerciseId: exercise.id,
       exerciseName: exercise.nombre_snapshot,
       endAt: now + seconds * 1000,
     });
@@ -1006,6 +1065,12 @@ export function SessionEditor({
     }
     autosaveRef.current?.dispose();
     for (const key of draftKeys) removeDraft(key);
+    setRestTimer(null);
+    try {
+      window.sessionStorage.removeItem(restTimerStorageKey(detail.session.id));
+    } catch {
+      // Completion is already saved; rest timer cleanup is best-effort browser state.
+    }
     router.refresh();
   }
 
@@ -1031,6 +1096,12 @@ export function SessionEditor({
     }
     autosaveRef.current?.dispose();
     for (const key of draftKeys) removeDraft(key);
+    setRestTimer(null);
+    try {
+      window.sessionStorage.removeItem(restTimerStorageKey(detail.session.id));
+    } catch {
+      // The deleted session remains correct if local browser cleanup is unavailable.
+    }
     router.replace("/train");
     router.refresh();
   }
@@ -1045,28 +1116,32 @@ export function SessionEditor({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
       <header
         className={cn(
-          "relative space-y-3 border-b border-border/70 pb-4",
+          "sticky top-[max(0.5rem,env(safe-area-inset-top))] z-30 -mx-1 space-y-2 rounded-2xl border border-border/70 bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85",
           hasRoutineAccent && "pl-3",
         )}
       >
         {hasRoutineAccent ? (
           <span
-            className="absolute bottom-4 left-0 top-0 w-[3px] rounded-full"
+            className="absolute bottom-3 left-0 top-3 w-[3px] rounded-full"
             style={{ backgroundColor: routineAccent }}
             aria-hidden
           />
         ) : null}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">
+            <h1 className="truncate text-xl font-semibold tracking-tight">
               {detail.session.session_name ??
                 detail.session.routine_name_snapshot ??
                 "Sesión libre"}
             </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">{formatSessionDate(detail.logDate)}</p>
+            <SessionTiming
+              startedAt={detail.session.started_at}
+              endedAt={detail.session.ended_at}
+              isActive={!readOnly}
+            />
           </div>
           {!readOnly && (syncErrorCount > 0 || syncingCount > 0 || metadataDirty) ? (
             <span
@@ -1089,10 +1164,9 @@ export function SessionEditor({
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>
               <span className="metric-number font-semibold text-foreground">
-                {stats.completedSets}
+                {stats.completedSets}/{stats.totalSets}
               </span>{" "}
-              de {stats.totalSets} series · {stats.completedExercises} de{" "}
-              {detail.exercises.length} ejercicios
+              series · {stats.completedExercises}/{detail.exercises.length} ejercicios
             </span>
             <span className="metric-number shrink-0 font-medium text-foreground">
               {progressPercent}%
@@ -1112,11 +1186,6 @@ export function SessionEditor({
             />
           </div>
         </div>
-        <SessionTiming
-          startedAt={detail.session.started_at}
-          endedAt={detail.session.ended_at}
-          isActive={!readOnly}
-        />
         {detail.session.status === "completed" ? (
           <CompletedSessionActions
             sessionId={detail.session.id}
@@ -1159,6 +1228,7 @@ export function SessionEditor({
           onOpenChange={(open) => {
             if (!open) setQuickHistoryExerciseId(null);
           }}
+          exerciseId={quickHistoryExercise.exercise_id}
           exerciseName={quickHistoryExercise.nombre_snapshot}
           sessions={recentHistoryByExerciseId[quickHistoryExercise.exercise_id] ?? []}
         />
@@ -1193,6 +1263,7 @@ export function SessionEditor({
               exercise.rest_min_seconds_snapshot,
               exercise.rest_max_seconds_snapshot,
             );
+            const activeRestTimer = restTimer?.exerciseId === exercise.id ? restTimer : null;
             const receivedReminder = !readOnly
               ? nextSessionReminder(
                   exercise.next_adjustment_snapshot,
@@ -1237,15 +1308,15 @@ export function SessionEditor({
                 <Card
                   size="sm"
                   className={cn(
-                    "relative gap-0 overflow-hidden py-0 transition-[box-shadow,transform] duration-200 motion-reduce:transition-none",
-                    expanded && "shadow-md ring-1 ring-primary/30",
-                    completion.isComplete && !expanded && "ring-emerald-500/20",
+                    "relative gap-0 overflow-hidden py-0 transition-[box-shadow,border-color] duration-200 motion-reduce:transition-none",
+                    expanded && "border-primary/35 shadow-md",
+                    completion.isComplete && !expanded && "border-emerald-500/25",
                   )}
                 >
                 <span
                   className={cn(
-                    "absolute inset-y-3 left-0 w-0.5 rounded-r-full transition-opacity duration-200",
-                    expanded ? "opacity-100" : "opacity-35",
+                    "absolute inset-y-2.5 left-0 w-[3px] rounded-r-full transition-opacity duration-200",
+                    expanded ? "opacity-100" : "opacity-55",
                   )}
                   style={{ backgroundColor: routineAccent }}
                   aria-hidden
@@ -1253,12 +1324,15 @@ export function SessionEditor({
                 <CardHeader className="p-0">
                   <button
                     type="button"
-                    className="grid min-h-[4.25rem] w-full touch-manipulation grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+                    className="grid min-h-[4.75rem] w-full touch-manipulation grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-muted/40 active:bg-muted/60 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
                     aria-expanded={expanded}
                     aria-controls={exerciseContentId}
                     onClick={() => toggleExercise(exercise.id)}
                   >
-                    <div className="min-w-0 flex-1">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/75 bg-muted/45 text-primary" aria-hidden>
+                      <Dumbbell className="size-4" strokeWidth={1.8} />
+                    </span>
+                    <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <h3 className="truncate text-sm font-semibold tracking-tight">
                           {exercise.nombre_snapshot}
@@ -1271,12 +1345,12 @@ export function SessionEditor({
                         ) : null}
                       </div>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {!expanded ? collapsedSubtitle : exerciseMeta}
+                        {collapsedSubtitle}
                       </p>
-                      {receivedReminder ? (
+                      {!expanded && receivedReminder ? (
                         <p className="mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium text-primary">
                           <ArrowUpRight className="size-3 shrink-0" aria-hidden />
-                          <span className="truncate">Revisar hoy · {receivedReminder}</span>
+                          <span className="truncate">{receivedReminder}</span>
                         </p>
                       ) : null}
                       {staleDraftIds.has(exercise.id) ? (
@@ -1288,7 +1362,7 @@ export function SessionEditor({
                     <span className="flex shrink-0 items-center gap-2" aria-label={`${progressLabel} series completadas`}>
                       <span
                         className={cn(
-                          "metric-number min-w-[4.25rem] rounded-full border px-2 py-1 text-center text-xs font-medium tabular-nums",
+                          "metric-number min-w-[3.75rem] rounded-full border px-2 py-1 text-center text-xs font-medium tabular-nums",
                           completion.isComplete &&
                             "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
                         )}
@@ -1351,32 +1425,27 @@ export function SessionEditor({
                     </div>
                   ) : null}
 
-                  {receivedReminder ? (
-                    <div className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm text-primary">
-                      <ArrowUpRight className="mt-0.5 size-4 shrink-0" aria-hidden />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium">Revisar hoy</p>
-                        <p className="mt-0.5 break-words font-medium text-foreground">
-                          {receivedReminder}
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {quickNote ? (
-                    <div className="flex gap-2 border-b border-border/60 px-1 pb-2 text-xs leading-relaxed text-muted-foreground">
-                      <Info className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground">
-                          {exercise.routine_exercise_id
-                            ? "Nota para próximas sesiones"
-                            : "Nota del ejercicio en esta sesión"}
-                        </p>
-                        <p className="line-clamp-2">{quickNote}</p>
-                      </div>
-                    </div>
-                  ) : null}
-
+                  <div className="flex min-h-10 items-center justify-between gap-3 px-1">
+                    <h4 className="text-base font-semibold tracking-tight">Series</h4>
+                    {!readOnly ? (
+                      <Button
+                        className="h-10 px-2 text-sm"
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={interactionLocked}
+                        onClick={() => {
+                          const activeElement = document.activeElement;
+                          if (activeElement instanceof HTMLElement) activeElement.blur();
+                          setQuickHistoryExerciseId(exercise.id);
+                        }}
+                      >
+                        <History className="size-4" aria-hidden />
+                        Últimas veces
+                        <ChevronDown className="size-3.5 -rotate-90" aria-hidden />
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="overflow-hidden rounded-xl border border-border/75 bg-background/35">
                     <div
                       className={cn(
@@ -1416,51 +1485,10 @@ export function SessionEditor({
 
                   {!readOnly ? (
                     <Button
-                      className="h-9 self-start"
+                      className="h-11 w-full border border-dashed border-primary/45 text-primary hover:bg-primary/5"
                       type="button"
                       size="sm"
-                      variant="ghost"
-                      disabled={interactionLocked}
-                      onClick={() => {
-                        const activeElement = document.activeElement;
-                        if (activeElement instanceof HTMLElement) activeElement.blur();
-                        setQuickHistoryExerciseId(exercise.id);
-                      }}
-                    >
-                      <History className="size-3.5" aria-hidden />
-                      Últimas veces
-                    </Button>
-                  ) : null}
-
-                  {restLabel ? (
-                    <div className="flex min-h-9 items-center justify-between gap-3 px-1">
-                      <p className="text-xs text-muted-foreground">
-                        Descanso{" "}
-                        <span className="metric-number font-semibold text-foreground">
-                          {restLabel}
-                        </span>
-                      </p>
-                      {!interactionLocked ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startRestTimer(exercise)}
-                          aria-label={`Iniciar temporizador de descanso para ${exercise.nombre_snapshot}`}
-                        >
-                          <Clock3 className="size-3.5" aria-hidden />
-                          Iniciar
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {!readOnly ? (
-                    <Button
-                      className="h-9"
-                      type="button"
-                      size="sm"
-                      variant="ghost"
+                      variant="outline"
                       disabled={interactionLocked || payload.sets.length >= 50}
                       onClick={() =>
                         updateExercise(exercise.id, (current) => {
@@ -1487,6 +1515,46 @@ export function SessionEditor({
                       <Plus className="size-3.5" aria-hidden />
                       Agregar serie
                     </Button>
+                  ) : null}
+
+                  {restLabel ? (
+                    <div className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-border/75 bg-muted/25 px-3">
+                      <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                        <Clock3 className="size-4 shrink-0 text-primary" aria-hidden />
+                        <span className="truncate">
+                          Descanso{" "}
+                          <span className="metric-number font-semibold text-foreground">
+                            {activeRestTimer
+                              ? restRemaining > 0
+                                ? timerLabel(restRemaining)
+                                : "Listo"
+                              : restLabel}
+                          </span>
+                        </span>
+                      </p>
+                      {!interactionLocked ? (
+                        activeRestTimer ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRestTimer(null)}
+                          >
+                            Saltar
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => startRestTimer(exercise)}
+                            aria-label={`Iniciar temporizador de descanso para ${exercise.nombre_snapshot}`}
+                          >
+                            Iniciar
+                          </Button>
+                        )
+                      ) : null}
+                    </div>
                   ) : null}
 
                   {!readOnly && status?.error ? (
@@ -1531,14 +1599,7 @@ export function SessionEditor({
                   <section className="space-y-3 border-t border-border/60 pt-3">
                     <div className="flex min-h-8 items-center justify-between gap-3 px-1">
                       <Label>Próxima vez</Label>
-                      {hasFutureExerciseAction(payload.decision, payload.apply_to_routine) ? (
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                          <Check className="size-3.5" strokeWidth={2.75} aria-hidden />
-                          Configurada
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sin cambios</span>
-                      )}
+                      <span className="text-xs text-muted-foreground">Opcional</span>
                     </div>
                     <div className="space-y-3 pb-1">
                       <div className="space-y-2">
@@ -1570,9 +1631,11 @@ export function SessionEditor({
                             </Button>
                           ))}
                         </div>
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                          Recordatorio para tu próxima sesión.
-                        </p>
+                        {payload.decision === "maintain" ? (
+                          <p className="text-xs leading-relaxed text-muted-foreground">
+                            Dejá todo sin marcar para mantener el objetivo actual.
+                          </p>
+                        ) : null}
                       </div>
 
                       {payload.decision === "custom" ? (
@@ -1613,7 +1676,7 @@ export function SessionEditor({
                       {exercise.routine_exercise_id ? (
                         <label
                           className={cn(
-                            "flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-within:ring-3 focus-within:ring-ring/50",
+                            "flex min-h-16 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-within:ring-3 focus-within:ring-ring/50",
                             payload.apply_to_routine
                               ? "border-primary/40 bg-primary/5"
                               : "border-border/75 bg-background/35 hover:bg-muted/35",
@@ -1635,9 +1698,18 @@ export function SessionEditor({
                               )
                             }
                           />
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden>
+                            <Target className="size-4" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-medium">Tomar resultado de hoy</span>
+                            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                              Usa las series completadas como base.
+                            </span>
+                          </span>
                           <span
                             className={cn(
-                              "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border",
+                              "flex size-6 shrink-0 items-center justify-center rounded-full border",
                               payload.apply_to_routine
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "border-input bg-background",
@@ -1648,23 +1720,18 @@ export function SessionEditor({
                               <Check className="size-3.5" strokeWidth={3} />
                             ) : null}
                           </span>
-                          <span className="min-w-0">
-                            <span className="block font-medium">
-                              Usar lo realizado hoy como nuevo objetivo
-                            </span>
-                            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-                              Al finalizar, sólo toma las series completadas.
-                            </span>
-                          </span>
                         </label>
                       ) : null}
 
-                      <div className="space-y-2 pt-0.5">
+                      <div className="space-y-2 rounded-xl border border-border/75 bg-muted/20 px-3 py-2.5">
                         <div className="flex min-h-8 items-center justify-between gap-3">
                           {noteEditorOpen ? (
                             <Label htmlFor={`exercise-notes-${exercise.id}`}>{noteLabel}</Label>
                           ) : (
-                            <p className="text-sm font-medium">{noteLabel}</p>
+                          <p className="flex items-center gap-2 text-sm font-medium">
+                            <FileText className="size-4 text-primary" aria-hidden />
+                            {noteLabel}
+                          </p>
                           )}
                           {!readOnly ? (
                             <Button
@@ -1763,114 +1830,38 @@ export function SessionEditor({
           </summary>
           <CardContent className="border-t border-border/70 px-3 pb-3 pt-4">
           <fieldset className="space-y-4 disabled:opacity-80" disabled={interactionLocked}>
+          <RatingPicker
+            label="Energía (1–5)"
+            value={metadata.energy_level}
+            minimum={1}
+            maximum={5}
+            disabled={interactionLocked}
+            onChange={(value) => updateMetadata((current) => ({ ...current, energy_level: value }))}
+          />
+          <RatingPicker
+            label="Rendimiento (1–5)"
+            value={metadata.performance_level}
+            minimum={1}
+            maximum={5}
+            disabled={interactionLocked}
+            onChange={(value) => updateMetadata((current) => ({ ...current, performance_level: value }))}
+          />
+          <RatingPicker
+            label="Dolor (0–10)"
+            value={metadata.pain_level}
+            minimum={0}
+            maximum={10}
+            disabled={interactionLocked}
+            onChange={(value) => updateMetadata((current) => ({ ...current, pain_level: value }))}
+          />
           <div className="space-y-1">
-            <Label htmlFor="session-name">Nombre</Label>
-            <Input
-              id="session-name"
-              value={metadata.session_name}
-              readOnly={readOnly}
-              onChange={(event) =>
-                updateMetadata((current) => ({
-                  ...current,
-                  session_name: event.target.value,
-                }))
-              }
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="space-y-1">
-              <Label>Energía 1–5</Label>
-              {metadataInput(
-                metadata.energy_level,
-                (value) => updateMetadata((current) => ({ ...current, energy_level: value })),
-                { min: 1, max: 5, label: "Energía" },
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Rendimiento 1–5</Label>
-              {metadataInput(
-                metadata.performance_level,
-                (value) =>
-                  updateMetadata((current) => ({ ...current, performance_level: value })),
-                { min: 1, max: 5, label: "Rendimiento" },
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Dolor 0–10</Label>
-              {metadataInput(
-                metadata.pain_level,
-                (value) => updateMetadata((current) => ({ ...current, pain_level: value })),
-                { min: 0, max: 10, label: "Dolor" },
-              )}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="pain-note">Zona o detalle de dolor</Label>
-            <Input
-              id="pain-note"
-              value={metadata.pain_note}
-              readOnly={readOnly}
-              onChange={(event) =>
-                updateMetadata((current) => ({ ...current, pain_note: event.target.value }))
-              }
-            />
-          </div>
-          {hasCardioExercise ? (
-            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
-              <p className="text-sm font-medium">Cardio</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>Minutos de cinta</Label>
-                  {metadataInput(
-                    metadata.treadmill_minutes,
-                    (value) =>
-                      updateMetadata((current) => ({ ...current, treadmill_minutes: value })),
-                    { min: 0, max: 1440, step: 0.5, label: "Minutos de cinta" },
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label>Distancia km</Label>
-                  {metadataInput(
-                    metadata.treadmill_distance_km,
-                    (value) =>
-                      updateMetadata((current) => ({
-                        ...current,
-                        treadmill_distance_km: value,
-                      })),
-                    { min: 0, max: 1000, step: 0.01, label: "Distancia de cinta" },
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label>Velocidad km/h</Label>
-                  {metadataInput(
-                    metadata.treadmill_speed_kmh,
-                    (value) =>
-                      updateMetadata((current) => ({ ...current, treadmill_speed_kmh: value })),
-                    { min: 0, max: 100, step: 0.1, label: "Velocidad de cinta" },
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label>Inclinación %</Label>
-                  {metadataInput(
-                    metadata.treadmill_incline_percent,
-                    (value) =>
-                      updateMetadata((current) => ({
-                        ...current,
-                        treadmill_incline_percent: value,
-                      })),
-                    { min: 0, max: 100, step: 0.5, label: "Inclinación de cinta" },
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <Label htmlFor="session-notes">Notas generales</Label>
+            <Label htmlFor="session-notes">Notas (opcional)</Label>
             <textarea
               id="session-notes"
-              className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
+              className="min-h-24 w-full rounded-xl border bg-background px-3 py-2 text-sm disabled:opacity-60"
               value={metadata.notes}
               disabled={readOnly}
+              placeholder="¿Cómo te sentiste? Algo para recordar para la próxima sesión…"
               onChange={(event) =>
                 updateMetadata((current) => ({ ...current, notes: event.target.value }))
               }
@@ -1909,13 +1900,22 @@ export function SessionEditor({
           >
             {finishStage ? "Finalizando…" : "Finalizar entrenamiento"}
           </Button>
-          <p className="text-xs text-muted-foreground">
+          {finishStage ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
             {finishStage === "saving"
               ? "Guardando los últimos cambios antes de cerrar la sesión…"
               : finishStage === "finishing"
                 ? "Todos los ejercicios están sincronizados. Cerrando la sesión…"
-              : "Solo se actualiza la rutina donde activaste “Guardar lo realizado como nuevo objetivo”."}
+                : null}
           </p>
+          ) : null}
+          <Link
+            href="/train"
+            className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
+            onClick={confirmNavigation}
+          >
+            Volver a Entrenar
+          </Link>
           <div aria-live="polite">
             {globalError ? <p className="text-sm text-destructive">{globalError}</p> : null}
           </div>
@@ -1966,33 +1966,32 @@ export function SessionEditor({
           getWorkoutElapsedMilliseconds(detail.session.started_at, detail.session.ended_at),
         )}
         completedSets={stats.completedSets}
-        completedExercises={Object.values(currentPayloads).filter((payload) =>
-          payload.sets.some((set) => set.is_completed),
-        ).length}
+        completedExercises={stats.completedExercises}
       />
 
-      <Link
-        href="/train"
-        className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
-        onClick={confirmNavigation}
-      >
-        Volver a Entrenar
-      </Link>
+      {readOnly ? (
+        <Link
+          href="/train"
+          className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
+        >
+          Volver a Entrenar
+        </Link>
+      ) : null}
 
       {restTimer && !readOnly ? (
         <aside
-          className="fixed inset-x-3 bottom-[calc(5.35rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[406px] rounded-2xl border border-orange-400/25 bg-card/85 px-3 py-2.5 shadow-xl shadow-black/15 backdrop-blur-xl"
+          className="fixed inset-x-3 bottom-[calc(5.65rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[406px] rounded-2xl border border-primary/25 bg-card/95 px-3 py-2.5 shadow-xl shadow-black/15 backdrop-blur-xl"
           aria-live="polite"
           aria-label="Temporizador de descanso"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/15 text-orange-500">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
                 <Clock3 className="size-4" aria-hidden />
               </span>
               <div className="min-w-0">
                 <p className="truncate text-xs text-muted-foreground">Descanso · {restTimer.exerciseName}</p>
-                <p className="metric-number text-lg font-semibold tracking-tight text-orange-500">
+                <p className="metric-number text-lg font-semibold tracking-tight text-primary">
                   {restRemaining > 0 ? timerLabel(restRemaining) : "Listo"}
                 </p>
               </div>

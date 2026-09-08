@@ -4,7 +4,9 @@ import {
   quickHistoryCompletedSets,
   quickHistoryLatestSummary,
   quickHistorySetLabel,
+  quickHistoryUniformLoadSummary,
   recentExerciseHistorySessions,
+  splitQuickExerciseHistory,
 } from "./quick-exercise-history";
 
 const set = (overrides: Partial<ExerciseReportSet> = {}): ExerciseReportSet => ({
@@ -46,6 +48,7 @@ describe("historial rápido de ejercicio", () => {
       "session-4",
       "session-3",
       "session-2",
+      "session-1",
     ]);
   });
 
@@ -78,5 +81,49 @@ describe("historial rápido de ejercicio", () => {
 
     expect(quickHistoryLatestSummary(item)).toBe("10 × 90 kg · 9 × 90 kg");
     expect(quickHistoryCompletedSets(item).map((entry) => entry.set_number)).toEqual([1, 2]);
+  });
+
+  it("solo compacta reps bajo una carga cuando todas las series realmente usaron la misma", () => {
+    expect(
+      quickHistoryUniformLoadSummary(
+        session({
+          sets: [
+            set({ id: "one", actual_weight_kg: 90, actual_reps: 10 }),
+            set({ id: "two", actual_weight_kg: 90, actual_reps: 9 }),
+          ],
+        }),
+      ),
+    ).toBe("90 kg · 10 / 9 reps");
+    expect(
+      quickHistoryUniformLoadSummary(
+        session({
+          sets: [
+            set({ id: "one", actual_weight_kg: 90, actual_reps: 10 }),
+            set({ id: "two", actual_weight_kg: 85, actual_reps: 8 }),
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("separa la última sesión destacada del historial para no duplicarla", () => {
+    const sessions = Array.from({ length: 7 }, (_, index) =>
+      session({
+        sessionId: `session-${index + 1}`,
+        logDate: `2026-09-0${index + 1}`,
+        completedAt: `2026-09-0${index + 1}T18:00:00.000Z`,
+      }),
+    );
+
+    const result = splitQuickExerciseHistory(sessions);
+    expect(result.latest?.sessionId).toBe("session-7");
+    expect(result.previous.map((item) => item.sessionId)).toEqual([
+      "session-6",
+      "session-5",
+      "session-4",
+      "session-3",
+      "session-2",
+    ]);
+    expect(result.previous).not.toContainEqual(result.latest);
   });
 });
