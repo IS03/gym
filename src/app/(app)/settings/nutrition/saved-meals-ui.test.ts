@@ -13,6 +13,8 @@ describe("PR30 — gestión de Comidas habituales", () => {
     expect(hub).toContain('href="/settings/nutrition/meals"');
     expect(hub).toContain('title="Comidas guardadas"');
     expect(page).toContain("<SavedMealsCatalog");
+    expect(page).toContain('href="/settings/library"');
+    expect(page).toContain("Biblioteca");
   });
 
   it("ofrece búsqueda y filtros Activas / Archivadas / Todas", () => {
