@@ -77,6 +77,7 @@ export async function saveFoodAction(input: FoodMutationInput) {
       error: error instanceof FoodProductError
         ? error.message
         : "No pudimos guardar el alimento.",
+      field: error instanceof FoodProductError ? error.field : undefined,
     };
   }
 }
