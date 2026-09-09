@@ -80,7 +80,6 @@ function FoodEditor({
   pending,
   message,
   errorField,
-  showInlineSubmit,
   onChange,
   onSave,
 }: {
@@ -88,7 +87,6 @@ function FoodEditor({
   pending: boolean;
   message: string | null;
   errorField: FoodInputField | null;
-  showInlineSubmit: boolean;
   onChange: (key: keyof Values, value: string) => void;
   onSave: () => void;
 }) {
@@ -134,7 +132,6 @@ function FoodEditor({
 
       <div className="space-y-1 border-t pt-4"><Label htmlFor="food-source" className={errorField === "sourceNote" ? "text-destructive" : undefined}>Fuente</Label><Input id="food-source" value={values.sourceNote} onChange={(event) => onChange("sourceNote", event.target.value)} placeholder="Opcional" disabled={pending} aria-invalid={errorField === "sourceNote"} className={invalidFieldClass} /></div>
       <div className="min-h-5" aria-live="polite">{message ? <p className="text-sm text-destructive" role="alert">{message}</p> : null}</div>
-      {showInlineSubmit ? <Button className="h-11 w-full" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar alimento"}</Button> : null}
     </form>
   );
 }
@@ -272,8 +269,8 @@ export function FoodsCatalog({ initialFoods }: { initialFoods: Food[] }) {
         </ul>
       )}
 
-      <ResponsiveDialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }} title={editing ? "Editar alimento" : "Nuevo alimento"} description="Definí una porción base y la nutrición que conozcas." closeLabel="Cerrar editor de alimento" footer={!editing ? saveButton : undefined}>
-        <FoodEditor values={values} pending={pending} message={message} errorField={errorField} showInlineSubmit={editing !== null} onChange={change} onSave={save} />
+      <ResponsiveDialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }} title={editing ? "Editar alimento" : "Nuevo alimento"} description="Definí una porción base y la nutrición que conozcas." closeLabel="Cerrar editor de alimento" footer={saveButton}>
+        <FoodEditor values={values} pending={pending} message={message} errorField={errorField} onChange={change} onSave={save} />
       </ResponsiveDialog>
 
       <Dialog.Root open={deleteTarget !== null} onOpenChange={(next) => { if (!next && !pending) { setDeleteTarget(null); setDeleteError(null); } }}>
