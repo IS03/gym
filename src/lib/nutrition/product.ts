@@ -102,14 +102,16 @@ export async function updateDailyActivity(input: {
   mateL: unknown;
 }): Promise<DayLog> {
   const { supabase, userId } = await authed();
-  const patch = {
-    steps: parseOptionalNumber(input.steps, "Pasos", { integer: true, min: 0, max: 1_000_000 }),
-    water_l: parseOptionalNumber(input.waterL, "Agua", { min: 0, max: 50 }),
-    mate_l: parseOptionalNumber(input.mateL, "Mate", { min: 0, max: 50 }),
-  };
-  const { data, error } = await supabase.from("day_logs").update(patch)
-    .eq("id", input.dayLogId).eq("user_id", userId).select("*").single();
+  const { error } = await supabase.rpc("save_daily_activity_metrics", {
+    p_day_log_id: input.dayLogId,
+    p_steps: parseOptionalNumber(input.steps, "Pasos", { integer: true, min: 0, max: 1_000_000 }),
+    p_water_l: parseOptionalNumber(input.waterL, "Agua", { min: 0, max: 50 }),
+    p_mate_l: parseOptionalNumber(input.mateL, "Mate", { min: 0, max: 50 }),
+  });
   if (error) throw new Error(`Guardar actividad diaria: ${error.message}`);
+  const { data, error: readError } = await supabase.from("day_logs").select("*")
+    .eq("id", input.dayLogId).eq("user_id", userId).single();
+  if (readError) throw new Error(`Leer actividad diaria: ${readError.message}`);
   return data as DayLog;
 }
 

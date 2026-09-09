@@ -86,9 +86,10 @@ describe("PR 7 — experiencia nutricional", () => {
 
   it("actividad no calcula totales ni refresca el motor desde TypeScript", () => {
     const activity = product.slice(product.indexOf("export async function updateDailyActivity"), product.indexOf("export async function updateWorkOverride"));
-    expect(activity).toContain("steps:");
-    expect(activity).toContain("water_l:");
-    expect(activity).toContain("mate_l:");
+    expect(activity).toContain('rpc("save_daily_activity_metrics"');
+    expect(activity).toContain("p_steps:");
+    expect(activity).toContain("p_water_l:");
+    expect(activity).toContain("p_mate_l:");
     expect(activity).not.toContain("refresh_nutrition_day");
     expect(activity).not.toContain("total_calories_consumed");
     expect(activity).not.toContain("expenditure_override_kcal");
