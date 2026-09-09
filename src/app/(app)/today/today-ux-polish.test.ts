@@ -15,11 +15,11 @@ describe("PR20 — Today UX polish", () => {
     expect(todayActivity).toContain("<DayActivityPanel");
     expect(todayActivity).not.toContain("<StepsCard");
     expect(todayActivity).toContain("<ResponsiveDialog");
-    expect(todayActivity).toContain("onActivityChange={setActivity}");
-    expect(todayActivity).toContain("activityValuesLabel={activityValuesLabel}");
+    expect(todayActivity).toContain("onMetricsChange={setActivity}");
+    expect(todayActivity).toContain("metrics={metricSummaries}");
     expect(activityPanel).toContain('aria-label="Abrir actividad de hoy"');
     expect(activityPanel).toContain('aria-haspopup="dialog"');
-    expect(activityEditor).toContain("<StepsSummary steps={steps} summary={stepsSummary} />");
+    expect(activityEditor).toContain('<StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} />');
     expect(activityPanel).not.toContain("Prom. 7 días");
     expect(activityPanel).not.toContain('href="/today/steps"');
   });
@@ -27,8 +27,9 @@ describe("PR20 — Today UX polish", () => {
   it("keeps the closed state focused on balance and daily activity", () => {
     expect(activityPanel).not.toContain("<details");
     expect(activityPanel).toContain('"Gasto"');
-    expect(activityPanel).toContain('"Balance parcial"');
-    for (const label of ["Pasos", "Agua", "Mate"]) expect(activityPanel).toContain(`["${label}"`);
+    expect(activityPanel).toContain('"Balance"');
+    expect(activityPanel).toContain("metrics.slice(0, 3)");
+    expect(activityPanel).toContain("metric.label");
     expect(activityPanel).not.toContain("<DayContextEditor");
     expect(closedActivityPanel).not.toContain('["Trabajo"');
     expect(closedActivityPanel).not.toContain('["Entrenamiento"');
@@ -44,16 +45,15 @@ describe("PR20 — Today UX polish", () => {
     expect(meals).toBeGreaterThan(activity);
   });
 
-  it("keeps the three daily inputs, the water target and a stable autosave slot in detail", () => {
-    for (const field of ["daily-steps", "daily-water", "daily-mate"]) {
-      expect(activityEditor).toContain(`htmlFor="${field}"`);
-    }
-    expect(activityEditor).toContain("grid grid-cols-3");
-    expect(activityEditor).toContain("· meta {waterTargetLabel}");
-    expect(activityEditor).toContain("truncate font-normal text-muted-foreground");
+  it("renders active metric ids with generic integer, decimal and duration controls", () => {
+    expect(activityEditor).toContain("metrics.map");
+    expect(activityEditor).toContain("daily-metric-${metric.id}");
+    expect(activityEditor).toContain('metric.value_type === "duration"');
+    expect(activityEditor).toContain("Horas");
+    expect(activityEditor).toContain("Minutos");
     expect(activityEditor).toContain("min-h-4 text-xs leading-4");
     expect(activityEditor).toContain("debounceMs: 650");
-    expect(activityEditor.match(/queueRef\.current\?\.flush\(\)/g)).toHaveLength(3);
+    expect(activityEditor).toContain("saveDailyMetricsAction");
   });
 
   it("keeps only Correcciones del día collapsible with an accessible rotating chevron", () => {
@@ -80,8 +80,17 @@ describe("PR20 — Today UX polish", () => {
     expect(stepsCard).toContain("Prom. 7 días");
     expect(stepsCard).toContain("{summary.daysWithData}/7 días");
     expect(stepsCard).toContain("Sin datos en los últimos 7 días");
-    expect(todayActivity).toContain("formatSteps(activity.steps)");
-    expect(todayActivity).toContain("formatLiters(activity.waterL)");
-    expect(todayActivity).toContain("formatLiters(activity.mateL)");
+    expect(todayActivity).toContain("formatDailyMetricProgress");
+    expect(todayActivity).toContain("activity[metric.id]");
+    expect(activityEditor).toContain('metric.system_key === "steps"');
+  });
+
+  it("removes the legacy subtitle and work/training correction controls", () => {
+    expect(todayActivity).not.toContain("Registrá pasos, agua y mate");
+    expect(activityEditor).not.toContain("Usar horario habitual");
+    expect(activityEditor).not.toContain("Registrar que entrené sin sesión");
+    expect(activityEditor).toContain("Objetivo nutricional");
+    expect(activityEditor).toContain("Gasto estimado");
+    expect(activityEditor).toContain("Usar valor automático");
   });
 });

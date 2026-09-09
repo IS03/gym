@@ -22,6 +22,10 @@ export type UserMetric = {
   has_history: boolean;
 };
 
+export type DailyMetricWithValue = UserMetric & {
+  value: number | null;
+};
+
 export const SYSTEM_METRIC_DEFAULTS = [
   { systemKey: "steps", name: "Pasos", unit: "pasos", valueType: "integer", target: 10_000, sortOrder: 0 },
   { systemKey: "water", name: "Agua", unit: "L", valueType: "decimal", target: 2.5, sortOrder: 1 },
@@ -87,6 +91,34 @@ export function formatMetricTarget(metric: Pick<UserMetric, "target_value" | "un
     return `Objetivo ${hours ? `${hours} h` : ""}${hours && minutes ? " " : ""}${minutes ? `${minutes} min` : ""}`;
   }
   return `Objetivo ${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 }).format(metric.target_value)}${metric.unit ? ` ${metric.unit}` : ""}`;
+}
+
+const metricNumberFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 4 });
+
+export function formatDurationMinutes(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (!hours) return `${minutes} min`;
+  if (!minutes) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
+export function formatDailyMetricValue(
+  value: number | null,
+  metric: Pick<UserMetric, "unit" | "value_type">,
+) {
+  if (value === null) return "—";
+  if (metric.value_type === "duration") return formatDurationMinutes(value);
+  return `${metricNumberFormatter.format(value)}${metric.unit ? ` ${metric.unit}` : ""}`;
+}
+
+export function formatDailyMetricProgress(
+  value: number | null,
+  metric: Pick<UserMetric, "target_value" | "unit" | "value_type">,
+) {
+  const current = formatDailyMetricValue(value, metric);
+  if (metric.target_value === null) return current;
+  return `${current} / ${formatDailyMetricValue(metric.target_value, metric)}`;
 }
 
 export function moveMetric<T>(items: T[], index: number, direction: -1 | 1) {

@@ -86,18 +86,17 @@ describe("PR 9.6 — UX diaria mobile", () => {
     expect(dateFieldWrapper).not.toContain("overflow-hidden");
   });
 
-  it("autoguarda sólo pasos, agua y mate; las correcciones siguen explícitas", () => {
+  it("autoguarda métricas por id y deja los dos overrides diarios explícitos", () => {
     expect(activityEditor).toContain("debounceMs: 650");
-    expect(activityEditor.match(/queueRef\.current\?\.flush\(\)/g)?.length).toBe(3);
+    expect(activityEditor).toContain("saveDailyMetricsAction");
+    expect(activityEditor).toContain("metrics.map");
     expect(activityEditor).toContain("Guardando…");
     expect(activityEditor).toContain("Guardado");
     expect(activityEditor).toContain("text-destructive");
-    for (const explicitAction of [
-      "saveWorkOverrideAction",
-      "saveGymOverrideAction",
-      "saveExpenditureOverrideAction",
-    ]) {
+    for (const explicitAction of ["saveNutritionTargetOverrideAction", "saveExpenditureOverrideAction"]) {
       expect(activityEditor).toContain(`submit(() => ${explicitAction}`);
     }
+    expect(activityEditor).not.toContain("saveWorkOverrideAction");
+    expect(activityEditor).not.toContain("saveGymOverrideAction");
   });
 });

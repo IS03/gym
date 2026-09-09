@@ -22,6 +22,7 @@ export type DayLog = {
   water_l: number | null;
   mate_l: number | null;
   expenditure_override_kcal: number | null;
+  nutrition_target_override_kcal: number | null;
   work_effective_snapshot: boolean | null;
   gym_effective_snapshot: boolean | null;
   work_source_snapshot: string | null;
@@ -32,9 +33,11 @@ export type DayLog = {
   nutrition_plan_period_id: string | null;
   energy_config_period_id: string | null;
   nutrition_target_kcal_snapshot: number | null;
+  nutrition_target_automatic_kcal_snapshot: number | null;
   protein_target_g_snapshot: number | null;
   water_target_l_snapshot: number | null;
   estimated_expenditure_kcal_snapshot: number | null;
+  estimated_expenditure_automatic_kcal_snapshot: number | null;
   total_carbs_g: number;
   total_fat_g: number;
   delta_vs_nutrition_target: number | null;

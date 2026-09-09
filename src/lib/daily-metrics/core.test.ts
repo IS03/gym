@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   SYSTEM_METRIC_DEFAULTS,
+  formatDailyMetricProgress,
+  formatDailyMetricValue,
   formatMetricTarget,
   moveMetric,
   normalizeMetricName,
@@ -39,6 +41,15 @@ describe("PR72 — núcleo de métricas diarias", () => {
     expect(parseMetricTarget("480", "duration")).toBe(480);
     expect(formatMetricTarget({ target_value: 455, value_type: "duration", unit: "min" })).toBe("Objetivo 7 h 35 min");
     expect(formatMetricTarget({ target_value: 0, value_type: "duration", unit: "min" })).toBe("Objetivo 0 min");
+    expect(formatDailyMetricValue(455, { value_type: "duration", unit: "min" })).toBe("7 h 35 min");
+  });
+
+  it("formatea valores y objetivos sin confundir ausencia con cero", () => {
+    const metric = { target_value: 10, value_type: "decimal" as const, unit: "km" };
+    expect(formatDailyMetricProgress(6.4, metric)).toBe("6,4 km / 10 km");
+    expect(formatDailyMetricProgress(0, metric)).toBe("0 km / 10 km");
+    expect(formatDailyMetricProgress(null, metric)).toBe("— / 10 km");
+    expect(formatDailyMetricProgress(1, { ...metric, target_value: null })).toBe("1 km");
   });
 
   it("valida nombre, unidad y objetivo sin imponer un objetivo", () => {

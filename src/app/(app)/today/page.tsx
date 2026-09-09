@@ -4,9 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateFieldValue } from "@/lib/date-field-display";
 import { cn } from "@/lib/utils";
+import { getActiveDailyMetrics } from "@/lib/daily-metrics/server";
 import { getNutritionDay } from "@/lib/nutrition/day";
-import { getEnergyConfigEditor } from "@/lib/nutrition/plan-v2";
-import { resolveV2EnergyBreakdown, type ActivityLevel } from "@/lib/nutrition/plan-v2-core";
 import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { getStepsOverview } from "@/lib/nutrition/steps-report";
 import { listActiveFoods } from "@/lib/nutrition/product";
@@ -33,11 +32,6 @@ function formatGrams(n: number | null | undefined) {
   return `${gramFormatter.format(n)} g`;
 }
 
-function formatLiters(n: number | null | undefined) {
-  if (typeof n !== "number") return "—";
-  return `${gramFormatter.format(n)} L`;
-}
-
 function formatBalance(value: number | null) {
   if (value === null) return "Sin gasto configurado";
   if (value > 0) return `+${value} kcal`;
@@ -49,33 +43,17 @@ function formatProteinProgress(consumed: number, target: number | null) {
   return target === null ? `${value} g` : `${value} / ${formatGrams(target)}`;
 }
 
-function activityLevelLabel(value: ActivityLevel) {
-  if (value === "low") return "Baja";
-  if (value === "high") return "Alta";
-  return "Moderada";
-}
-
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, stepsOverview, quickMeals, foods, savedMeals, energyConfig] = await Promise.all([
+  const [{ dayLog, meals, context }, metrics, stepsOverview, quickMeals, foods, savedMeals] = await Promise.all([
     getNutritionDay(today, undefined, auth),
+    getActiveDailyMetrics(today, auth),
     getStepsOverview(today, auth),
     getQuickMealCandidates(today, auth),
     listActiveFoods(auth),
     listActiveSavedMeals(auth),
-    getEnergyConfigEditor(today),
   ]);
-  const energyBreakdown = dayLog.energy_config_period_id && energyConfig.source === "v2"
-    ? resolveV2EnergyBreakdown({
-        bmrKcal: dayLog.bmr_kcal_snapshot,
-        activityLevel: energyConfig.activityLevel,
-        baseExpenditureMode: energyConfig.baseExpenditureMode,
-        customBaseExpenditureKcal: energyConfig.customBaseExpenditureKcal,
-        trainingExpenditureDeltaKcal: energyConfig.trainingExpenditureDeltaKcal,
-        workoutStatuses: context.gym.effective ? ["completed"] : [],
-      })
-    : null;
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
@@ -149,27 +127,16 @@ export default async function TodayPage() {
       <div className="lg:col-span-4 lg:col-start-1 lg:row-start-2">
         <TodayActivity
           dayLogId={dayLog.id}
-          stepsInitial={dayLog.steps}
-          waterInitial={dayLog.water_l}
-          mateInitial={dayLog.mate_l}
-          workOverride={dayLog.work_override}
-          workReasonInitial={dayLog.work_override_reason}
-          gymReasonInitial={dayLog.gym_override_reason}
-          expenditureInitial={dayLog.expenditure_override_kcal}
-          gymSource={context.gym.source}
+          date={today}
+          metrics={metrics}
+          targetAutomaticInitial={dayLog.nutrition_target_automatic_kcal_snapshot}
+          targetOverrideInitial={dayLog.nutrition_target_override_kcal}
+          expenditureAutomaticInitial={dayLog.estimated_expenditure_automatic_kcal_snapshot}
+          expenditureOverrideInitial={dayLog.expenditure_override_kcal}
+          targetLabel={formatKcal(context.targets.calories)}
           expenditureLabel={formatKcal(context.expenditureKcal)}
           balanceLabel={formatBalance(context.metrics.energyBalanceKcal)}
-          workLabel={context.work.effective == null ? "—" : context.work.effective ? "Sí" : "No"}
-          workSourceLabel={context.work.source === "override" ? "corrección" : context.work.source === "schedule" ? "horario" : "sin regla"}
-          gymLabel={context.gym.effective ? "Sí" : "No"}
-          gymSourceLabel={context.gym.source === "workout" ? "sesión" : context.gym.source === "override" ? "corrección" : "sin sesión"}
-          v2EnergyContext={energyBreakdown ? {
-            activityLevelLabel: activityLevelLabel(energyConfig.activityLevel),
-            trainingLabel: energyBreakdown.completedTraining ? "Completado" : "Sin completar",
-            baseExpenditureLabel: formatKcal(energyBreakdown.baseUsedKcal),
-            dailyExpenditureLabel: formatKcal(context.expenditureKcal),
-          } : null}
-          waterTargetLabel={context.targets.waterL == null ? null : formatLiters(context.targets.waterL)}
+          trainingLabel={context.gym.effective ? "Completado" : "Sin completar"}
           stepsSummary={stepsOverview.summary}
         />
       </div>

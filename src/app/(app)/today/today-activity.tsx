@@ -2,57 +2,50 @@
 
 import { useState } from "react";
 import {
+  formatDailyMetricProgress,
+  parseDailyMetricValue,
+} from "@/lib/daily-metrics/core";
+import type { DailyActivityDraft } from "@/lib/nutrition/activity-autosave";
+import {
   ActivityContextSummary,
   DayActivityPanel,
   type ActivityContextValues,
 } from "./day-activity-panel";
 import { DayContextEditor } from "./day-context-editor";
 import { ResponsiveDialog } from "./responsive-dialog";
-import { stepsFromInput } from "./steps-card-core";
-import type { DailyActivityDraft } from "@/lib/nutrition/activity-autosave";
-import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 
-type EditorProps = Omit<React.ComponentProps<typeof DayContextEditor>, "onActivityChange" | "stepsSummary">;
-type TodayActivityProps = EditorProps & ActivityContextValues & { stepsSummary: StepsReportSummary };
+type EditorProps = Omit<React.ComponentProps<typeof DayContextEditor>, "onMetricsChange">;
+type TodayActivityProps = EditorProps & ActivityContextValues;
 
-const formatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
-
-function formatSteps(value: string) {
-  const steps = stepsFromInput(value);
-  return steps === null ? "—" : formatter.format(steps);
+function draftValue(value: string, type: EditorProps["metrics"][number]["value_type"]) {
+  try {
+    return parseDailyMetricValue(value, type);
+  } catch {
+    return null;
+  }
 }
 
-function formatLiters(value: string) {
-  if (!value.trim()) return "—";
-  const parsed = Number(value.trim().replace(",", "."));
-  return Number.isFinite(parsed) ? `${formatter.format(parsed)} L` : "—";
-}
-
-export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps) {
+export function TodayActivity({ metrics, ...props }: TodayActivityProps) {
   const [open, setOpen] = useState(false);
-  const [activity, setActivity] = useState<DailyActivityDraft>({
-    steps: props.stepsInitial == null ? "" : String(props.stepsInitial),
-    waterL: props.waterInitial == null ? "" : String(props.waterInitial),
-    mateL: props.mateInitial == null ? "" : String(props.mateInitial),
-  });
-
-  const activityValuesLabel = {
-    steps: formatSteps(activity.steps),
-    water: formatLiters(activity.waterL),
-    mate: formatLiters(activity.mateL),
-  };
+  const [activity, setActivity] = useState<DailyActivityDraft>(() => Object.fromEntries(
+    metrics.map((metric) => [metric.id, metric.value === null ? "" : String(metric.value)]),
+  ));
+  const metricSummaries = metrics.map((metric) => ({
+    id: metric.id,
+    label: metric.name,
+    valueLabel: formatDailyMetricProgress(draftValue(activity[metric.id] ?? "", metric.value_type), metric),
+    systemKey: metric.system_key,
+    valueType: metric.value_type,
+  }));
 
   return (
     <>
       <DayActivityPanel
+        targetLabel={props.targetLabel}
         expenditureLabel={props.expenditureLabel}
         balanceLabel={props.balanceLabel}
-        workLabel={props.workLabel}
-        workSourceLabel={props.workSourceLabel}
-        gymLabel={props.gymLabel}
-        gymSourceLabel={props.gymSourceLabel}
-        v2EnergyContext={props.v2EnergyContext}
-        activityValuesLabel={activityValuesLabel}
+        trainingLabel={props.trainingLabel}
+        metrics={metricSummaries}
         onOpen={() => setOpen(true)}
       />
 
@@ -60,24 +53,20 @@ export function TodayActivity({ stepsSummary, ...props }: TodayActivityProps) {
         open={open}
         onOpenChange={setOpen}
         title="Actividad de hoy"
-        description="Registrá pasos, agua y mate; el contexto y las correcciones quedan disponibles acá."
         closeLabel="Cerrar actividad de hoy"
       >
         <div className="space-y-5">
           <section className="space-y-3" aria-labelledby="daily-activity-context">
             <h3 id="daily-activity-context" className="text-sm font-semibold">Contexto del día</h3>
             <ActivityContextSummary
+              targetLabel={props.targetLabel}
               expenditureLabel={props.expenditureLabel}
               balanceLabel={props.balanceLabel}
-              workLabel={props.workLabel}
-              workSourceLabel={props.workSourceLabel}
-              gymLabel={props.gymLabel}
-              gymSourceLabel={props.gymSourceLabel}
-              v2EnergyContext={props.v2EnergyContext}
+              trainingLabel={props.trainingLabel}
             />
           </section>
 
-          <DayContextEditor {...props} stepsSummary={stepsSummary} onActivityChange={setActivity} />
+          <DayContextEditor {...props} metrics={metrics} onMetricsChange={setActivity} />
         </div>
       </ResponsiveDialog>
     </>
