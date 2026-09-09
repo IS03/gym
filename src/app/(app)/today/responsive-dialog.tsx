@@ -11,10 +11,11 @@ type Props = {
   closeLabel: string;
   backLabel?: string;
   onBack?: () => void;
+  footer?: React.ReactNode;
   children: React.ReactNode;
 };
 
-export function ResponsiveDialog({ open, onOpenChange, title, description, closeLabel, backLabel, onBack, children }: Props) {
+export function ResponsiveDialog({ open, onOpenChange, title, description, closeLabel, backLabel, onBack, footer, children }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -45,9 +46,17 @@ export function ResponsiveDialog({ open, onOpenChange, title, description, close
                 <X className="size-4" aria-hidden />
               </Dialog.Close>
             </header>
-            <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 [scrollbar-gutter:stable] sm:px-5">
+            <div className={footer
+              ? "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-4 pt-4 [scrollbar-gutter:stable] sm:px-5"
+              : "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 [scrollbar-gutter:stable] sm:px-5"}
+            >
               {children}
             </div>
+            {footer ? (
+              <footer className="shrink-0 border-t border-border/70 bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-5 lg:pb-3">
+                {footer}
+              </footer>
+            ) : null}
           </Dialog.Popup>
         </Dialog.Viewport>
       </Dialog.Portal>

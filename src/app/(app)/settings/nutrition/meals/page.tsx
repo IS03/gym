@@ -16,8 +16,8 @@ export default async function SavedMealsSettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-16 lg:pb-0">
       <div className="space-y-2">
-        <Link href="/settings/nutrition" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" aria-hidden /> Nutrición
+        <Link href="/settings/library" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" aria-hidden /> Biblioteca
         </Link>
         <div className="flex items-center gap-2">
           <CookingPot className="size-5 text-primary" aria-hidden />
