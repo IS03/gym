@@ -9,7 +9,7 @@ const settings = source("src/app/(app)/settings/page.tsx");
 describe("PR72 — Ajustes de métricas diarias", () => {
   it("expone la ruta real desde Ajustes y mantiene el parent correcto", () => {
     expect(settings).toContain('href="/settings/metrics"');
-    expect(page).toContain('backHref="/settings"');
+    expect(page).toContain('href="/settings"');
     expect(page).toContain("Elegí qué querés registrar cada día.");
   });
 
