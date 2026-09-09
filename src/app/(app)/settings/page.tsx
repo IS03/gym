@@ -44,11 +44,10 @@ export default async function SettingsPage() {
           description="Alimentos y comidas guardadas"
         />
         <SettingsRow
+          href="/settings/metrics"
           icon={ChartNoAxesColumnIncreasing}
           title="Métricas diarias"
           description="Configurá qué querés registrar cada día"
-          trailing={<span className="text-xs font-medium text-muted-foreground">Próximamente</span>}
-          disabled
         />
       </SettingsSection>
 

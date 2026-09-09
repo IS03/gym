@@ -28,10 +28,10 @@ describe("PR70 — Ajustes, Perfil y Aplicación", () => {
   it("mantiene navegación útil y marca las funciones futuras sin controles falsos", () => {
     expect(settings).toContain('href="/settings/nutrition"');
     expect(settings).toContain('href="/settings/library"');
+    expect(settings).toContain('href="/settings/metrics"');
     expect(settings).toContain('href="/settings/application#theme"');
     expect(settings).toContain('href="/settings/application#integrations"');
     expect(settings).toContain('href="/settings/account"');
-    expect(settings).toContain("Próximamente");
     expect(library).toContain('href="/settings/nutrition/foods"');
     expect(library).toContain('href="/settings/nutrition/meals"');
   });
