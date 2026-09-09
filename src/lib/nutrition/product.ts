@@ -30,11 +30,11 @@ function textValue(value: unknown, label: string, required = true) {
 export function parseRequiredNumber(
   value: unknown,
   label: string,
-  options: { integer?: boolean; min?: number; max?: number } = {},
+  options: { integer?: boolean; min?: number; max?: number; maxFractionDigits?: number } = {},
 ) {
   const raw = String(value ?? "").trim();
   const unsigned = raw.startsWith("-") ? raw.slice(1) : raw;
-  const decimal = parseLocalizedDecimal(unsigned);
+  const decimal = parseLocalizedDecimal(unsigned, options.maxFractionDigits);
   const parsed = raw.startsWith("-") && decimal !== null ? -decimal : decimal;
   if (!raw || parsed === null || !Number.isFinite(parsed)) throw new Error(`${label} debe ser un número válido.`);
   if (options.integer && !Number.isInteger(parsed)) throw new Error(`${label} debe ser entero.`);
@@ -46,7 +46,7 @@ export function parseRequiredNumber(
 export function parseOptionalNumber(
   value: unknown,
   label: string,
-  options: { integer?: boolean; min?: number; max?: number } = {},
+  options: { integer?: boolean; min?: number; max?: number; maxFractionDigits?: number } = {},
 ) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -61,8 +61,22 @@ async function authed() {
   return { supabase, userId: user.id };
 }
 
+export type FoodInputField =
+  | "name"
+  | "description"
+  | "servingQuantity"
+  | "servingUnit"
+  | "calories"
+  | "proteinG"
+  | "carbsG"
+  | "fatG"
+  | "sourceNote";
+
 export class FoodProductError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly field?: FoodInputField,
+  ) {
     super(message);
     this.name = "FoodProductError";
   }
@@ -314,24 +328,35 @@ export type FoodMutationInput = {
   precisionLevel?: NutritionPrecision | "";
 };
 
+function parseFoodField<T>(field: FoodInputField, parse: () => T): T {
+  try {
+    return parse();
+  } catch (error) {
+    throw new FoodProductError(
+      error instanceof Error ? error.message : "El valor no es válido.",
+      field,
+    );
+  }
+}
+
 export function parseFoodInput(input: FoodMutationInput) {
   const nutrition = {
-    calories: parseOptionalNumber(input.calories, "Calorías", { integer: true, min: 0 }),
-    protein_g: parseOptionalNumber(input.proteinG, "Proteína", { min: 0 }),
-    carbs_g: parseOptionalNumber(input.carbsG, "Carbohidratos", { min: 0 }),
-    fat_g: parseOptionalNumber(input.fatG, "Grasas", { min: 0 }),
+    calories: parseFoodField("calories", () => parseOptionalNumber(input.calories, "Calorías", { min: 0 })),
+    protein_g: parseFoodField("proteinG", () => parseOptionalNumber(input.proteinG, "Proteína", { min: 0 })),
+    carbs_g: parseFoodField("carbsG", () => parseOptionalNumber(input.carbsG, "Carbohidratos", { min: 0 })),
+    fat_g: parseFoodField("fatG", () => parseOptionalNumber(input.fatG, "Grasas", { min: 0 })),
   };
   if (Object.values(nutrition).every((value) => value === null)) {
-    throw new Error("Informá al menos un valor nutricional.");
+    throw new FoodProductError("Informá al menos un valor nutricional.");
   }
   return {
-    name: textValue(input.name, "Nombre"),
-    description: textValue(input.description, "Descripción", false),
-    serving_quantity: parseRequiredNumber(input.servingQuantity, "Porción", { min: 0.001, max: 1_000_000 }),
-    serving_unit: textValue(input.servingUnit, "Unidad"),
+    name: parseFoodField("name", () => textValue(input.name, "Nombre")),
+    description: parseFoodField("description", () => textValue(input.description, "Descripción", false)),
+    serving_quantity: parseFoodField("servingQuantity", () => parseRequiredNumber(input.servingQuantity, "Porción", { min: 0.001, max: 1_000_000, maxFractionDigits: 3 })),
+    serving_unit: parseFoodField("servingUnit", () => textValue(input.servingUnit, "Unidad")),
     ...nutrition,
     precision_level: input.precisionLevel || null,
-    source_note: textValue(input.sourceNote, "Fuente", false),
+    source_note: parseFoodField("sourceNote", () => textValue(input.sourceNote, "Fuente", false)),
   };
 }
 

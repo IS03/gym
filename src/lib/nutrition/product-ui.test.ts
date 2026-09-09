@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 
-import { parseFoodInput, parseOptionalNumber, parseRequiredNumber } from "./product";
+import { FoodProductError, parseFoodInput, parseOptionalNumber, parseRequiredNumber } from "./product";
 
 const source = (path: string) => readFileSync(path, "utf8");
 const today = source("src/app/(app)/today/page.tsx");
@@ -28,6 +28,7 @@ const historicalActivityEditor = source("src/app/(app)/history/historical-activi
 const nutritionActions = source("src/app/(app)/today/nutrition-actions.ts");
 const foods = source("src/app/(app)/settings/nutrition/foods-catalog.tsx");
 const body = source("src/components/body/body-measurements.tsx");
+const foodCaloriesDecimalMigration = source("supabase/migrations/20260908223000_food_calories_decimal.sql");
 
 describe("PR 7 — experiencia nutricional", () => {
   it("valida números finitos, enteros, cero y null sin confundirlos", () => {
@@ -44,6 +45,26 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(parseFoodInput({ name: "Sintético", servingQuantity: "100", servingUnit: "g", calories: "200", proteinG: "10", carbsG: "0", fatG: "5" })).toMatchObject({ calories: 200, protein_g: 10, carbs_g: 0, fat_g: 5 });
     expect(parseFoodInput({ name: "Parcial", servingQuantity: "1", servingUnit: "unidad", calories: "", proteinG: "2", carbsG: "", fatG: "0" })).toMatchObject({ calories: null, protein_g: 2, carbs_g: null, fat_g: 0 });
     expect(() => parseFoodInput({ name: "Vacío", servingQuantity: "1", servingUnit: "unidad", calories: "", proteinG: "", carbsG: "", fatG: "" })).toThrow("al menos un valor");
+  });
+
+  it("acepta calorías y macros decimales con coma o punto sin perder precisión", () => {
+    const comma = parseFoodInput({ name: "Tostada", servingQuantity: "1", servingUnit: "unidad", calories: "22,5", proteinG: "0,38", carbsG: "5,25", fatG: "0" });
+    const point = parseFoodInput({ name: "Tostada", servingQuantity: "1.125", servingUnit: "unidad", calories: "22.5", proteinG: "0.38", carbsG: "5.25", fatG: "0" });
+
+    expect(comma).toMatchObject({ serving_quantity: 1, calories: 22.5, protein_g: 0.38, carbs_g: 5.25, fat_g: 0 });
+    expect(point).toMatchObject({ serving_quantity: 1.125, calories: 22.5, protein_g: 0.38, carbs_g: 5.25, fat_g: 0 });
+    expect(foodCaloriesDecimalMigration).toContain("alter column calories type numeric(10, 2)");
+  });
+
+  it("rechaza separadores inválidos y asocia el error al campo correspondiente", () => {
+    try {
+      parseFoodInput({ name: "Tostada", servingQuantity: "1", servingUnit: "unidad", calories: "22;5", proteinG: "0,38", carbsG: "5,25", fatG: "0" });
+      expect.fail("El alimento inválido no fue rechazado");
+    } catch (error) {
+      expect(error).toBeInstanceOf(FoodProductError);
+      expect((error as FoodProductError).message).toBe("Calorías debe ser un número válido.");
+      expect((error as FoodProductError).field).toBe("calories");
+    }
   });
 
   it("Today separa objetivo, gasto, balance y fuentes de trabajo/gym", () => {
@@ -116,6 +137,8 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(goalSettings).toContain("Objetivo actual");
     expect(goalSettings).toContain("Próximos cambios");
     expect(foodsPage).toContain("<FoodsCatalog");
+    expect(foodsPage).toContain('href="/settings/library"');
+    expect(foodsPage).toContain("Biblioteca");
     expect(integrationsPage).toContain("<ChatgptIntegration");
   });
 

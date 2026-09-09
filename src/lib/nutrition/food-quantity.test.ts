@@ -31,6 +31,10 @@ describe("PR29 — escalado canónico de alimentos", () => {
     expect(scaleFoodNutrition({ ...baseFood, calories: 75 }, 150).calories).toBe(113);
   });
 
+  it("usa las calorías decimales guardadas antes de redondear la porción final", () => {
+    expect(scaleFoodNutrition({ ...baseFood, serving_quantity: 1, serving_unit: "unidad", calories: 22.5 }, 2).calories).toBe(45);
+  });
+
   it("redondea macros conocidos a dos decimales", () => {
     const scaled = scaleFoodNutrition({ ...baseFood, protein_g: 1.111, fat_g: 0 }, 150);
     expect(scaled.proteinG).toBe(1.67);

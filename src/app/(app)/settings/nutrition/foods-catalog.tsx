@@ -20,6 +20,8 @@ import {
   type FoodCatalogFilter,
 } from "@/lib/nutrition/food-catalog-core";
 import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
+import type { FoodInputField } from "@/lib/nutrition/product";
+import { cn } from "@/lib/utils";
 import {
   deleteFoodAction,
   saveFoodAction,
@@ -77,12 +79,14 @@ function FoodEditor({
   values,
   pending,
   message,
+  errorField,
   onChange,
   onSave,
 }: {
   values: Values;
   pending: boolean;
   message: string | null;
+  errorField: FoodInputField | null;
   onChange: (key: keyof Values, value: string) => void;
   onSave: () => void;
 }) {
@@ -92,6 +96,7 @@ function FoodEditor({
     ["carbsG", "Carbohidratos (g)"],
     ["fatG", "Grasas (g)"],
   ] as const;
+  const invalidFieldClass = "aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/25";
 
   return (
     <form
@@ -102,15 +107,15 @@ function FoodEditor({
       }}
     >
       <div className="space-y-3">
-        <div className="space-y-1"><Label htmlFor="food-name">Nombre</Label><Input id="food-name" value={values.name} onChange={(event) => onChange("name", event.target.value)} disabled={pending} /></div>
-        <div className="space-y-1"><Label htmlFor="food-description">Descripción</Label><textarea id="food-description" rows={2} value={values.description} onChange={(event) => onChange("description", event.target.value)} disabled={pending} className="min-h-20 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-[color,border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:text-sm dark:bg-input/30" /></div>
+        <div className="space-y-1"><Label htmlFor="food-name" className={errorField === "name" ? "text-destructive" : undefined}>Nombre</Label><Input id="food-name" value={values.name} onChange={(event) => onChange("name", event.target.value)} disabled={pending} aria-invalid={errorField === "name"} className={invalidFieldClass} /></div>
+        <div className="space-y-1"><Label htmlFor="food-description" className={errorField === "description" ? "text-destructive" : undefined}>Descripción</Label><textarea id="food-description" rows={2} value={values.description} onChange={(event) => onChange("description", event.target.value)} disabled={pending} aria-invalid={errorField === "description"} className={cn("min-h-20 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-base outline-none transition-[color,border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/25 md:text-sm dark:bg-input/30", errorField === "description" && "border-destructive")} /></div>
       </div>
 
       <div className="space-y-2 border-t pt-4">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Porción base</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><Label htmlFor="food-serving-quantity">Cantidad</Label><Input id="food-serving-quantity" inputMode="decimal" value={values.servingQuantity} onChange={(event) => onChange("servingQuantity", event.target.value)} disabled={pending} /></div>
-          <div className="space-y-1"><Label htmlFor="food-serving-unit">Unidad</Label><Input id="food-serving-unit" value={values.servingUnit} onChange={(event) => onChange("servingUnit", event.target.value)} placeholder="g, ml, unidad" disabled={pending} /></div>
+          <div className="space-y-1"><Label htmlFor="food-serving-quantity" className={errorField === "servingQuantity" ? "text-destructive" : undefined}>Cantidad</Label><Input id="food-serving-quantity" inputMode="decimal" value={values.servingQuantity} onChange={(event) => onChange("servingQuantity", event.target.value)} disabled={pending} aria-invalid={errorField === "servingQuantity"} className={invalidFieldClass} /></div>
+          <div className="space-y-1"><Label htmlFor="food-serving-unit" className={errorField === "servingUnit" ? "text-destructive" : undefined}>Unidad</Label><Input id="food-serving-unit" value={values.servingUnit} onChange={(event) => onChange("servingUnit", event.target.value)} placeholder="g, ml, unidad" disabled={pending} aria-invalid={errorField === "servingUnit"} className={invalidFieldClass} /></div>
         </div>
       </div>
 
@@ -118,13 +123,13 @@ function FoodEditor({
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Nutrición de esa porción</p>
         <div className="grid grid-cols-2 gap-3">
           {nutritionFields.map(([key, label]) => (
-            <div key={key} className="space-y-1"><Label htmlFor={`food-${key}`}>{label}</Label><Input id={`food-${key}`} inputMode="decimal" value={values[key]} onChange={(event) => onChange(key, event.target.value)} placeholder="—" disabled={pending} /></div>
+            <div key={key} className="space-y-1"><Label htmlFor={`food-${key}`} className={errorField === key ? "text-destructive" : undefined}>{label}</Label><Input id={`food-${key}`} inputMode="decimal" value={values[key]} onChange={(event) => onChange(key, event.target.value)} placeholder="—" disabled={pending} aria-invalid={errorField === key} className={invalidFieldClass} /></div>
           ))}
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">Dejá vacío lo que no conozcas. Usá 0 sólo cuando sea realmente cero. Informá al menos un valor nutricional.</p>
       </div>
 
-      <div className="space-y-1 border-t pt-4"><Label htmlFor="food-source">Fuente</Label><Input id="food-source" value={values.sourceNote} onChange={(event) => onChange("sourceNote", event.target.value)} placeholder="Opcional" disabled={pending} /></div>
+      <div className="space-y-1 border-t pt-4"><Label htmlFor="food-source" className={errorField === "sourceNote" ? "text-destructive" : undefined}>Fuente</Label><Input id="food-source" value={values.sourceNote} onChange={(event) => onChange("sourceNote", event.target.value)} placeholder="Opcional" disabled={pending} aria-invalid={errorField === "sourceNote"} className={invalidFieldClass} /></div>
       <div className="min-h-5" aria-live="polite">{message ? <p className="text-sm text-destructive" role="alert">{message}</p> : null}</div>
       <Button className="h-11 w-full" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar alimento"}</Button>
     </form>
@@ -139,6 +144,7 @@ export function FoodsCatalog({ initialFoods }: { initialFoods: Food[] }) {
   const [values, setValues] = useState<Values>(empty);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<FoodInputField | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Food | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -150,12 +156,17 @@ export function FoodsCatalog({ initialFoods }: { initialFoods: Food[] }) {
 
   const change = (key: keyof Values, value: string) => {
     setValues((current) => ({ ...current, [key]: value }));
+    if (key === errorField) {
+      setErrorField(null);
+      setMessage(null);
+    }
   };
 
   function begin(food?: Food) {
     setEditing(food ?? null);
     setValues(food ? valuesOf(food) : empty());
     setMessage(null);
+    setErrorField(null);
     setOpen(true);
   }
 
@@ -164,6 +175,7 @@ export function FoodsCatalog({ initialFoods }: { initialFoods: Food[] }) {
       const result = await saveFoodAction({ id: editing?.id, ...values });
       if (!result.ok) {
         setMessage(result.error);
+        setErrorField(result.field ?? null);
         return;
       }
       setFoods((current) => {
@@ -257,7 +269,7 @@ export function FoodsCatalog({ initialFoods }: { initialFoods: Food[] }) {
       )}
 
       <ResponsiveDialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }} title={editing ? "Editar alimento" : "Nuevo alimento"} description="Definí una porción base y la nutrición que conozcas." closeLabel="Cerrar editor de alimento">
-        <FoodEditor values={values} pending={pending} message={message} onChange={change} onSave={save} />
+        <FoodEditor values={values} pending={pending} message={message} errorField={errorField} onChange={change} onSave={save} />
       </ResponsiveDialog>
 
       <Dialog.Root open={deleteTarget !== null} onOpenChange={(next) => { if (!next && !pending) { setDeleteTarget(null); setDeleteError(null); } }}>
