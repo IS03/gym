@@ -133,7 +133,7 @@ type SetRowProps = {
 };
 
 const SET_GRID_LAYOUT =
-  "grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_2.5rem]";
+  "grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2.5rem_2.75rem]";
 const SET_GRID_SHARED = `grid ${SET_GRID_LAYOUT} gap-x-1.5 px-2`;
 const FINISH_CONFIRMATION_KEY_PREFIX = "ownlevel:workout-finished:";
 const REST_TIMER_STORAGE_KEY_PREFIX = "ownlevel:workout-rest-timer:";
@@ -235,69 +235,63 @@ function SetRow({
     <div
       className={cn(
         SET_GRID_SHARED,
-        "items-center border-b border-border/50 px-2 py-2 last:border-b-0 transition-colors duration-150",
+        "grid-rows-[2.25rem_auto] items-center gap-y-0.5 border-b border-border/50 py-1 last:border-b-0 transition-colors duration-150",
         set.is_completed
-          ? "bg-emerald-500/[0.055]"
+          ? "bg-emerald-500/[0.035]"
           : "bg-transparent",
       )}
     >
-      <div className="flex min-w-0 items-center justify-center">
-        <span className="metric-number flex size-7 items-center justify-center rounded-md bg-muted/35 text-xs font-semibold text-muted-foreground">
+      <div className="col-start-1 row-start-1 flex min-w-0 items-center justify-center">
+        <span className="metric-number flex size-6 items-center justify-center rounded-md bg-muted/25 text-xs font-semibold text-muted-foreground">
           {setIndex + 1}
         </span>
       </div>
-      <div className="min-w-0 space-y-0.5">
-        <LocalizedDecimalInput
-          aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
-          min={0}
-          max={9999.99}
-          readOnly={readOnly}
-          value={set.actual_weight_kg}
-          onValueChange={(value) =>
-            onChange((current) => ({
-              ...current,
-              actual_weight_kg: value,
-            }))
-          }
-        />
-        <p className="metric-number truncate text-center text-[10px] leading-none text-muted-foreground">
-          obj {compactNumber(set.target_weight_kg)}
-        </p>
-      </div>
-      <div className="min-w-0 space-y-0.5">
-        <Input
-          aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
-          className="metric-number h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
-          type="number"
-          min={0}
-          max={1000}
-          step={1}
-          inputMode="numeric"
-          readOnly={readOnly}
-          value={set.actual_reps ?? ""}
-          onChange={(event) =>
-            onChange((current) => ({
-              ...current,
-              actual_reps: nullableNumberFromInput(event.target.value),
-            }))
-          }
-        />
-        <p className="metric-number truncate text-center text-[10px] leading-none text-muted-foreground">
-          obj {compactNumber(set.target_reps)}
-        </p>
-      </div>
-      <div className="flex min-w-0 items-center justify-center">
-        <span
-          className="metric-number flex h-9 w-full items-center justify-center rounded-md border border-border/55 bg-background px-1 text-center text-sm font-semibold"
-          aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
-        >
-          {compactNumber(set.target_rir)}
-        </span>
-      </div>
+      <LocalizedDecimalInput
+        aria-label={`Peso de la serie ${setIndex + 1} de ${exerciseId}`}
+        className="metric-number col-start-2 row-start-1 h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
+        min={0}
+        max={9999.99}
+        readOnly={readOnly}
+        value={set.actual_weight_kg}
+        onValueChange={(value) =>
+          onChange((current) => ({
+            ...current,
+            actual_weight_kg: value,
+          }))
+        }
+      />
+      <p className="metric-number col-start-2 row-start-2 truncate text-center text-[10px] leading-none text-muted-foreground/85">
+        obj {compactNumber(set.target_weight_kg)}
+      </p>
+      <Input
+        aria-label={`Repeticiones de la serie ${setIndex + 1} de ${exerciseId}`}
+        className="metric-number col-start-3 row-start-1 h-9 rounded-md border-border/55 bg-background px-1 text-center text-sm font-semibold"
+        type="number"
+        min={0}
+        max={1000}
+        step={1}
+        inputMode="numeric"
+        readOnly={readOnly}
+        value={set.actual_reps ?? ""}
+        onChange={(event) =>
+          onChange((current) => ({
+            ...current,
+            actual_reps: nullableNumberFromInput(event.target.value),
+          }))
+        }
+      />
+      <p className="metric-number col-start-3 row-start-2 truncate text-center text-[10px] leading-none text-muted-foreground/85">
+        obj {compactNumber(set.target_reps)}
+      </p>
+      <span
+        className="metric-number col-start-4 row-start-1 flex min-w-0 items-center justify-center text-sm font-semibold text-foreground"
+        aria-label={`RIR objetivo de la serie ${setIndex + 1}: ${set.target_rir ?? "sin definir"}`}
+      >
+        {compactNumber(set.target_rir)}
+      </span>
       {readOnly ? (
         <div
-          className="flex min-w-0 items-center justify-center"
+          className="col-start-5 row-start-1 flex min-w-0 items-center justify-center"
           aria-label={set.is_completed ? "Serie completada" : "Serie pendiente"}
         >
           <span
@@ -314,7 +308,7 @@ function SetRow({
       ) : (
         <button
           type="button"
-          className="group flex size-11 min-w-0 touch-manipulation justify-self-center items-center justify-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="group col-start-5 row-start-1 flex size-11 min-w-0 touch-manipulation items-center justify-center justify-self-center rounded-full outline-none transition-transform duration-150 active:scale-90 focus-visible:ring-3 focus-visible:ring-ring/50"
           aria-label={`Marcar serie ${setIndex + 1} como ${set.is_completed ? "pendiente" : "completada"}`}
           aria-pressed={set.is_completed}
           onClick={() =>
