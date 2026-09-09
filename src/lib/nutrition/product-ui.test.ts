@@ -178,7 +178,7 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(foods).toContain("Eliminar alimento");
     expect(foods).toContain("Las comidas ya registradas no cambiarán");
     expect(foods).toContain("Dejá vacío lo que no conozcas");
-    expect(foods).toContain('footer={!editing ? saveButton : undefined}');
+    expect(foods).toContain('footer={saveButton}');
     expect(foods).toContain('form="food-editor-form"');
     expect(product).toContain('.from("foods")');
     expect(product).toContain(".delete()");

@@ -27,6 +27,8 @@ describe("PR30 — gestión de Comidas habituales", () => {
 
   it("crea y edita en dialog responsive, con modo manual y compuesto", () => {
     expect(catalog).toContain("<ResponsiveDialog");
+    expect(catalog).toContain('footer={saveButton}');
+    expect(catalog).toContain('form="saved-meal-editor-form"');
     expect(catalog).toContain("Manual");
     expect(catalog).toContain("Con alimentos");
     expect(catalog).toContain("Agregar alimento");
