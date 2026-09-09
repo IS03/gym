@@ -1,8 +1,4 @@
-export type DailyActivityDraft = {
-  steps: string;
-  waterL: string;
-  mateL: string;
-};
+export type DailyActivityDraft = Record<string, string>;
 
 export type DailyActivityAutosaveState =
   | { phase: "idle" | "scheduled" | "saving" | "saved"; error: null }
@@ -16,11 +12,9 @@ type Options = {
 };
 
 function same(left: DailyActivityDraft, right: DailyActivityDraft) {
-  return (
-    left.steps === right.steps &&
-    left.waterL === right.waterL &&
-    left.mateL === right.mateL
-  );
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length && leftKeys.every((key) => left[key] === right[key]);
 }
 
 function errorMessage(error: unknown) {
@@ -28,7 +22,7 @@ function errorMessage(error: unknown) {
 }
 
 /**
- * Cola de una sola escritura para actividad diaria. Los cambios rápidos se
+ * Cola genérica de una sola escritura para métricas diarias. Los cambios rápidos se
  * agrupan y una revisión nueva espera a la anterior, por lo que una respuesta
  * vieja nunca puede persistir después del último valor local.
  */

@@ -7,6 +7,7 @@ import {
   normalizeMetricUnit,
   parseDailyMetricValue,
   parseMetricTarget,
+  type DailyMetricWithValue,
   type MetricValueType,
   type UserMetric,
 } from "./core";
@@ -47,6 +48,34 @@ export async function getUserMetrics(auth?: AuthenticatedRequestContext): Promis
   }));
   const history = new Set(historyChecks.filter((item) => item.hasHistory).map((item) => item.id));
   return (metrics.data ?? []).map((row) => metricFromRow(row, history));
+}
+
+export async function getActiveDailyMetrics(
+  date: string,
+  auth?: AuthenticatedRequestContext,
+): Promise<DailyMetricWithValue[]> {
+  if (!ISO_DATE.test(date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
+  const { supabase, userId } = await context(auth);
+  const ensured = await supabase.rpc("ensure_user_metrics");
+  if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
+
+  const metrics = await supabase.from("user_metrics").select("*")
+    .eq("user_id", userId).eq("is_active", true)
+    .order("sort_order").order("created_at");
+  if (metrics.error) throw new Error(`Leer métricas activas: ${metrics.error.message}`);
+
+  const rows = metrics.data ?? [];
+  if (!rows.length) return [];
+  const values = await supabase.from("daily_metric_values").select("metric_id,value")
+    .eq("user_id", userId).eq("metric_date", date)
+    .in("metric_id", rows.map((row) => row.id));
+  if (values.error) throw new Error(`Leer valores diarios: ${values.error.message}`);
+  const byMetric = new Map((values.data ?? []).map((row) => [String(row.metric_id), asNumber(row.value)]));
+
+  return rows.map((row) => ({
+    ...metricFromRow(row, new Set()),
+    value: byMetric.get(String(row.id)) ?? null,
+  }));
 }
 
 export async function createMetric(input: {
@@ -170,4 +199,44 @@ export async function saveDailyMetricValue(input: {
     value,
   }, { onConflict: "user_id,metric_date,metric_id" });
   if (error) throw new Error(`Guardar valor: ${error.message}`);
+}
+
+export async function saveDailyMetricValues(input: {
+  date: string;
+  values: Record<string, unknown>;
+}): Promise<void> {
+  const { supabase, userId } = await context();
+  if (!ISO_DATE.test(input.date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
+  const metricIds = Object.keys(input.values);
+  if (!metricIds.length) return;
+
+  const metrics = await supabase.from("user_metrics").select("id,value_type")
+    .eq("user_id", userId).eq("is_active", true).in("id", metricIds);
+  if (metrics.error) throw new Error(`Leer métricas activas: ${metrics.error.message}`);
+  if ((metrics.data ?? []).length !== new Set(metricIds).size) {
+    throw new Error("Una métrica ya no está activa o disponible.");
+  }
+
+  const parsed = (metrics.data ?? []).map((metric) => ({
+    metricId: String(metric.id),
+    value: parseDailyMetricValue(input.values[String(metric.id)], metric.value_type as MetricValueType),
+  }));
+  const rows = parsed.filter((item) => item.value !== null).map((item) => ({
+    user_id: userId,
+    metric_id: item.metricId,
+    metric_date: input.date,
+    value: item.value,
+  }));
+  if (rows.length) {
+    const saved = await supabase.from("daily_metric_values").upsert(rows, {
+      onConflict: "user_id,metric_date,metric_id",
+    });
+    if (saved.error) throw new Error(`Guardar valores diarios: ${saved.error.message}`);
+  }
+  const emptyIds = parsed.filter((item) => item.value === null).map((item) => item.metricId);
+  if (emptyIds.length) {
+    const removed = await supabase.from("daily_metric_values").delete()
+      .eq("user_id", userId).eq("metric_date", input.date).in("metric_id", emptyIds);
+    if (removed.error) throw new Error(`Borrar valores diarios: ${removed.error.message}`);
+  }
 }

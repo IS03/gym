@@ -67,19 +67,19 @@ describe("PR 7 — experiencia nutricional", () => {
     }
   });
 
-  it("Today separa objetivo, gasto, balance y fuentes de trabajo/gym", () => {
+  it("Today separa objetivo, gasto, balance y entrenamiento sin controles legacy", () => {
     expect(today).toContain("context.targets.calories");
-    expect(todayActivity).toContain('["Balance parcial", values.balanceLabel, Scale]');
+    expect(todayActivity).toContain('["Balance", values.balanceLabel, Scale]');
     expect(today).toContain("if (value > 0) return `+${value} kcal`");
     expect(today).toContain("return `${value} kcal`");
-    expect(todayActivity).toContain('["Gasto", values.expenditureLabel, Flame]');
-    expect(todayActivity).toContain('["Actividad cotidiana", values.v2EnergyContext.activityLevelLabel, Activity]');
-    expect(todayActivity).toContain('["Gasto base", values.v2EnergyContext.baseExpenditureLabel, Flame]');
+    expect(todayActivity).toContain('["Gasto estimado", values.expenditureLabel, Flame]');
+    expect(todayActivity).toContain('["Objetivo nutricional", values.targetLabel, Target]');
+    expect(todayActivity).toContain('["Entrenamiento", values.trainingLabel, Dumbbell]');
     expect(today).toContain("context.expenditureKcal");
     expect(today).not.toContain("dayLog.target_kcal_snapshot");
-    expect(todayEditor).toContain("Usar horario habitual");
-    expect(todayEditor).toContain("Registrar que entrené sin sesión");
-    expect(todayEditor).toContain("gymSource === \"workout\"");
+    expect(todayEditor).not.toContain("Usar horario habitual");
+    expect(todayEditor).not.toContain("Registrar que entrené sin sesión");
+    expect(todayEditor).toContain("saveNutritionTargetOverrideAction");
     expect(product).toContain("gym_override: true");
     expect(product).not.toContain("gym_override: false");
   });
@@ -102,12 +102,12 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(todayActivitySection).toContain("<DayActivityPanel");
     expect(todayActivitySection).not.toContain("<StepsCard");
     expect(todayActivitySection).toContain("<ResponsiveDialog");
-    expect(todayActivitySection).toContain("onActivityChange={setActivity}");
+    expect(todayActivitySection).toContain("onMetricsChange={setActivity}");
     expect(stepsCard).toContain('href="/today/steps"');
     expect(stepsCard).toContain("stepsFromInput");
-    expect(todayActivitySection).toContain("stepsSummary={stepsSummary}");
-    expect(todayEditor).toContain("<StepsSummary steps={steps} summary={stepsSummary} />");
-    expect(todayEditor).toContain('htmlFor="daily-steps"');
+    expect(today).toContain("stepsSummary={stepsOverview.summary}");
+    expect(todayEditor).toContain('<StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} />');
+    expect(todayEditor).toContain('metric.system_key === "steps"');
     expect(nutritionActions).toContain('revalidatePath("/today/steps")');
     expect(stepsPage).toContain("<StepsReport");
     expect(stepsPage).toContain('href="/today"');

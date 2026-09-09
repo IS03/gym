@@ -157,7 +157,18 @@ export async function updateExpenditureOverride(input: {
   const kcal = parseOptionalNumber(input.kcal, "Gasto estimado", { integer: true, min: 1, max: 50_000 });
   const { error } = await supabase.from("day_logs").update({ expenditure_override_kcal: kcal })
     .eq("id", input.dayLogId).eq("user_id", userId);
-  if (error) throw new Error(`Guardar gasto excepcional: ${error.message}`);
+  if (error) throw new Error(`Guardar gasto estimado: ${error.message}`);
+}
+
+export async function updateNutritionTargetOverride(input: {
+  dayLogId: string;
+  kcal: unknown;
+}): Promise<void> {
+  const { supabase, userId } = await authed();
+  const kcal = parseOptionalNumber(input.kcal, "Objetivo nutricional", { integer: true, min: 1, max: 20_000 });
+  const { error } = await supabase.from("day_logs").update({ nutrition_target_override_kcal: kcal })
+    .eq("id", input.dayLogId).eq("user_id", userId);
+  if (error) throw new Error(`Guardar objetivo nutricional: ${error.message}`);
 }
 
 export async function listNutritionEvents(date: string): Promise<NutritionEvent[]> {

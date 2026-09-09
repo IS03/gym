@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  formatDailyMetricProgress,
+  parseDailyMetricValue,
+  type DailyMetricWithValue,
+} from "@/lib/daily-metrics/core";
 import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 import {
   DailyActivityAutosaveQueue,
@@ -13,41 +19,67 @@ import {
   type DailyActivityDraft,
 } from "@/lib/nutrition/activity-autosave";
 import {
-  saveDailyActivityAction,
+  saveDailyMetricsAction,
   saveExpenditureOverrideAction,
-  saveGymOverrideAction,
-  saveWorkOverrideAction,
+  saveNutritionTargetOverrideAction,
 } from "./nutrition-actions";
+import { getMetricIcon } from "./day-activity-panel";
 import { StepsSummary } from "./steps-card";
 
 type Props = {
   dayLogId: string;
-  stepsInitial: number | null;
-  waterInitial: number | null;
-  mateInitial: number | null;
-  workOverride: boolean | null;
-  workReasonInitial: string | null;
-  gymReasonInitial: string | null;
-  expenditureInitial: number | null;
-  gymSource: "workout" | "override" | "none";
-  waterTargetLabel: string | null;
+  date: string;
+  metrics: DailyMetricWithValue[];
   stepsSummary: StepsReportSummary;
-  onActivityChange?: (draft: DailyActivityDraft) => void;
+  targetAutomaticInitial: number | null;
+  targetOverrideInitial: number | null;
+  expenditureAutomaticInitial: number | null;
+  expenditureOverrideInitial: number | null;
+  onMetricsChange?: (draft: DailyActivityDraft) => void;
 };
 
-export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateInitial, workOverride, workReasonInitial, gymReasonInitial, expenditureInitial, gymSource, waterTargetLabel, stepsSummary, onActivityChange }: Props) {
+function initialMetricDraft(metrics: DailyMetricWithValue[]): DailyActivityDraft {
+  return Object.fromEntries(metrics.map((metric) => [metric.id, metric.value === null ? "" : String(metric.value)]));
+}
+
+function parsedDraftValue(raw: string, metric: DailyMetricWithValue) {
+  try {
+    return parseDailyMetricValue(raw, metric.value_type);
+  } catch {
+    return null;
+  }
+}
+
+function durationParts(raw: string) {
+  const total = Number(raw);
+  if (!raw || !Number.isInteger(total) || total < 0) return { hours: "", minutes: "" };
+  return { hours: String(Math.floor(total / 60)), minutes: String(total % 60) };
+}
+
+function automaticKcal(value: number | null) {
+  return value === null ? "Sin valor automático" : `Automático · ${value} kcal`;
+}
+
+export function DayContextEditor({
+  dayLogId,
+  date,
+  metrics,
+  stepsSummary,
+  targetAutomaticInitial,
+  targetOverrideInitial,
+  expenditureAutomaticInitial,
+  expenditureOverrideInitial,
+  onMetricsChange,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const initialDraft = useMemo(() => initialMetricDraft(metrics), [metrics]);
+  const [values, setValues] = useState<DailyActivityDraft>(initialDraft);
+  const [target, setTarget] = useState(String(targetOverrideInitial ?? targetAutomaticInitial ?? ""));
+  const [expenditure, setExpenditure] = useState(String(expenditureOverrideInitial ?? expenditureAutomaticInitial ?? ""));
+  const [targetCorrected, setTargetCorrected] = useState(targetOverrideInitial !== null);
+  const [expenditureCorrected, setExpenditureCorrected] = useState(expenditureOverrideInitial !== null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [steps, setSteps] = useState(stepsInitial == null ? "" : String(stepsInitial));
-  const [water, setWater] = useState(waterInitial == null ? "" : String(waterInitial));
-  const [mate, setMate] = useState(mateInitial == null ? "" : String(mateInitial));
-  const [workMode, setWorkMode] = useState<"schedule" | "worked" | "not_worked">(
-    workOverride == null ? "schedule" : workOverride ? "worked" : "not_worked",
-  );
-  const [workReason, setWorkReason] = useState(workReasonInitial ?? "Corrección manual del día");
-  const [gymReason, setGymReason] = useState(gymReasonInitial ?? "Entrenamiento histórico sin sesión");
-  const [expenditure, setExpenditure] = useState(expenditureInitial == null ? "" : String(expenditureInitial));
   const [autosave, setAutosave] = useState<DailyActivityAutosaveState>({ phase: "idle", error: null });
   const mountedRef = useRef(true);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,13 +89,9 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
     mountedRef.current = true;
     const queue = new DailyActivityAutosaveQueue({
       debounceMs: 650,
-      initial: {
-        steps: stepsInitial == null ? "" : String(stepsInitial),
-        waterL: waterInitial == null ? "" : String(waterInitial),
-        mateL: mateInitial == null ? "" : String(mateInitial),
-      },
+      initial: initialDraft,
       save: async (draft) => {
-        const result = await saveDailyActivityAction({ dayLogId, ...draft });
+        const result = await saveDailyMetricsAction({ date, values: draft });
         if (!result.ok) throw new Error(result.error);
       },
       onStateChange: (state) => {
@@ -84,50 +112,135 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
       queue.dispose();
       if (queueRef.current === queue) queueRef.current = null;
     };
-  }, [dayLogId, mateInitial, stepsInitial, waterInitial]);
+  }, [date, initialDraft]);
 
-  function changeActivity(next: DailyActivityDraft) {
-    setSteps(next.steps);
-    setWater(next.waterL);
-    setMate(next.mateL);
-    onActivityChange?.(next);
+  function changeMetric(metricId: string, value: string) {
+    const next = { ...values, [metricId]: value };
+    setValues(next);
+    onMetricsChange?.(next);
     queueRef.current?.change(next);
   }
 
-  function activityDraft(overrides: Partial<DailyActivityDraft> = {}): DailyActivityDraft {
-    return { steps, waterL: water, mateL: mate, ...overrides };
+  function changeDuration(metricId: string, hours: string, minutes: string) {
+    if (!hours && !minutes) {
+      changeMetric(metricId, "");
+      return;
+    }
+    const parsedHours = Number(hours || 0);
+    const parsedMinutes = Number(minutes || 0);
+    if (!Number.isInteger(parsedHours) || !Number.isInteger(parsedMinutes) || parsedHours < 0 || parsedMinutes < 0 || parsedMinutes > 59) return;
+    changeMetric(metricId, String(parsedHours * 60 + parsedMinutes));
   }
 
-  function submit(task: () => Promise<{ ok: true } | { ok: false; error: string }>) {
+  function submit(
+    task: () => Promise<{ ok: true } | { ok: false; error: string }>,
+    onSuccess: () => void,
+  ) {
     setNotice(null);
     startTransition(async () => {
       const result = await task();
       setNotice(result.ok ? "Cambios guardados." : result.error);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        onSuccess();
+        router.refresh();
+      }
     });
   }
+
+  const stepsMetric = metrics.find((metric) => metric.system_key === "steps");
 
   return (
     <div className="space-y-5">
       <section className="space-y-3" aria-labelledby="daily-activity-inputs">
         <h3 id="daily-activity-inputs" className="text-sm font-semibold">Registrar</h3>
-        <div className="grid grid-cols-3 gap-2 rounded-xl border bg-background/35 p-3">
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="daily-steps" className="text-xs">Pasos</Label>
-            <Input className="h-10 px-2" id="daily-steps" inputMode="numeric" value={steps} onChange={(e) => changeActivity(activityDraft({ steps: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+        {metrics.length ? (
+          <div className="overflow-hidden rounded-xl border bg-background/35">
+            {metrics.map((metric, index) => {
+              const Icon = getMetricIcon(metric.system_key, metric.value_type);
+              const raw = values[metric.id] ?? "";
+              const value = parsedDraftValue(raw, metric);
+              const progress = metric.target_value && value !== null
+                ? Math.min((value / metric.target_value) * 100, 100)
+                : null;
+              const duration = durationParts(raw);
+              return (
+                <div key={metric.id} className={`space-y-3 p-3 ${index ? "border-t" : ""}`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="size-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{metric.name}</p>
+                      <p className="metric-number truncate text-xs text-muted-foreground">
+                        {formatDailyMetricProgress(value, metric)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {metric.value_type === "duration" ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor={`daily-metric-${metric.id}-hours`} className="text-xs">Horas</Label>
+                          <Input
+                            id={`daily-metric-${metric.id}-hours`}
+                            inputMode="numeric"
+                            min={0}
+                            value={duration.hours}
+                            onChange={(event) => changeDuration(metric.id, event.target.value, duration.minutes)}
+                            onBlur={() => void queueRef.current?.flush()}
+                            placeholder="—"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`daily-metric-${metric.id}-minutes`} className="text-xs">Minutos</Label>
+                          <Input
+                            id={`daily-metric-${metric.id}-minutes`}
+                            inputMode="numeric"
+                            min={0}
+                            max={59}
+                            value={duration.minutes}
+                            onChange={(event) => changeDuration(metric.id, duration.hours, event.target.value)}
+                            onBlur={() => void queueRef.current?.flush()}
+                            placeholder="—"
+                          />
+                        </div>
+                      </div>
+                      {raw ? (
+                        <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => changeMetric(metric.id, "")}>
+                          Quitar registro
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id={`daily-metric-${metric.id}`}
+                        aria-label={`Valor de ${metric.name}`}
+                        inputMode={metric.value_type === "integer" ? "numeric" : "decimal"}
+                        value={raw}
+                        onChange={(event) => changeMetric(metric.id, event.target.value)}
+                        onBlur={() => void queueRef.current?.flush()}
+                        placeholder="—"
+                      />
+                      {metric.unit ? <span className="shrink-0 text-sm text-muted-foreground">{metric.unit}</span> : null}
+                    </div>
+                  )}
+
+                  {progress !== null ? (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Progreso de ${metric.name}`} aria-valuemin={0} aria-valuemax={metric.target_value ?? undefined} aria-valuenow={value ?? undefined}>
+                      <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="daily-water" className="min-w-0 gap-1 text-[11px] sm:text-xs">
-              <span className="shrink-0">Agua</span>
-              {waterTargetLabel ? <span className="truncate font-normal text-muted-foreground">· meta {waterTargetLabel}</span> : null}
-            </Label>
-            <Input className="h-10 px-2" id="daily-water" inputMode="decimal" value={water} onChange={(e) => changeActivity(activityDraft({ waterL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
+        ) : (
+          <div className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            No tenés métricas activas. <Link className="font-medium text-primary hover:underline" href="/settings/metrics">Configurarlas</Link>
           </div>
-          <div className="min-w-0 space-y-1">
-            <Label htmlFor="daily-mate" className="text-xs">Mate</Label>
-            <Input className="h-10 px-2" id="daily-mate" inputMode="decimal" value={mate} onChange={(e) => changeActivity(activityDraft({ mateL: e.target.value }))} onBlur={() => void queueRef.current?.flush()} placeholder="—" />
-          </div>
-        </div>
+        )}
         <p
           className={`min-h-4 text-xs leading-4 ${autosave.phase === "error" ? "text-destructive" : autosave.phase === "saved" ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
           role="status"
@@ -142,7 +255,7 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
                 : null}
         </p>
 
-        <StepsSummary steps={steps} summary={stepsSummary} />
+        {stepsMetric ? <StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} /> : null}
       </section>
 
       <details className="group/corrections rounded-xl border">
@@ -154,48 +267,60 @@ export function DayContextEditor({ dayLogId, stepsInitial, waterInitial, mateIni
         </summary>
         <div className="space-y-4 border-t px-3 pb-3 pt-3">
           <div className="space-y-2">
-            <Label htmlFor="work-mode">Trabajo</Label>
-            <select id="work-mode" value={workMode} onChange={(e) => setWorkMode(e.target.value as typeof workMode)} className="h-11 w-full rounded-md border bg-background px-3 text-sm">
-              <option value="schedule">Usar horario habitual</option>
-              <option value="worked">Trabajé</option>
-              <option value="not_worked">No trabajé</option>
-            </select>
-            {workMode !== "schedule" ? <Input aria-label="Motivo de la corrección laboral" value={workReason} onChange={(e) => setWorkReason(e.target.value)} placeholder="Motivo" /> : null}
-            <Button type="button" size="sm" variant="outline" disabled={pending}
-              onClick={() => submit(() => saveWorkOverrideAction({ dayLogId, mode: workMode, reason: workReason }))}>
-              Guardar trabajo
-            </Button>
-          </div>
-
-          <div className="space-y-2 border-t pt-3">
-            <p className="text-sm font-medium">Entrenamiento</p>
-            {gymSource === "workout" ? (
-              <p className="text-xs text-muted-foreground">Proviene de una sesión completada y no puede negarse desde Nutrición.</p>
-            ) : gymSource === "override" ? (
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="nutrition-target-override">Objetivo nutricional</Label>
+              {targetCorrected ? <span className="text-xs font-medium text-primary">Corregido para este día</span> : null}
+            </div>
+            <p className="text-xs text-muted-foreground">{automaticKcal(targetAutomaticInitial)}</p>
+            <div className="flex items-center gap-2">
+              <Input id="nutrition-target-override" inputMode="numeric" value={target} onChange={(event) => setTarget(event.target.value)} placeholder="—" />
+              <span className="text-sm text-muted-foreground">kcal</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="outline" disabled={pending}
-                onClick={() => submit(() => saveGymOverrideAction({ dayLogId, enabled: false }))}>
-                Quitar entrenamiento sin sesión
+                onClick={() => submit(() => saveNutritionTargetOverrideAction({ dayLogId, kcal: target }), () => setTargetCorrected(true))}>
+                Guardar objetivo
               </Button>
-            ) : (
-              <div className="space-y-2">
-                <Input aria-label="Motivo del entrenamiento sin sesión" value={gymReason} onChange={(e) => setGymReason(e.target.value)} placeholder="Motivo" />
-                <Button type="button" size="sm" variant="outline" disabled={pending}
-                  onClick={() => submit(() => saveGymOverrideAction({ dayLogId, enabled: true, reason: gymReason }))}>
-                  Registrar que entrené sin sesión
+              {targetCorrected ? (
+                <Button type="button" size="sm" variant="ghost" disabled={pending}
+                  onClick={() => submit(() => saveNutritionTargetOverrideAction({ dayLogId, kcal: "" }), () => {
+                    setTarget(String(targetAutomaticInitial ?? ""));
+                    setTargetCorrected(false);
+                  })}>
+                  Usar valor automático
                 </Button>
-              </div>
-            )}
+              ) : null}
+            </div>
           </div>
 
           <div className="space-y-2 border-t pt-3">
-            <Label htmlFor="expenditure-override">Gasto manual excepcional (kcal)</Label>
-            <Input id="expenditure-override" inputMode="numeric" value={expenditure} onChange={(e) => setExpenditure(e.target.value)} placeholder="Vacío = regla automática" />
-            <p className="text-xs text-muted-foreground">Es gasto estimado, no objetivo de calorías.</p>
-            <Button type="button" size="sm" variant="outline" disabled={pending}
-              onClick={() => submit(() => saveExpenditureOverrideAction({ dayLogId, kcal: expenditure }))}>
-              {expenditure ? "Guardar gasto excepcional" : "Usar gasto automático"}
-            </Button>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="expenditure-override">Gasto estimado</Label>
+              {expenditureCorrected ? <span className="text-xs font-medium text-primary">Corregido para este día</span> : null}
+            </div>
+            <p className="text-xs text-muted-foreground">{automaticKcal(expenditureAutomaticInitial)}</p>
+            <div className="flex items-center gap-2">
+              <Input id="expenditure-override" inputMode="numeric" value={expenditure} onChange={(event) => setExpenditure(event.target.value)} placeholder="—" />
+              <span className="text-sm text-muted-foreground">kcal</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" disabled={pending}
+                onClick={() => submit(() => saveExpenditureOverrideAction({ dayLogId, kcal: expenditure }), () => setExpenditureCorrected(true))}>
+                Guardar gasto
+              </Button>
+              {expenditureCorrected ? (
+                <Button type="button" size="sm" variant="ghost" disabled={pending}
+                  onClick={() => submit(() => saveExpenditureOverrideAction({ dayLogId, kcal: "" }), () => {
+                    setExpenditure(String(expenditureAutomaticInitial ?? ""));
+                    setExpenditureCorrected(false);
+                  })}>
+                  Usar valor automático
+                </Button>
+              ) : null}
+            </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">Estas correcciones modifican únicamente esta fecha.</p>
         </div>
       </details>
       <div className="text-xs text-muted-foreground" role="status" aria-live="polite">

@@ -11,7 +11,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description: string;
+  description?: string;
   closeLabel: string;
   backLabel?: string;
   onBack?: () => void;
@@ -51,7 +51,9 @@ export function ResponsiveDialog({ open, onOpenChange, title, description, close
                   ) : null}
                   <Dialog.Title className="text-xl font-semibold tracking-tight">{title}</Dialog.Title>
                 </div>
-                <Dialog.Description className={onBack ? "mt-1 pl-11 pr-10 text-sm text-muted-foreground" : "mt-1 pr-10 text-sm text-muted-foreground"}>{description}</Dialog.Description>
+                {description ? (
+                  <Dialog.Description className={onBack ? "mt-1 pl-11 pr-10 text-sm text-muted-foreground" : "mt-1 pr-10 text-sm text-muted-foreground"}>{description}</Dialog.Description>
+                ) : null}
                 <Dialog.Close
                   type="button"
                   aria-label={closeLabel}
