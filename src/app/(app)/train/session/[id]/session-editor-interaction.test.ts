@@ -132,14 +132,25 @@ describe("PR 14 — interacción de sesión", () => {
     expect(editor).not.toContain('htmlFor="pain-note"');
   });
 
-  it("mantiene el encabezado de sesión en su posición natural y simplifica las filas de series", () => {
+  it("mantiene el encabezado de sesión y alinea las series en dos tracks compartidos", () => {
     expect(editor).not.toContain('"sticky top-[max(0.5rem,env(safe-area-inset-top))]');
     expect(editor).toContain('overflow-hidden rounded-lg border border-border/55 bg-background/20');
-    expect(editor).toContain('items-center border-b border-border/50 px-2 py-2 last:border-b-0');
+    expect(editor).toContain('grid-rows-[2.25rem_auto] items-center gap-y-0.5 border-b');
     expect(editor).not.toContain('items-center rounded-lg border border-border/55 px-2 py-2');
-    expect(editor).toContain("grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem_2.5rem]");
+    expect(editor).toContain("grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2.5rem_2.75rem]");
+    expect(editor).toContain('col-start-2 row-start-2 truncate text-center');
+    expect(editor).toContain('col-start-3 row-start-2 truncate text-center');
     expect(editor).toContain('h-8 w-full rounded-md border border-dashed');
     expect(editor).not.toContain("Este resumen se guarda al finalizar.");
+  });
+
+  it("mantiene KG y repeticiones editables, RIR de lectura y el check funcional", () => {
+    expect(editor).toContain("<LocalizedDecimalInput");
+    expect(editor).toContain('aria-label={`Repeticiones de la serie');
+    expect(editor).toContain('aria-label={`RIR objetivo de la serie');
+    expect(editor).not.toMatch(/<Input[\s\S]{0,160}aria-label=\{`RIR objetivo/);
+    expect(editor).toContain('aria-pressed={set.is_completed}');
+    expect(editor).toContain('is_completed: !current.is_completed');
   });
 });
 
