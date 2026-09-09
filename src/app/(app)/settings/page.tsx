@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, ChartNoAxesColumnIncreasing, ChevronRight, KeyRound, Palette, ShieldCheck, Utensils } from "lucide-react";
+import { AppWindow, BookOpen, ChartNoAxesColumnIncreasing, ChevronRight, ShieldCheck, Utensils } from "lucide-react";
 import { getAuthedUser, getProfileForUser } from "@/lib/phase1/profile";
 import { ProfileInitial, SettingsHeader, SettingsRow, SettingsSection } from "./settings-components";
 
@@ -53,16 +53,10 @@ export default async function SettingsPage() {
 
       <SettingsSection title="Preferencias">
         <SettingsRow
-          href="/settings/application#theme"
-          icon={Palette}
-          title="Apariencia"
-          description="Tema del sistema"
-        />
-        <SettingsRow
-          href="/settings/application#integrations"
-          icon={KeyRound}
-          title="Integraciones"
-          description="ChatGPT"
+          href="/settings/application"
+          icon={AppWindow}
+          title="Aplicación"
+          description="Tema, integraciones e idioma"
         />
       </SettingsSection>
 
