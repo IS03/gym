@@ -18,8 +18,9 @@ describe("PR70 — Ajustes, Perfil y Aplicación", () => {
     expect(settings).toContain('title="Plan nutricional"');
     expect(settings).toContain('title="Biblioteca"');
     expect(settings).toContain('title="Métricas diarias"');
-    expect(settings).toContain('title="Apariencia"');
-    expect(settings).toContain('title="Integraciones"');
+    expect(settings.match(/title="Aplicación"/g)).toHaveLength(1);
+    expect(settings).not.toContain('title="Apariencia"');
+    expect(settings).not.toContain('title="Integraciones"');
     expect(settings).toContain('title="Cuenta y seguridad"');
     expect(settings).not.toContain("Gasto estimado");
     expect(settings).not.toContain("Horario laboral");
@@ -29,8 +30,7 @@ describe("PR70 — Ajustes, Perfil y Aplicación", () => {
     expect(settings).toContain('href="/settings/nutrition"');
     expect(settings).toContain('href="/settings/library"');
     expect(settings).toContain('href="/settings/metrics"');
-    expect(settings).toContain('href="/settings/application#theme"');
-    expect(settings).toContain('href="/settings/application#integrations"');
+    expect(settings).toContain('href="/settings/application"');
     expect(settings).toContain('href="/settings/account"');
     expect(library).toContain('href="/settings/nutrition/foods"');
     expect(library).toContain('href="/settings/nutrition/meals"');
