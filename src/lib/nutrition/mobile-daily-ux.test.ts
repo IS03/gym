@@ -69,6 +69,10 @@ describe("PR 9.6 — UX diaria mobile", () => {
     expect(mealForm).toContain("defaultValue={date}");
     expect(mealForm).toContain("[min-inline-size:0]");
     expect(mealForm).toContain("checkRecentDuplicateMealAction");
+    expect(mealComposer).toContain('footerSlot={mode === "manual" || mode === "food"}');
+    expect(mealComposer).toContain('className="space-y-3 pb-4"');
+    expect(mealForm).toContain("<ResponsiveDialogFooter>");
+    expect(mealForm).toContain('form="today-create-meal-form"');
     expect(responsiveDialog).toContain("100dvh");
     expect(responsiveDialog).toContain("env(safe-area-inset-bottom)");
     expect(responsiveDialog).toContain("overflow-y-auto overscroll-contain");

@@ -14,6 +14,7 @@ import {
   mealFieldControlClass,
   mealTextareaClass,
 } from "./meal-field";
+import { ResponsiveDialogFooter } from "./responsive-dialog";
 
 type Props = {
   date: string;
@@ -38,6 +39,7 @@ export function CreateMealForm({ date, onSuccess }: Props) {
   return (
     <>
       <form
+        id="today-create-meal-form"
         ref={formRef}
         className="min-w-0 space-y-3"
         onSubmit={async (e) => {
@@ -155,11 +157,11 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             className={mealTextareaClass}
           />
         </MealField>
-        <div>
-          <Button className="h-11 w-full" type="submit" disabled={saving}>
+        <ResponsiveDialogFooter>
+          <Button className="h-11 w-full" type="submit" form="today-create-meal-form" disabled={saving}>
             {saving ? "Guardando…" : "Agregar comida"}
           </Button>
-        </div>
+        </ResponsiveDialogFooter>
       </form>
 
       {showDup ? (

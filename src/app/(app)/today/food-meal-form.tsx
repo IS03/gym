@@ -18,6 +18,7 @@ import {
 } from "@/lib/nutrition/food-quantity";
 import { addFoodToDayAction } from "./actions";
 import { cn } from "@/lib/utils";
+import { ResponsiveDialogFooter } from "./responsive-dialog";
 
 const numberFormatter = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
@@ -117,7 +118,7 @@ export function FoodMealForm({
   }
 
   return (
-    <div className="space-y-4">
+    <form id="today-food-meal-form" className="space-y-4" onSubmit={(event) => { event.preventDefault(); void add(); }}>
       <div className="space-y-1">
         <Label htmlFor="food-meal-search">Buscar alimento</Label>
         <div className="relative">
@@ -176,9 +177,11 @@ export function FoodMealForm({
       <div className="min-h-5" aria-live="polite">
         {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
       </div>
-      <Button type="button" className="h-11 w-full" disabled={!selected || !preview || pending} onClick={() => void add()}>
-        {pending ? "Agregando…" : "Agregar a hoy"}
-      </Button>
-    </div>
+      <ResponsiveDialogFooter>
+        <Button type="submit" form="today-food-meal-form" className="h-11 w-full" disabled={!selected || !preview || pending}>
+          {pending ? "Agregando…" : "Agregar a hoy"}
+        </Button>
+      </ResponsiveDialogFooter>
+    </form>
   );
 }

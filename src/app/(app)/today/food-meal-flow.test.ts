@@ -24,6 +24,8 @@ describe("PR29 — registrar alimento por cantidad", () => {
     expect(form).toContain("foodId: selected.id");
     expect(form).toContain("quantity,");
     expect(form).toContain("date,");
+    expect(form).toContain("<ResponsiveDialogFooter>");
+    expect(form).toContain('form="today-food-meal-form"');
     expect(form).not.toContain("final_calories:");
     expect(form).not.toContain("final_protein_g:");
   });

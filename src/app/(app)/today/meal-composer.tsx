@@ -73,9 +73,10 @@ export function MealComposer({ date, quickMeals, foods, savedMeals }: { date: st
         closeLabel="Cerrar agregado de comida"
         backLabel="Volver a formas de carga"
         onBack={mode === "menu" ? undefined : () => setMode("menu")}
+        footerSlot={mode === "manual" || mode === "food"}
       >
         {mode === "menu" ? (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-4">
             <AddChoice icon={Plus} title="Nueva comida" description="Cargá título, calorías y macros manualmente." onClick={() => setMode("manual")} />
             <AddChoice icon={Zap} title="Agregar rápido" description="Usá una comida habitual o una sugerencia." onClick={() => setMode("quick")} />
             <AddChoice icon={Scale} title="Alimento por cantidad" description="Elegí un alimento, indicá la cantidad y calculá la porción." onClick={() => setMode("food")} />
