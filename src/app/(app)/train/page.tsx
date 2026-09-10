@@ -109,7 +109,7 @@ export default async function TrainPage() {
       )}
 
       <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6 lg:space-y-0">
-        <section className="lg:col-span-7" aria-label="Constancia de entrenamiento">
+        <section className="lg:col-span-7" aria-label="Calendario de entrenamiento de este mes">
           <TrainingMonthPreview month={month} today={today} trainedDays={trainedDays} />
         </section>
 

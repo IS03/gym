@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { addMonths, buildMonthGrid, formatMonthLabel, trainingCalendarHref } from "@/lib/phase2/training-calendar";
+import { addMonths, buildMonthGrid, formatMonthLabel, trainingCalendarHref, trainingDayHref } from "@/lib/phase2/training-calendar";
 import { cn } from "@/lib/utils";
 import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import { listRoutines, listTrainingDaysInMonth } from "@/lib/phase2/training";
@@ -40,7 +40,7 @@ export default async function TrainCalendarPage({ searchParams }: { searchParams
             const colors = trainedDays.get(entry.date) ?? [];
             const trained = colors.length > 0;
             const isToday = entry.date === today;
-            return <Link key={entry.date} href={`/train/day?date=${entry.date}${routineId ? `&routine_id=${routineId}` : ""}`} aria-current={isToday ? "date" : undefined} aria-label={`${entry.date}${isToday ? ", hoy" : ""}${trained ? ", entrenaste" : ""}`} className={cn("flex h-10 min-w-0 items-center justify-center rounded-md border text-sm outline-none transition-colors hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring sm:h-12 lg:h-14", entry.inMonth ? "bg-background" : "bg-muted/30 text-muted-foreground", trained ? "border-foreground font-semibold" : "border-border", isToday && "border-primary/55 bg-primary/10 text-primary ring-1 ring-primary/35")}>
+            return <Link key={entry.date} href={trainingDayHref(entry.date, { routineId: routineId || null })} aria-current={isToday ? "date" : undefined} aria-label={`${entry.date}${isToday ? ", hoy" : ""}${trained ? ", entrenaste" : ""}`} className={cn("flex h-10 min-w-0 items-center justify-center rounded-md border text-sm outline-none transition-colors hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring sm:h-12 lg:h-14", entry.inMonth ? "bg-background" : "bg-muted/30 text-muted-foreground", trained ? "border-foreground font-semibold" : "border-border", isToday && "border-primary/55 bg-primary/10 text-primary ring-1 ring-primary/35")}>
               <span className="flex flex-col items-center leading-none"><span>{entry.date.slice(8, 10)}</span>{trained ? <span className="mt-1 flex max-w-full gap-0.5 sm:gap-1">{colors.slice(0, 4).map((color) => <span key={color} className="inline-block size-1.5 rounded-full" style={{ backgroundColor: routineColorCssVariable(color) }} />)}</span> : null}</span>
             </Link>;
           })}

@@ -1,11 +1,12 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowLeft, Dumbbell, Pencil, Play, Plus } from "lucide-react";
+import { ArrowLeft, ChevronDown, Dumbbell, Pencil, Play, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { RoutineRestoreButton } from "../routine-restore-button";
+import { RoutineArchiveButton } from "../routine-archive-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
@@ -148,6 +149,27 @@ export function RoutineEditorShell({
           />
         )}
       </section>
+
+      {routine.is_active ? (
+        <details className="group border-t border-border/80 pt-2">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-1 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            Opciones de rutina
+            <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <div className="flex flex-col items-stretch gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+              Archivarla la quita de tus rutinas activas sin modificar su historial.
+            </p>
+            <RoutineArchiveButton
+              routineId={routine.id}
+              routineName={routine.nombre}
+              trigger="secondary"
+              disabled={!canChangeStructure()}
+              onArchived={() => router.push("/train/routines")}
+            />
+          </div>
+        </details>
+      ) : null}
 
       <Button type="button" variant="outline" className="h-11 w-full" onClick={() => {
         if (dirtyCount > 0) setLeaveOpen(true);

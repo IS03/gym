@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { listRoutineOverviews, listRoutines } from "@/lib/phase2/training";
 import { getInitialPlanStatus } from "@/lib/phase2/training-robust";
@@ -7,7 +7,6 @@ import { partitionRoutines } from "@/lib/phase2/routine-list";
 import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import { ArchivedRoutines } from "./archived-routines";
 import { InitialPlanImportButton } from "./initial-plan-import-button";
-import { RoutineArchiveButton } from "./routine-archive-button";
 import { RoutineCreateSheet } from "./routine-create-sheet";
 
 export const dynamic = "force-dynamic";
@@ -73,82 +72,33 @@ export default async function RoutinesPage() {
             </CardContent>
           </Card>
         ) : (
-          <>
-            <div className="space-y-2 lg:hidden">
-              {active.map((routine) => {
-                const overview = overviews.get(routine.id);
-                return (
-                  <div
-                    key={routine.id}
-                    className="relative flex min-h-16 items-stretch overflow-hidden rounded-xl border bg-card shadow-sm ring-1 ring-foreground/5"
-                  >
-                    <span
-                      className="absolute inset-y-2 left-0 w-[3px] rounded-r-full"
-                      style={{ backgroundColor: routineColorCssVariable(routine.color) }}
-                      aria-hidden
+          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
+            {active.map((routine, index) => {
+              const overview = overviews.get(routine.id);
+              return (
+                <Link
+                  key={routine.id}
+                  href={`/train/routines/${routine.id}`}
+                  className={`group relative flex min-h-16 items-center gap-3 px-5 py-3 outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${index > 0 ? "border-t border-border/70" : ""}`}
+                  aria-label={`Abrir rutina ${routine.nombre}`}
+                >
+                  <span
+                    className="absolute inset-y-2.5 left-0 w-[3px] rounded-r-full"
+                    style={{ backgroundColor: routineColorCssVariable(routine.color) }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{routine.nombre}</span>
+                    <RoutineMeta
+                      exerciseCount={overview?.exerciseCount ?? 0}
+                      setCount={overview?.setCount ?? 0}
                     />
-                    <Link
-                      href={`/train/routines/${routine.id}`}
-                      className="flex min-w-0 flex-1 items-center gap-3 px-5 py-3 outline-none transition-colors hover:bg-muted/35 focus-visible:rounded-l-xl focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{routine.nombre}</span>
-                        <RoutineMeta
-                          exerciseCount={overview?.exerciseCount ?? 0}
-                          setCount={overview?.setCount ?? 0}
-                        />
-                      </span>
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </Link>
-                    <div className="flex items-center pr-2">
-                      <RoutineArchiveButton routineId={routine.id} routineName={routine.nombre} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="hidden grid-cols-2 gap-3 lg:grid">
-              {active.map((routine) => {
-                const overview = overviews.get(routine.id);
-                return (
-                  <Card key={routine.id} className="relative overflow-hidden shadow-sm">
-                    <span
-                      className="absolute inset-y-3 left-0 w-[3px] rounded-r-full"
-                      style={{ backgroundColor: routineColorCssVariable(routine.color) }}
-                      aria-hidden
-                    />
-                    <Link
-                      href={`/train/routines/${routine.id}`}
-                      className="flex min-h-36 flex-col gap-3 rounded-xl p-4 pl-5 outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Abrir rutina ${routine.nombre}`}
-                    >
-                      <div className="min-w-0 pr-9">
-                        <h3 className="truncate text-lg font-semibold tracking-tight">{routine.nombre}</h3>
-                        <RoutineMeta
-                          exerciseCount={overview?.exerciseCount ?? 0}
-                          setCount={overview?.setCount ?? 0}
-                        />
-                      </div>
-                      <div className="min-h-5">
-                        {(overview?.muscleGroups.length ?? 0) > 0 ? (
-                          <p className="truncate text-xs text-muted-foreground">{overview?.muscleGroups.slice(0, 4).join(" · ")}</p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">Sin ejercicios todavía</p>
-                        )}
-                      </div>
-                      <span className="mt-auto flex items-center gap-1 text-sm font-medium text-primary">
-                        Editar rutina <ArrowRight className="size-4" aria-hidden />
-                      </span>
-                    </Link>
-                    <div className="absolute right-3 top-3">
-                      <RoutineArchiveButton routineId={routine.id} routineName={routine.nombre} />
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden />
+                </Link>
+              );
+            })}
+          </div>
         )}
       </section>
 

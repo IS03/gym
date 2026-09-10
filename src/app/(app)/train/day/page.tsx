@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { trainingCalendarHref } from "@/lib/phase2/training-calendar";
+import { trainingDayReturnTarget } from "@/lib/phase2/training-calendar";
 import { formatTrainingDayHeading } from "@/lib/phase2/session-history";
 import {
   listCompletedSessionHistory,
@@ -30,12 +30,13 @@ export default async function TrainDayPage({
   const sp = (await searchParams) ?? {};
   const date = typeof sp.date === "string" ? sp.date : todayInCordoba();
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
+  const source = typeof sp.from === "string" ? sp.from : undefined;
   const allSessions = await listCompletedSessionHistory({ logDate: date, limit: 100 });
   const sessions = orderTrainingDaySessions(
     routineId ? allSessions.filter((session) => session.routineId === routineId) : allSessions,
   );
   const summary = summarizeTrainingDay(sessions);
-  const calendarHref = trainingCalendarHref(date.slice(0, 7) as `${number}-${number}`, routineId || null);
+  const returnTarget = trainingDayReturnTarget(date, routineId || null, source);
   const summaryParts = [
     summary.sessionCount > 1 ? plural(summary.sessionCount, "entrenamiento") : null,
     plural(summary.exercisesCompleted, "ejercicio"),
@@ -47,11 +48,11 @@ export default async function TrainDayPage({
     <div className="space-y-5 lg:mx-auto lg:max-w-5xl">
       <header className="space-y-2">
         <Link
-          href={calendarHref}
+          href={returnTarget.href}
           className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <ChevronLeft className="size-4" aria-hidden />
-          Calendario
+          {returnTarget.label}
         </Link>
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
@@ -73,10 +74,10 @@ export default async function TrainDayPage({
             No hay entrenamientos terminados este día.
           </p>
           <Link
-            href={calendarHref}
+            href={returnTarget.href}
             className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Volver al calendario
+            Volver a {returnTarget.label.toLocaleLowerCase("es-AR")}
           </Link>
         </section>
       ) : (

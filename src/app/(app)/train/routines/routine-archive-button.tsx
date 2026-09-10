@@ -10,9 +10,18 @@ import { Button } from "@/components/ui/button";
 type Props = {
   routineId: string;
   routineName: string;
+  trigger?: "icon" | "secondary";
+  onArchived?: () => void;
+  disabled?: boolean;
 };
 
-export function RoutineArchiveButton({ routineId, routineName }: Props) {
+export function RoutineArchiveButton({
+  routineId,
+  routineName,
+  trigger = "icon",
+  onArchived,
+  disabled = false,
+}: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +33,8 @@ export function RoutineArchiveButton({ routineId, routineName }: Props) {
       try {
         await archiveRoutineAction(routineId);
         setOpen(false);
-        router.refresh();
+        if (onArchived) onArchived();
+        else router.refresh();
       } catch (actionError) {
         setError(
           actionError instanceof Error
@@ -39,10 +49,14 @@ export function RoutineArchiveButton({ routineId, routineName }: Props) {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger
         type="button"
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-[background-color,color,transform] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+        disabled={disabled}
+        className={trigger === "icon"
+          ? "flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-[background-color,color,transform] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:scale-95 disabled:pointer-events-none disabled:opacity-50"
+          : "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:border-destructive/35 hover:bg-destructive/5 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"}
         aria-label={`Archivar rutina ${routineName}`}
       >
         <Archive className="size-4" aria-hidden />
+        {trigger === "secondary" ? <span>Archivar rutina</span> : null}
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 opacity-100 backdrop-blur-[2px] transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
