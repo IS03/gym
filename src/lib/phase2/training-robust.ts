@@ -554,7 +554,7 @@ export async function listCompletedSessionHistory(input?: {
 
   let sessionsQuery = supabase
     .from("workout_sessions")
-    .select("*")
+    .select("*, routine:routines(color)")
     .eq("user_id", userId)
     .eq("status", "completed")
     .not("ended_at", "is", null)
@@ -564,7 +564,7 @@ export async function listCompletedSessionHistory(input?: {
   }
   const { data: rawSessions, error: sessionError } = await sessionsQuery.limit(limit);
   if (sessionError) throw new Error(`Leer sesiones recientes: ${sessionError.message}`);
-  const sessions = (rawSessions ?? []) as WorkoutSession[];
+  const sessions = (rawSessions ?? []) as RawWorkoutSession[];
   if (sessions.length === 0) return [] as CompletedSessionSummary[];
 
   const sessionIds = sessions.map((session) => session.id);
@@ -636,6 +636,7 @@ export async function listCompletedSessionHistory(input?: {
       exercisesCompleted: sessionExercises.filter((exercise) => exercise.is_completed).length,
       completedSets: completedSetsBySession.get(session.id) ?? 0,
       volumeKg: summarizeTrainingSessionVolume(completedSetRowsBySession.get(session.id) ?? []),
+      routineColor: firstRelation(session.routine)?.color ?? null,
       muscleGroups,
     }];
   });
