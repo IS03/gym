@@ -12,7 +12,6 @@ import {
   parseDailyMetricValue,
   type DailyMetricWithValue,
 } from "@/lib/daily-metrics/core";
-import type { StepsReportSummary } from "@/lib/nutrition/steps-report-core";
 import {
   DailyActivityAutosaveQueue,
   type DailyActivityAutosaveState,
@@ -24,13 +23,11 @@ import {
   saveNutritionTargetOverrideAction,
 } from "./nutrition-actions";
 import { getMetricIcon } from "./day-activity-panel";
-import { StepsSummary } from "./steps-card";
 
 type Props = {
   dayLogId: string;
   date: string;
   metrics: DailyMetricWithValue[];
-  stepsSummary: StepsReportSummary;
   targetAutomaticInitial: number | null;
   targetOverrideInitial: number | null;
   expenditureAutomaticInitial: number | null;
@@ -64,7 +61,6 @@ export function DayContextEditor({
   dayLogId,
   date,
   metrics,
-  stepsSummary,
   targetAutomaticInitial,
   targetOverrideInitial,
   expenditureAutomaticInitial,
@@ -147,8 +143,6 @@ export function DayContextEditor({
     });
   }
 
-  const stepsMetric = metrics.find((metric) => metric.system_key === "steps");
-
   return (
     <div className="space-y-5">
       <section className="space-y-3" aria-labelledby="daily-activity-inputs">
@@ -159,9 +153,6 @@ export function DayContextEditor({
               const Icon = getMetricIcon(metric.system_key, metric.value_type);
               const raw = values[metric.id] ?? "";
               const value = parsedDraftValue(raw, metric);
-              const progress = metric.target_value && value !== null
-                ? Math.min((value / metric.target_value) * 100, 100)
-                : null;
               const duration = durationParts(raw);
               return (
                 <div key={metric.id} className={`space-y-3 p-3 ${index ? "border-t" : ""}`}>
@@ -226,12 +217,6 @@ export function DayContextEditor({
                       {metric.unit ? <span className="shrink-0 text-sm text-muted-foreground">{metric.unit}</span> : null}
                     </div>
                   )}
-
-                  {progress !== null ? (
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Progreso de ${metric.name}`} aria-valuemin={0} aria-valuemax={metric.target_value ?? undefined} aria-valuenow={value ?? undefined}>
-                      <div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${progress}%` }} />
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
@@ -254,8 +239,6 @@ export function DayContextEditor({
                 ? autosave.error
                 : null}
         </p>
-
-        {stepsMetric ? <StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} /> : null}
       </section>
 
       <details className="group/corrections rounded-xl border">

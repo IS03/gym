@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { getActiveDailyMetrics } from "@/lib/daily-metrics/server";
 import { getNutritionDay } from "@/lib/nutrition/day";
 import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
-import { getStepsOverview } from "@/lib/nutrition/steps-report";
 import { listActiveFoods } from "@/lib/nutrition/product";
 import { listActiveSavedMeals } from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
@@ -46,10 +45,9 @@ function formatProteinProgress(consumed: number, target: number | null) {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, metrics, stepsOverview, quickMeals, foods, savedMeals] = await Promise.all([
+  const [{ dayLog, meals, context }, metrics, quickMeals, foods, savedMeals] = await Promise.all([
     getNutritionDay(today, undefined, auth),
     getActiveDailyMetrics(today, auth),
-    getStepsOverview(today, auth),
     getQuickMealCandidates(today, auth),
     listActiveFoods(auth),
     listActiveSavedMeals(auth),
@@ -137,7 +135,6 @@ export default async function TodayPage() {
           expenditureLabel={formatKcal(context.expenditureKcal)}
           balanceLabel={formatBalance(context.metrics.energyBalanceKcal)}
           trainingLabel={context.gym.effective ? "Completado" : "Sin completar"}
-          stepsSummary={stepsOverview.summary}
         />
       </div>
 
