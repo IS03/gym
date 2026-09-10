@@ -10,7 +10,6 @@ const source = (path: string) => readFileSync(path, "utf8");
 const today = source("src/app/(app)/today/page.tsx");
 const todayActivity = source("src/app/(app)/today/day-activity-panel.tsx");
 const todayActivitySection = source("src/app/(app)/today/today-activity.tsx");
-const stepsCard = source("src/app/(app)/today/steps-card.tsx");
 const stepsPage = source("src/app/(app)/today/steps/page.tsx");
 const todayEditor = source("src/app/(app)/today/day-context-editor.tsx");
 const product = source("src/lib/nutrition/product.ts");
@@ -98,17 +97,17 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(activity).not.toContain("energy_balance_kcal");
   });
 
-  it("Pasos está integrado a Actividad y se sincroniza con el mismo editor", () => {
+  it("Pasos se edita como métrica diaria sin analytics históricos en Actividad", () => {
     expect(today).toContain("<TodayActivity");
     expect(todayActivitySection).toContain("<DayActivityPanel");
     expect(todayActivitySection).not.toContain("<StepsCard");
     expect(todayActivitySection).toContain("<ResponsiveDialog");
     expect(todayActivitySection).toContain("onMetricsChange={setActivity}");
-    expect(stepsCard).toContain('href="/today/steps"');
-    expect(stepsCard).toContain("stepsFromInput");
-    expect(today).toContain("stepsSummary={stepsOverview.summary}");
-    expect(todayEditor).toContain('<StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} />');
-    expect(todayEditor).toContain('metric.system_key === "steps"');
+    expect(todayEditor).toContain("metrics.map");
+    expect(todayEditor).not.toContain("StepsSummary");
+    expect(todayEditor).not.toContain('role="progressbar"');
+    expect(todayEditor).not.toContain("Prom. 7 días");
+    expect(today).not.toContain("getStepsOverview");
     expect(nutritionActions).toContain('revalidatePath("/today/steps")');
     expect(stepsPage).toContain("<StepsReport");
     expect(stepsPage).toContain('href="/today"');

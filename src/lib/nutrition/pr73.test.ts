@@ -32,11 +32,11 @@ describe("PR73 — actividad dinámica y correcciones diarias V2", () => {
     expect(activity).not.toContain("Registrá pasos, agua y mate");
   });
 
-  it("conserva Pasos como acceso histórico sin acoplar el resto por nombre", () => {
-    expect(editor).toContain('metric.system_key === "steps"');
-    expect(editor).toContain("<StepsSummary");
+  it("conserva Pasos en el editor genérico sin cargar historia en Today", () => {
+    expect(editor).toContain("metrics.map");
+    expect(editor).not.toContain("<StepsSummary");
     expect(panel).not.toContain('metric.name === "Bicicleta"');
-    expect(todayPage).toContain("getStepsOverview(today, auth)");
+    expect(todayPage).not.toContain("getStepsOverview(today, auth)");
   });
 
   it("persisten objetivo y gasto automáticos separados de sus overrides", () => {

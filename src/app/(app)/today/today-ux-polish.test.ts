@@ -1,14 +1,15 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { stepsFromInput } from "./steps-card-core";
+import { parseDailyMetricValue } from "../../../lib/daily-metrics/core";
 
 const source = (path: string) => readFileSync(path, "utf8");
 const todayActivity = source("src/app/(app)/today/today-activity.tsx");
 const activityPanel = source("src/app/(app)/today/day-activity-panel.tsx");
 const closedActivityPanel = activityPanel.slice(activityPanel.indexOf("export function DayActivityPanel"));
 const activityEditor = source("src/app/(app)/today/day-context-editor.tsx");
-const stepsCard = source("src/app/(app)/today/steps-card.tsx");
 const todayPage = source("src/app/(app)/today/page.tsx");
+const progressPage = source("src/app/(app)/progress/page.tsx");
+const metricsProgressPage = source("src/app/(app)/progress/metrics/page.tsx");
 
 describe("PR20 — Today UX polish", () => {
   it("renders a compact activity summary and moves editing into its responsive detail", () => {
@@ -19,7 +20,7 @@ describe("PR20 — Today UX polish", () => {
     expect(todayActivity).toContain("metrics={metricSummaries}");
     expect(activityPanel).toContain('aria-label="Abrir actividad de hoy"');
     expect(activityPanel).toContain('aria-haspopup="dialog"');
-    expect(activityEditor).toContain('<StepsSummary steps={values[stepsMetric.id] ?? ""} summary={stepsSummary} />');
+    expect(activityEditor).not.toContain("StepsSummary");
     expect(activityPanel).not.toContain("Prom. 7 días");
     expect(activityPanel).not.toContain('href="/today/steps"');
   });
@@ -64,25 +65,20 @@ describe("PR20 — Today UX polish", () => {
     expect(activityEditor).toContain("motion-reduce:transition-none");
   });
 
-  it("preserves null, invalid and explicit zero step values", () => {
-    expect(stepsFromInput("")).toBeNull();
-    expect(stepsFromInput("invalid")).toBeNull();
-    expect(stepsFromInput("0")).toBe(0);
-    expect(stepsFromInput("8421")).toBe(8421);
+  it("preserves null and explicit zero metric values", () => {
+    expect(parseDailyMetricValue("", "integer")).toBeNull();
+    expect(parseDailyMetricValue("0", "integer")).toBe(0);
+    expect(parseDailyMetricValue("8421", "integer")).toBe(8421);
   });
 
-  it("uses the compact integrated steps summary without a second card", () => {
-    expect(stepsCard).toContain("export function StepsSummary");
-    expect(stepsCard).not.toContain("<Card");
-    expect(stepsCard).toContain('href="/today/steps"');
-    expect(stepsCard).toContain("Historial");
-    expect(stepsCard).toContain("text-lg");
-    expect(stepsCard).toContain("Prom. 7 días");
-    expect(stepsCard).toContain("{summary.daysWithData}/7 días");
-    expect(stepsCard).toContain("Sin datos en los últimos 7 días");
-    expect(todayActivity).toContain("formatDailyMetricProgress");
-    expect(todayActivity).toContain("activity[metric.id]");
-    expect(activityEditor).toContain('metric.system_key === "steps"');
+  it("keeps Today focused on input while Progress owns metric history", () => {
+    expect(activityEditor).toContain("formatDailyMetricProgress(value, metric)");
+    expect(activityEditor).not.toContain('role="progressbar"');
+    expect(activityEditor).not.toContain("Prom. 7 días");
+    expect(activityEditor).not.toContain("Historial");
+    expect(todayPage).not.toContain("getStepsOverview");
+    expect(progressPage).toContain('href="/progress/metrics"');
+    expect(metricsProgressPage).toContain("getDailyMetricsReport");
   });
 
   it("removes the legacy subtitle and work/training correction controls", () => {
