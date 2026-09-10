@@ -16,7 +16,7 @@ const weekdays = ["L", "M", "X", "J", "V", "S", "D"];
 const signals = [
   { key: "hasNutrition", label: "Nutrición", className: "bg-primary" },
   { key: "hasTraining", label: "Entreno", className: "bg-chart-2" },
-  { key: "hasActivity", label: "Actividad", className: "bg-chart-3" },
+  { key: "hasMetrics", label: "Métricas", className: "bg-chart-3" },
   { key: "hasBody", label: "Cuerpo", className: "bg-chart-5" },
 ] as const;
 
@@ -42,7 +42,7 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
     <div className="space-y-6 pb-2 lg:mx-auto lg:max-w-5xl">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Calendario</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Nutrición, actividad, entrenamiento y cuerpo, día por día.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Nutrición, métricas, entrenamiento y cuerpo, día por día.</p>
       </header>
 
       <Card className="surface-elevated">

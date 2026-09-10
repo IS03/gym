@@ -3,17 +3,19 @@ import type { CalendarMonthDay } from "./month";
 export type GlobalCalendarDay = CalendarMonthDay & {
   hasNutrition: boolean;
   hasTraining: boolean;
-  hasActivity: boolean;
+  hasMetrics: boolean;
   hasBody: boolean;
 };
 
 export type GlobalCalendarDayLogFact = {
   id: string;
   log_date: string;
-  steps: number | null;
-  water_l: number | null;
-  mate_l: number | null;
   weight_kg: number | null;
+};
+
+export type GlobalCalendarMetricFact = {
+  metric_date: string;
+  value: number;
 };
 
 export type GlobalCalendarMealFact = {
@@ -32,6 +34,7 @@ export function buildGlobalCalendarDays(input: {
   dayLogs: GlobalCalendarDayLogFact[];
   meals: GlobalCalendarMealFact[];
   workouts: GlobalCalendarWorkoutFact[];
+  metrics: GlobalCalendarMetricFact[];
   bodyMeasurementDates: string[];
 }): GlobalCalendarDay[] {
   const dayLogsById = new Map(input.dayLogs.map((day) => [day.id, day]));
@@ -44,6 +47,7 @@ export function buildGlobalCalendarDays(input: {
   const trainingIds = new Set(input.workouts.filter((workout) => workout.status === "completed").map((workout) => workout.day_log_id));
   const nutritionDates = new Set([...nutritionIds].flatMap((id) => dayLogsById.get(id)?.log_date ?? []));
   const trainingDates = new Set([...trainingIds].flatMap((id) => dayLogsById.get(id)?.log_date ?? []));
+  const metricDates = new Set(input.metrics.map((metric) => metric.metric_date));
   const bodyDates = new Set(input.bodyMeasurementDates);
 
   return input.grid.map((day) => {
@@ -52,7 +56,7 @@ export function buildGlobalCalendarDays(input: {
       ...day,
       hasNutrition: nutritionDates.has(day.date),
       hasTraining: trainingDates.has(day.date),
-      hasActivity: Boolean(dayLog && (dayLog.steps !== null || dayLog.water_l !== null || dayLog.mate_l !== null)),
+      hasMetrics: metricDates.has(day.date),
       hasBody: Boolean(dayLog?.weight_kg !== null && dayLog?.weight_kg !== undefined) || bodyDates.has(day.date),
     };
   });

@@ -13,6 +13,9 @@ describe("navegación del calendario global", () => {
     expect(page).toContain('dailyHistoryDetailHref(day.date, { source: "calendar", month })');
     expect(loader).toContain("buildMonthGrid");
     expect(page).toContain("aria-disabled=\"true\"");
+    expect(page).toContain('{ key: "hasMetrics", label: "Métricas"');
+    expect(loader).toContain('.from("daily_metric_values")');
+    expect(loader).not.toContain('select("id,log_date,steps,water_l,mate_l');
   });
 
   it("lo expone desde Progreso y el sidebar, sin cambiar el preview de Entrenar", () => {
