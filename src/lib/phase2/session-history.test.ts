@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { daysBetweenIsoDates, formatRelativeTrainingDays, leastRecentRoutine } from "./session-history";
+import { daysBetweenIsoDates, formatCompactRelativeTrainingDays, formatRelativeTrainingDays, leastRecentRoutine } from "./session-history";
 
 describe("historial de sesiones", () => {
   it("calcula días de continuidad sin recomendar una rutina", () => {
     expect(daysBetweenIsoDates("2026-08-01", "2026-08-09")).toBe(8);
     expect(formatRelativeTrainingDays(3)).toBe("hace 3 días");
     expect(formatRelativeTrainingDays(null)).toBe("Sin registros");
+    expect(formatCompactRelativeTrainingDays(0)).toBe("hoy");
+    expect(formatCompactRelativeTrainingDays(1)).toBe("ayer");
+    expect(formatCompactRelativeTrainingDays(16)).toBe("16 d");
   });
 
   it("encuentra la rutina activa menos reciente", () => {

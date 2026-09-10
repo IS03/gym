@@ -34,6 +34,13 @@ export function formatRelativeTrainingDays(days: number | null) {
   return `hace ${days} ${days === 1 ? "día" : "días"}`;
 }
 
+export function formatCompactRelativeTrainingDays(days: number | null) {
+  if (days === null) return "Sin registros";
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  return `${days} d`;
+}
+
 export function daysBetweenIsoDates(fromDate: string, toDate: string) {
   const from = dateAtNoon(fromDate).getTime();
   const to = dateAtNoon(toDate).getTime();

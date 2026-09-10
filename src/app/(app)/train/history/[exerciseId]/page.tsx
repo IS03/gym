@@ -14,6 +14,7 @@ import {
   type RobustExerciseHistoryItem,
 } from "@/lib/phase2/training-robust";
 import type { ExerciseReportSession } from "@/lib/phase2/exercise-insights";
+import { HistoryExerciseDetail } from "./history-exercise-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,32 @@ export default async function ExerciseHistoryPage({
 }) {
   const { exerciseId } = await params;
   const sp = (await searchParams) ?? {};
+  const cameFromProgress = sp.from === "progress";
+  if (!cameFromProgress) {
+    const rawLimit = typeof sp.limit === "string" ? Number(sp.limit) : 20;
+    const currentLimit = Number.isInteger(rawLimit) ? Math.min(Math.max(rawLimit, 20), 100) : 20;
+    const [allExercises, allHistoryItems] = await Promise.all([
+      listExercises({ includeArchived: true }),
+      listRobustExerciseHistory({ exerciseId, limit: 500 }),
+    ]);
+    const exercise = allExercises.find((item) => item.id === exerciseId) ?? null;
+    const latestSnapshot = allHistoryItems[0]?.exercise ?? null;
+    const requestedReturn = typeof sp.return === "string" ? sp.return : "";
+    const returnHref = requestedReturn.startsWith("/train/history?")
+      ? requestedReturn
+      : "/train/history?view=exercises";
+    return <HistoryExerciseDetail
+      exerciseId={exerciseId}
+      exerciseName={latestSnapshot?.nombre_snapshot ?? exercise?.nombre ?? "Ejercicio"}
+      muscleGroup={latestSnapshot?.grupo_muscular_snapshot ?? exercise?.grupo_muscular ?? null}
+      muscleLabel={latestSnapshot?.muscle_group_label_snapshot ?? exercise?.muscle_group_label ?? null}
+      implement={latestSnapshot?.implement_snapshot ?? exercise?.implement ?? null}
+      weightMode={latestSnapshot?.weight_mode_snapshot ?? exercise?.weight_mode ?? null}
+      sessions={serializeSessions(allHistoryItems)}
+      currentLimit={currentLimit}
+      returnHref={returnHref}
+    />;
+  }
   const rawPeriod = typeof sp.period === "string" && PERIODS.has(sp.period) ? sp.period : "3m";
   const period = rawPeriod === "30d" ? "4w" : rawPeriod === "90d" ? "3m" : rawPeriod;
   const routineId = typeof sp.routine_id === "string" && sp.routine_id ? sp.routine_id : null;
@@ -77,7 +104,6 @@ export default async function ExerciseHistoryPage({
         nombre: item.session.routine_name_snapshot ?? item.session.session_name ?? "Rutina",
       }]),
   ).values()].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
-  const cameFromProgress = sp.from === "progress";
   const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
   const progressRoutine = typeof sp.routine === "string" ? sp.routine : null;
   const progressMuscle = typeof sp.muscle === "string" ? sp.muscle : null;

@@ -212,6 +212,7 @@ export type CompletedSessionSummary = {
 export type RoutineContinuity = {
   routineId: string;
   routineName: string;
+  routineColor?: RoutineColorKey | null;
   lastLogDate: string | null;
   daysSince: number | null;
 };
