@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   buildMonthGrid,
   formatMonthLabel,
+  trainingDayHref,
   type TrainingMonthDay,
 } from "@/lib/phase2/training-calendar";
 import { cn } from "@/lib/utils";
@@ -28,21 +28,17 @@ function DayCell({
 }) {
   const isToday = day.date === today;
   const trained = colors.length > 0;
-
-  return (
-    <span
-      className={cn(
-        "flex min-h-8 flex-col items-center justify-center rounded-lg text-xs font-medium leading-none",
-        !day.inMonth && "text-muted-foreground/35",
-        day.inMonth && !isToday && "text-foreground",
-        isToday && "bg-primary/10 text-primary ring-1 ring-primary/45",
-      )}
-      aria-label={
-        day.inMonth
-          ? `${day.date}${isToday ? ", hoy" : ""}${trained ? ", entrenaste" : ""}`
-          : undefined
-      }
-    >
+  const canOpen = day.inMonth && day.date <= today;
+  const className = cn(
+    "flex min-h-9 flex-col items-center justify-center rounded-lg text-xs font-medium leading-none outline-none transition-colors",
+    !day.inMonth && "text-muted-foreground/35",
+    day.inMonth && !isToday && day.date <= today && "text-foreground hover:bg-muted/60",
+    day.inMonth && day.date > today && "text-muted-foreground/45",
+    isToday && "bg-primary/10 text-primary ring-1 ring-primary/45 hover:bg-primary/15",
+    canOpen && "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+  );
+  const content = (
+    <>
       <span>{day.date.slice(8, 10)}</span>
       <span className="mt-1 flex h-1.5 items-center justify-center gap-0.5" aria-hidden>
         {colors.slice(0, 3).map((color) => (
@@ -53,6 +49,27 @@ function DayCell({
           />
         ))}
       </span>
+    </>
+  );
+
+  if (canOpen) {
+    return (
+      <Link
+        href={trainingDayHref(day.date, { source: "train" })}
+        className={className}
+        aria-label={`${day.date}${isToday ? ", hoy" : ""}${trained ? ", entrenaste" : ", sin entrenamiento"}`}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <span
+      className={className}
+      aria-label={day.inMonth ? `${day.date}, fecha futura` : undefined}
+    >
+      {content}
     </span>
   );
 }
@@ -64,40 +81,37 @@ export function TrainingMonthPreview({
 }: TrainingMonthPreviewProps) {
   const label = formatMonthLabel(month);
   const days = buildMonthGrid(month);
+  const activeDayCount = [...trainedDays.keys()].filter(
+    (date) => date.startsWith(`${month}-`) && date <= today,
+  ).length;
+  const activityLabel = activeDayCount === 1
+    ? "1 día con entrenamiento"
+    : `${activeDayCount} días con entrenamiento`;
 
   return (
-    <Link
-      href={`/train/calendar?month=${month}`}
-      aria-label={`Ver calendario de ${label}`}
-      className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      <Card size="sm" className="surface-elevated border transition-[border-color,transform,box-shadow] duration-150 hover:border-primary/25 hover:shadow-md active:scale-[0.99]">
-        <CardContent className="py-0">
-          <div className="mb-2.5 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-base font-semibold tracking-tight">{label}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Constancia del mes</p>
-            </div>
-            <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-          </div>
+    <Card size="sm" className="surface-elevated border">
+      <CardContent className="py-0">
+        <div className="mb-2.5">
+          <p className="text-base font-semibold tracking-tight">{label}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{activityLabel}</p>
+        </div>
 
-          <div className="grid grid-cols-7 text-center text-[10px] font-medium text-muted-foreground">
-            {weekdayLabels.map((label) => (
-              <span key={label} className="pb-1">{label}</span>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-y-0.5">
-            {days.map((day) => (
-              <DayCell
-                key={day.date}
-                day={day}
-                today={today}
-                colors={day.inMonth ? trainedDays.get(day.date) ?? [] : []}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+        <div className="grid grid-cols-7 text-center text-[10px] font-medium text-muted-foreground">
+          {weekdayLabels.map((weekday) => (
+            <span key={weekday} className="pb-1">{weekday}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-y-0.5">
+          {days.map((day) => (
+            <DayCell
+              key={day.date}
+              day={day}
+              today={today}
+              colors={day.inMonth ? trainedDays.get(day.date) ?? [] : []}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

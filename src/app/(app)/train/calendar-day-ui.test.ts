@@ -9,13 +9,21 @@ const day = source("src/app/(app)/train/day/page.tsx");
 describe("calendario y detalle de entrenamiento", () => {
   it("compacta el contenedor mensual sin reducir las celdas del preview", () => {
     expect(preview).toContain('<Card size="sm"');
-    expect(preview).toContain('"flex min-h-8 flex-col');
+    expect(preview).toContain('"flex min-h-9 flex-col');
     expect(preview).toContain('gap-y-0.5');
+  });
+
+  it("abre cada fecha directamente y deja de exponer el calendario duplicado desde Entrenar", () => {
+    expect(preview).toContain('trainingDayHref(day.date, { source: "train" })');
+    expect(preview).toContain('`${activeDayCount} días con entrenamiento`');
+    expect(preview).not.toContain('/train/calendar?month=');
+    expect(preview).not.toContain("Constancia del mes");
   });
 
   it("conserva el mes navegable y comunica hoy/entrenamiento en el calendario", () => {
     expect(calendar).toContain("trainingCalendarHref(addMonths(month, -1), routineId)");
     expect(calendar).toContain("trainingCalendarHref(addMonths(month, 1), routineId)");
+    expect(calendar).toContain("trainingDayHref(entry.date, { routineId: routineId || null })");
     expect(calendar).toContain('aria-current={isToday ? "date" : undefined}');
     expect(calendar).toContain('trained ? ", entrenaste" : ""');
   });
@@ -27,7 +35,8 @@ describe("calendario y detalle de entrenamiento", () => {
     expect(day).toContain("formatWorkoutTimeRange(session.startedAt, session.endedAt)");
     expect(day).toContain("formatWorkoutDuration(session.durationMilliseconds)");
     expect(day).toContain('href={`/train/session/${session.id}`}');
-    expect(day).toContain("trainingCalendarHref(date.slice(0, 7)");
+    expect(day).toContain("trainingDayReturnTarget(date, routineId || null, source)");
+    expect(day).toContain("{returnTarget.label}");
     expect(day).not.toContain("listEndedSessionsByDate");
     expect(day).not.toContain("listRoutines");
     expect(day).not.toContain("Aplicar");

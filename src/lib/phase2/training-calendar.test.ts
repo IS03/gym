@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, buildMonthGrid, formatMonthLabel, trainingCalendarHref } from "./training-calendar";
+import {
+  addMonths,
+  buildMonthGrid,
+  formatMonthLabel,
+  groupTrainingDays,
+  trainingCalendarHref,
+  trainingDayHref,
+  trainingDayReturnTarget,
+} from "./training-calendar";
 
 describe("calendario de entrenamiento", () => {
   it("arma sólo las semanas necesarias y empieza en lunes", () => {
@@ -29,5 +37,36 @@ describe("calendario de entrenamiento", () => {
     expect(formatMonthLabel("2026-08")).toBe("Agosto 2026");
     expect(addMonths("2026-01", -1)).toBe("2025-12");
     expect(addMonths("2026-12", 1)).toBe("2027-01");
+  });
+
+  it("lleva una fecha del mini calendario directo al detalle y conserva su origen", () => {
+    expect(trainingDayHref("2026-09-08", { source: "train" })).toBe(
+      "/train/day?date=2026-09-08&from=train",
+    );
+    expect(trainingDayReturnTarget("2026-09-08", null, "train")).toEqual({
+      href: "/train",
+      label: "Entrenar",
+    });
+  });
+
+  it("mantiene deep links del calendario dedicado y su filtro", () => {
+    expect(trainingDayHref("2026-09-08", { routineId: "pull-id" })).toBe(
+      "/train/day?date=2026-09-08&routine_id=pull-id",
+    );
+    expect(trainingDayReturnTarget("2026-09-08", "pull-id")).toEqual({
+      href: "/train/calendar?month=2026-09&routine_id=pull-id",
+      label: "Calendario",
+    });
+  });
+
+  it("identifica sólo fechas con sesiones y preserva varias rutinas en el mismo día", () => {
+    const days = groupTrainingDays([
+      { date: "2026-09-08", color: "violet" },
+      { date: "2026-09-08", color: "blue" },
+      { date: "2026-09-08", color: "violet" },
+    ]);
+
+    expect(days.get("2026-09-08")).toEqual(["violet", "blue"]);
+    expect(days.has("2026-09-09")).toBe(false);
   });
 });

@@ -447,7 +447,7 @@ export function ExerciseLibrary({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
-          <p className="text-sm text-muted-foreground">Tus ejercicios generales.</p>
+          <p className="text-sm text-muted-foreground">Buscá y organizá tus ejercicios.</p>
         </div>
         <Button type="button" onClick={openCreate} size="sm" className="shrink-0 lg:h-11 lg:px-3">
           <Plus className="size-4" aria-hidden />
@@ -557,7 +557,7 @@ export function ExerciseLibrary({
             </Button>
           </div>
         ) : showGroups ? (
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
             {groupedExercises.map((section) => (
               <section key={section.value} aria-labelledby={`exercise-group-${section.value}`}>
                 <h3
@@ -571,7 +571,7 @@ export function ExerciseLibrary({
             ))}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
             <ExerciseRows exercises={sortExerciseLibrary(visibleExercises)} onEdit={openEdit} />
           </div>
         )}

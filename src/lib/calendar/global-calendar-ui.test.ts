@@ -18,9 +18,10 @@ describe("navegación del calendario global", () => {
     expect(loader).not.toContain('select("id,log_date,steps,water_l,mate_l');
   });
 
-  it("lo expone desde Progreso y el sidebar, sin cambiar el preview de Entrenar", () => {
+  it("lo expone desde Progreso y el sidebar, separado del acceso rápido de Entrenar", () => {
     expect(progress).toContain('href="/calendar"');
     expect(sidebar).toContain('href: "/calendar", label: "Calendario"');
-    expect(preview).toContain('href={`/train/calendar?month=${month}`}');
+    expect(preview).toContain('trainingDayHref(day.date, { source: "train" })');
+    expect(preview).not.toContain('href={`/train/calendar?month=${month}`}');
   });
 });

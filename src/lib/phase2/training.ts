@@ -19,9 +19,9 @@ import type {
 import type { ExerciseRoutineMembership } from "./exercise-insights";
 import {
   assertRoutineColor,
-  resolveRoutineColor,
   type RoutineColorKey,
 } from "./routine-colors";
+import { groupTrainingDays } from "./training-calendar";
 
 async function getAuthedUserId() {
   const supabase = await createClient();
@@ -187,18 +187,12 @@ export async function listTrainingDaysInMonth(
   const { data, error } = await q;
   if (error) throw new Error(`Leer días entrenados: ${error.message}`);
 
-  const out = new Map<string, Set<RoutineColorKey>>();
-  for (const row of (data ?? []) as TrainingDayQueryRow[]) {
-    const dayLog = firstRelation(row.day_log);
-    const routine = firstRelation(row.routine);
-    const date = dayLog?.log_date ? String(dayLog.log_date) : null;
-    if (!date) continue;
-    const color = resolveRoutineColor(routine?.color);
-    const set = out.get(date) ?? new Set<RoutineColorKey>();
-    set.add(color);
-    out.set(date, set);
-  }
-  return new Map(Array.from(out.entries()).map(([k, v]) => [k, Array.from(v)]));
+  const records = ((data ?? []) as TrainingDayQueryRow[]).flatMap((row) => {
+    const date = firstRelation(row.day_log)?.log_date;
+    if (!date) return [];
+    return [{ date: String(date), color: firstRelation(row.routine)?.color }];
+  });
+  return groupTrainingDays(records);
 }
 
 export async function listEndedSessionsByDate(input: {
