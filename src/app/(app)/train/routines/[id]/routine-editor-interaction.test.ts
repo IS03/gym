@@ -4,7 +4,6 @@ import {
   filterRoutinePickerExercises,
   nextExpandedRoutineExerciseId,
   shouldShowRoutineExerciseSectionAddAction,
-  shouldShowRoutineExercisePrescription,
   toggleRoutineNextAdjustment,
 } from "./routine-editor-interaction";
 
@@ -23,11 +22,6 @@ describe("routine editor v2 interactions", () => {
   it("keeps the section action out of the empty state", () => {
     expect(shouldShowRoutineExerciseSectionAddAction(0)).toBe(false);
     expect(shouldShowRoutineExerciseSectionAddAction(1)).toBe(true);
-  });
-
-  it("keeps prescriptions out of collapsed rows and exposes them when expanded", () => {
-    expect(shouldShowRoutineExercisePrescription(false)).toBe(false);
-    expect(shouldShowRoutineExercisePrescription(true)).toBe(true);
   });
 
   it("toggles the two supported next-time adjustments without producing legacy custom", () => {

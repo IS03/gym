@@ -10,7 +10,6 @@ import { LocalizedDecimalInput } from "@/components/ui/localized-decimal-input";
 import { Label } from "@/components/ui/label";
 import { exerciseIdentityLabel } from "@/lib/phase2/exercise-library";
 import { routineColorCssVariable, type RoutineColorKey } from "@/lib/phase2/routine-colors";
-import { summarizeRoutineExerciseTarget } from "@/lib/phase2/routine-template-summary";
 import { formatRestRange } from "@/lib/phase2/training-display";
 import { nullableNumberFromInput, payloadsEqual } from "@/lib/phase2/training-validation";
 import type {
@@ -24,7 +23,6 @@ import {
 } from "../../actions";
 import {
   nextExpandedRoutineExerciseId,
-  shouldShowRoutineExercisePrescription,
   toggleRoutineNextAdjustment,
   type SelectableRoutineAdjustment,
 } from "./routine-editor-interaction";
@@ -241,8 +239,6 @@ export function RoutineTemplateEditor({
           const status = statuses[item.id];
           const dirty = dirtyIds.has(item.id);
           const isOpen = expandedExerciseId === item.id;
-          const showPrescription = shouldShowRoutineExercisePrescription(isOpen);
-          const summary = summarizeRoutineExerciseTarget(payload);
           const identity = exerciseIdentityLabel(item.exercise);
           const contentId = `routine-target-${item.id}`;
 
@@ -267,11 +263,6 @@ export function RoutineTemplateEditor({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold leading-5">{item.exercise.nombre}</span>
                     <span className="block truncate text-xs leading-4 text-muted-foreground">{identity}</span>
-                    {showPrescription ? (
-                      <span className="block truncate text-xs leading-4 text-muted-foreground">
-                        {[summary.setLabel, ...summary.signals, summary.adjustmentLabel].filter(Boolean).join(" · ")}
-                      </span>
-                    ) : null}
                   </span>
                   <ChevronDown
                     className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}

@@ -20,10 +20,8 @@ describe("PR78 — editor compacto de rutinas", () => {
     expect(editor).toContain("divide-y divide-border/70");
     expect(editor).toContain("nextExpandedRoutineExerciseId");
     expect(editor).toContain("aria-expanded={isOpen}");
-    expect(editor).toContain("summary.setLabel");
     expect(editor).toContain("exerciseIdentityLabel");
-    expect(editor).toContain("shouldShowRoutineExercisePrescription(isOpen)");
-    expect(editor).toContain("showPrescription ? (");
+    expect(editor).not.toContain("summarizeRoutineExerciseTarget");
   });
 
   it("centra número, contenido, chevron y menú sobre el mismo eje", () => {
