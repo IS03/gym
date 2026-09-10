@@ -17,9 +17,10 @@ describe("PR 9.6 — UX diaria mobile", () => {
       homeDashboard.indexOf("function QuickAccess("),
       homeDashboard.indexOf("function QuickAccesses"),
     );
-    expect(quickAccess).toContain("flex min-h-24");
-    expect(quickAccess).toContain("items-start gap-3");
-    expect(quickAccess).toContain("text-xs leading-snug");
+    expect(quickAccess).toContain("flex min-h-16");
+    expect(quickAccess).toContain("items-center gap-3");
+    expect(quickAccess).not.toContain("min-h-24");
+    expect(quickAccess).not.toContain("text-xs leading-snug");
     expect(quickAccess).not.toContain("Nutrición");
   });
 
@@ -31,7 +32,7 @@ describe("PR 9.6 — UX diaria mobile", () => {
 
     expect(quickAccess).toContain("<Icon");
     expect(quickAccess).toContain("{title}");
-    expect(quickAccess).toContain("{description}");
+    expect(quickAccess).not.toContain("description");
     for (const href of ["/train/routines", "/calendar", "/train/body", "/history"]) {
       expect(homeDashboard).toContain(`href=\"${href}\"`);
     }
