@@ -235,7 +235,7 @@ function SetRow({
     <div
       className={cn(
         SET_GRID_SHARED,
-        "grid-rows-[2.25rem_auto] items-center gap-y-0.5 border-b border-border/50 py-1 last:border-b-0 transition-colors duration-150",
+        "grid-rows-[2.25rem_auto] items-center gap-y-0 border-b border-border/50 pb-1 pt-2 last:border-b-0 transition-colors duration-150",
         set.is_completed
           ? "bg-emerald-500/[0.035]"
           : "bg-transparent",

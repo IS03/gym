@@ -135,7 +135,8 @@ describe("PR 14 — interacción de sesión", () => {
   it("mantiene el encabezado de sesión y alinea las series en dos tracks compartidos", () => {
     expect(editor).not.toContain('"sticky top-[max(0.5rem,env(safe-area-inset-top))]');
     expect(editor).toContain('overflow-hidden rounded-lg border border-border/55 bg-background/20');
-    expect(editor).toContain('grid-rows-[2.25rem_auto] items-center gap-y-0.5 border-b');
+    expect(editor).toContain('grid-rows-[2.25rem_auto] items-center gap-y-0 border-b');
+    expect(editor).toContain('pb-1 pt-2 last:border-b-0');
     expect(editor).not.toContain('items-center rounded-lg border border-border/55 px-2 py-2');
     expect(editor).toContain("grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2.5rem_2.75rem]");
     expect(editor).toContain('col-start-2 row-start-2 truncate text-center');
