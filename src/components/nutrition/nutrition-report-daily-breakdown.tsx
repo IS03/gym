@@ -45,10 +45,10 @@ function DailyRow({ day }: { day: NutritionReportDay }) {
         <p className="metric-number text-sm font-medium">{formatValue(day.calories, "kcal", true)}{day.targetCalories === null ? "" : ` / ${integerFormatter.format(day.targetCalories)}`}<span className="px-1.5 text-muted-foreground">·</span>P {formatValue(day.proteinG, "g")}{day.targetProteinG === null ? "" : ` / ${numberFormatter.format(day.targetProteinG)}`}</p>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {balance ? <span>{balance}</span> : null}
-          {day.steps !== null ? <span>{integerFormatter.format(day.steps)} pasos</span> : null}
-          {day.waterL !== null ? <span>{numberFormatter.format(day.waterL)} L agua</span> : null}
-          {day.hasCompletedWorkout ? <span>Entrenamiento: Sí</span> : day.gymEffective ? <span>Gym: Sí · corrección</span> : day.dayLogId ? <span>Entrenamiento: No</span> : null}
-          {day.workEffective !== null ? <span>Trabajo: {day.workEffective ? "Sí" : "No"}</span> : null}
+          {day.expenditureKcal !== null ? <span>Gasto {integerFormatter.format(day.expenditureKcal)} kcal</span> : null}
+          {day.carbsG !== null ? <span>C {numberFormatter.format(day.carbsG)} g</span> : null}
+          {day.fatG !== null ? <span>G {numberFormatter.format(day.fatG)} g</span> : null}
+          {day.goalStage ? <span>Etapa: {day.goalStage}</span> : null}
         </div>
       </>}
     </div>

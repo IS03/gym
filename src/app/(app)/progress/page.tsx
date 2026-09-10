@@ -4,6 +4,7 @@ import {
   Activity,
   Apple,
   CalendarDays,
+  ChartNoAxesColumnIncreasing,
   ChevronRight,
   Dumbbell,
   History,
@@ -105,8 +106,9 @@ export default async function ProgressPage() {
 
       <section aria-labelledby="progress-analyze-title" className="space-y-3">
         <div><h2 id="progress-analyze-title" className="text-lg font-semibold tracking-tight">Analizar</h2></div>
-        <div className="grid gap-2 lg:grid-cols-3">
+        <div className="grid gap-2 lg:grid-cols-2">
           <ProgressLink href="/today/reports" icon={Apple} title="Nutrición" description="Tendencias, objetivos y balance" />
+          <ProgressLink href="/progress/metrics" icon={ChartNoAxesColumnIncreasing} title="Métricas diarias" description="Pasos, agua, sueño y métricas personalizadas" />
           <ProgressLink href="/train/progress" icon={Dumbbell} title="Entrenamiento" description="Sesiones, volumen y ejercicios" />
           <ProgressLink href="/train/body" icon={Activity} title="Cuerpo" description="Peso y medidas" />
         </div>

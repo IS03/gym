@@ -31,7 +31,7 @@ const RIGHT = 12;
 const TOP = 14;
 const BOTTOM = 28;
 
-type Metric = "energy" | "balance" | "protein" | "water" | "steps";
+type Metric = "energy" | "balance" | "protein";
 type LineSeries = {
   label: string;
   values: Array<number | null>;
@@ -44,8 +44,6 @@ const metricOptions: Array<{ id: Metric; label: string }> = [
   { id: "energy", label: "Energía" },
   { id: "balance", label: "Balance" },
   { id: "protein", label: "Proteína" },
-  { id: "water", label: "Agua" },
-  { id: "steps", label: "Pasos" },
 ];
 
 function dateLabel(value: string, year = false) {
@@ -168,9 +166,7 @@ function comparisonBucketValues(
   const value = (day: NutritionReportDay) => {
     if (metric === "energy") return day.hasNutrition ? day.calories : null;
     if (metric === "balance") return day.hasNutrition ? day.energyBalanceKcal : null;
-    if (metric === "protein") return day.hasNutrition ? day.proteinG : null;
-    if (metric === "water") return day.waterL;
-    return day.steps;
+    return day.hasNutrition ? day.proteinG : null;
   };
   return {
     current: buckets.map((bucket) => averageBucketValue(bucket.current, value)),
@@ -180,8 +176,6 @@ function comparisonBucketValues(
 
 function comparisonUnit(metric: Metric): ChartUnit {
   if (metric === "protein") return "g";
-  if (metric === "water") return "L";
-  if (metric === "steps") return "pasos";
   return "kcal";
 }
 
@@ -427,38 +421,6 @@ function BalanceChart({ buckets, values }: { buckets: NutritionChartBucket<Nutri
   </div>;
 }
 
-function StepsChart({ buckets, values }: { buckets: NutritionChartBucket<NutritionReportDay>[]; values: Array<number | null> }) {
-  const known = values.some((value) => value !== null);
-  const [selected, setSelected] = useState(() => firstSelectableIndex(values));
-  const [focused, setFocused] = useState<number | null>(null);
-  if (!known) return <p className="py-8 text-sm text-muted-foreground">Registrá pasos algunos días para ver la tendencia.</p>;
-  const domain = chartDomain(values, { nonNegative: true });
-  const selectedIndex = Math.min(selected, buckets.length - 1);
-  const selectedBucket = buckets[selectedIndex]!;
-  const baseline = chartY(0, domain, HEIGHT, TOP, BOTTOM);
-  const bucketed = buckets.some((bucket) => bucket.start !== bucket.end);
-
-  return <div className="space-y-3">
-    <p className="text-xs text-muted-foreground">Fecha · pasos{bucketed ? " · promedio diario por período" : ""}</p>
-    <svg className="block h-auto w-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet" role="group" aria-label="Pasos registrados por fecha." style={{ touchAction: "pan-y" }}>
-      <ChartGrid domain={domain} unit="pasos" />
-      <line x1={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(selectedIndex, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP} y2={HEIGHT - BOTTOM} className="stroke-primary/35" strokeDasharray="2 3" pointerEvents="none" />
-      {focused === null ? null : <line x1={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} x2={chartBandGeometry(focused, buckets.length, WIDTH, LEFT, RIGHT).center} y1={TOP + 2} y2={HEIGHT - BOTTOM - 2} className="stroke-primary" strokeWidth="2" pointerEvents="none" />}
-      {values.map((value, index) => {
-        if (value === null) return null;
-        const band = chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT);
-        const barWidth = Math.max(3, Math.min(18, band.width - 2));
-        return <g key={buckets[index]!.end}>
-          <rect x={band.center - barWidth / 2} y={chartY(value, domain, HEIGHT, TOP, BOTTOM)} width={barWidth} height={Math.max(1, baseline - chartY(value, domain, HEIGHT, TOP, BOTTOM))} rx="1" className={buckets[index]?.includesToday ? "fill-primary/45" : "fill-primary/75"} pointerEvents="none" />
-          <rect x={band.start} y={TOP} width={band.width} height={HEIGHT - TOP - BOTTOM} fill="transparent" role="button" tabIndex={0} className="outline-none focus:outline-none" style={{ outline: "none" }} aria-label={`${bucketLabel(buckets[index]!, true)}. ${formatChartValue(value, "pasos")}.`} onClick={() => setSelected(index)} onFocus={() => setFocused(index)} onBlur={() => setFocused(null)} onKeyDown={(event) => keySelect(event, () => setSelected(index))} />
-        </g>;
-      })}
-      <DateTicks buckets={buckets} position={(index) => chartBandGeometry(index, buckets.length, WIDTH, LEFT, RIGHT).center} />
-    </svg>
-    <ChartDetail title={bucketLabel(selectedBucket, true)} items={[{ label: "Pasos", value: values[selectedIndex] === null ? "Sin dato" : formatChartValue(values[selectedIndex]!, "pasos") }]} description={selectedBucket.includesToday ? "Hoy · En curso. No modifica los resúmenes de días terminados." : bucketed ? "Cada barra muestra el promedio diario del período." : undefined} className="min-h-24" />
-  </div>;
-}
-
 export function NutritionReportCharts({
   days,
   comparison,
@@ -491,16 +453,8 @@ export function NutritionReportCharts({
     { label: "Consumida", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.proteinG : null)), className: "text-primary", width: 2.5 },
     { label: "Objetivo", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.targetProteinG : null)), className: "text-muted-foreground", dash: "5 4" },
   ], [buckets]);
-  const water = useMemo<LineSeries[]>(() => [
-    { label: "Agua", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.waterL)), className: "text-primary", width: 2.5 },
-    { label: "Objetivo", values: buckets.map((bucket) => averageBucketValue(bucket, (day) => day.targetWaterL)), className: "text-muted-foreground", dash: "5 4" },
-  ], [buckets]);
   const balance = useMemo(() => buckets.map((bucket) => averageBucketValue(bucket, (day) => day.hasNutrition ? day.energyBalanceKcal : null)), [buckets]);
-  const steps = useMemo(() => buckets.map((bucket) => averageBucketValue(bucket, (day) => day.steps)), [buckets]);
   const isPrevious = comparisonMode === "previous" && comparison !== null;
-  const waterKnown = isPrevious
-    ? comparisonValues.current.some((value) => value !== null) || comparisonValues.previous.some((value) => value !== null)
-    : water.some((series) => series.values.some((value) => value !== null));
   const includesToday = buckets.some((bucket) => bucket.includesToday);
   const comparisonUnitValue = comparisonUnit(metric);
 
@@ -523,19 +477,14 @@ export function NutritionReportCharts({
     <Card id="nutrition-trend-workspace" role="tabpanel" aria-labelledby={`nutrition-trend-tab-${metric}`} className="surface-elevated">
       <CardContent className="space-y-3 p-3 sm:p-4">
         {isPrevious ? <>
-          {metric === "balance" || metric === "steps"
-            ? <ComparisonBarChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} balance={metric === "balance"} description={`Comparación de ${metric === "balance" ? "balance energético" : "pasos"} entre el período actual y el anterior.`} />
-            : metric === "water" && !waterKnown
-              ? <p className="py-8 text-sm text-muted-foreground">No hay agua registrada en estos períodos.</p>
-              : <ComparisonLineChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} description={`Comparación de ${metric === "energy" ? "calorías consumidas" : metric === "protein" ? "proteína" : "agua"} entre el período actual y el anterior.`} />}
+          {metric === "balance"
+            ? <ComparisonBarChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} balance description="Comparación del balance energético entre el período actual y el anterior." />
+            : <ComparisonLineChart buckets={comparisonBuckets} values={comparisonValues} unit={comparisonUnitValue} description={`Comparación de ${metric === "energy" ? "calorías consumidas" : "proteína"} entre el período actual y el anterior.`} />}
           {metric === "energy" ? <p className="text-xs text-muted-foreground">El resumen compara también objetivo y gasto. El gráfico prioriza el consumo para mantener la lectura clara.</p> : null}
-          {metric === "water" ? <p className="text-xs text-muted-foreground">El mate se mantiene separado del agua.</p> : null}
         </> : <>
           {metric === "energy" ? <><ChartLegend series={energy} /><LineChart buckets={buckets} series={energy} unit="kcal" description="Tendencia de energía. Eje horizontal: fecha. Eje vertical: calorías." /></> : null}
           {metric === "balance" ? <BalanceChart buckets={buckets} values={balance} /> : null}
           {metric === "protein" ? <><ChartLegend series={protein} /><LineChart buckets={buckets} series={protein} unit="g" description="Tendencia de proteína. Eje horizontal: fecha. Eje vertical: gramos." /></> : null}
-          {metric === "water" ? waterKnown ? <><ChartLegend series={water} /><LineChart buckets={buckets} series={water} unit="L" description="Tendencia de agua. Eje horizontal: fecha. Eje vertical: litros." /><p className="text-xs text-muted-foreground">El mate se mantiene separado del agua.</p></> : <p className="py-8 text-sm text-muted-foreground">Registrá agua algunos días para ver la tendencia.</p> : null}
-          {metric === "steps" ? <StepsChart buckets={buckets} values={steps} /> : null}
         </>}
       </CardContent>
     </Card>

@@ -34,7 +34,8 @@ async function readNutritionReportFacts(
       nutrition_target_kcal_snapshot, protein_target_g_snapshot, water_target_l_snapshot,
       estimated_expenditure_kcal_snapshot, delta_vs_nutrition_target, energy_balance_kcal,
       water_l, mate_l, steps,
-      work_effective_snapshot, gym_effective_snapshot, gym_source_snapshot
+      work_effective_snapshot, gym_effective_snapshot, gym_source_snapshot,
+      nutrition_goal_period_id, nutrition_plan_period_id, goal_type_snapshot
     `)
     .eq("user_id", userId)
     .gte("log_date", range.start)
@@ -46,9 +47,12 @@ async function readNutritionReportFacts(
   const ids = dayLogs.map((day) => day.id);
   let meals: NutritionReportMealFact[] = [];
   let workouts: NutritionReportWorkoutFact[] = [];
+  const goalNames = new Map<string, string>();
 
   if (ids.length > 0) {
-    const [mealResult, workoutResult] = await Promise.all([
+    const nutritionPlanIds = [...new Set(dayLogs.map((day) => day.nutrition_plan_period_id).filter((id): id is string => id !== null))];
+    const legacyGoalIds = [...new Set(dayLogs.map((day) => day.nutrition_goal_period_id).filter((id): id is string => id !== null))];
+    const [mealResult, workoutResult, planResult, legacyGoalResult] = await Promise.all([
       supabase
         .from("meal_entries")
         .select("day_log_id, entry_kind, final_calories, final_protein_g, final_carbs_g, final_fat_g, source_type, deleted_at")
@@ -61,14 +65,25 @@ async function readNutritionReportFacts(
         .eq("user_id", userId)
         .in("day_log_id", ids)
         .eq("status", "completed"),
+      nutritionPlanIds.length
+        ? supabase.from("nutrition_plan_periods").select("id,name").eq("user_id", userId).in("id", nutritionPlanIds)
+        : Promise.resolve({ data: [], error: null }),
+      legacyGoalIds.length
+        ? supabase.from("nutrition_goal_periods").select("id,name").eq("user_id", userId).in("id", legacyGoalIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (mealResult.error) throw new Error(`Leer comidas para reportes: ${mealResult.error.message}`);
     if (workoutResult.error) throw new Error(`Leer entrenamientos para reportes: ${workoutResult.error.message}`);
+    if (planResult.error) throw new Error(`Leer etapas nutricionales: ${planResult.error.message}`);
+    if (legacyGoalResult.error) throw new Error(`Leer etapas nutricionales anteriores: ${legacyGoalResult.error.message}`);
     meals = (mealResult.data ?? []) as NutritionReportMealFact[];
     workouts = (workoutResult.data ?? []) as NutritionReportWorkoutFact[];
+    for (const row of [...(planResult.data ?? []), ...(legacyGoalResult.data ?? [])]) {
+      goalNames.set(String(row.id), String(row.name));
+    }
   }
 
-  return { dayLogs, meals, workouts };
+  return { dayLogs, meals, workouts, goalNames };
 }
 
 export async function getNutritionReport(

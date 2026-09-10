@@ -28,11 +28,9 @@ describe("PR 10.7 — jerarquía de reportes", () => {
   });
 
   it("muestra seis opciones nuevas, el rango actual y no deja el formulario visible", () => {
-    for (const label of ["7 días", "15 días", "30 días", "3 meses", "1 año", "Personalizado"]) {
+    for (const label of ["Semana", "2 semanas", "Mes", "3 meses", "6 meses", "1 año", "Personalizado"]) {
       expect(periodSelector).toContain(label);
     }
-    expect(periodSelector).not.toContain("14 días");
-    expect(periodSelector).not.toContain("Este mes");
     expect(periodSelector).toContain("rangeLabel");
     expect(reportsPage).not.toContain('name="from"');
     expect(reportsPage).not.toContain('name="to"');
@@ -61,11 +59,17 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(periodSelector).toContain("basePath,");
   });
 
-  it("preserva proteína, carbos y grasas dentro del resumen compacto", () => {
+  it("preserva proteína, carbos, grasas, gasto y balance dentro del resumen compacto", () => {
     expect(reportsPage).toContain('label="Proteína promedio"');
     expect(reportsPage).toContain('label="Carbos"');
     expect(reportsPage).toContain('label="Grasas"');
     expect(reportsPage).toContain("summary.protein.hitDays");
+    expect(reportsPage).toContain('label="Gasto estimado"');
+    expect(reportsPage).toContain('label="Balance promedio"');
+    expect(reportsPage).toContain("summary.goalStages");
+    for (const legacy of ["summary.hydration", "summary.activity", 'label="Trabajo"', 'label="Agua"', 'label="Pasos"']) {
+      expect(reportsPage).not.toContain(legacy);
+    }
   });
 
   it("delega el desglose a una isla local con expansión accesible", () => {
@@ -76,12 +80,14 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(breakdown).not.toContain("<Card");
   });
 
-  it("concentra tendencias en una única superficie y conserva sus cinco métricas", () => {
+  it("concentra tendencias nutricionales en una única superficie", () => {
     const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
     expect(charts).toContain('role="tablist"');
-    for (const label of ["Energía", "Balance", "Proteína", "Agua", "Pasos"]) {
+    for (const label of ["Energía", "Balance", "Proteína"]) {
       expect(charts).toContain(label);
     }
+    expect(charts).not.toContain('{ id: "water"');
+    expect(charts).not.toContain('{ id: "steps"');
     expect(charts).toContain("bucketNutritionChartDays");
     expect(charts).toContain('touchAction: "pan-y"');
   });
@@ -101,8 +107,11 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     for (const label of ["Actual", "Anterior", "Cambio"]) {
       expect(comparisonSummary).toContain(label);
     }
-    for (const label of ["Calorías", "Balance", "Proteína", "Carbos", "Grasas", "Agua", "Mate", "Pasos", "Entrenamientos"]) {
+    for (const label of ["Calorías", "Objetivo", "Balance", "Gasto", "Proteína", "Carbos", "Grasas"]) {
       expect(reportCore).toContain(label);
+    }
+    for (const legacy of ['comparisonRow("water"', 'comparisonRow("mate"', 'comparisonRow("steps"', 'comparisonRow("workouts"']) {
+      expect(reportCore).not.toContain(legacy);
     }
     expect(comparisonSummary).toContain("table-fixed");
     expect(comparisonSummary).not.toContain("text-emerald");
