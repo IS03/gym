@@ -19,8 +19,9 @@ import {
   type TrainingAnalysis,
   type TrainingAnalysisPeriod,
 } from "./training-analysis";
-import { listRoutines } from "./training";
+import { listExercises, listRoutines } from "./training";
 import { daysBetweenIsoDates } from "./session-history";
+import { buildTrainingHistoryDirectory, type TrainingHistoryDirectory } from "./training-history";
 import { resolveWorkoutSessionLookup } from "./training-session-lookup";
 import { summarizeTrainingSessionVolume } from "./training-day-summary";
 import {
@@ -646,12 +647,12 @@ export async function getSessionContinuity(today = todayInCordoba()) {
   const { supabase, userId } = await getAuthedContext();
   const { data: rawRoutines, error: routinesError } = await supabase
     .from("routines")
-    .select("id, nombre")
+    .select("id, nombre, color")
     .eq("user_id", userId)
     .eq("is_active", true)
     .order("routine_order", { ascending: true });
   if (routinesError) throw new Error(`Leer rutinas activas: ${routinesError.message}`);
-  const routines = (rawRoutines ?? []) as Array<{ id: string; nombre: string }>;
+  const routines = (rawRoutines ?? []) as Array<{ id: string; nombre: string; color: RoutineColorKey | null }>;
   if (routines.length === 0) return [] as RoutineContinuity[];
   const { data: rawSessions, error: sessionsError } = await supabase
     .from("workout_sessions")
@@ -682,6 +683,7 @@ export async function getSessionContinuity(today = todayInCordoba()) {
     return {
       routineId: routine.id,
       routineName: routine.nombre,
+      routineColor: routine.color,
       lastLogDate,
       daysSince: lastLogDate ? daysBetweenIsoDates(lastLogDate, today) : null,
     };
@@ -1041,8 +1043,10 @@ export async function getHomeTrainingSnapshot(
   return buildHomeTrainingSnapshot(source, today);
 }
 
-async function loadCompletedTrainingData(): Promise<CompletedTrainingData> {
-  const { supabase, userId } = await getAuthedContext();
+async function loadCompletedTrainingData(
+  context?: AuthenticatedRequestContext,
+): Promise<CompletedTrainingData> {
+  const { supabase, userId } = context ?? await getAuthedContext();
   const { data: rawSessions, error: sessionError } = await supabase
     .from("workout_sessions")
     .select("*")
@@ -1107,6 +1111,19 @@ async function loadCompletedTrainingData(): Promise<CompletedTrainingData> {
       ]),
     ),
   };
+}
+
+/**
+ * One batched historical read model for the exercise tab. Memberships come
+ * from completed session snapshots, never from the current routine template.
+ */
+export async function getTrainingHistoryDirectory(): Promise<TrainingHistoryDirectory> {
+  const context = await getAuthedContext();
+  const [data, catalog] = await Promise.all([
+    loadCompletedTrainingData(context),
+    listExercises({ includeArchived: true }, context),
+  ]);
+  return buildTrainingHistoryDirectory({ catalog, ...data });
 }
 
 export { mondayOfIsoDate } from "./training-progress-summary";

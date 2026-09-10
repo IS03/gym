@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { listExerciseRoutineMemberships, listExercises, listRoutines } from "@/lib/phase2/training";
-import { getSessionContinuity, getTrainingProgress, listCompletedSessionHistory, todayInCordoba } from "@/lib/phase2/training-robust";
+import { getSessionContinuity, getTrainingHistoryDirectory, listCompletedSessionHistory, todayInCordoba } from "@/lib/phase2/training-robust";
+import { trainingHistoryFiltersFromSearchParams } from "@/lib/phase2/training-history";
 import { HistoryExerciseList } from "./history-exercise-list";
 import { HistorySessionList } from "./history-session-list";
 
@@ -26,26 +27,16 @@ export default async function TrainHistoryPage({
       <HistorySessionList sessions={sessions.slice(0, sessionLimit)} continuity={continuity} hasMore={sessions.length > sessionLimit} currentLimit={sessionLimit} currentDate={todayInCordoba()} notice={typeof sp.notice === "string" ? sp.notice : null} />
     </div>;
   }
-  const [exercises, progress, routines] = await Promise.all([
-    listExercises({ includeArchived: false }),
-    getTrainingProgress(),
-    listRoutines({ includeArchived: false }),
-  ]);
-  const memberships = await listExerciseRoutineMemberships(routines.map((routine) => routine.id));
-  const progressByExerciseId = new Map(
-    progress.exercises.map((exercise) => [exercise.exerciseId, exercise]),
-  );
+  const directory = await getTrainingHistoryDirectory();
+  const initialFilters = trainingHistoryFiltersFromSearchParams(sp, directory.routines.map((routine) => routine.id));
 
   return (
     <div className="space-y-6">
       <HistoryTabs view={view} />
       <HistoryExerciseList
-        exercises={exercises.map((exercise) => ({
-          ...exercise,
-          progress: progressByExerciseId.get(exercise.id) ?? null,
-          routineIds: (memberships.get(exercise.id) ?? []).map((membership) => membership.id),
-        }))}
-        routines={routines.map((routine) => ({ id: routine.id, nombre: routine.nombre }))}
+        exercises={directory.exercises}
+        routines={directory.routines}
+        initialFilters={initialFilters}
       />
     </div>
   );
@@ -53,13 +44,18 @@ export default async function TrainHistoryPage({
 
 function HistoryTabs({ view }: { view: "sessions" | "exercises" }) {
   return <div className="space-y-2.5">
-    <div className="space-y-1">
-      <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial</h1>
-      <p className="text-sm text-muted-foreground">Revisá tus sesiones y el progreso de cada ejercicio.</p>
+    <div className="flex items-start justify-between gap-3">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Historial</h1>
+        <p className="text-sm text-muted-foreground">Revisá tus entrenamientos anteriores.</p>
+      </div>
+      <Link href="/train/calendar" className="flex size-10 shrink-0 items-center justify-center rounded-full border bg-background text-primary outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" aria-label="Abrir calendario de entrenamiento">
+        <CalendarDays className="size-4" aria-hidden />
+      </Link>
     </div>
     <nav className="grid grid-cols-2 rounded-xl border bg-muted/35 p-1" aria-label="Vista de historial">
       <Link href="/train/history?view=sessions" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "sessions" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Sesiones</Link>
-      <Link href="/train/history?view=exercises" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "exercises" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Por ejercicio</Link>
+      <Link href="/train/history?view=exercises" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "exercises" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Ejercicios</Link>
     </nav>
   </div>;
 }
