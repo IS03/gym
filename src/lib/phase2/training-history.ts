@@ -242,7 +242,7 @@ export function toggleTrainingHistoryFilter<T extends string>(values: readonly T
 
 export function trainingHistoryFilterCount(filters: TrainingHistoryFilters): number {
   return filters.routineIds.length + filters.muscleGroups.length +
-    (filters.activity === "all" ? 1 : 0) + (filters.order === "recent" ? 0 : 1);
+    (filters.activity === "all" ? 1 : 0);
 }
 
 export function groupCompletedSessionsByDate(sessions: readonly CompletedSessionSummary[]) {

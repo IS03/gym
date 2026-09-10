@@ -1119,11 +1119,16 @@ async function loadCompletedTrainingData(
  */
 export async function getTrainingHistoryDirectory(): Promise<TrainingHistoryDirectory> {
   const context = await getAuthedContext();
-  const [data, catalog] = await Promise.all([
+  const [data, catalog, activeRoutines] = await Promise.all([
     loadCompletedTrainingData(context),
     listExercises({ includeArchived: true }, context),
+    listRoutines({ includeArchived: false }, context),
   ]);
-  return buildTrainingHistoryDirectory({ catalog, ...data });
+  const directory = buildTrainingHistoryDirectory({ catalog, ...data });
+  return {
+    ...directory,
+    routines: activeRoutines.map((routine) => ({ id: routine.id, name: routine.nombre })),
+  };
 }
 
 export { mondayOfIsoDate } from "./training-progress-summary";
