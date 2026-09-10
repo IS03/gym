@@ -1,30 +1,29 @@
 import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "./muscle-groups";
+import type { RoutineColorKey } from "./routine-colors";
 import type { Exercise, MuscleGroup } from "./types";
 
-export type ExerciseLibraryFilter = "all" | "none" | MuscleGroup;
+export type ExerciseLibraryStatus = "active" | "archived" | "all";
+export type ExerciseLibraryGroup = MuscleGroup | "none";
 
-export type ExerciseLibrarySection = {
-  value: Exclude<ExerciseLibraryFilter, "all">;
-  label: string;
-  exercises: ExerciseLibraryItem[];
+export type ExerciseLibraryRoutine = { id: string; nombre: string; color: RoutineColorKey | null };
+export type ExerciseLibraryMembership = ExerciseLibraryRoutine;
+export type ExerciseLibraryFilters = {
+  routineIds: string[];
+  withoutRoutine: boolean;
+  muscleGroups: ExerciseLibraryGroup[];
+  implements: string[];
+  status: ExerciseLibraryStatus;
 };
-
-export type ExerciseLibraryItem = Pick<
-  Exercise,
-  | "id"
-  | "nombre"
-  | "grupo_muscular"
-  | "muscle_group_label"
-  | "implement"
-  | "weight_mode"
-  | "series_sugeridas"
-  | "reps_sugeridas"
-  | "peso_sugerido"
-  | "rir_sugerido"
-  | "descanso_min_sugerido_segundos"
-  | "descanso_max_sugerido_segundos"
-  | "updated_at"
->;
+export const DEFAULT_EXERCISE_LIBRARY_FILTERS: ExerciseLibraryFilters = {
+  routineIds: [], withoutRoutine: false, muscleGroups: [], implements: [], status: "active",
+};
+export type ExerciseLibrarySection = { value: ExerciseLibraryGroup; label: string; exercises: ExerciseLibraryItem[] };
+export type ExerciseLibraryItem = Pick<Exercise,
+  "id" | "nombre" | "grupo_muscular" | "muscle_group_label" | "implement" | "weight_mode"
+  | "series_sugeridas" | "reps_sugeridas" | "peso_sugerido" | "rir_sugerido"
+  | "descanso_min_sugerido_segundos" | "descanso_max_sugerido_segundos"
+  | "notes" | "is_active" | "updated_at"
+> & { memberships: ExerciseLibraryMembership[] };
 
 export function isMuscleGroup(value: string): value is MuscleGroup {
   return muscleGroupLabel(value as MuscleGroup) !== null;
@@ -43,131 +42,76 @@ function nonEmptyText(value: string | null | undefined): string | null {
 }
 
 export function normalizeExerciseSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es-AR")
-    .replace(/\s+/g, " ")
-    .trim();
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-AR").replace(/\s+/g, " ").trim();
 }
 
 export function exerciseGroupLabel(exercise: ExerciseIdentityFields): string {
-  return (
-    nonEmptyText(exercise.muscle_group_label) ??
-    muscleGroupLabel(exercise.grupo_muscular) ??
-    "Sin grupo"
-  );
+  return nonEmptyText(exercise.muscle_group_label) ?? muscleGroupLabel(exercise.grupo_muscular) ?? "Sin grupo";
 }
 
 export function exerciseIdentityLabel(exercise: ExerciseIdentityFields): string {
-  return [
-    exerciseGroupLabel(exercise),
-    nonEmptyText(exercise.implement),
-    nonEmptyText(exercise.weight_mode),
-  ].filter((part): part is string => Boolean(part)).join(" · ");
-}
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("es-AR", {
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-export function exerciseSuggestedValuesLabel(exercise: ExerciseLibraryItem): string | null {
-  const values: string[] = [];
-  const series = exercise.series_sugeridas;
-  const reps = exercise.reps_sugeridas;
-
-  if (series !== null && series > 0 && reps !== null && reps > 0) {
-    values.push(`${formatNumber(series)}×${formatNumber(reps)}`);
-  } else if (series !== null && series > 0) {
-    values.push(`${formatNumber(series)} ${series === 1 ? "serie" : "series"}`);
-  } else if (reps !== null && reps > 0) {
-    values.push(`${formatNumber(reps)} reps`);
-  }
-
-  if (exercise.peso_sugerido !== null && exercise.peso_sugerido > 0) {
-    values.push(`${formatNumber(exercise.peso_sugerido)} kg`);
-  }
-
-  if (exercise.rir_sugerido !== null) {
-    values.push(`RIR ${formatNumber(exercise.rir_sugerido)}`);
-  }
-
-  if (
-    exercise.descanso_min_sugerido_segundos !== null &&
-    exercise.descanso_max_sugerido_segundos !== null
-  ) {
-    const minimum = exercise.descanso_min_sugerido_segundos;
-    const maximum = exercise.descanso_max_sugerido_segundos;
-    values.push(minimum === maximum ? `${minimum} s` : `${minimum}–${maximum} s`);
-  }
-
-  return values.length > 0 ? values.join(" · ") : null;
+  return [exerciseGroupLabel(exercise), nonEmptyText(exercise.implement), nonEmptyText(exercise.weight_mode)]
+    .filter((part): part is string => Boolean(part)).join(" · ");
 }
 
 export function exerciseLibrarySummary(exercise: ExerciseLibraryItem): string {
-  return exerciseIdentityLabel(exercise);
+  return [nonEmptyText(exercise.implement), nonEmptyText(exercise.weight_mode)]
+    .filter((part): part is string => Boolean(part)).join(" · ") || "Sin configuración";
 }
 
 function exerciseSearchText(exercise: ExerciseLibraryItem): string {
-  return normalizeExerciseSearch(
-    [
-      exercise.nombre,
-      muscleGroupLabel(exercise.grupo_muscular),
-      exercise.muscle_group_label,
-      exercise.implement,
-      exercise.weight_mode,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(" "),
-  );
+  return normalizeExerciseSearch([exercise.nombre, muscleGroupLabel(exercise.grupo_muscular), exercise.muscle_group_label,
+    exercise.implement, exercise.weight_mode].filter((value): value is string => Boolean(value)).join(" "));
 }
 
-export function sortExerciseLibrary(
-  exercises: readonly ExerciseLibraryItem[],
-): ExerciseLibraryItem[] {
-  return [...exercises].sort((left, right) =>
-    left.nombre.localeCompare(right.nombre, "es-AR"),
-  );
+export function sortExerciseLibrary(exercises: readonly ExerciseLibraryItem[]): ExerciseLibraryItem[] {
+  return [...exercises].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
 }
 
-export function groupExerciseLibrary(
-  exercises: readonly ExerciseLibraryItem[],
-): ExerciseLibrarySection[] {
-  const byGroup = new Map<Exclude<ExerciseLibraryFilter, "all">, ExerciseLibraryItem[]>();
-
+export function groupExerciseLibrary(exercises: readonly ExerciseLibraryItem[]): ExerciseLibrarySection[] {
+  const byGroup = new Map<ExerciseLibraryGroup, ExerciseLibraryItem[]>();
   for (const exercise of exercises) {
     const key = exercise.grupo_muscular ?? "none";
-    const current = byGroup.get(key) ?? [];
-    current.push(exercise);
-    byGroup.set(key, current);
+    byGroup.set(key, [...(byGroup.get(key) ?? []), exercise]);
   }
-
-  const orderedGroups: ReadonlyArray<{
-    value: Exclude<ExerciseLibraryFilter, "all">;
-    label: string;
-  }> = [...MUSCLE_GROUP_OPTIONS, { value: "none", label: "Sin grupo" }];
-
+  const orderedGroups: ReadonlyArray<{ value: ExerciseLibraryGroup; label: string }> = [
+    ...MUSCLE_GROUP_OPTIONS, { value: "none", label: "Sin grupo" },
+  ];
   return orderedGroups.flatMap((group) => {
     const entries = byGroup.get(group.value);
-    return entries
-      ? [{ ...group, exercises: sortExerciseLibrary(entries) }]
-      : [];
+    return entries?.length ? [{ ...group, exercises: sortExerciseLibrary(entries) }] : [];
   });
 }
 
-export function filterExerciseLibrary(
-  exercises: readonly ExerciseLibraryItem[],
-  input: { query: string; group: ExerciseLibraryFilter },
-): ExerciseLibraryItem[] {
+export function filterExerciseLibrary(exercises: readonly ExerciseLibraryItem[], input: { query: string; filters: ExerciseLibraryFilters }): ExerciseLibraryItem[] {
   const query = normalizeExerciseSearch(input.query);
+  const selectedImplements = new Set(input.filters.implements.map(normalizeExerciseSearch));
   return exercises.filter((exercise) => {
-    const groupMatches =
-      input.group === "all" ||
-      (input.group === "none"
-        ? exercise.grupo_muscular === null
-        : exercise.grupo_muscular === input.group);
-    return groupMatches && exerciseSearchText(exercise).includes(query);
+    const statusMatches = input.filters.status === "all" || (input.filters.status === "active" ? exercise.is_active : !exercise.is_active);
+    const routineMatches = input.filters.withoutRoutine ? exercise.memberships.length === 0
+      : input.filters.routineIds.length === 0 || exercise.memberships.some((membership) => input.filters.routineIds.includes(membership.id));
+    const muscleMatches = input.filters.muscleGroups.length === 0 || input.filters.muscleGroups.includes(exercise.grupo_muscular ?? "none");
+    const implementMatches = selectedImplements.size === 0 || selectedImplements.has(normalizeExerciseSearch(exercise.implement ?? ""));
+    return statusMatches && routineMatches && muscleMatches && implementMatches && exerciseSearchText(exercise).includes(query);
   });
+}
+
+export function exerciseLibraryActiveFilterCount(filters: ExerciseLibraryFilters): number {
+  return filters.routineIds.length + Number(filters.withoutRoutine) + filters.muscleGroups.length
+    + filters.implements.length + Number(filters.status !== "active");
+}
+
+export function exerciseLibraryImplementOptions(exercises: readonly ExerciseLibraryItem[]): string[] {
+  const values = new Map<string, string>();
+  for (const exercise of exercises) {
+    const label = nonEmptyText(exercise.implement);
+    if (label) values.set(normalizeExerciseSearch(label), label);
+  }
+  return [...values.values()].sort((left, right) => left.localeCompare(right, "es-AR"));
+}
+
+export function diffRoutineMemberships(currentIds: readonly string[], nextIds: readonly string[]) {
+  const current = new Set(currentIds);
+  const next = new Set(nextIds);
+  return { add: nextIds.filter((id) => !current.has(id)), remove: currentIds.filter((id) => !next.has(id)) };
 }

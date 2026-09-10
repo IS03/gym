@@ -15,6 +15,7 @@ export type ExerciseFormValues = {
   rir_sugerido: string;
   descanso_min_sugerido_segundos: string;
   descanso_max_sugerido_segundos: string;
+  notes: string;
 };
 
 export function emptyForm(): ExerciseFormValues {
@@ -30,6 +31,7 @@ export function emptyForm(): ExerciseFormValues {
     rir_sugerido: "",
     descanso_min_sugerido_segundos: "",
     descanso_max_sugerido_segundos: "",
+    notes: "",
   };
 }
 
@@ -44,11 +46,33 @@ export function formFromExercise(exercise: ExerciseLibraryItem): ExerciseFormVal
     reps_sugeridas: exercise.reps_sugeridas === null ? "" : String(exercise.reps_sugeridas),
     peso_sugerido: exercise.peso_sugerido === null ? "" : String(exercise.peso_sugerido),
     rir_sugerido: exercise.rir_sugerido === null ? "" : String(exercise.rir_sugerido),
-    descanso_min_sugerido_segundos:
-      exercise.descanso_min_sugerido_segundos === null ? "" : String(exercise.descanso_min_sugerido_segundos),
-    descanso_max_sugerido_segundos:
-      exercise.descanso_max_sugerido_segundos === null ? "" : String(exercise.descanso_max_sugerido_segundos),
+    descanso_min_sugerido_segundos: formatRestInput(exercise.descanso_min_sugerido_segundos),
+    descanso_max_sugerido_segundos: formatRestInput(exercise.descanso_max_sugerido_segundos),
+    notes: exercise.notes ?? "",
   };
+}
+
+export function formatRestInput(seconds: number | null): string {
+  if (seconds === null) return "";
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+export function parseRestInput(raw: string, label: string): number | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (/^\d+$/.test(value)) {
+    const minutes = Number(value);
+    if (minutes <= 60) return minutes * 60;
+  }
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value);
+  if (!match) throw new Error(`${label} debe tener formato mm:ss.`);
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2]);
+  if (seconds > 59 || minutes * 60 + seconds > 3600) {
+    throw new Error(`${label} debe estar entre 0:00 y 60:00.`);
+  }
+  return minutes * 60 + seconds;
 }
 
 function numberOrNull(raw: string, label: string): number | null {
@@ -72,13 +96,14 @@ export function mutationFromForm(values: ExerciseFormValues): ExerciseMutationIn
     reps_sugeridas: numberOrNull(values.reps_sugeridas, "Repeticiones sugeridas"),
     peso_sugerido: numberOrNull(values.peso_sugerido, "Peso sugerido"),
     rir_sugerido: numberOrNull(values.rir_sugerido, "RIR sugerido"),
-    descanso_min_sugerido_segundos: numberOrNull(
+    descanso_min_sugerido_segundos: parseRestInput(
       values.descanso_min_sugerido_segundos,
       "Descanso mínimo sugerido",
     ),
-    descanso_max_sugerido_segundos: numberOrNull(
+    descanso_max_sugerido_segundos: parseRestInput(
       values.descanso_max_sugerido_segundos,
       "Descanso máximo sugerido",
     ),
+    notes: values.notes,
   };
 }

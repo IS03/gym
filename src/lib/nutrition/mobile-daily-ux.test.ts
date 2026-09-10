@@ -41,7 +41,7 @@ describe("PR 9.6 — UX diaria mobile", () => {
     const header = library.slice(library.indexOf("<h1"), library.indexOf("<div className=\"flex gap-2\">"));
     expect(header).toContain("onClick={openCreate}");
     expect(header).toContain("Nuevo");
-    expect(library.match(/onClick=\{openCreate\}/g)?.length).toBe(2); // header + estado vacío
+    expect(library.match(/onClick=\{openCreate\}/g)?.length).toBe(1); // CTA única del header
     expect(library).not.toContain('className="h-11 w-full lg:hidden" onClick={openCreate}');
   });
 

@@ -14,6 +14,7 @@ import {
   addExistingExerciseToSession,
   addExerciseToRoutine,
   archiveExercise,
+  restoreExercise,
   createExercise,
   createExerciseFromSession,
   archiveRoutine,
@@ -24,6 +25,7 @@ import {
   removeRoutineExercise,
   replaceRoutineExercises,
   updateExercise,
+  syncExerciseActiveRoutineMemberships,
   updateRoutine,
   updateSessionExercise,
 } from "@/lib/phase2/training";
@@ -93,17 +95,29 @@ function toExerciseActionExercise(exercise: Awaited<ReturnType<typeof createExer
     rir_sugerido: exercise.rir_sugerido,
     descanso_min_sugerido_segundos: exercise.descanso_min_sugerido_segundos,
     descanso_max_sugerido_segundos: exercise.descanso_max_sugerido_segundos,
+    notes: exercise.notes,
+    is_active: exercise.is_active,
     updated_at: exercise.updated_at,
   };
 }
 
 export async function createExerciseAction(
   input: ExerciseMutationInput,
+  routineIds: string[] = [],
 ): Promise<ExerciseActionResult<ExerciseActionExercise>> {
   try {
-    const exercise = await createExercise(normalizeExerciseMutation(input));
+    const normalized = normalizeExerciseMutation(input);
+    const exercise = await createExercise(normalized);
+    let warning: string | undefined;
+    if (routineIds.length) {
+      try {
+        await syncExerciseActiveRoutineMemberships({ exerciseId: exercise.id, routineIds });
+      } catch {
+        warning = "Ejercicio creado. No pudo agregarse a la rutina; podés reintentarlo al editarlo.";
+      }
+    }
     revalidatePath("/train/exercises");
-    return { ok: true, data: toExerciseActionExercise(exercise) };
+    return { ok: true, data: toExerciseActionExercise(exercise), warning };
   } catch (error) {
     return {
       ok: false,
@@ -115,6 +129,7 @@ export async function createExerciseAction(
 export async function updateExerciseAction(
   id: string,
   input: ExerciseMutationInput,
+  routineIds?: string[],
 ): Promise<ExerciseActionResult<ExerciseActionExercise>> {
   try {
     if (!id.trim()) throw new Error("Falta el ejercicio a editar.");
@@ -122,6 +137,9 @@ export async function updateExerciseAction(
       id,
       ...normalizeExerciseMutation(input),
     });
+    if (routineIds) {
+      await syncExerciseActiveRoutineMemberships({ exerciseId: id, routineIds });
+    }
     revalidatePath("/train/exercises");
     return { ok: true, data: toExerciseActionExercise(exercise) };
   } catch (error) {
@@ -145,6 +163,19 @@ export async function archiveExerciseAction(
       ok: false,
       error: error instanceof Error ? error.message : "No se pudo archivar el ejercicio.",
     };
+  }
+}
+
+export async function restoreExerciseAction(
+  id: string,
+): Promise<ExerciseActionResult<ExerciseActionExercise>> {
+  try {
+    if (!id.trim()) throw new Error("Falta el ejercicio a restaurar.");
+    const exercise = await restoreExercise(id);
+    revalidatePath("/train/exercises");
+    return { ok: true, data: toExerciseActionExercise(exercise) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "No se pudo restaurar el ejercicio." };
   }
 }
 

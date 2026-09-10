@@ -52,9 +52,9 @@ describe("PR76 — Entrenar y organización V2", () => {
     expect(routines).not.toContain("/train/session/new?routine_id=");
   });
 
-  it("mantiene Biblioteca como colección descriptiva agrupada con búsqueda y filtro muscular", () => {
-    expect(library).toContain('placeholder="Buscar ejercicio"');
-    expect(library).toContain("GROUP_FILTER_OPTIONS");
+  it("mantiene Biblioteca como catálogo descriptivo agrupado con búsqueda y filtros", () => {
+    expect(library).toContain('placeholder="Buscar ejercicio, músculo o implemento"');
+    expect(library).toContain("GROUP_OPTIONS");
     expect(library).toContain("groupExerciseLibrary(visibleExercises)");
     expect(library).toContain("divide-y divide-border/70");
     expect(library).toContain("exerciseLibrarySummary(exercise)");

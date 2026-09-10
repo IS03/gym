@@ -13,15 +13,17 @@ export type ExerciseMutationInput = {
   rir_sugerido: number | null;
   descanso_min_sugerido_segundos: number | null;
   descanso_max_sugerido_segundos: number | null;
+  notes: string | null;
 };
 
 export type ExerciseActionExercise = ExerciseMutationInput & {
   id: string;
+  is_active: boolean;
   updated_at: string;
 };
 
 export type ExerciseActionResult<T = undefined> =
-  | { ok: true; data: T }
+  | { ok: true; data: T; warning?: string }
   | { ok: false; error: string };
 
 export const EXERCISE_IMPLEMENT_SUGGESTIONS = [
@@ -31,6 +33,9 @@ export const EXERCISE_IMPLEMENT_SUGGESTIONS = [
   "Polea con barra",
   "Barra",
   "Peso corporal",
+  "Smith",
+  "Banda",
+  "Otro",
 ] as const;
 
 export const EXERCISE_WEIGHT_MODE_SUGGESTIONS = [
@@ -108,12 +113,6 @@ export function normalizeExerciseMutation(input: unknown): ExerciseMutationInput
     3600,
   );
   if (
-    (descanso_min_sugerido_segundos === null) !==
-    (descanso_max_sugerido_segundos === null)
-  ) {
-    throw new Error("Completá ambos descansos sugeridos o dejalos vacíos.");
-  }
-  if (
     descanso_min_sugerido_segundos !== null &&
     descanso_max_sugerido_segundos !== null &&
     descanso_min_sugerido_segundos > descanso_max_sugerido_segundos
@@ -130,13 +129,17 @@ export function normalizeExerciseMutation(input: unknown): ExerciseMutationInput
     ),
     implement: optionalTextFromExerciseInput(values?.implement, "Implemento"),
     weight_mode: optionalTextFromExerciseInput(values?.weight_mode, "Registro de carga"),
-    series_sugeridas: numberFromExerciseInput(
+    series_sugeridas: integerInRangeFromExerciseInput(
       values?.series_sugeridas,
       "Series sugeridas",
+      0,
+      100,
     ),
-    reps_sugeridas: numberFromExerciseInput(
+    reps_sugeridas: integerInRangeFromExerciseInput(
       values?.reps_sugeridas,
       "Repeticiones sugeridas",
+      0,
+      1000,
     ),
     peso_sugerido: numberFromExerciseInput(
       values?.peso_sugerido,
@@ -145,5 +148,6 @@ export function normalizeExerciseMutation(input: unknown): ExerciseMutationInput
     rir_sugerido,
     descanso_min_sugerido_segundos,
     descanso_max_sugerido_segundos,
+    notes: optionalTextFromExerciseInput(values?.notes, "Notas", 1000),
   };
 }

@@ -50,14 +50,16 @@ describe("PR 7.1 — defaults y UX de entrenamiento", () => {
   });
 
   it("biblioteca expone los seis valores sugeridos", () => {
-    for (const label of [
-      "Series sugeridas",
-      "Repeticiones sugeridas",
-      "Peso sugerido en kg",
-      "RIR sugerido",
-      "Descanso mínimo sugerido en segundos",
-      "Descanso máximo sugerido en segundos",
-    ]) expect(library).toContain(label);
+    for (const field of [
+      "series_sugeridas",
+      "reps_sugeridas",
+      "peso_sugerido",
+      "rir_sugerido",
+      "descanso_min_sugerido_segundos",
+      "descanso_max_sugerido_segundos",
+    ]) expect(library).toContain(field);
+    expect(library).toContain("Descanso mínimo en minutos y segundos");
+    expect(library).toContain("Descanso máximo en minutos y segundos");
   });
 
   it("el selector de sesión tiene header fijo y contenido vertical desplazable", () => {
