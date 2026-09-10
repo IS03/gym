@@ -3,6 +3,7 @@ import "server-only";
 import { requireAuthenticatedRequestContext, type AuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
   METRIC_VALUE_TYPES,
+  buildHistoricalDailyMetrics,
   normalizeMetricName,
   normalizeMetricUnit,
   parseDailyMetricValue,
@@ -76,6 +77,36 @@ export async function getActiveDailyMetrics(
     ...metricFromRow(row, new Set()),
     value: byMetric.get(String(row.id)) ?? null,
   }));
+}
+
+export type HistoricalDailyMetrics = {
+  recorded: DailyMetricWithValue[];
+  editable: DailyMetricWithValue[];
+};
+
+/**
+ * History reads every definition once so archived metrics keep their recorded
+ * values. Active metrics without a value are only exposed to the editor.
+ */
+export async function getHistoricalDailyMetrics(
+  date: string,
+  auth?: AuthenticatedRequestContext,
+): Promise<HistoricalDailyMetrics> {
+  if (!ISO_DATE.test(date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
+  const { supabase, userId } = await context(auth);
+  const [metrics, values] = await Promise.all([
+    supabase.from("user_metrics").select("*").eq("user_id", userId)
+      .order("is_active", { ascending: false }).order("sort_order").order("created_at"),
+    supabase.from("daily_metric_values").select("metric_id,value")
+      .eq("user_id", userId).eq("metric_date", date),
+  ]);
+  if (metrics.error) throw new Error(`Leer definiciones de métricas: ${metrics.error.message}`);
+  if (values.error) throw new Error(`Leer métricas del día: ${values.error.message}`);
+
+  return buildHistoricalDailyMetrics(
+    (metrics.data ?? []).map((row) => metricFromRow(row, new Set())),
+    (values.data ?? []).map((row) => ({ metric_id: String(row.metric_id), value: asNumber(row.value) })),
+  );
 }
 
 export async function createMetric(input: {
@@ -205,16 +236,44 @@ export async function saveDailyMetricValues(input: {
   date: string;
   values: Record<string, unknown>;
 }): Promise<void> {
+  return saveDailyMetricValuesInternal(input, false);
+}
+
+/** History can correct an archived metric only when that date already has a row. */
+export async function saveHistoricalDailyMetricValues(input: {
+  date: string;
+  values: Record<string, unknown>;
+}): Promise<void> {
+  return saveDailyMetricValuesInternal(input, true);
+}
+
+async function saveDailyMetricValuesInternal(input: {
+  date: string;
+  values: Record<string, unknown>;
+}, historical: boolean): Promise<void> {
   const { supabase, userId } = await context();
   if (!ISO_DATE.test(input.date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
   const metricIds = Object.keys(input.values);
   if (!metricIds.length) return;
 
-  const metrics = await supabase.from("user_metrics").select("id,value_type")
-    .eq("user_id", userId).eq("is_active", true).in("id", metricIds);
-  if (metrics.error) throw new Error(`Leer métricas activas: ${metrics.error.message}`);
+  const metricsQuery = supabase.from("user_metrics").select("id,value_type,is_active")
+    .eq("user_id", userId).in("id", metricIds);
+  const [metrics, existing] = await Promise.all([
+    historical ? metricsQuery : metricsQuery.eq("is_active", true),
+    historical
+      ? supabase.from("daily_metric_values").select("metric_id")
+        .eq("user_id", userId).eq("metric_date", input.date).in("metric_id", metricIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (metrics.error) throw new Error(`Leer métricas disponibles: ${metrics.error.message}`);
+  if (existing.error) throw new Error(`Leer valores históricos: ${existing.error.message}`);
   if ((metrics.data ?? []).length !== new Set(metricIds).size) {
     throw new Error("Una métrica ya no está activa o disponible.");
+  }
+  if (historical) {
+    const existingIds = new Set((existing.data ?? []).map((row) => String(row.metric_id)));
+    const invalidArchived = (metrics.data ?? []).some((metric) => !metric.is_active && !existingIds.has(String(metric.id)));
+    if (invalidArchived) throw new Error("Una métrica archivada sólo puede corregirse si ya tenía un valor ese día.");
   }
 
   const parsed = (metrics.data ?? []).map((metric) => ({

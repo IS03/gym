@@ -24,7 +24,8 @@ const goalSettings = source("src/app/(app)/settings/nutrition/goals/page.tsx");
 const foodsPage = source("src/app/(app)/settings/nutrition/foods/page.tsx");
 const integrationsPage = source("src/app/(app)/settings/nutrition/integrations/page.tsx");
 const history = source("src/app/(app)/history/page.tsx");
-const historicalActivityEditor = source("src/app/(app)/history/historical-activity-editor.tsx");
+const historicalMetricsEditor = source("src/app/(app)/history/historical-metrics-editor.tsx");
+const historicalMetricsActions = source("src/app/(app)/history/historical-metrics-actions.ts");
 const nutritionActions = source("src/app/(app)/today/nutrition-actions.ts");
 const foods = source("src/app/(app)/settings/nutrition/foods-catalog.tsx");
 const body = source("src/components/body/body-measurements.tsx");
@@ -148,25 +149,24 @@ describe("PR 7 — experiencia nutricional", () => {
     expect(history).toContain("Resumen diario histórico");
     expect(history).toContain("Sin desglose de comidas disponible");
     expect(history).toContain("Horario no informado");
-    expect(history).toContain("Eventos / permitidos");
-    expect(history).toContain("sólo contexto");
+    expect(history).toContain("Eventos / contexto");
   });
 
-  it("permite corregir sólo actividad histórica con el day log indicado", () => {
+  it("corrige métricas históricas por metric_id sin restaurar el editor legacy", () => {
     expect(parseOptionalNumber("9350", "Pasos", { integer: true, min: 0 })).toBe(9350);
     expect(parseOptionalNumber("2,5", "Agua", { min: 0 })).toBe(2.5);
     expect(parseOptionalNumber("0.5", "Mate", { min: 0 })).toBe(0.5);
     expect(parseOptionalNumber("", "Agua", { min: 0 })).toBeNull();
     expect(() => parseOptionalNumber("1.5", "Pasos", { integer: true, min: 0 })).toThrow("entero");
     expect(() => parseOptionalNumber("-1", "Mate", { min: 0 })).toThrow("al menos 0");
-    expect(product).toContain('.eq("id", input.dayLogId).eq("user_id", userId)');
-    expect(history).toContain("<HistoricalActivityEditor dayLogId={dayLog.id}");
-    expect(historicalActivityEditor).toContain("saveDailyActivityAction({ dayLogId, steps, waterL: water, mateL: mate })");
-    expect(historicalActivityEditor).toContain("if (!result.ok)");
-    expect(historicalActivityEditor).toContain("setOpen(false)");
-    expect(historicalActivityEditor).not.toContain("saveWorkOverrideAction");
-    expect(historicalActivityEditor).not.toContain("saveGymOverrideAction");
-    expect(historicalActivityEditor).not.toContain("saveExpenditureOverrideAction");
+    expect(history).toContain("<HistoricalMetricsEditor date={requestedDate} metrics={metrics.editable}");
+    expect(historicalMetricsEditor).toContain("saveHistoricalDailyMetricsAction({ date, values })");
+    expect(historicalMetricsEditor).toContain("if (!result.ok)");
+    expect(historicalMetricsEditor).toContain("setOpen(false)");
+    expect(historicalMetricsEditor).not.toContain("saveDailyActivityAction");
+    expect(historicalMetricsEditor).not.toContain("Trabajo");
+    expect(historicalMetricsEditor).not.toContain("Gym");
+    expect(historicalMetricsActions).toContain('revalidatePath("/calendar")');
     expect(nutritionActions).toContain('revalidatePath("/today/reports")');
   });
 

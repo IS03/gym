@@ -26,6 +26,26 @@ export type DailyMetricWithValue = UserMetric & {
   value: number | null;
 };
 
+export type DailyMetricValueFact = {
+  metric_id: string;
+  value: number | null;
+};
+
+export function buildHistoricalDailyMetrics(
+  metrics: UserMetric[],
+  values: DailyMetricValueFact[],
+) {
+  const valueByMetric = new Map(values.map((row) => [row.metric_id, row.value]));
+  const merged = metrics.map((metric) => ({
+    ...metric,
+    value: valueByMetric.get(metric.id) ?? null,
+  }));
+  return {
+    recorded: merged.filter((metric) => metric.value !== null),
+    editable: merged.filter((metric) => metric.is_active || metric.value !== null),
+  };
+}
+
 export const SYSTEM_METRIC_DEFAULTS = [
   { systemKey: "steps", name: "Pasos", unit: "pasos", valueType: "integer", target: 10_000, sortOrder: 0 },
   { systemKey: "water", name: "Agua", unit: "L", valueType: "decimal", target: 2.5, sortOrder: 1 },
