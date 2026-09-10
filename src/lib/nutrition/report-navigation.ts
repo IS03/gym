@@ -12,8 +12,12 @@ export function nutritionReportPath(input: {
   end: string;
   comparison?: NutritionReportComparisonMode;
   basePath?: string;
+  query?: Record<string, string | undefined>;
 }) {
   const params = new URLSearchParams({ period: input.preset });
+  for (const [key, value] of Object.entries(input.query ?? {})) {
+    if (value) params.set(key, value);
+  }
   if (input.preset === "custom") {
     params.set("from", input.start);
     params.set("to", input.end);
@@ -22,10 +26,10 @@ export function nutritionReportPath(input: {
   return `${input.basePath ?? "/today/reports"}?${params.toString()}`;
 }
 
-export function nutritionReportCurrentPath(range: NutritionReportRange) {
-  return nutritionReportPath({ ...range, comparison: null });
+export function nutritionReportCurrentPath(range: NutritionReportRange, input: { basePath?: string; query?: Record<string, string | undefined> } = {}) {
+  return nutritionReportPath({ ...range, ...input, comparison: null });
 }
 
-export function nutritionReportPreviousPath(range: NutritionReportRange) {
-  return nutritionReportPath({ ...range, comparison: "previous" });
+export function nutritionReportPreviousPath(range: NutritionReportRange, input: { basePath?: string; query?: Record<string, string | undefined> } = {}) {
+  return nutritionReportPath({ ...range, ...input, comparison: "previous" });
 }

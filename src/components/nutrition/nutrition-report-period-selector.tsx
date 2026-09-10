@@ -11,10 +11,11 @@ import { nutritionReportPath, type NutritionReportComparisonMode } from "@/lib/n
 import { NUTRITION_REPORT_MAX_DAYS, type NutritionReportPreset } from "@/lib/nutrition/reports-core";
 
 const presets: Array<{ period: Exclude<NutritionReportPreset, "custom">; label: string }> = [
-  { period: "7", label: "7 días" },
-  { period: "15", label: "15 días" },
-  { period: "30", label: "30 días" },
+  { period: "7", label: "Semana" },
+  { period: "14", label: "2 semanas" },
+  { period: "30", label: "Mes" },
   { period: "3m", label: "3 meses" },
+  { period: "6m", label: "6 meses" },
   { period: "1y", label: "1 año" },
 ];
 
@@ -26,9 +27,10 @@ type Props = {
   rangeLabel: string;
   basePath?: string;
   comparison?: NutritionReportComparisonMode;
+  query?: Record<string, string | undefined>;
 };
 
-export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel, basePath = "/today/reports", comparison = null }: Props) {
+export function NutritionReportPeriodSelector({ preset, start, end, today, rangeLabel, basePath = "/today/reports", comparison = null, query }: Props) {
   const [customOpen, setCustomOpen] = useState(false);
   const [customRange, setCustomRange] = useState<DateRangeValue>({ start, end });
   const [isPending, startTransition] = useTransition();
@@ -48,6 +50,7 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
       end: customRange.end,
       comparison,
       basePath,
+      query,
     }));
   }
 
@@ -70,6 +73,7 @@ export function NutritionReportPeriodSelector({ preset, start, end, today, range
               end,
               comparison,
               basePath,
+              query,
             }))}
           >
             {option.label}

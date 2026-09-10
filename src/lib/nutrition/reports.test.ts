@@ -41,6 +41,9 @@ function day(
     work_effective_snapshot: true,
     gym_effective_snapshot: false,
     gym_source_snapshot: "none",
+    nutrition_goal_period_id: null,
+    nutrition_plan_period_id: null,
+    goal_type_snapshot: null,
     ...overrides,
   };
 }
@@ -72,7 +75,7 @@ function workout(
 describe("nutrition report ranges", () => {
   it.each([
     ["7", "2026-08-14"],
-    ["15", "2026-08-06"],
+    ["14", "2026-08-07"],
     ["30", "2026-07-22"],
   ])("resuelve %s días con extremos inclusivos", (period, start) => {
     expect(resolveNutritionReportRange({ period }, today)).toEqual({
@@ -83,17 +86,19 @@ describe("nutrition report ranges", () => {
     });
   });
 
-  it("resuelve ventanas de calendario de tres meses y un año", () => {
+  it("resuelve ventanas de calendario de tres, seis y doce meses", () => {
     expect(resolveNutritionReportRange({ period: "3m" }, "2026-08-21")).toMatchObject({ preset: "3m", start: "2026-05-22", end: "2026-08-21" });
+    expect(resolveNutritionReportRange({ period: "6m" }, "2026-08-21")).toMatchObject({ preset: "6m", start: "2026-02-22", end: "2026-08-21" });
     expect(resolveNutritionReportRange({ period: "1y" }, "2026-08-21")).toMatchObject({ preset: "1y", start: "2025-08-22", end: "2026-08-21" });
   });
 
   it("mantiene los extremos inclusivos pedidos para los seis presets", () => {
     const exampleToday = "2026-08-21";
     expect(resolveNutritionReportRange({ period: "7" }, exampleToday)).toMatchObject({ start: "2026-08-15", end: exampleToday });
-    expect(resolveNutritionReportRange({ period: "15" }, exampleToday)).toMatchObject({ start: "2026-08-07", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "14" }, exampleToday)).toMatchObject({ start: "2026-08-08", end: exampleToday });
     expect(resolveNutritionReportRange({ period: "30" }, exampleToday)).toMatchObject({ start: "2026-07-23", end: exampleToday });
     expect(resolveNutritionReportRange({ period: "3m" }, exampleToday)).toMatchObject({ start: "2026-05-22", end: exampleToday });
+    expect(resolveNutritionReportRange({ period: "6m" }, exampleToday)).toMatchObject({ start: "2026-02-22", end: exampleToday });
     expect(resolveNutritionReportRange({ period: "1y" }, exampleToday)).toMatchObject({ start: "2025-08-22", end: exampleToday });
   });
 
@@ -115,7 +120,7 @@ describe("nutrition report ranges", () => {
   });
 
   it("vuelve de forma segura a siete días ante presets inválidos", () => {
-    expect(resolveNutritionReportRange({ period: "14" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
+    expect(resolveNutritionReportRange({ period: "15" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
     expect(resolveNutritionReportRange({ period: "month" }, today)).toMatchObject({ preset: "7", start: "2026-08-14", end: today });
   });
 
@@ -269,6 +274,38 @@ describe("nutrition report aggregation", () => {
     expect(summary.calories.averageTargetDeviation).toBe(100);
     expect(summary.calories.aboveTargetDays).toBe(1);
     expect(summary.energy.accumulatedBalance).toBe(-300);
+    expect(summary.energy.averageBalance).toBe(-300);
+    expect(summary.energy).toMatchObject({ deficitDays: 1, neutralDays: 0, surplusDays: 0 });
+  });
+
+  it("conserva snapshots y etapas versionadas sin reinterpretar la historia", () => {
+    const days = buildNutritionReportDays({
+      range: { start: "2026-08-18", end: "2026-08-19" },
+      today,
+      dayLogs: [
+        day("2026-08-18", {
+          nutrition_plan_period_id: "plan-deficit",
+          nutrition_target_kcal_snapshot: 1_700,
+          estimated_expenditure_kcal_snapshot: 2_200,
+          delta_vs_nutrition_target: 100,
+          energy_balance_kcal: -400,
+        }),
+        day("2026-08-19", {
+          nutrition_plan_period_id: "plan-volume",
+          nutrition_target_kcal_snapshot: 2_400,
+          estimated_expenditure_kcal_snapshot: 2_300,
+          delta_vs_nutrition_target: -600,
+          energy_balance_kcal: -500,
+        }),
+      ],
+      meals: [meal("2026-08-18"), meal("2026-08-19")],
+      workouts: [],
+      goalNames: new Map([["plan-deficit", "Déficit"], ["plan-volume", "Volumen controlado"]]),
+    });
+
+    expect(days.map((item) => item.targetCalories)).toEqual([2_400, 1_700]);
+    expect(days.map((item) => item.expenditureKcal)).toEqual([2_300, 2_200]);
+    expect(aggregateNutritionReport(days).goalStages).toEqual(["Volumen controlado", "Déficit"]);
   });
 
   it("cuenta entrenamiento efectivo sólo desde sesiones completed", () => {
@@ -311,7 +348,7 @@ describe("nutrition report temporal comparison", () => {
     };
   }
 
-  it("compara promedios con promedios, totales con totales y mantiene agua separada de mate", () => {
+  it("compara únicamente cada variable nutricional contra sí misma", () => {
     const currentRange = { start: "2026-09-01", end: "2026-09-07" };
     const previousRange = previousNutritionReportRange(currentRange);
     const current = periodFacts(currentRange.start, currentRange.end, 2_000, -100);
@@ -323,9 +360,7 @@ describe("nutrition report temporal comparison", () => {
 
     expect(rows.get("calories")).toMatchObject({ aggregation: "average", current: 2_000, previous: 1_800, delta: 200 });
     expect(rows.get("energyBalance")).toMatchObject({ aggregation: "total", current: -600, previous: -1_200, delta: 600 });
-    expect(rows.get("water")).toMatchObject({ current: 2, previous: 2 });
-    expect(rows.get("mate")).toMatchObject({ current: 0.75, previous: 0.75 });
-    expect(rows.get("workouts")).toMatchObject({ current: 1, previous: 0, delta: 1 });
+    expect([...rows.keys()]).toEqual(["calories", "targetCalories", "energyBalance", "expenditure", "protein", "carbs", "fat"]);
   });
 
   it("compara un período en curso sólo contra las mismas posiciones finalizadas del anterior", () => {
@@ -352,8 +387,8 @@ describe("nutrition report temporal comparison", () => {
     const previousDays = buildNutritionReportDays({ range: previousRange, today, dayLogs: [], meals: [], workouts: [] });
     const comparison = buildNutritionReportComparison({ currentRange, previousRange, currentDays, previousDays });
     const calories = comparison.rows.find((row) => row.metric === "calories");
-    const water = comparison.rows.find((row) => row.metric === "water");
+    const expenditure = comparison.rows.find((row) => row.metric === "expenditure");
     expect(calories).toMatchObject({ current: null, previous: null, delta: null });
-    expect(water).toMatchObject({ current: null, previous: null, delta: null });
+    expect(expenditure).toMatchObject({ current: null, previous: null, delta: null });
   });
 });

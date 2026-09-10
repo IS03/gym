@@ -103,7 +103,7 @@ export default async function NutritionReportsPage({
         <CardContent className="space-y-4 p-3 sm:p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:divide-x">
             <SummaryStat label="Calorías promedio" value={formatValue(summary.calories.averageConsumed, "kcal", true)} detail={`Objetivo: ${formatValue(summary.calories.averageTarget, "kcal", true)}`} className="sm:pr-3" />
-            <SummaryStat label="Balance acumulado" value={energyBalanceLabel(summary.energy.accumulatedBalance)} detail={`Gasto promedio: ${formatValue(summary.energy.averageExpenditure, "kcal", true)}`} className="sm:px-3" />
+            <SummaryStat label="Balance acumulado" value={energyBalanceLabel(summary.energy.accumulatedBalance)} detail={`${summary.energy.comparableDays} días comparables`} className="sm:px-3" />
             <SummaryStat label="Proteína promedio" value={formatValue(summary.protein.averageConsumed, "g")} detail={`Objetivo: ${formatValue(summary.protein.averageTarget, "g")} · ${summary.protein.hitDays}/${summary.protein.comparableDays} días`} className="sm:pl-3" />
           </div>
           <div className="flex flex-wrap gap-1.5 border-t pt-3 text-xs">
@@ -112,15 +112,19 @@ export default async function NutritionReportsPage({
             <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">Sobre {summary.calories.aboveTargetDays}</span>
             <span className="px-1 py-1 text-muted-foreground">{targetDeviationLabel(summary.calories.averageTargetDeviation)}</span>
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-4 lg:grid-cols-6">
-            <SummaryStat label="Agua" value={formatValue(summary.hydration.averageWaterL, "L")} detail={`${summary.hydration.hitDays}/${summary.hydration.comparableDays} con meta`} />
-            <SummaryStat label="Pasos" value={formatValue(summary.activity.averageSteps, "pasos", true)} detail={`${summary.activity.stepDays} días con dato`} />
-            <SummaryStat label="Entrenamientos" value={integerFormatter.format(summary.activity.completedWorkoutDays)} detail="sesiones terminadas" />
-            <SummaryStat label="Trabajo" value={integerFormatter.format(summary.activity.workedDays)} detail="días trabajados" />
+          <div className="flex flex-wrap gap-1.5 border-t pt-3 text-xs">
+            <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">Déficit {summary.energy.deficitDays}</span>
+            <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">Neutro {summary.energy.neutralDays}</span>
+            <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-300">Superávit {summary.energy.surplusDays}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t pt-3 sm:grid-cols-4">
             <SummaryStat label="Carbos" value={formatValue(summary.carbs.averageConsumed, "g")} detail="promedio" />
             <SummaryStat label="Grasas" value={formatValue(summary.fat.averageConsumed, "g")} detail="promedio" />
+            <SummaryStat label="Gasto estimado" value={formatValue(summary.energy.averageExpenditure, "kcal", true)} detail="promedio" />
+            <SummaryStat label="Balance promedio" value={energyBalanceLabel(summary.energy.averageBalance)} detail="consumo − gasto" />
           </div>
-          <p className="text-xs text-muted-foreground">Balance = consumo − gasto. No es la desviación contra el objetivo. El mate se mantiene separado del agua.</p>
+          {summary.goalStages.length ? <p className="border-t pt-3 text-xs text-muted-foreground">Etapa{summary.goalStages.length === 1 ? "" : "s"} del período: <span className="font-medium text-foreground">{summary.goalStages.join(" · ")}</span></p> : null}
+          <p className="text-xs text-muted-foreground">Balance = consumo − gasto. No es la desviación contra el objetivo.</p>
         </CardContent>
       </Card>
     </section>

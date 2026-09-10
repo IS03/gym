@@ -50,6 +50,8 @@ describe("PR72 — núcleo de métricas diarias", () => {
     expect(formatDailyMetricProgress(0, metric)).toBe("0 km / 10 km");
     expect(formatDailyMetricProgress(null, metric)).toBe("— / 10 km");
     expect(formatDailyMetricProgress(1, { ...metric, target_value: null })).toBe("1 km");
+    expect(formatDailyMetricValue(8071, { value_type: "integer", unit: "pasos" })).toBe("8.071 pasos");
+    expect(formatDailyMetricValue(2.35, { value_type: "decimal", unit: "L" })).toBe("2,35 L");
   });
 
   it("valida nombre, unidad y objetivo sin imponer un objetivo", () => {

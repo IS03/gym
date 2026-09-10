@@ -2,7 +2,7 @@ import type { MealEntryKind } from "@/lib/phase1/types";
 
 export const NUTRITION_REPORT_MAX_DAYS = 366;
 
-export type NutritionReportPreset = "7" | "15" | "30" | "3m" | "1y" | "custom";
+export type NutritionReportPreset = "7" | "14" | "30" | "3m" | "6m" | "1y" | "custom";
 
 export type NutritionReportRange = {
   preset: NutritionReportPreset;
@@ -81,6 +81,9 @@ export type NutritionReportDayLogFact = {
   work_effective_snapshot: boolean | null;
   gym_effective_snapshot: boolean | null;
   gym_source_snapshot: string | null;
+  nutrition_goal_period_id: string | null;
+  nutrition_plan_period_id: string | null;
+  goal_type_snapshot: string | null;
 };
 
 export type NutritionReportDay = {
@@ -106,6 +109,7 @@ export type NutritionReportDay = {
   gymEffective: boolean;
   gymSource: string | null;
   hasCompletedWorkout: boolean;
+  goalStage: string | null;
   isToday: boolean;
   isComplete: boolean;
 };
@@ -126,6 +130,10 @@ export type NutritionReportSummary = {
   energy: {
     averageExpenditure: number | null;
     accumulatedBalance: number | null;
+    averageBalance: number | null;
+    deficitDays: number;
+    neutralDays: number;
+    surplusDays: number;
     comparableDays: number;
   };
   protein: {
@@ -150,6 +158,7 @@ export type NutritionReportSummary = {
     completedWorkoutDays: number;
     workedDays: number;
   };
+  goalStages: string[];
 };
 
 function validIsoDate(value: string | undefined): value is string {
@@ -207,7 +216,7 @@ export function resolveNutritionReportRange(
   if (!validIsoDate(today)) throw new Error("Fecha lógica de Córdoba inválida.");
   const period = input.period ?? "7";
 
-  if (period === "7" || period === "15" || period === "30") {
+  if (period === "7" || period === "14" || period === "30") {
     return {
       preset: period,
       start: addIsoDays(today, -(Number(period) - 1)),
@@ -216,8 +225,8 @@ export function resolveNutritionReportRange(
     };
   }
 
-  if (period === "3m" || period === "1y") {
-    const months = period === "3m" ? 3 : 12;
+  if (period === "3m" || period === "6m" || period === "1y") {
+    const months = period === "3m" ? 3 : period === "6m" ? 6 : 12;
     return {
       preset: period,
       start: addIsoDays(subtractCalendarMonthsClamped(today, months), 1),
@@ -303,6 +312,7 @@ export function buildNutritionReportDays(input: {
   dayLogs: NutritionReportDayLogFact[];
   meals: NutritionReportMealFact[];
   workouts: NutritionReportWorkoutFact[];
+  goalNames?: Map<string, string>;
 }): NutritionReportDay[] {
   const logs = new Map(input.dayLogs.map((day) => [day.log_date, day]));
   const coverage = nutritionMealCoverage(input.meals);
@@ -341,6 +351,16 @@ export function buildNutritionReportDays(input: {
       gymEffective: day?.gym_effective_snapshot ?? false,
       gymSource: day?.gym_source_snapshot ?? null,
       hasCompletedWorkout: day ? completedWorkouts.has(day.id) : false,
+      goalStage: day
+        ? input.goalNames?.get(day.nutrition_plan_period_id ?? day.nutrition_goal_period_id ?? "")
+          ?? (day.goal_type_snapshot === "lose"
+            ? "Déficit"
+            : day.goal_type_snapshot === "maintain"
+              ? "Mantenimiento"
+              : day.goal_type_snapshot === "gain"
+                ? "Volumen"
+                : null)
+        : null,
       isToday: date === input.today,
       isComplete: date < input.today,
     };
@@ -383,6 +403,10 @@ export function aggregateNutritionReport(days: NutritionReportDay[]): NutritionR
       accumulatedBalance: balanceDays.length === 0
         ? null
         : balanceDays.reduce((sum, day) => sum + (day.energyBalanceKcal ?? 0), 0),
+      averageBalance: average(balanceDays.map((day) => day.energyBalanceKcal)),
+      deficitDays: balanceDays.filter((day) => (day.energyBalanceKcal ?? 0) < 0).length,
+      neutralDays: balanceDays.filter((day) => day.energyBalanceKcal === 0).length,
+      surplusDays: balanceDays.filter((day) => (day.energyBalanceKcal ?? 0) > 0).length,
       comparableDays: balanceDays.length,
     },
     protein: {
@@ -413,6 +437,7 @@ export function aggregateNutritionReport(days: NutritionReportDay[]): NutritionR
       completedWorkoutDays: days.filter((day) => day.hasCompletedWorkout).length,
       workedDays: days.filter((day) => day.workEffective === true).length,
     },
+    goalStages: [...new Set(completed.map((day) => day.goalStage).filter((value): value is string => value !== null))],
   };
 }
 
@@ -471,10 +496,6 @@ export function buildNutritionReportComparison(input: {
     comparisonRow("protein", "Proteína", "average", "g", currentSummary.protein.averageConsumed, previousSummary.protein.averageConsumed),
     comparisonRow("carbs", "Carbos", "average", "g", currentSummary.carbs.averageConsumed, previousSummary.carbs.averageConsumed),
     comparisonRow("fat", "Grasas", "average", "g", currentSummary.fat.averageConsumed, previousSummary.fat.averageConsumed),
-    comparisonRow("water", "Agua", "average", "L", currentSummary.hydration.averageWaterL, previousSummary.hydration.averageWaterL),
-    comparisonRow("mate", "Mate", "average", "L", currentSummary.hydration.averageMateL, previousSummary.hydration.averageMateL),
-    comparisonRow("steps", "Pasos", "average", "pasos", currentSummary.activity.averageSteps, previousSummary.activity.averageSteps),
-    comparisonRow("workouts", "Entrenamientos", "total", "entrenamientos", currentSummary.activity.completedWorkoutDays, previousSummary.activity.completedWorkoutDays),
   ];
 
   return {

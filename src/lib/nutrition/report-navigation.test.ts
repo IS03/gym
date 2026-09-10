@@ -18,7 +18,8 @@ describe("nutrition report comparison navigation", () => {
     const custom = { preset: "custom" as const, start: "2026-08-20", end: "2026-09-07", error: null };
     expect(nutritionReportPreviousPath(custom)).toBe("/today/reports?period=custom&from=2026-08-20&to=2026-09-07&compare=previous");
     expect(nutritionReportCurrentPath(custom)).toBe("/today/reports?period=custom&from=2026-08-20&to=2026-09-07");
-    expect(nutritionReportPath({ preset: "15", start: "2026-08-24", end: "2026-09-07", comparison: "previous" })).toBe("/today/reports?period=15&compare=previous");
+    expect(nutritionReportPath({ preset: "14", start: "2026-08-25", end: "2026-09-07", comparison: "previous" })).toBe("/today/reports?period=14&compare=previous");
+    expect(nutritionReportPath({ preset: "14", start: "2026-08-25", end: "2026-09-07", basePath: "/progress/metrics", query: { metric: "metric-1" } })).toBe("/progress/metrics?period=14&metric=metric-1");
   });
 
   it("sigue permitiendo reutilizar el selector sin comparación en Pasos", () => {
