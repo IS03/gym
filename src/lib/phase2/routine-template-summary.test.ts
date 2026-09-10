@@ -20,23 +20,23 @@ function summary(
 describe("resumen compacto de objetivos de rutina", () => {
   it("resume sets uniformes sin inventar datos", () => {
     expect(summary([{ reps: 10, weight: 85, rir: 2 }, { reps: 10, weight: 85, rir: 2 }])).toEqual({
-      setLabel: "2 series",
+      setLabel: "2 × 10",
       signals: ["85 kg", "RIR 2"],
       adjustmentLabel: null,
     });
   });
 
-  it("marca carga y RIR variables", () => {
+  it("resume rangos completos sin ocultar la prescripción", () => {
     expect(summary([{ reps: 10, weight: 80, rir: 1 }, { reps: 8, weight: 85, rir: 2 }])).toEqual({
       setLabel: "2 series",
-      signals: ["carga variable", "RIR variable"],
+      signals: ["80–85 kg", "RIR 1–2"],
       adjustmentLabel: null,
     });
   });
 
   it("maneja una sola serie y valores desconocidos", () => {
     expect(summary([{ reps: 12, weight: 20, rir: 3 }])).toEqual({
-      setLabel: "1 serie",
+      setLabel: "1 × 12",
       signals: ["20 kg", "RIR 3"],
       adjustmentLabel: null,
     });
