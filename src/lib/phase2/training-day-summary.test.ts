@@ -22,6 +22,7 @@ function session(
     exercisesCompleted: 4,
     completedSets: 12,
     volumeKg: 1_200,
+    routineColor: "rose",
     muscleGroups: ["Pecho"],
     ...overrides,
   };

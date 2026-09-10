@@ -13,4 +13,11 @@ describe("carga histórica del volumen diario", () => {
     expect(source).toContain("volumeKg: summarizeTrainingSessionVolume(");
     expect(source).toContain("completedSetRowsBySession.get(session.id) ?? []");
   });
+
+  it("conserva snapshots de sesión y reutiliza el color de rutina sin otra query", () => {
+    expect(source).toContain('.select("*, routine:routines(color)")');
+    expect(source).toContain("routineName: sessionDisplayName(session)");
+    expect(source).toContain("sessionExercises.filter((exercise) => exercise.is_completed).length");
+    expect(source).toContain("routineColor: firstRelation(session.routine)?.color ?? null");
+  });
 });

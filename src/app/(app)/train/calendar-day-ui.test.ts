@@ -34,7 +34,7 @@ describe("calendario y detalle de entrenamiento", () => {
     expect(calendar).toContain('trained ? ", entrenaste" : ""');
   });
 
-  it("usa sesiones completed con snapshots y elimina el filtro administrativo del día", () => {
+  it("mantiene resumen y sesiones con el mismo layout para uno o varios entrenamientos", () => {
     expect(day).toContain("listCompletedSessionHistory({");
     expect(day).toContain("logDate: date");
     expect(day).toContain("limit: 100");
@@ -46,12 +46,21 @@ describe("calendario y detalle de entrenamiento", () => {
     expect(day).toContain(
       "formatWorkoutDuration(session.durationMilliseconds)",
     );
-    expect(day).toContain("sessions.length === 1");
-    expect(day).toContain("<SessionHero session={sessions[0]} />");
-    expect(day).toContain('aria-label="Resumen del día"');
+    expect(day).toContain("Resumen del día");
+    expect(day).toContain('aria-labelledby="day-summary-title"');
+    expect(day).toContain("plural(summary.sessionCount, \"entrenamiento\")");
     expect(day).toContain("formatTrainingDayVolume(summary.volumeKg)");
     expect(day).toContain("formatTrainingDayVolume(session.volumeKg)");
     expect(day).toContain("Sesiones del día");
+    expect(day).toContain("sessions.map((session, index)");
+    expect(day).not.toContain("sessions.length === 1");
+    expect(day).not.toContain("SessionHero");
+  });
+
+  it("usa snapshots históricos y la identidad de color canónica sin acento gris", () => {
+    expect(day).toContain("routineColorCssVariable");
+    expect(day).toContain("routineColorCssVariable(color)");
+    expect(day).toContain("<SessionIdentity color={session.routineColor} />");
     expect(day).toContain("Volumen sin registrar");
     expect(day).toContain("href={`/train/session/${session.id}`}");
     expect(day).toContain(
@@ -60,8 +69,7 @@ describe("calendario y detalle de entrenamiento", () => {
     expect(day).toContain("{returnTarget.label}");
     expect(day).not.toContain("listEndedSessionsByDate");
     expect(day).not.toContain("listRoutines");
-    expect(day).not.toContain("routineColorCssVariable");
-    expect(day).not.toContain("routine:routines(color)");
+    expect(day).not.toContain("bg-muted-foreground/45");
     expect(day).not.toContain("Toca una sesión");
     expect(day).not.toContain("Aplicar");
   });

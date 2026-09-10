@@ -205,6 +205,7 @@ export type CompletedSessionSummary = {
   exercisesCompleted: number;
   completedSets: number;
   volumeKg?: number | null;
+  routineColor?: RoutineColorKey | null;
   muscleGroups: string[];
 };
 

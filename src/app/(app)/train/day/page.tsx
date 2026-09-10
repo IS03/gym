@@ -12,6 +12,7 @@ import {
   orderTrainingDaySessions,
   summarizeTrainingDay,
 } from "@/lib/phase2/training-day-summary";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import type { CompletedSessionSummary } from "@/lib/phase2/types";
 import {
   formatWorkoutDuration,
@@ -24,65 +25,45 @@ function plural(value: number, singular: string, pluralValue = `${singular}s`) {
   return `${value} ${value === 1 ? singular : pluralValue}`;
 }
 
-function DayStat({ value, label }: { value: string | null; label: string }) {
+function DayStat({
+  value,
+  label,
+  divided,
+}: {
+  value: string | null;
+  label: string;
+  divided?: "left" | "top-left" | "top";
+}) {
   return (
-    <span className="min-w-0">
-      <span className="metric-number block truncate text-base font-semibold text-foreground">
+    <div
+      className={cn(
+        "min-w-0 px-4 py-3.5",
+        divided === "left" && "border-l border-border/70",
+        divided === "top" && "border-t border-border/70",
+        divided === "top-left" && "border-l border-t border-border/70",
+      )}
+    >
+      <span className="metric-number block truncate text-lg font-semibold tracking-tight text-foreground">
         {value ?? "—"}
       </span>
-      <span className="block truncate text-xs text-muted-foreground">
+      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
         {label}
       </span>
-    </span>
+    </div>
   );
 }
 
-function SessionIdentity() {
+function SessionIdentity({
+  color,
+}: {
+  color: CompletedSessionSummary["routineColor"];
+}) {
   return (
     <span
-      className="h-11 w-0.5 shrink-0 rounded-full bg-muted-foreground/45"
+      className="h-12 w-1 shrink-0 rounded-full"
+      style={{ backgroundColor: routineColorCssVariable(color) }}
       aria-hidden
     />
-  );
-}
-
-function SessionHero({ session }: { session: CompletedSessionSummary }) {
-  const range = formatWorkoutTimeRange(session.startedAt, session.endedAt);
-  const duration = formatWorkoutDuration(session.durationMilliseconds);
-
-  return (
-    <Link
-      href={`/train/session/${session.id}`}
-      className="group block rounded-xl border border-border/80 bg-card p-4 outline-none transition-[background-color,transform] duration-150 hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted/55"
-    >
-      <span className="flex items-center gap-3">
-        <SessionIdentity />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xl font-semibold tracking-tight">
-            {session.routineName}
-          </span>
-          <span className="metric-number mt-0.5 block truncate text-sm text-muted-foreground">
-            {range || "Sesión terminada"}
-          </span>
-        </span>
-        <ChevronRight
-          className="size-5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
-          aria-hidden
-        />
-      </span>
-      <span className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/70 pt-4 sm:grid-cols-4">
-        <DayStat value={duration} label="duración" />
-        <DayStat
-          value={String(session.exercisesCompleted)}
-          label="ejercicios"
-        />
-        <DayStat value={String(session.completedSets)} label="series" />
-        <DayStat
-          value={formatTrainingDayVolume(session.volumeKg)}
-          label="volumen"
-        />
-      </span>
-    </Link>
   );
 }
 
@@ -105,9 +86,9 @@ function SessionRow({
         divided && "border-t border-border/70",
       )}
     >
-      <SessionIdentity />
+      <SessionIdentity color={session.routineColor} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-semibold">
+        <span className="block truncate text-lg font-semibold tracking-tight">
           {session.routineName}
         </span>
         <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">
@@ -175,33 +156,39 @@ export default async function TrainDayPage({
             Volver a {returnTarget.label.toLocaleLowerCase("es-AR")}
           </Link>
         </section>
-      ) : sessions.length === 1 ? (
-        <section aria-label="Entrenamiento del día">
-          <SessionHero session={sessions[0]} />
-        </section>
       ) : (
         <div className="space-y-5">
-          <section
-            aria-label="Resumen del día"
-            className="rounded-xl border border-border/80 bg-card p-4"
-          >
-            <p className="text-base font-semibold">
-              {plural(summary.sessionCount, "entrenamiento")}
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/70 pt-4 sm:grid-cols-4">
-              <DayStat
-                value={formatWorkoutDuration(summary.durationMilliseconds)}
-                label="duración total"
-              />
-              <DayStat
-                value={String(summary.exercisesCompleted)}
-                label="ejercicios"
-              />
-              <DayStat value={String(summary.completedSets)} label="series" />
-              <DayStat
-                value={formatTrainingDayVolume(summary.volumeKg)}
-                label="volumen total"
-              />
+          <section aria-labelledby="day-summary-title">
+            <h2 id="day-summary-title" className="mb-2 text-sm font-semibold">
+              Resumen del día
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
+              <div className="px-4 py-4">
+                <p className="metric-number text-2xl font-semibold tracking-tight">
+                  {plural(summary.sessionCount, "entrenamiento")}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 border-t border-border/70">
+                <DayStat
+                  value={formatWorkoutDuration(summary.durationMilliseconds)}
+                  label="duración total"
+                />
+                <DayStat
+                  value={String(summary.exercisesCompleted)}
+                  label="ejercicios"
+                  divided="left"
+                />
+                <DayStat
+                  value={String(summary.completedSets)}
+                  label="series"
+                  divided="top"
+                />
+                <DayStat
+                  value={formatTrainingDayVolume(summary.volumeKg)}
+                  label="volumen total"
+                  divided="top-left"
+                />
+              </div>
             </div>
           </section>
           <section aria-labelledby="day-sessions-title">
