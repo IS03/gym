@@ -8,9 +8,11 @@ import {
   todayInCordoba,
 } from "@/lib/phase2/training-robust";
 import {
+  formatTrainingDayVolume,
   orderTrainingDaySessions,
   summarizeTrainingDay,
 } from "@/lib/phase2/training-day-summary";
+import type { CompletedSessionSummary } from "@/lib/phase2/types";
 import {
   formatWorkoutDuration,
   formatWorkoutTimeRange,
@@ -22,6 +24,109 @@ function plural(value: number, singular: string, pluralValue = `${singular}s`) {
   return `${value} ${value === 1 ? singular : pluralValue}`;
 }
 
+function DayStat({ value, label }: { value: string | null; label: string }) {
+  return (
+    <span className="min-w-0">
+      <span className="metric-number block truncate text-base font-semibold text-foreground">
+        {value ?? "—"}
+      </span>
+      <span className="block truncate text-xs text-muted-foreground">
+        {label}
+      </span>
+    </span>
+  );
+}
+
+function SessionIdentity() {
+  return (
+    <span
+      className="h-11 w-0.5 shrink-0 rounded-full bg-muted-foreground/45"
+      aria-hidden
+    />
+  );
+}
+
+function SessionHero({ session }: { session: CompletedSessionSummary }) {
+  const range = formatWorkoutTimeRange(session.startedAt, session.endedAt);
+  const duration = formatWorkoutDuration(session.durationMilliseconds);
+
+  return (
+    <Link
+      href={`/train/session/${session.id}`}
+      className="group block rounded-xl border border-border/80 bg-card p-4 outline-none transition-[background-color,transform] duration-150 hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-muted/55"
+    >
+      <span className="flex items-center gap-3">
+        <SessionIdentity />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xl font-semibold tracking-tight">
+            {session.routineName}
+          </span>
+          <span className="metric-number mt-0.5 block truncate text-sm text-muted-foreground">
+            {range || "Sesión terminada"}
+          </span>
+        </span>
+        <ChevronRight
+          className="size-5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
+      <span className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/70 pt-4 sm:grid-cols-4">
+        <DayStat value={duration} label="duración" />
+        <DayStat
+          value={String(session.exercisesCompleted)}
+          label="ejercicios"
+        />
+        <DayStat value={String(session.completedSets)} label="series" />
+        <DayStat
+          value={formatTrainingDayVolume(session.volumeKg)}
+          label="volumen"
+        />
+      </span>
+    </Link>
+  );
+}
+
+function SessionRow({
+  session,
+  divided,
+}: {
+  session: CompletedSessionSummary;
+  divided: boolean;
+}) {
+  const range = formatWorkoutTimeRange(session.startedAt, session.endedAt);
+  const duration = formatWorkoutDuration(session.durationMilliseconds);
+  const volume = formatTrainingDayVolume(session.volumeKg);
+
+  return (
+    <Link
+      href={`/train/session/${session.id}`}
+      className={cn(
+        "group flex min-h-[88px] items-center gap-3 px-3.5 py-3 outline-none transition-[background-color,transform] duration-150 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/60",
+        divided && "border-t border-border/70",
+      )}
+    >
+      <SessionIdentity />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-semibold">
+          {session.routineName}
+        </span>
+        <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">
+          {[range, duration].filter(Boolean).join(" · ") || "Sesión terminada"}
+        </span>
+        <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">
+          {plural(session.exercisesCompleted, "ejercicio")} ·{" "}
+          {plural(session.completedSets, "serie")}
+          {volume ? ` · ${volume}` : " · Volumen sin registrar"}
+        </span>
+      </span>
+      <ChevronRight
+        className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+        aria-hidden
+      />
+    </Link>
+  );
+}
+
 export default async function TrainDayPage({
   searchParams,
 }: {
@@ -31,18 +136,17 @@ export default async function TrainDayPage({
   const date = typeof sp.date === "string" ? sp.date : todayInCordoba();
   const routineId = typeof sp.routine_id === "string" ? sp.routine_id : "";
   const source = typeof sp.from === "string" ? sp.from : undefined;
-  const allSessions = await listCompletedSessionHistory({ logDate: date, limit: 100 });
+  const allSessions = await listCompletedSessionHistory({
+    logDate: date,
+    limit: 100,
+  });
   const sessions = orderTrainingDaySessions(
-    routineId ? allSessions.filter((session) => session.routineId === routineId) : allSessions,
+    routineId
+      ? allSessions.filter((session) => session.routineId === routineId)
+      : allSessions,
   );
   const summary = summarizeTrainingDay(sessions);
   const returnTarget = trainingDayReturnTarget(date, routineId || null, source);
-  const summaryParts = [
-    summary.sessionCount > 1 ? plural(summary.sessionCount, "entrenamiento") : null,
-    plural(summary.exercisesCompleted, "ejercicio"),
-    plural(summary.completedSets, "serie"),
-    formatWorkoutDuration(summary.durationMilliseconds),
-  ].filter(Boolean);
 
   return (
     <div className="space-y-5 lg:mx-auto lg:max-w-5xl">
@@ -54,18 +158,9 @@ export default async function TrainDayPage({
           <ChevronLeft className="size-4" aria-hidden />
           {returnTarget.label}
         </Link>
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
-            {formatTrainingDayHeading(date)}
-          </h1>
-          {sessions.length > 0 ? (
-            <p className="metric-number text-sm text-muted-foreground">
-              {summaryParts.join(" · ")}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Sesiones terminadas.</p>
-          )}
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">
+          {formatTrainingDayHeading(date)}
+        </h1>
       </header>
 
       {sessions.length === 0 ? (
@@ -80,43 +175,50 @@ export default async function TrainDayPage({
             Volver a {returnTarget.label.toLocaleLowerCase("es-AR")}
           </Link>
         </section>
-      ) : (
-        <section aria-labelledby="day-sessions-title">
-          <h2 id="day-sessions-title" className="sr-only">Sesiones terminadas</h2>
-          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
-            {sessions.map((session, index) => {
-              const range = formatWorkoutTimeRange(session.startedAt, session.endedAt);
-              const duration = formatWorkoutDuration(session.durationMilliseconds);
-
-              return (
-                <Link
-                  key={session.id}
-                  href={`/train/session/${session.id}`}
-                  className={cn(
-                    "group flex min-h-[76px] items-center gap-3 px-3.5 py-3 outline-none transition-[background-color,transform] duration-150 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/60",
-                    index > 0 && "border-t border-border/70",
-                  )}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">
-                      {session.routineName}
-                    </span>
-                    <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">
-                      {[range, duration].filter(Boolean).join(" · ") || "Sesión terminada"}
-                    </span>
-                    <span className="metric-number mt-0.5 block truncate text-xs text-muted-foreground">
-                      {plural(session.exercisesCompleted, "ejercicio")} · {plural(session.completedSets, "serie")}
-                    </span>
-                  </span>
-                  <ChevronRight
-                    className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
-                    aria-hidden
-                  />
-                </Link>
-              );
-            })}
-          </div>
+      ) : sessions.length === 1 ? (
+        <section aria-label="Entrenamiento del día">
+          <SessionHero session={sessions[0]} />
         </section>
+      ) : (
+        <div className="space-y-5">
+          <section
+            aria-label="Resumen del día"
+            className="rounded-xl border border-border/80 bg-card p-4"
+          >
+            <p className="text-base font-semibold">
+              {plural(summary.sessionCount, "entrenamiento")}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/70 pt-4 sm:grid-cols-4">
+              <DayStat
+                value={formatWorkoutDuration(summary.durationMilliseconds)}
+                label="duración total"
+              />
+              <DayStat
+                value={String(summary.exercisesCompleted)}
+                label="ejercicios"
+              />
+              <DayStat value={String(summary.completedSets)} label="series" />
+              <DayStat
+                value={formatTrainingDayVolume(summary.volumeKg)}
+                label="volumen total"
+              />
+            </div>
+          </section>
+          <section aria-labelledby="day-sessions-title">
+            <h2 id="day-sessions-title" className="mb-2 text-sm font-semibold">
+              Sesiones del día
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
+              {sessions.map((session, index) => (
+                <SessionRow
+                  key={session.id}
+                  session={session}
+                  divided={index > 0}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

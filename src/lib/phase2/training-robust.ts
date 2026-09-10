@@ -22,6 +22,7 @@ import {
 import { listRoutines } from "./training";
 import { daysBetweenIsoDates } from "./session-history";
 import { resolveWorkoutSessionLookup } from "./training-session-lookup";
+import { summarizeTrainingSessionVolume } from "./training-day-summary";
 import {
   validateCompletedSessionCorrection,
   validateRoutineExercisePayload,
@@ -583,7 +584,7 @@ export async function listCompletedSessionHistory(input?: {
   const { data: rawSets, error: setsError } = exerciseIds.length
     ? await supabase
         .from("workout_sets")
-        .select("workout_session_exercise_id")
+        .select("workout_session_exercise_id, actual_reps, actual_weight_kg")
         .eq("user_id", userId)
         .eq("is_completed", true)
         .in("workout_session_exercise_id", exerciseIds)
@@ -601,9 +602,19 @@ export async function listCompletedSessionHistory(input?: {
     exercisesBySession.set(exercise.workout_session_id, items);
   }
   const completedSetsBySession = new Map<string, number>();
-  for (const set of (rawSets ?? []) as Array<{ workout_session_exercise_id: string }>) {
+  const completedSetRowsBySession = new Map<
+    string,
+    Array<Pick<WorkoutSet, "actual_reps" | "actual_weight_kg">>
+  >();
+  for (const set of (rawSets ?? []) as Array<
+    Pick<WorkoutSet, "workout_session_exercise_id" | "actual_reps" | "actual_weight_kg">
+  >) {
     const sessionId = sessionIdByExercise.get(set.workout_session_exercise_id);
-    if (sessionId) completedSetsBySession.set(sessionId, (completedSetsBySession.get(sessionId) ?? 0) + 1);
+    if (!sessionId) continue;
+    completedSetsBySession.set(sessionId, (completedSetsBySession.get(sessionId) ?? 0) + 1);
+    const setRows = completedSetRowsBySession.get(sessionId) ?? [];
+    setRows.push(set);
+    completedSetRowsBySession.set(sessionId, setRows);
   }
 
   return sessions.flatMap((session): CompletedSessionSummary[] => {
@@ -624,6 +635,7 @@ export async function listCompletedSessionHistory(input?: {
       durationMilliseconds: sessionDurationMilliseconds(session),
       exercisesCompleted: sessionExercises.filter((exercise) => exercise.is_completed).length,
       completedSets: completedSetsBySession.get(session.id) ?? 0,
+      volumeKg: summarizeTrainingSessionVolume(completedSetRowsBySession.get(session.id) ?? []),
       muscleGroups,
     }];
   });
