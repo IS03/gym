@@ -6,6 +6,7 @@ import {
   groupCompletedSessionsByDate,
   sortTrainingHistoryExercises,
   toggleTrainingHistoryFilter,
+  trainingHistoryFilterCount,
   trainingHistoryFiltersFromSearchParams,
   trainingHistoryListPath,
   type TrainingHistoryExercise,
@@ -50,6 +51,11 @@ describe("training history filters", () => {
   it("toggles multiselect values without duplicates", () => {
     expect(toggleTrainingHistoryFilter(["push"], "pull")).toEqual(["push", "pull"]);
     expect(toggleTrainingHistoryFilter(["push", "pull"], "push")).toEqual(["pull"]);
+  });
+
+  it("keeps sorting independent from the filter count", () => {
+    expect(trainingHistoryFilterCount({ query: "", routineIds: [], muscleGroups: [], activity: "recorded", order: "used" })).toBe(0);
+    expect(trainingHistoryFilterCount({ query: "", routineIds: ["push"], muscleGroups: ["pecho"], activity: "all", order: "alpha" })).toBe(3);
   });
 
   it("round-trips visible filter state through history navigation", () => {

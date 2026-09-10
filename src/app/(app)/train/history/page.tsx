@@ -54,8 +54,8 @@ function HistoryTabs({ view }: { view: "sessions" | "exercises" }) {
       </Link>
     </div>
     <nav className="grid grid-cols-2 rounded-xl border bg-muted/35 p-1" aria-label="Vista de historial">
-      <Link href="/train/history?view=sessions" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "sessions" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Sesiones</Link>
-      <Link href="/train/history?view=exercises" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "exercises" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Ejercicios</Link>
+      <Link href="/train/history?view=sessions" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "sessions" ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground")}>Sesiones</Link>
+      <Link href="/train/history?view=exercises" className={cn("flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-colors", view === "exercises" ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground")}>Ejercicios</Link>
     </nav>
   </div>;
 }

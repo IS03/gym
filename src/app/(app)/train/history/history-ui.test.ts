@@ -5,6 +5,7 @@ const page = readFileSync("src/app/(app)/train/history/page.tsx", "utf8");
 const sessions = readFileSync("src/app/(app)/train/history/history-session-list.tsx", "utf8");
 const exercises = readFileSync("src/app/(app)/train/history/history-exercise-list.tsx", "utf8");
 const directory = readFileSync("src/components/training/exercise-directory.tsx", "utf8");
+const robust = readFileSync("src/lib/phase2/training-robust.ts", "utf8");
 
 describe("historial de entrenamiento v2", () => {
   it("conserva un único título de página y la navegación por URL", () => {
@@ -14,6 +15,7 @@ describe("historial de entrenamiento v2", () => {
     expect(page).toContain("Revisá tus entrenamientos anteriores.");
     expect(page).toContain(">Ejercicios</Link>");
     expect(page).toContain('href="/train/calendar"');
+    expect(page).toContain('"bg-primary/10 text-primary shadow-sm"');
   });
 
   it("muestra continuidad y sesiones como colecciones densas navegables", () => {
@@ -49,7 +51,10 @@ describe("historial de entrenamiento v2", () => {
     expect(exercises).toContain("Más usados");
     expect(exercises).toContain("Nombre A–Z");
     expect(exercises).toContain("Más tiempo sin realizar");
+    expect(exercises).toContain('aria-label="Ordenar ejercicios"');
+    expect(exercises).not.toContain('id="history-order-filter-title"');
     expect(exercises).toContain('aria-label="Filtros activos"');
     expect(exercises).toContain("draftCount");
+    expect(robust).toContain("listRoutines({ includeArchived: false }, context)");
   });
 });

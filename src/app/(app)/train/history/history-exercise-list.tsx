@@ -100,17 +100,6 @@ function FilterSheet({
                 </div>
               </section>
 
-              <section aria-labelledby="history-order-filter-title">
-                <h3 id="history-order-filter-title" className="text-sm font-semibold">Ordenar por</h3>
-                <div className="mt-3 overflow-hidden rounded-xl border" role="radiogroup" aria-label="Orden de ejercicios">
-                  {ORDER_OPTIONS.map((option) => (
-                    <button key={option.value} type="button" role="radio" aria-checked={filters.order === option.value} className="flex min-h-11 w-full items-center justify-between border-b px-3 text-left text-sm last:border-b-0 hover:bg-muted/40" onClick={() => onChange({ ...filters, order: option.value })}>
-                      <span className={filters.order === option.value ? "font-medium text-primary" : ""}>{option.label}</span>
-                      <span className={`size-2.5 rounded-full border ${filters.order === option.value ? "border-primary bg-primary" : "border-muted-foreground/50"}`} aria-hidden />
-                    </button>
-                  ))}
-                </div>
-              </section>
             </div>
 
             <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 lg:pb-3">
@@ -201,13 +190,22 @@ export function HistoryExerciseList({ exercises, routines, initialFilters = DEFA
             return option ? <Button key={group} type="button" size="sm" variant="secondary" className="rounded-full text-primary" onClick={() => removeMuscle(group)}>{option.label}<X className="size-3" aria-hidden /></Button> : null;
           })}
           {filters.activity === "all" ? <Button type="button" size="sm" variant="secondary" className="rounded-full text-primary" onClick={() => setFilters((current) => ({ ...current, activity: "recorded" }))}>Todos<X className="size-3" aria-hidden /></Button> : null}
-          {filters.order !== "recent" ? <Button type="button" size="sm" variant="secondary" className="rounded-full text-primary" onClick={() => setFilters((current) => ({ ...current, order: "recent" }))}>{orderLabel}<X className="size-3" aria-hidden /></Button> : null}
         </div>
       ) : null}
 
       <div className="flex items-center justify-between gap-3 px-1">
         <h2 id="history-exercise-list-title" className="text-base font-semibold tracking-tight">{visibleItems.length} {visibleItems.length === 1 ? "ejercicio" : "ejercicios"}{filters.activity === "recorded" ? " con historial" : ""}</h2>
-        <button type="button" onClick={openFilters} className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{orderLabel}<ChevronDown className="size-3.5" aria-hidden /></button>
+        <label className="relative flex h-9 shrink-0 cursor-pointer items-center rounded-lg px-2 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-within:ring-2 focus-within:ring-ring">
+          <span className="flex items-center gap-1">{orderLabel}<ChevronDown className="size-3.5" aria-hidden /></span>
+          <select
+            value={filters.order}
+            onChange={(event) => setFilters((current) => ({ ...current, order: event.target.value as TrainingHistoryOrder }))}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+            aria-label="Ordenar ejercicios"
+          >
+            {ORDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
       </div>
 
       {visibleItems.length === 0 ? (
