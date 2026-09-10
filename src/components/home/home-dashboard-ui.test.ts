@@ -44,8 +44,11 @@ describe("Home V2", () => {
     expect(dashboard).toContain('href="/calendar"');
     expect(dashboard).toContain('href="/train/body"');
     expect(dashboard).toContain('href="/history"');
-    expect(dashboard).toContain("Organizá y editá tus planes.");
-    expect(dashboard).toContain("Revisá una fecha completa.");
+    expect(dashboard).not.toContain("Organizá y editá tus planes.");
+    expect(dashboard).not.toContain("Revisá tus días y registros.");
+    expect(dashboard).not.toContain("Peso y medidas.");
+    expect(dashboard).not.toContain("Revisá una fecha completa.");
+    expect(dashboard).toContain("grid grid-cols-2 gap-3 lg:grid-cols-4");
   });
 
   it("preserves the four-item bottom navigation instead of adding a Home-only tab", () => {

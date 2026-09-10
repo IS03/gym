@@ -513,22 +513,18 @@ type QuickAccessProps = {
   href: string;
   icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   title: string;
-  description: string;
 };
 
-function QuickAccess({ href, icon: Icon, title, description }: QuickAccessProps) {
+function QuickAccess({ href, icon: Icon, title }: QuickAccessProps) {
   return (
     <Link
       href={href}
-      className="group flex min-h-24 items-start gap-3 rounded-xl bg-card p-3.5 shadow-sm ring-1 ring-foreground/8 outline-none transition-[background-color,transform,box-shadow] duration-150 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
+      className="group flex min-h-16 items-center gap-3 rounded-xl bg-card p-3.5 shadow-sm ring-1 ring-foreground/8 outline-none transition-[background-color,transform,box-shadow] duration-150 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Icon className="size-[18px]" aria-hidden />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="mt-1 block text-xs leading-snug text-muted-foreground">{description}</span>
-      </span>
+      <span className="min-w-0 flex-1 text-sm font-semibold">{title}</span>
     </Link>
   );
 }
@@ -538,10 +534,10 @@ function QuickAccesses() {
     <section aria-labelledby="home-shortcuts-title" className="space-y-3 lg:col-span-12">
       <SectionHeader id="home-shortcuts-title" title="Accesos rápidos" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <QuickAccess href="/train/routines" icon={Dumbbell} title="Rutinas" description="Organizá y editá tus planes." />
-        <QuickAccess href="/calendar" icon={CalendarDays} title="Calendario" description="Revisá tus días y registros." />
-        <QuickAccess href="/train/body" icon={Scale} title="Cuerpo" description="Peso y medidas." />
-        <QuickAccess href="/history" icon={History} title="Historial diario" description="Revisá una fecha completa." />
+        <QuickAccess href="/train/routines" icon={Dumbbell} title="Rutinas" />
+        <QuickAccess href="/calendar" icon={CalendarDays} title="Calendario" />
+        <QuickAccess href="/train/body" icon={Scale} title="Cuerpo" />
+        <QuickAccess href="/history" icon={History} title="Historial diario" />
       </div>
     </section>
   );
