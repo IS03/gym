@@ -1,88 +1,59 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import {
-  Archive,
-  Check,
-  ChevronRight,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronRight, Plus, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  DEFAULT_EXERCISE_LIBRARY_FILTERS,
+  exerciseLibraryActiveFilterCount,
+  exerciseLibraryImplementOptions,
   exerciseLibrarySummary,
   filterExerciseLibrary,
   groupExerciseLibrary,
   sortExerciseLibrary,
-  type ExerciseLibraryFilter,
+  type ExerciseLibraryFilters,
+  type ExerciseLibraryGroup,
   type ExerciseLibraryItem,
+  type ExerciseLibraryRoutine,
+  type ExerciseLibraryStatus,
 } from "@/lib/phase2/exercise-library";
-import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
+import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "@/lib/phase2/muscle-groups";
 import type { MuscleGroup } from "@/lib/phase2/types";
-import {
-  EXERCISE_IMPLEMENT_SUGGESTIONS,
-  EXERCISE_WEIGHT_MODE_SUGGESTIONS,
-  type ExerciseMutationInput,
-} from "@/lib/phase2/exercise-mutation";
-import {
-  emptyForm,
-  formFromExercise,
-  mutationFromForm,
-  type ExerciseFormValues as FormValues,
-} from "@/lib/phase2/exercise-form";
-import {
-  archiveExerciseAction,
-  createExerciseAction,
-  updateExerciseAction,
-} from "../actions";
+import { EXERCISE_IMPLEMENT_SUGGESTIONS, EXERCISE_WEIGHT_MODE_SUGGESTIONS, type ExerciseMutationInput } from "@/lib/phase2/exercise-mutation";
+import { emptyForm, formFromExercise, mutationFromForm, type ExerciseFormValues as FormValues } from "@/lib/phase2/exercise-form";
+import { archiveExerciseAction, createExerciseAction, restoreExerciseAction, updateExerciseAction } from "../actions";
 
-const GROUP_FILTER_OPTIONS: ReadonlyArray<{
-  value: ExerciseLibraryFilter;
-  label: string;
-}> = [
-  { value: "all", label: "Todos" },
-  { value: "none", label: "Sin grupo" },
+const GROUP_OPTIONS: ReadonlyArray<{ value: ExerciseLibraryGroup; label: string }> = [
   ...MUSCLE_GROUP_OPTIONS,
+  { value: "none", label: "Sin grupo" },
 ];
 
-function Sheet({
-  children,
-  open,
-  onOpenChange,
-  variant = "default",
-  initialFocus,
-}: {
+function cloneFilters(filters: ExerciseLibraryFilters): ExerciseLibraryFilters {
+  return { ...filters, routineIds: [...filters.routineIds], muscleGroups: [...filters.muscleGroups], implements: [...filters.implements] };
+}
+
+function toggleValue<T>(values: readonly T[], value: T): T[] {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function Sheet({ children, open, onOpenChange, large = false, initialFocus }: {
   children: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  variant?: "default" | "editor";
+  large?: boolean;
   initialFocus?: React.RefObject<HTMLElement | null>;
 }) {
-  const editorSheet = variant === "editor";
-
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 opacity-100 backdrop-blur-[2px] transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
-        <Dialog.Viewport
-          className={
-            editorSheet
-              ? "fixed inset-0 z-[81] flex items-end justify-center overflow-hidden px-2 pt-[max(0.75rem,env(safe-area-inset-top))] lg:items-center lg:p-6"
-              : "fixed inset-0 z-[81] flex items-end justify-center overflow-hidden lg:items-center lg:p-6"
-          }
-        >
+        <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[2px] transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <Dialog.Viewport className="fixed inset-0 z-[81] flex items-end justify-center overflow-hidden px-0 pt-[max(.75rem,env(safe-area-inset-top))] lg:items-center lg:p-6">
           <Dialog.Popup
             initialFocus={initialFocus}
-            className={
-              editorSheet
-                ? "flex h-[min(82dvh,42rem)] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-top))] min-h-0 w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-opacity duration-150 ease-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none lg:h-[min(78dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:transition-[transform,opacity] lg:duration-200 lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]"
-                : "flex max-h-[min(86dvh,42rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 ease-out data-[ending-style]:translate-y-full data-[ending-style]:opacity-95 data-[starting-style]:translate-y-full data-[starting-style]:opacity-95 motion-reduce:transition-none lg:max-h-[min(80dvh,42rem)] lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[ending-style]:scale-[0.98] lg:data-[starting-style]:translate-y-2 lg:data-[starting-style]:scale-[0.98]"
-            }
+            className={`${large ? "h-[min(92dvh,52rem)]" : "max-h-[min(88dvh,46rem)]"} flex min-h-0 w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full lg:max-w-2xl lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[starting-style]:translate-y-2`}
           >
             {children}
           </Dialog.Popup>
@@ -92,665 +63,250 @@ function Sheet({
   );
 }
 
-function ExerciseForm({
-  values,
-  onChange,
-  pending,
-  submitLabel,
-}: {
+function SheetHeader({ title, description, closeLabel, closeRef, pending, action }: {
+  title: string;
+  description: string;
+  closeLabel: string;
+  closeRef?: React.RefObject<HTMLButtonElement | null>;
+  pending?: boolean;
+  action?: React.ReactNode;
+}) {
+  return (
+    <header className="relative shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5">
+      <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
+      <Dialog.Title className="text-xl font-semibold tracking-tight">{title}</Dialog.Title>
+      <Dialog.Description className="mt-1 pr-12 text-sm text-muted-foreground">{description}</Dialog.Description>
+      {action ? <div className="absolute right-12 top-5">{action}</div> : null}
+      <Dialog.Close ref={closeRef} type="button" disabled={pending} aria-label={closeLabel}
+        className="absolute right-2 top-4 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+        <X className="size-5" aria-hidden />
+      </Dialog.Close>
+    </header>
+  );
+}
+
+function SectionTitle({ number, title, subtitle }: { number: number; title: string; subtitle: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{number}</span>
+      <div><h3 className="font-semibold">{title}</h3><p className="text-xs text-muted-foreground">{subtitle}</p></div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block space-y-1.5"><span className="text-xs font-medium text-muted-foreground">{label}</span>{children}</label>;
+}
+
+function ExerciseForm({ values, onChange, pending, editing, routines, selectedRoutineIds, onRoutineIdsChange, error, onArchive, onRestore }: {
   values: FormValues;
   onChange: (next: FormValues) => void;
   pending: boolean;
-  submitLabel: string;
+  editing: ExerciseLibraryItem | null;
+  routines: ExerciseLibraryRoutine[];
+  selectedRoutineIds: string[];
+  onRoutineIdsChange: (ids: string[]) => void;
+  error: string | null;
+  onArchive: () => void;
+  onRestore: () => void;
 }) {
-  return (
-    <div className="space-y-4">
-      <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Nombre</span>
-        <Input
-          value={values.nombre}
-          onChange={(event) => onChange({ ...values, nombre: event.target.value })}
-          placeholder="Ej: Press banca"
-          required
-          disabled={pending}
-        />
-      </label>
-      <label className="block space-y-1.5">
-        <span className="text-sm font-medium">Grupo muscular</span>
-        <select
-          value={values.grupo_muscular}
-          onChange={(event) =>
-            onChange({
-              ...values,
-              grupo_muscular: event.target.value as MuscleGroup | "",
-            })
-          }
-          disabled={pending}
-          className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 lg:text-sm"
-        >
-          <option value="">Sin grupo</option>
-          {MUSCLE_GROUP_OPTIONS.map((group) => (
-            <option key={group.value} value={group.value}>
-              {group.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <fieldset className="space-y-1.5">
-        <legend className="text-sm font-medium">Valores sugeridos</legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Input
-            value={values.series_sugeridas}
-            onChange={(event) =>
-              onChange({ ...values, series_sugeridas: event.target.value })
-            }
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            placeholder="Series"
-            aria-label="Series sugeridas"
-            disabled={pending}
-          />
-          <Input
-            value={values.reps_sugeridas}
-            onChange={(event) =>
-              onChange({ ...values, reps_sugeridas: event.target.value })
-            }
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            placeholder="Reps"
-            aria-label="Repeticiones sugeridas"
-            disabled={pending}
-          />
-          <Input
-            value={values.peso_sugerido}
-            onChange={(event) =>
-              onChange({ ...values, peso_sugerido: event.target.value })
-            }
-            type="text"
-            min={0}
-            inputMode="decimal"
-            pattern="[0-9]*[.,]?[0-9]*"
-            placeholder="Peso"
-            aria-label="Peso sugerido en kg"
-            disabled={pending}
-          />
-          <Input
-            value={values.rir_sugerido}
-            onChange={(event) =>
-              onChange({ ...values, rir_sugerido: event.target.value })
-            }
-            type="number"
-            min={0}
-            max={10}
-            step={1}
-            inputMode="numeric"
-            placeholder="RIR"
-            aria-label="RIR sugerido"
-            disabled={pending}
-          />
-          <Input
-            value={values.descanso_min_sugerido_segundos}
-            onChange={(event) =>
-              onChange({
-                ...values,
-                descanso_min_sugerido_segundos: event.target.value,
-              })
-            }
-            type="number"
-            min={0}
-            max={3600}
-            step={1}
-            inputMode="numeric"
-            placeholder="Desc. mín. (s)"
-            aria-label="Descanso mínimo sugerido en segundos"
-            disabled={pending}
-          />
-          <Input
-            value={values.descanso_max_sugerido_segundos}
-            onChange={(event) =>
-              onChange({
-                ...values,
-                descanso_max_sugerido_segundos: event.target.value,
-              })
-            }
-            type="number"
-            min={0}
-            max={3600}
-            step={1}
-            inputMode="numeric"
-            placeholder="Desc. máx. (s)"
-            aria-label="Descanso máximo sugerido en segundos"
-            disabled={pending}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">Segundos totales.</p>
-      </fieldset>
-      <fieldset className="space-y-2 rounded-xl border border-border/70 bg-muted/25 p-3">
-        <legend className="px-1 text-sm font-medium">Detalles</legend>
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Detalle muscular</span>
-          <Input
-            value={values.muscle_group_label}
-            onChange={(event) => onChange({ ...values, muscle_group_label: event.target.value })}
-            placeholder="Ej: Deltoides posteriores"
-            maxLength={120}
-            disabled={pending}
-          />
-        </label>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Implemento</span>
-            <Input
-              value={values.implement}
-              onChange={(event) => onChange({ ...values, implement: event.target.value })}
-              placeholder="Ej: Polea"
-              list="exercise-implement-suggestions"
-              maxLength={120}
-              disabled={pending}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Registro de carga</span>
-            <Input
-              value={values.weight_mode}
-              onChange={(event) => onChange({ ...values, weight_mode: event.target.value })}
-              placeholder="Ej: Peso total"
-              list="exercise-weight-mode-suggestions"
-              maxLength={120}
-              disabled={pending}
-            />
-          </label>
-        </div>
-        <datalist id="exercise-implement-suggestions">
-          {EXERCISE_IMPLEMENT_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
-        </datalist>
-        <datalist id="exercise-weight-mode-suggestions">
-          {EXERCISE_WEIGHT_MODE_SUGGESTIONS.map((value) => <option key={value} value={value} />)}
-        </datalist>
-      </fieldset>
-      <Button className="h-11 w-full" type="submit" disabled={pending}>
-        {pending ? (submitLabel === "Crear ejercicio" ? "Creando…" : "Guardando…") : submitLabel}
-      </Button>
-    </div>
-  );
-}
-
-function ExerciseRows({
-  exercises,
-  onEdit,
-}: {
-  exercises: ExerciseLibraryItem[];
-  onEdit: (exercise: ExerciseLibraryItem) => void;
-}) {
+  const selectClass = "h-11 w-full rounded-lg border border-input bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 sm:text-sm";
+  const unknownImplement = values.implement && !EXERCISE_IMPLEMENT_SUGGESTIONS.includes(values.implement as never);
+  const unknownMode = values.weight_mode && !EXERCISE_WEIGHT_MODE_SUGGESTIONS.includes(values.weight_mode as never);
   return (
     <div className="divide-y divide-border/70">
-      {exercises.map((exercise) => (
-        <button
-          key={exercise.id}
-          type="button"
-          onClick={() => onEdit(exercise)}
-          className="group flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left outline-none transition-[background-color,transform] duration-150 hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:scale-[0.995] motion-reduce:transition-none"
-          aria-label={`Editar ${exercise.nombre}`}
-        >
-          <span className="min-w-0 flex-1">
-            <span className="line-clamp-2 block text-sm font-semibold leading-5">{exercise.nombre}</span>
-            <span className="mt-0.5 block truncate text-xs leading-4 text-muted-foreground">
-              {exerciseLibrarySummary(exercise)}
-            </span>
-          </span>
-          <ChevronRight
-            className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"
-            aria-hidden
-          />
-        </button>
-      ))}
+      <section className="space-y-4 pb-5">
+        <SectionTitle number={1} title="Información" subtitle="Datos básicos del ejercicio." />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nombre"><Input value={values.nombre} onChange={(event) => onChange({ ...values, nombre: event.target.value })} placeholder="Ej: Press banca" required disabled={pending} /></Field>
+          <Field label="Grupo muscular"><select value={values.grupo_muscular} onChange={(event) => onChange({ ...values, grupo_muscular: event.target.value as MuscleGroup | "" })} disabled={pending} className={selectClass}>
+            <option value="">Sin grupo</option>{MUSCLE_GROUP_OPTIONS.map((group) => <option key={group.value} value={group.value}>{group.label}</option>)}
+          </select></Field>
+        </div>
+      </section>
+
+      <section className="space-y-4 py-5">
+        <SectionTitle number={2} title="Configuración" subtitle="Definí los detalles del ejercicio." />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Músculo específico"><Input value={values.muscle_group_label} onChange={(event) => onChange({ ...values, muscle_group_label: event.target.value })} placeholder="Ej: Pectoral mayor" maxLength={120} disabled={pending} /></Field>
+          <Field label="Implemento"><select value={values.implement} onChange={(event) => onChange({ ...values, implement: event.target.value })} disabled={pending} className={selectClass}>
+            <option value="">Sin especificar</option>{unknownImplement ? <option value={values.implement}>{values.implement}</option> : null}{EXERCISE_IMPLEMENT_SUGGESTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select></Field>
+          <Field label="Registro de carga"><select value={values.weight_mode} onChange={(event) => onChange({ ...values, weight_mode: event.target.value })} disabled={pending} className={selectClass}>
+            <option value="">Sin especificar</option>{unknownMode ? <option value={values.weight_mode}>{values.weight_mode}</option> : null}{EXERCISE_WEIGHT_MODE_SUGGESTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select></Field>
+        </div>
+      </section>
+
+      <section className="space-y-4 py-5">
+        <SectionTitle number={3} title="Valores por defecto" subtitle="Se usarán al agregar este ejercicio a una rutina." />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            ["Series", "series_sugeridas", "numeric", "Ej: 3"], ["Reps", "reps_sugeridas", "numeric", "Ej: 10"],
+            ["Peso", "peso_sugerido", "decimal", "Ej: 60"], ["RIR", "rir_sugerido", "numeric", "Ej: 2"],
+          ] as const).map(([label, key, mode, placeholder]) => <Field key={key} label={label}><Input value={values[key]} onChange={(event) => onChange({ ...values, [key]: event.target.value })} inputMode={mode} placeholder={placeholder} disabled={pending} /></Field>)}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Descanso mínimo"><Input value={values.descanso_min_sugerido_segundos} onChange={(event) => onChange({ ...values, descanso_min_sugerido_segundos: event.target.value })} inputMode="text" placeholder="Ej: 1:30" aria-label="Descanso mínimo en minutos y segundos" disabled={pending} /></Field>
+          <Field label="Descanso máximo"><Input value={values.descanso_max_sugerido_segundos} onChange={(event) => onChange({ ...values, descanso_max_sugerido_segundos: event.target.value })} inputMode="text" placeholder="Ej: 2:00" aria-label="Descanso máximo en minutos y segundos" disabled={pending} /></Field>
+        </div>
+      </section>
+
+      <section className="space-y-4 py-5">
+        <SectionTitle number={4} title={editing ? "Usado en rutinas" : "Agregar a rutina (opcional)"} subtitle={editing ? "Gestioná dónde se utiliza actualmente." : "Seleccioná una rutina para tenerlo más a mano."} />
+        <div className="flex flex-wrap gap-2" aria-label={editing ? "Uso en rutinas" : "Agregar a rutina"}>
+          {!editing ? <button type="button" aria-pressed={selectedRoutineIds.length === 0} onClick={() => onRoutineIdsChange([])} className={`min-h-10 rounded-full border px-4 text-sm ${selectedRoutineIds.length === 0 ? "border-primary/30 bg-primary/10 text-primary" : "bg-background"}`}>Ninguna</button> : null}
+          {routines.map((routine) => {
+            const selected = selectedRoutineIds.includes(routine.id);
+            return <button key={routine.id} type="button" aria-pressed={selected} onClick={() => onRoutineIdsChange(editing ? toggleValue(selectedRoutineIds, routine.id) : selected ? [] : [routine.id])}
+              className={`min-h-10 rounded-full border px-4 text-sm font-medium ${selected ? "border-primary/30 bg-primary/10 text-primary" : "bg-background hover:bg-muted"}`}>{routine.nombre}</button>;
+          })}
+          {routines.length === 0 ? <span className="text-sm text-muted-foreground">No hay rutinas activas.</span> : null}
+        </div>
+      </section>
+
+      <section className="py-5">
+        <details className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span>Opciones avanzadas</span><ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+          </summary>
+          <Field label="Notas"><textarea value={values.notes} onChange={(event) => onChange({ ...values, notes: event.target.value })} placeholder="Notas opcionales" maxLength={1000} disabled={pending} className="mt-2 min-h-24 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm" /></Field>
+        </details>
+      </section>
+
+      {editing ? <section className="space-y-2 py-5">
+        {editing.is_active ? <Button type="button" variant="destructive" className="w-full bg-destructive/10 text-destructive hover:bg-destructive/15" onClick={onArchive} disabled={pending}><Archive className="size-4" aria-hidden />Archivar ejercicio</Button>
+          : <Button type="button" variant="secondary" className="w-full text-primary" onClick={onRestore} disabled={pending}><RotateCcw className="size-4" aria-hidden />Restaurar ejercicio</Button>}
+        <p className="text-center text-xs text-muted-foreground">Las sesiones y registros anteriores siempre se conservan.</p>
+      </section> : null}
+      {error ? <p className="py-4 text-sm text-destructive" role="alert">{error}</p> : null}
     </div>
   );
 }
 
-export function ExerciseLibrary({
-  initialExercises,
-}: {
-  initialExercises: ExerciseLibraryItem[];
-}) {
+function ExerciseRows({ exercises, onEdit }: { exercises: ExerciseLibraryItem[]; onEdit: (exercise: ExerciseLibraryItem) => void }) {
+  return <div className="divide-y divide-border/70">{exercises.map((exercise) => <button key={exercise.id} type="button" onClick={() => onEdit(exercise)}
+    className="group flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left outline-none hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-label={`Editar ${exercise.nombre}`}>
+    <span className="min-w-0 flex-1"><span className="flex items-center gap-2"><span className="line-clamp-2 text-sm font-semibold leading-5">{exercise.nombre}</span>{!exercise.is_active ? <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">Archivado</span> : null}</span>
+      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{exerciseLibrarySummary(exercise)}</span></span>
+    <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+  </button>)}</div>;
+}
+
+function FilterChip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return <button type="button" onClick={onRemove} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-medium text-primary">{children}<X className="size-3" aria-hidden /></button>;
+}
+
+function FilterChoice({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" aria-pressed={selected} onClick={onClick} className={`min-h-10 rounded-full border px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted"}`}>{children}</button>;
+}
+
+export function ExerciseLibrary({ initialExercises, initialRoutines }: { initialExercises: ExerciseLibraryItem[]; initialRoutines: ExerciseLibraryRoutine[] }) {
   const router = useRouter();
   const [exercises, setExercises] = useState(initialExercises);
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState<ExerciseLibraryFilter>("all");
-  const [draftGroup, setDraftGroup] = useState<ExerciseLibraryFilter>("all");
+  const [filters, setFilters] = useState<ExerciseLibraryFilters>(DEFAULT_EXERCISE_LIBRARY_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<ExerciseLibraryFilters>(DEFAULT_EXERCISE_LIBRARY_FILTERS);
+  const [openGroups, setOpenGroups] = useState<Set<ExerciseLibraryGroup>>(() => {
+    const first = groupExerciseLibrary(filterExerciseLibrary(initialExercises, { query: "", filters: DEFAULT_EXERCISE_LIBRARY_FILTERS }))[0];
+    return new Set(first ? [first.value] : []);
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm);
+  const [selectedRoutineIds, setSelectedRoutineIds] = useState<string[]>([]);
   const [archiveTarget, setArchiveTarget] = useState<ExerciseLibraryItem | null>(null);
-  const editorCloseRef = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const editorCloseRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timeout = window.setTimeout(() => setNotice(null), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
+  useEffect(() => { if (!notice) return; const timeout = window.setTimeout(() => setNotice(null), 3000); return () => window.clearTimeout(timeout); }, [notice]);
+  const visibleExercises = useMemo(() => filterExerciseLibrary(exercises, { query, filters }), [exercises, filters, query]);
+  const groupedExercises = useMemo(() => groupExerciseLibrary(visibleExercises), [visibleExercises]);
+  const previewExercises = useMemo(() => filterExerciseLibrary(exercises, { query, filters: draftFilters }), [draftFilters, exercises, query]);
+  const implementOptions = useMemo(() => exerciseLibraryImplementOptions(exercises), [exercises]);
+  const activeFilterCount = exerciseLibraryActiveFilterCount(filters);
 
-  const visibleExercises = useMemo(
-    () => filterExerciseLibrary(exercises, { query, group }),
-    [exercises, group, query],
-  );
-  const groupedExercises = useMemo(
-    () => groupExerciseLibrary(visibleExercises),
-    [visibleExercises],
-  );
-  const filterPreviewCount = useMemo(
-    () => filterExerciseLibrary(exercises, { query, group: draftGroup }).length,
-    [draftGroup, exercises, query],
-  );
-  const hasFilters = Boolean(query.trim()) || group !== "all";
-  const showGroups = !query.trim() && group === "all";
-  const selectedGroup = GROUP_FILTER_OPTIONS.find((option) => option.value === group);
-
-  function openCreate() {
-    setError(null);
-    setEditing(null);
-    setForm(emptyForm());
-    setEditorOpen(true);
-  }
-
-  function openEdit(exercise: ExerciseLibraryItem) {
-    setError(null);
-    setEditing(exercise);
-    setForm(formFromExercise(exercise));
-    setEditorOpen(true);
-  }
-
-  function clearFilters() {
-    setQuery("");
-    setGroup("all");
-    setDraftGroup("all");
-    setFiltersOpen(false);
-  }
-
-  function handleFiltersOpenChange(open: boolean) {
-    if (open) setDraftGroup(group);
-    setFiltersOpen(open);
-  }
-
-  function applyGroupFilter() {
-    setGroup(draftGroup);
-    setFiltersOpen(false);
-  }
+  function openCreate() { setEditing(null); setForm(emptyForm()); setSelectedRoutineIds([]); setError(null); setEditorOpen(true); }
+  function openEdit(exercise: ExerciseLibraryItem) { setEditing(exercise); setForm(formFromExercise(exercise)); setSelectedRoutineIds(exercise.memberships.map((item) => item.id)); setError(null); setEditorOpen(true); }
+  function openFilters() { setDraftFilters(cloneFilters(filters)); setFiltersOpen(true); }
+  function clearDraftFilters() { setDraftFilters(cloneFilters(DEFAULT_EXERCISE_LIBRARY_FILTERS)); }
 
   function saveExercise(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (pending) return;
-
-    setError(null);
+    event.preventDefault(); if (pending) return; setError(null);
     let input: ExerciseMutationInput;
-    try {
-      input = mutationFromForm(form);
-    } catch (validationError) {
-      setError(
-        validationError instanceof Error
-          ? validationError.message
-          : "Revisá los valores del ejercicio.",
-      );
-      return;
-    }
-
+    try { input = mutationFromForm(form); } catch (cause) { setError(cause instanceof Error ? cause.message : "Revisá los valores del ejercicio."); return; }
     startTransition(async () => {
-      const result = editing
-        ? await updateExerciseAction(editing.id, input)
-        : await createExerciseAction(input);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-
-      setExercises((current) => {
-        const next = result.data;
-        const withoutCurrent = current.filter((exercise) => exercise.id !== next.id);
-        return [...withoutCurrent, next].sort((left, right) =>
-          left.nombre.localeCompare(right.nombre, "es-AR"),
-        );
-      });
-      setEditorOpen(false);
-      setNotice(editing ? "Cambios guardados" : "Ejercicio creado");
-      router.refresh();
+      const result = editing ? await updateExerciseAction(editing.id, input, selectedRoutineIds) : await createExerciseAction(input, selectedRoutineIds);
+      if (!result.ok) { setError(result.error); return; }
+      const memberships = initialRoutines.filter((routine) => selectedRoutineIds.includes(routine.id));
+      const next: ExerciseLibraryItem = { ...result.data, memberships };
+      setExercises((current) => sortExerciseLibrary([...current.filter((item) => item.id !== next.id), next]));
+      setOpenGroups((current) => new Set([...current, next.grupo_muscular ?? "none"]));
+      setEditorOpen(false); setNotice(result.warning ?? (editing ? "Cambios guardados" : "Ejercicio creado")); router.refresh();
     });
   }
 
-  function archive() {
+  function archiveConfirmed() {
     if (!archiveTarget || pending) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await archiveExerciseAction(archiveTarget.id);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setExercises((current) =>
-        current.filter((exercise) => exercise.id !== archiveTarget.id),
-      );
-      setArchiveTarget(null);
-      setNotice("Ejercicio archivado");
-      router.refresh();
-    });
+    startTransition(async () => { const result = await archiveExerciseAction(archiveTarget.id); if (!result.ok) { setError(result.error); return; }
+      setExercises((current) => current.map((item) => item.id === archiveTarget.id ? { ...item, is_active: false } : item));
+      setArchiveTarget(null); setNotice("Ejercicio archivado"); router.refresh(); });
   }
 
-  return (
-    <div className="space-y-5 lg:mx-auto lg:max-w-3xl">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1>
-          <p className="text-sm text-muted-foreground">Buscá y organizá tus ejercicios.</p>
-        </div>
-        <Button type="button" onClick={openCreate} size="sm" className="shrink-0 lg:h-11 lg:px-3">
-          <Plus className="size-4" aria-hidden />
-          <span className="lg:hidden">Nuevo</span>
-          <span className="hidden lg:inline">Nuevo ejercicio</span>
-        </Button>
+  function restoreCurrent() {
+    if (!editing || pending) return;
+    startTransition(async () => { const result = await restoreExerciseAction(editing.id); if (!result.ok) { setError(result.error); return; }
+      setExercises((current) => current.map((item) => item.id === editing.id ? { ...item, ...result.data } : item));
+      setEditorOpen(false); setNotice("Ejercicio restaurado"); router.refresh(); });
+  }
+
+  const statusHeading = filters.status === "active" ? "Ejercicios activos" : filters.status === "archived" ? "Ejercicios archivados" : "Todos los ejercicios";
+  return <div className="space-y-5 lg:mx-auto lg:max-w-3xl">
+    <div className="flex items-start justify-between gap-4"><div className="space-y-1"><h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1><p className="text-sm text-muted-foreground">Buscá y organizá tus ejercicios.</p></div>
+      <Button type="button" onClick={openCreate} className="shrink-0"><Plus className="size-4" aria-hidden />Nuevo</Button></div>
+
+    <div className="flex gap-2"><label className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+      <Input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 pl-9 pr-10" placeholder="Buscar ejercicio, músculo o implemento" aria-label="Buscar ejercicio, músculo o implemento" />
+      {query ? <button type="button" onClick={() => setQuery("")} className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label="Limpiar búsqueda"><X className="size-4" /></button> : null}</label>
+      <Button type="button" variant="outline" className="h-11 shrink-0 px-3 text-primary" onClick={openFilters} aria-haspopup="dialog"><SlidersHorizontal className="size-4" aria-hidden /><span className="hidden sm:inline">Filtros</span>{activeFilterCount ? <span>· {activeFilterCount}</span> : null}</Button></div>
+
+    {activeFilterCount ? <div className="flex flex-wrap gap-2" aria-label="Filtros activos">
+      {filters.withoutRoutine ? <FilterChip onRemove={() => setFilters({ ...filters, withoutRoutine: false })}>Sin rutina</FilterChip> : null}
+      {filters.routineIds.map((id) => <FilterChip key={id} onRemove={() => setFilters({ ...filters, routineIds: filters.routineIds.filter((item) => item !== id) })}>{initialRoutines.find((routine) => routine.id === id)?.nombre ?? "Rutina"}</FilterChip>)}
+      {filters.muscleGroups.map((group) => <FilterChip key={group} onRemove={() => setFilters({ ...filters, muscleGroups: filters.muscleGroups.filter((item) => item !== group) })}>{group === "none" ? "Sin grupo" : muscleGroupLabel(group)}</FilterChip>)}
+      {filters.implements.map((item) => <FilterChip key={item} onRemove={() => setFilters({ ...filters, implements: filters.implements.filter((value) => value !== item) })}>{item}</FilterChip>)}
+      {filters.status !== "active" ? <FilterChip onRemove={() => setFilters({ ...filters, status: "active" })}>{filters.status === "archived" ? "Archivados" : "Todos"}</FilterChip> : null}
+    </div> : null}
+
+    <section className="space-y-2" aria-labelledby="exercise-library-list-title"><div className="flex items-center justify-between gap-3 px-1"><h2 id="exercise-library-list-title" className="text-sm text-muted-foreground">{query.trim() ? "Resultados" : statusHeading}</h2><span className="text-sm text-muted-foreground">{visibleExercises.length} {visibleExercises.length === 1 ? "ejercicio" : "ejercicios"}</span></div>
+      {visibleExercises.length === 0 ? <div className="rounded-2xl border border-dashed p-6 text-center"><p className="text-sm text-muted-foreground">{query ? `No encontramos “${query.trim()}”.` : "No hay ejercicios con estos filtros."}</p><Button type="button" variant="link" onClick={() => { setQuery(""); setFilters(cloneFilters(DEFAULT_EXERCISE_LIBRARY_FILTERS)); }}>Limpiar</Button></div>
+        : query.trim() ? <div className="overflow-hidden rounded-xl border bg-card"><ExerciseRows exercises={sortExerciseLibrary(visibleExercises)} onEdit={openEdit} /></div>
+        : <div className="space-y-2">{groupedExercises.map((section) => { const open = openGroups.has(section.value); return <section key={section.value} className="overflow-hidden rounded-xl border bg-card"><button type="button" aria-expanded={open} onClick={() => setOpenGroups((current) => { const next = new Set(current); if (open) next.delete(section.value); else next.add(section.value); return next; })} className="flex min-h-14 w-full items-center gap-3 px-4 text-left outline-none hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+          {open ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}<span className="flex-1 text-sm font-semibold uppercase tracking-wide">{section.label}</span><span className="rounded-full bg-muted px-2.5 py-1 text-xs">{section.exercises.length}</span></button>{open ? <ExerciseRows exercises={section.exercises} onEdit={openEdit} /> : null}</section>; })}</div>}
+    </section>
+
+    <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+      <SheetHeader title="Filtrar ejercicios" description="Acotá la biblioteca por rutina, músculo e implemento." closeLabel="Cerrar filtros" action={<button type="button" onClick={clearDraftFilters} className="text-sm font-medium text-primary">Limpiar</button>} />
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+        <fieldset><legend className="font-semibold">Rutina</legend><div className="mt-3 flex flex-wrap gap-2"><FilterChoice selected={!draftFilters.withoutRoutine && draftFilters.routineIds.length === 0} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: false, routineIds: [] })}>Todas</FilterChoice><FilterChoice selected={draftFilters.withoutRoutine} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: !draftFilters.withoutRoutine, routineIds: [] })}>Sin rutina</FilterChoice>{initialRoutines.map((routine) => <FilterChoice key={routine.id} selected={draftFilters.routineIds.includes(routine.id)} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: false, routineIds: toggleValue(draftFilters.routineIds, routine.id) })}>{routine.nombre}</FilterChoice>)}</div></fieldset>
+        <fieldset><legend className="font-semibold">Grupo muscular</legend><div className="mt-3 flex flex-wrap gap-2"><FilterChoice selected={draftFilters.muscleGroups.length === 0} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: [] })}>Todos</FilterChoice>{GROUP_OPTIONS.map((group) => <FilterChoice key={group.value} selected={draftFilters.muscleGroups.includes(group.value)} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: toggleValue(draftFilters.muscleGroups, group.value) })}>{group.label}</FilterChoice>)}</div></fieldset>
+        <fieldset><legend className="font-semibold">Implemento</legend><div className="mt-3 flex flex-wrap gap-2">{implementOptions.map((item) => <FilterChoice key={item} selected={draftFilters.implements.includes(item)} onClick={() => setDraftFilters({ ...draftFilters, implements: toggleValue(draftFilters.implements, item) })}>{item}</FilterChoice>)}</div></fieldset>
+        <fieldset><legend className="font-semibold">Estado</legend><div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border">{([['active','Activos'],['archived','Archivados'],['all','Todos']] as const).map(([value,label]) => <button key={value} type="button" aria-pressed={draftFilters.status === value} onClick={() => setDraftFilters({ ...draftFilters, status: value as ExerciseLibraryStatus })} className={`min-h-11 border-r text-sm last:border-r-0 ${draftFilters.status === value ? "bg-primary/10 font-medium text-primary" : "bg-background"}`}>{label}</button>)}</div></fieldset>
       </div>
+      <footer className="flex shrink-0 items-center justify-between gap-4 border-t bg-card px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5"><span className="text-sm text-muted-foreground">{previewExercises.length} {previewExercises.length === 1 ? "ejercicio" : "ejercicios"}</span><Button type="button" onClick={() => { setFilters(cloneFilters(draftFilters)); setFiltersOpen(false); }}>Ver ejercicios</Button></footer>
+    </Sheet>
 
-      <div className="flex gap-2">
-        <label className="relative min-w-0 flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="h-11 pr-10 pl-9"
-            placeholder="Buscar ejercicio"
-            aria-label="Buscar ejercicio"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Limpiar búsqueda"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          ) : null}
-        </label>
-        <button
-          type="button"
-          onClick={() => handleFiltersOpenChange(true)}
-          className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
-          aria-label={
-            group === "all"
-              ? "Filtrar ejercicios"
-              : `Filtrar ejercicios. Filtro activo: ${selectedGroup?.label}`
-          }
-          aria-haspopup="dialog"
-        >
-          <SlidersHorizontal className="size-4" aria-hidden />
-          {group !== "all" ? (
-            <span
-              className="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background"
-              aria-hidden
-            />
-          ) : null}
-        </button>
-        <select
-          value={group}
-          onChange={(event) => setGroup(event.target.value as ExerciseLibraryFilter)}
-          className="hidden h-11 min-w-40 rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring lg:block"
-          aria-label="Filtrar por grupo muscular"
-        >
-          {GROUP_FILTER_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label === "Todos" ? "Grupo: Todos" : option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+    <Sheet open={editorOpen} large initialFocus={editorCloseRef} onOpenChange={(open) => { if (!pending) { setEditorOpen(open); if (!open) setError(null); } }}>
+      <SheetHeader title={editing ? "Editar ejercicio" : "Nuevo ejercicio"} description={editing ? "Actualizá la configuración del ejercicio." : "Agregalo a tu biblioteca para usarlo cuando lo necesites."} closeLabel="Cerrar formulario de ejercicio" closeRef={editorCloseRef} pending={pending} />
+      <form onSubmit={saveExercise} className="flex min-h-0 flex-1 flex-col" noValidate><div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-5 sm:px-5"><ExerciseForm values={form} onChange={setForm} pending={pending} editing={editing} routines={initialRoutines} selectedRoutineIds={selectedRoutineIds} onRoutineIdsChange={setSelectedRoutineIds} error={error} onArchive={() => { if (editing) { setError(null); setEditorOpen(false); setArchiveTarget(editing); } }} onRestore={restoreCurrent} /></div>
+        <footer className="shrink-0 border-t bg-card px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5"><Button className="h-11 w-full" type="submit" disabled={pending}>{pending ? (editing ? "Guardando…" : "Creando…") : editing ? "Guardar cambios" : "Crear ejercicio"}</Button></footer></form>
+    </Sheet>
 
-      {group !== "all" ? (
-        <div className="flex flex-wrap items-center gap-2" aria-label="Filtros activos">
-          <Button type="button" size="sm" variant="secondary" onClick={() => setGroup("all")}>
-            {selectedGroup?.label}
-            <X className="size-3" aria-hidden />
-          </Button>
-          {query ? (
-            <Button type="button" size="sm" variant="ghost" onClick={clearFilters}>
-              Limpiar filtros
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+    <Sheet open={Boolean(archiveTarget)} onOpenChange={(open) => { if (!open && !pending) setArchiveTarget(null); }}><div className="p-5"><Dialog.Title className="font-semibold">¿Archivar {archiveTarget?.nombre}?</Dialog.Title><Dialog.Description className="mt-2 text-sm text-muted-foreground">Se ocultará de los ejercicios activos. Las sesiones anteriores y sus rutinas se conservan.</Dialog.Description><div className="mt-5 flex justify-end gap-2"><Dialog.Close render={<Button type="button" variant="outline" disabled={pending} />}>Cancelar</Dialog.Close><Button type="button" variant="destructive" onClick={archiveConfirmed} disabled={pending}>{pending ? "Archivando…" : "Archivar"}</Button></div>{error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}</div></Sheet>
 
-      <section aria-labelledby="exercise-library-list-title" className="space-y-2">
-        <div className="flex items-center justify-between gap-3 px-1">
-          <h2 id="exercise-library-list-title" className="sr-only">
-            Biblioteca de ejercicios
-          </h2>
-          <span className="text-sm text-muted-foreground">
-            {hasFilters ? "Resultados" : "Ejercicios activos"}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {visibleExercises.length} {visibleExercises.length === 1 ? "ejercicio" : "ejercicios"}
-          </span>
-        </div>
-
-        {exercises.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-6 text-center">
-            <p className="text-sm text-muted-foreground">Todavía no creaste ejercicios.</p>
-            <Button type="button" size="sm" className="mt-3" onClick={openCreate}>
-              <Plus className="size-3.5" aria-hidden />Crear ejercicio
-            </Button>
-          </div>
-        ) : visibleExercises.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              {query ? `No encontramos “${query.trim()}”.` : "No encontramos ejercicios con ese filtro."}
-            </p>
-            <Button type="button" variant="link" className="mt-1 h-auto px-0" onClick={clearFilters}>
-              Limpiar filtros
-            </Button>
-          </div>
-        ) : showGroups ? (
-          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
-            {groupedExercises.map((section) => (
-              <section key={section.value} aria-labelledby={`exercise-group-${section.value}`}>
-                <h3
-                  id={`exercise-group-${section.value}`}
-                  className="border-y border-border/70 bg-muted/35 px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground first:border-t-0"
-                >
-                  {section.label}
-                </h3>
-                <ExerciseRows exercises={section.exercises} onEdit={openEdit} />
-              </section>
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border/80 bg-card">
-            <ExerciseRows exercises={sortExerciseLibrary(visibleExercises)} onEdit={openEdit} />
-          </div>
-        )}
-      </section>
-
-      <Sheet open={filtersOpen} onOpenChange={handleFiltersOpenChange}>
-        <header className="relative border-b border-border/70 px-4 pb-3 pt-3 sm:px-5 lg:pt-5">
-          <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
-          <Dialog.Title className="text-lg font-semibold">Filtrar ejercicios</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-            Elegí un grupo muscular para acotar la biblioteca.
-          </Dialog.Description>
-          <Dialog.Close
-            type="button"
-            className="absolute right-2 top-3 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:right-3 lg:top-3"
-            aria-label="Cerrar filtros"
-          >
-            <X className="size-4" aria-hidden />
-          </Dialog.Close>
-        </header>
-        <div className="overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
-          <p className="text-sm font-medium">Grupo muscular</p>
-          <div className="mt-3 flex flex-wrap gap-2" aria-label="Grupo muscular">
-            {GROUP_FILTER_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={draftGroup === option.value}
-                onClick={() => setDraftGroup(option.value)}
-                className={`min-h-9 rounded-full border px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-                  draftGroup === option.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-foreground hover:bg-muted"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <footer className="flex items-center justify-between gap-3 border-t border-border/70 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 lg:pb-3">
-          {draftGroup !== "all" ? (
-            <Button type="button" variant="ghost" onClick={() => setDraftGroup("all")}>
-              Limpiar
-            </Button>
-          ) : (
-            <span aria-hidden />
-          )}
-          <Button type="button" onClick={applyGroupFilter}>
-            Ver {filterPreviewCount} {filterPreviewCount === 1 ? "ejercicio" : "ejercicios"}
-          </Button>
-        </footer>
-      </Sheet>
-
-      <Sheet
-        open={editorOpen}
-        variant="editor"
-        initialFocus={editorCloseRef}
-        onOpenChange={(open) => {
-          if (!pending) {
-            setEditorOpen(open);
-            if (!open) setError(null);
-          }
-        }}
-      >
-        <header className="relative shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5 lg:pt-5">
-          <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
-          <Dialog.Title className="text-xl font-semibold tracking-tight">
-            {editing ? "Editar ejercicio" : "Nuevo ejercicio"}
-          </Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-            {editing
-              ? "Actualizá los valores generales de este ejercicio."
-              : "Agregalo a tu biblioteca para usarlo cuando lo necesites."}
-          </Dialog.Description>
-          <Dialog.Close
-            ref={editorCloseRef}
-            type="button"
-            aria-label="Cerrar formulario de ejercicio"
-            disabled={pending}
-            className="absolute right-2 top-7 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none transition-[background-color,color,transform] hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:scale-95 lg:right-3 lg:top-3"
-          >
-            <X className="size-4.5" aria-hidden />
-          </Dialog.Close>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 [-webkit-overflow-scrolling:touch] sm:px-5">
-          <form onSubmit={saveExercise} noValidate>
-            <ExerciseForm
-              values={form}
-              onChange={setForm}
-              pending={pending}
-              submitLabel={editing ? "Guardar cambios" : "Crear ejercicio"}
-            />
-          </form>
-          {editing ? (
-            <div className="mt-6 border-t pt-5">
-              <p className="text-sm font-medium">Acciones de biblioteca</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Archivar lo oculta de los ejercicios activos; las sesiones y registros anteriores se conservan.
-              </p>
-              <Button
-                type="button"
-                variant="destructive"
-                className="mt-3 w-full"
-                disabled={pending}
-                onClick={() => {
-                  setError(null);
-                  setEditorOpen(false);
-                  setArchiveTarget(editing);
-                }}
-              >
-                <Archive className="size-4" aria-hidden />Archivar ejercicio
-              </Button>
-            </div>
-          ) : null}
-          {error ? (
-            <p className="mt-4 text-sm text-destructive" role="alert" aria-live="polite">
-              {error}
-            </p>
-          ) : null}
-        </div>
-      </Sheet>
-
-      <Sheet
-        open={Boolean(archiveTarget)}
-        onOpenChange={(open) => {
-          if (!open && !pending) {
-            setArchiveTarget(null);
-            setError(null);
-          }
-        }}
-      >
-        <div className="p-5">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-              <Archive className="size-5" aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <Dialog.Title className="text-base font-semibold">
-                ¿Archivar {archiveTarget?.nombre}?
-              </Dialog.Title>
-              <Dialog.Description className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Ya no aparecerá entre tus ejercicios activos. Las sesiones y registros históricos existentes se conservan.
-              </Dialog.Description>
-            </div>
-            <Dialog.Close
-              type="button"
-              aria-label="Cancelar archivado"
-              disabled={pending}
-              className="-mr-2 -mt-2 flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-            >
-              <X className="size-4" aria-hidden />
-            </Dialog.Close>
-          </div>
-          {error ? (
-            <p className="mt-3 text-sm text-destructive" role="alert" aria-live="polite">
-              {error}
-            </p>
-          ) : null}
-          <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close render={<Button type="button" variant="outline" disabled={pending} />}>
-              Cancelar
-            </Dialog.Close>
-            <Button type="button" variant="destructive" disabled={pending} onClick={archive}>
-              {pending ? "Archivando…" : "Archivar"}
-            </Button>
-          </div>
-        </div>
-      </Sheet>
-
-      {notice ? (
-        <div
-          className="fixed inset-x-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-sm items-center justify-center gap-2 rounded-xl border bg-card/95 px-4 py-3 text-sm font-medium shadow-lg backdrop-blur lg:bottom-6 lg:left-auto lg:right-6 lg:mx-0"
-          role="status"
-          aria-live="polite"
-        >
-          <Check className="size-4 text-primary" aria-hidden />{notice}
-        </div>
-      ) : null}
-    </div>
-  );
+    {notice ? <div className="fixed inset-x-4 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-sm items-center justify-center gap-2 rounded-xl border bg-card/95 px-4 py-3 text-sm font-medium shadow-lg backdrop-blur" role="status"><Check className="size-4 text-primary" aria-hidden />{notice}</div> : null}
+  </div>;
 }

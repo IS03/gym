@@ -277,6 +277,7 @@ export async function createExercise(input: {
   rir_sugerido: number | null;
   descanso_min_sugerido_segundos: number | null;
   descanso_max_sugerido_segundos: number | null;
+  notes?: string | null;
 }): Promise<Exercise> {
   assertNonEmpty(input.nombre, "Nombre");
   const supabase = await createClient();
@@ -297,6 +298,7 @@ export async function createExercise(input: {
       rir_sugerido: input.rir_sugerido,
       descanso_min_sugerido_segundos: input.descanso_min_sugerido_segundos,
       descanso_max_sugerido_segundos: input.descanso_max_sugerido_segundos,
+      notes: input.notes ?? null,
       is_active: true,
     })
     .select("*")
@@ -325,6 +327,7 @@ export async function updateExercise(input: {
   rir_sugerido?: number | null;
   descanso_min_sugerido_segundos?: number | null;
   descanso_max_sugerido_segundos?: number | null;
+  notes?: string | null;
   is_active?: boolean;
 }): Promise<Exercise> {
   const supabase = await createClient();
@@ -351,6 +354,7 @@ export async function updateExercise(input: {
   if (input.descanso_max_sugerido_segundos !== undefined) {
     patch.descanso_max_sugerido_segundos = input.descanso_max_sugerido_segundos;
   }
+  if (input.notes !== undefined) patch.notes = input.notes;
   if (input.is_active !== undefined) patch.is_active = input.is_active;
 
   const { data, error } = await supabase
@@ -373,6 +377,10 @@ export async function updateExercise(input: {
 
 export async function archiveExercise(id: string): Promise<void> {
   await updateExercise({ id, is_active: false });
+}
+
+export async function restoreExercise(id: string): Promise<Exercise> {
+  return updateExercise({ id, is_active: true });
 }
 
 export async function listRoutines(
@@ -662,6 +670,45 @@ export async function removeRoutineExercise(input: {
     .eq("id", input.routineExerciseId);
 
   if (error) throw new Error(`Quitar ejercicio de rutina: ${error.message}`);
+}
+
+export async function syncExerciseActiveRoutineMemberships(input: {
+  exerciseId: string;
+  routineIds: string[];
+}): Promise<void> {
+  const supabase = await createClient();
+  const userId = await getAuthedUserId();
+  const requestedIds = [...new Set(input.routineIds.filter(Boolean))];
+
+  const { data: activeRoutines, error: routineError } = await supabase
+    .from("routines")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+  if (routineError) throw new Error(`Leer rutinas activas: ${routineError.message}`);
+  const activeIds = new Set((activeRoutines ?? []).map((routine) => String(routine.id)));
+  if (requestedIds.some((id) => !activeIds.has(id))) {
+    throw new Error("Una de las rutinas seleccionadas ya no está activa.");
+  }
+
+  const { data: currentRows, error: currentError } = activeIds.size
+    ? await supabase.from("routine_exercises").select("id, routine_id").eq("exercise_id", input.exerciseId).in("routine_id", [...activeIds])
+    : { data: [], error: null };
+  if (currentError) throw new Error(`Leer uso en rutinas: ${currentError.message}`);
+  const currentByRoutine = new Map((currentRows ?? []).map((row) => [String(row.routine_id), String(row.id)]));
+  const requested = new Set(requestedIds);
+  const removeIds = [...currentByRoutine].filter(([routineId]) => !requested.has(routineId)).map(([, id]) => id);
+  if (removeIds.length) {
+    const { error } = await supabase.from("routine_exercises").delete().in("id", removeIds);
+    if (error) throw new Error(`Quitar ejercicio de rutinas: ${error.message}`);
+  }
+
+  const addIds = requestedIds.filter((routineId) => !currentByRoutine.has(routineId));
+  if (!addIds.length) return;
+  const { error: insertError } = await supabase
+    .from("routine_exercises")
+    .insert(addIds.map((routineId) => ({ routine_id: routineId, exercise_id: input.exerciseId })));
+  if (insertError) throw new Error(`Agregar ejercicio a rutinas: ${insertError.message}`);
 }
 
 export async function startFreeSession(input: {

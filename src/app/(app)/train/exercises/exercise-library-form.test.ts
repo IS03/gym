@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyForm,
   formFromExercise,
   mutationFromForm,
 } from "../../../../lib/phase2/exercise-form";
 import { normalizeExerciseMutation } from "../../../../lib/phase2/exercise-mutation";
 
 describe("exercise library form", () => {
-  it("hidrata los descansos generales del ejercicio en segundos al editar", () => {
+  it("hidrata los descansos generales del ejercicio como mm:ss al editar", () => {
     const form = formFromExercise({
       id: "exercise-1",
       nombre: "CURL POLEA BARRA",
@@ -20,11 +21,14 @@ describe("exercise library form", () => {
       rir_sugerido: 2,
       descanso_min_sugerido_segundos: 90,
       descanso_max_sugerido_segundos: 90,
+      notes: "Controlar técnica",
+      is_active: true,
       updated_at: "2026-08-26T00:00:00.000Z",
+      memberships: [],
     });
 
-    expect(form.descanso_min_sugerido_segundos).toBe("90");
-    expect(form.descanso_max_sugerido_segundos).toBe("90");
+    expect(form.descanso_min_sugerido_segundos).toBe("1:30");
+    expect(form.descanso_max_sugerido_segundos).toBe("1:30");
     expect(form.implement).toBe("Polea con barra");
     expect(form.weight_mode).toBe("Peso total");
   });
@@ -40,8 +44,9 @@ describe("exercise library form", () => {
       reps_sugeridas: "",
       peso_sugerido: "",
       rir_sugerido: "",
-      descanso_min_sugerido_segundos: "90",
-      descanso_max_sugerido_segundos: "120",
+      descanso_min_sugerido_segundos: "1:30",
+      descanso_max_sugerido_segundos: "2:00",
+      notes: "",
     }));
 
     expect(input).toMatchObject({
@@ -51,5 +56,31 @@ describe("exercise library form", () => {
       descanso_min_sugerido_segundos: 90,
       descanso_max_sugerido_segundos: 120,
     });
+  });
+
+  it("mantiene defaults opcionales y acepta un solo descanso", () => {
+    const input = normalizeExerciseMutation(mutationFromForm({
+      ...emptyForm(),
+      nombre: "Movilidad",
+      descanso_min_sugerido_segundos: "1:30",
+    }));
+    expect(input).toMatchObject({
+      series_sugeridas: null,
+      reps_sugeridas: null,
+      peso_sugerido: null,
+      rir_sugerido: null,
+      descanso_min_sugerido_segundos: 90,
+      descanso_max_sugerido_segundos: null,
+    });
+  });
+
+  it("valida el rango de descanso en formato humano", () => {
+    expect(() => normalizeExerciseMutation(mutationFromForm({
+      ...emptyForm(),
+      nombre: "Press",
+      descanso_min_sugerido_segundos: "2:00",
+      descanso_max_sugerido_segundos: "1:30",
+    }))).toThrow("no puede superar");
+    expect(() => mutationFromForm({ ...emptyForm(), nombre: "Press", descanso_min_sugerido_segundos: "1:75" })).toThrow("entre 0:00 y 60:00");
   });
 });
