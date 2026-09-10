@@ -30,7 +30,9 @@ describe("PR76 — Entrenar y organización V2", () => {
   it("preserva la ruta dedicada como deep link y el detalle real con múltiples sesiones", () => {
     expect(dedicatedCalendar).toContain("trainingCalendarHref(addMonths(month, -1), routineId)");
     expect(dedicatedCalendar).toContain("trainingDayHref(entry.date, { routineId: routineId || null })");
-    expect(day).toContain("listCompletedSessionHistory({ logDate: date, limit: 100 })");
+    expect(day).toContain("listCompletedSessionHistory({");
+    expect(day).toContain("logDate: date");
+    expect(day).toContain("limit: 100");
     expect(day).toContain("sessions.map((session, index)");
     expect(day).toContain("trainingDayReturnTarget(date, routineId || null, source)");
   });

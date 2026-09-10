@@ -204,6 +204,7 @@ export type CompletedSessionSummary = {
   durationMilliseconds: number | null;
   exercisesCompleted: number;
   completedSets: number;
+  volumeKg?: number | null;
   muscleGroups: string[];
 };
 
