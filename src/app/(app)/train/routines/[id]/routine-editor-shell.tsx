@@ -148,7 +148,7 @@ export function RoutineEditorShell({
             <Dumbbell className="mx-auto size-5 text-primary" aria-hidden />
             <h3 className="mt-3 text-base font-semibold">Todavía no tiene ejercicios</h3>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Agregá el primero para empezar a armar esta rutina.</p>
-            <Button type="button" className="mt-4 h-11" onClick={openPicker}><Plus className="size-4" aria-hidden />Agregar ejercicio</Button>
+            <Button type="button" variant="outline" className="mt-4 h-10 w-full max-w-xs border-primary/20 bg-primary/10 text-primary hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20" onClick={openPicker}><Plus className="size-4" aria-hidden />Agregar ejercicio</Button>
           </div>
         ) : (
           <RoutineTemplateEditor
@@ -161,8 +161,8 @@ export function RoutineEditorShell({
         )}
 
         {shouldShowRoutineExerciseSectionAddAction(items.length) ? (
-          <div className="flex justify-center pt-1">
-            <Button type="button" size="sm" variant="outline" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
+          <div className="flex justify-center px-4 pt-1">
+            <Button type="button" size="sm" variant="outline" className="h-10 w-full max-w-xs border-primary/20 bg-primary/10 text-primary hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
               <Plus className="size-4" aria-hidden />
               Agregar ejercicio
             </Button>

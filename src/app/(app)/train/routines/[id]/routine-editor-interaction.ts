@@ -24,6 +24,11 @@ export function shouldShowRoutineExerciseSectionAddAction(itemCount: number) {
   return itemCount > 0;
 }
 
+/** Prescriptions belong to the editor, not to the compact overview row. */
+export function shouldShowRoutineExercisePrescription(isExpanded: boolean) {
+  return isExpanded;
+}
+
 export type SelectableRoutineAdjustment = Extract<
   TrainingAdjustment,
   "increase_weight" | "increase_reps"
