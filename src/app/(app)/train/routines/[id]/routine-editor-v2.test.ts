@@ -22,6 +22,16 @@ describe("PR78 — editor compacto de rutinas", () => {
     expect(editor).toContain("aria-expanded={isOpen}");
     expect(editor).toContain("summary.setLabel");
     expect(editor).toContain("exerciseIdentityLabel");
+    expect(editor).toContain("shouldShowRoutineExercisePrescription(isOpen)");
+    expect(editor).toContain("showPrescription ? (");
+  });
+
+  it("centra número, contenido, chevron y menú sobre el mismo eje", () => {
+    expect(editor).toContain("min-h-16 min-w-0 flex-1 items-center");
+    expect(editor).toContain("flex size-7 shrink-0 items-center justify-center");
+    expect(editor).toContain("size-4 shrink-0 text-muted-foreground");
+    expect(editor).toContain("flex size-10 cursor-pointer");
+    expect(editor).not.toContain("metric-number mt-0.5");
   });
 
   it("mantiene series editables con reps, peso y RIR centrados", () => {
@@ -59,5 +69,12 @@ describe("PR78 — editor compacto de rutinas", () => {
     expect(shell).toContain("Todavía no tiene ejercicios");
     expect(shell).toContain("Agregá el primero para empezar a armar esta rutina.");
     expect(shell).toContain("RoutineExerciseAddDialog");
+  });
+
+  it("usa acciones violetas suaves y conserva ambos flujos de agregado", () => {
+    expect(editor).toContain("Agregar serie");
+    expect(editor).toContain("bg-primary/10 text-primary hover:bg-primary/15");
+    expect(shell).toContain("Agregar ejercicio");
+    expect(shell).toContain("w-full max-w-xs border-primary/20 bg-primary/10");
   });
 });

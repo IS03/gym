@@ -24,6 +24,7 @@ import {
 } from "../../actions";
 import {
   nextExpandedRoutineExerciseId,
+  shouldShowRoutineExercisePrescription,
   toggleRoutineNextAdjustment,
   type SelectableRoutineAdjustment,
 } from "./routine-editor-interaction";
@@ -240,6 +241,7 @@ export function RoutineTemplateEditor({
           const status = statuses[item.id];
           const dirty = dirtyIds.has(item.id);
           const isOpen = expandedExerciseId === item.id;
+          const showPrescription = shouldShowRoutineExercisePrescription(isOpen);
           const summary = summarizeRoutineExerciseTarget(payload);
           const identity = exerciseIdentityLabel(item.exercise);
           const contentId = `routine-target-${item.id}`;
@@ -257,20 +259,22 @@ export function RoutineTemplateEditor({
                   aria-expanded={isOpen}
                   aria-controls={contentId}
                   onClick={() => setExpandedExerciseId((current) => nextExpandedRoutineExerciseId(current, item.id))}
-                  className="flex min-h-[72px] min-w-0 flex-1 items-start gap-2.5 py-2.5 pr-2 pl-4 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2.5 pr-2 pl-4 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="metric-number mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                  <span className="metric-number flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold leading-5">{item.exercise.nombre}</span>
                     <span className="block truncate text-xs leading-4 text-muted-foreground">{identity}</span>
-                    <span className="block truncate text-xs leading-4 text-muted-foreground">
-                      {[summary.setLabel, ...summary.signals, summary.adjustmentLabel].filter(Boolean).join(" · ")}
-                    </span>
+                    {showPrescription ? (
+                      <span className="block truncate text-xs leading-4 text-muted-foreground">
+                        {[summary.setLabel, ...summary.signals, summary.adjustmentLabel].filter(Boolean).join(" · ")}
+                      </span>
+                    ) : null}
                   </span>
                   <ChevronDown
-                    className={`mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
+                    className={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
                     aria-hidden
                   />
                 </button>
@@ -400,7 +404,7 @@ export function RoutineTemplateEditor({
                       ))}
                     </div>
                     <Button
-                      className="h-9 w-full"
+                      className="h-9 w-full border-primary/20 bg-primary/10 text-primary hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20"
                       type="button"
                       size="sm"
                       variant="outline"
