@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RoutineColorPicker } from "@/components/training/routine-color-picker";
-import type { RoutineColorKey } from "@/lib/phase2/routine-colors";
+import { routineColorCssVariable, type RoutineColorKey } from "@/lib/phase2/routine-colors";
 import {
   type CreateRoutineState,
   createRoutineAction,
@@ -49,18 +49,25 @@ export function RoutineCreateForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div className="space-y-1">
-        <Label htmlFor="nombre">Nombre</Label>
-        <Input
-          id="nombre"
-          name="nombre"
-          placeholder="Ej: Push B"
-          autoFocus={autoFocus}
-          required
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="relative space-y-4 rounded-xl border bg-muted/15 p-4 pl-5">
+        <span
+          className="absolute inset-y-3 left-0 w-[3px] rounded-r-full"
+          style={{ backgroundColor: routineColorCssVariable(color) }}
+          aria-hidden
         />
+        <div className="space-y-1">
+          <Label htmlFor="nombre">Nombre</Label>
+          <Input
+            id="nombre"
+            name="nombre"
+            placeholder="Ej: Push B"
+            autoFocus={autoFocus}
+            required
+          />
+        </div>
+        <RoutineColorPicker value={color} onChange={setColor} />
       </div>
-      <RoutineColorPicker value={color} onChange={setColor} />
       {error ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : null}

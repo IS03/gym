@@ -65,16 +65,26 @@ export function RoutineEditorShell({
     router.refresh();
   }
 
+  function leaveRoutine() {
+    if (dirtyCount > 0) setLeaveOpen(true);
+    else router.push("/train/routines");
+  }
+
   return (
-    <div className="space-y-6 pb-8 lg:mx-auto lg:max-w-4xl">
-      <header className="relative border-b border-border/80 pb-5">
-        <span
-          className="absolute inset-y-0 left-0 w-[3px] rounded-r-full"
-          style={{ backgroundColor: routineColorCssVariable(routine.color) }}
-          aria-hidden
-        />
-        <div className="flex flex-wrap items-start justify-between gap-4 pl-4">
-          <div className="min-w-0">
+    <div className="space-y-5 pb-8 lg:mx-auto lg:max-w-4xl">
+      <header className="space-y-4 border-b border-border/80 pb-5">
+        <Button type="button" size="sm" variant="ghost" className="-ml-2 text-muted-foreground" onClick={leaveRoutine}>
+          <ArrowLeft className="size-4" aria-hidden />
+          Rutinas
+        </Button>
+
+        <div className="relative flex items-start gap-3 pl-4">
+          <span
+            className="absolute inset-y-0 left-0 w-[3px] rounded-full"
+            style={{ backgroundColor: routineColorCssVariable(routine.color) }}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-2xl font-semibold tracking-tight lg:text-3xl">{routine.nombre}</h1>
               {!routine.is_active ? (
@@ -85,29 +95,38 @@ export function RoutineEditorShell({
               {items.length} ejercicio{items.length === 1 ? "" : "s"} · {setCount} serie{setCount === 1 ? "" : "s"}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={!canChangeStructure()} onClick={openSettings}>
-              <Pencil className="size-3.5" aria-hidden />
-              Editar rutina
-            </Button>
-            {routine.is_active ? (
-              canChangeStructure() ? (
-                <Link href={`/train/session/new?routine_id=${routine.id}`} className={cn(buttonVariants({ size: "sm" }), "h-10")}>
-                  <Play className="size-3.5" aria-hidden />
-                  Iniciar entrenamiento
-                </Link>
-              ) : (
-                <Button type="button" size="sm" disabled aria-describedby="routine-dirty-status">
-                  <Play className="size-3.5" aria-hidden />
-                  Iniciar entrenamiento
-                </Button>
-              )
-            ) : null}
-          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="-mt-1 shrink-0"
+            aria-label="Editar nombre y color de la rutina"
+            disabled={!canChangeStructure()}
+            onClick={openSettings}
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Button>
         </div>
-        <p id="routine-dirty-status" className="mt-3 min-h-5 pl-4 text-xs text-amber-700 dark:text-amber-300" aria-live="polite">
-          {changesMessage}
-        </p>
+
+        {routine.is_active ? (
+          canChangeStructure() ? (
+            <Link href={`/train/session/new?routine_id=${routine.id}`} className={cn(buttonVariants(), "w-full")}>
+              <Play className="size-4" aria-hidden />
+              Iniciar entrenamiento
+            </Link>
+          ) : (
+            <Button type="button" className="w-full" disabled aria-describedby="routine-dirty-status">
+              <Play className="size-4" aria-hidden />
+              Iniciar entrenamiento
+            </Button>
+          )
+        ) : null}
+
+        {changesMessage ? (
+          <p id="routine-dirty-status" className="text-xs text-amber-700 dark:text-amber-300" aria-live="polite">
+            {changesMessage}
+          </p>
+        ) : null}
       </header>
 
       {!routine.is_active ? (
@@ -119,21 +138,13 @@ export function RoutineEditorShell({
       ) : null}
 
       <section className="space-y-3" aria-labelledby="routine-exercises-title">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 id="routine-exercises-title" className="text-lg font-semibold tracking-tight">Ejercicios</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">La estructura primero; el detalle se abre cuando lo necesitás.</p>
-          </div>
-          {shouldShowRoutineExerciseSectionAddAction(items.length) ? (
-            <Button type="button" className="h-10" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
-              <Plus className="size-4" aria-hidden />
-              Agregar ejercicio
-            </Button>
-          ) : null}
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="routine-exercises-title" className="text-lg font-semibold tracking-tight">Ejercicios</h2>
+          {items.length > 0 ? <span className="text-xs text-muted-foreground">Abrí uno para editarlo</span> : null}
         </div>
 
         {items.length === 0 ? (
-          <div className="border border-dashed bg-muted/20 px-4 py-8 text-center">
+          <div className="rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
             <Dumbbell className="mx-auto size-5 text-primary" aria-hidden />
             <h3 className="mt-3 text-base font-semibold">Todavía no tiene ejercicios</h3>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Agregá el primero para empezar a armar esta rutina.</p>
@@ -148,6 +159,15 @@ export function RoutineEditorShell({
             onDirtyChange={setDirtyCount}
           />
         )}
+
+        {shouldShowRoutineExerciseSectionAddAction(items.length) ? (
+          <div className="flex justify-center pt-1">
+            <Button type="button" size="sm" variant="outline" disabled={!canChangeStructure()} onClick={openPicker} aria-describedby={dirtyCount > 0 ? "routine-dirty-status" : undefined}>
+              <Plus className="size-4" aria-hidden />
+              Agregar ejercicio
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       {routine.is_active ? (
@@ -170,14 +190,6 @@ export function RoutineEditorShell({
           </div>
         </details>
       ) : null}
-
-      <Button type="button" variant="outline" className="h-11 w-full" onClick={() => {
-        if (dirtyCount > 0) setLeaveOpen(true);
-        else router.push("/train/routines");
-      }}>
-        <ArrowLeft className="size-4" aria-hidden />
-        Volver a rutinas
-      </Button>
 
       <RoutineSettingsSheet
         routine={routine}

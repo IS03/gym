@@ -25,7 +25,7 @@ describe("PR 10.6 — divulgación progresiva de entrenamiento", () => {
     expect(editor).toContain("nextExpandedRoutineExerciseId");
     expect(editor).toContain("aria-expanded={isOpen}");
     expect(editor).toContain("aria-controls={contentId}");
-    expect(editor).toContain("Sin guardar");
+    expect(editor).toContain("Cambios sin guardar");
     expect(editor).toContain("saveRoutineExerciseTargetAction");
     expect(editor).toContain("moveRoutineExerciseTargetAction");
     expect(editor).toContain("removeRoutineExerciseAction");

@@ -41,7 +41,7 @@ export function RoutineCreateSheet({
                 Nueva rutina
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                Creá una plantilla y configurala a tu manera.
+                Definí su identidad. Después vas a poder agregar y ordenar ejercicios.
               </Dialog.Description>
               <Dialog.Close
                 type="button"

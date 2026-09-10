@@ -1,11 +1,10 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowDown, ArrowUp, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LocalizedDecimalInput } from "@/components/ui/localized-decimal-input";
 import { Label } from "@/components/ui/label";
@@ -172,6 +171,7 @@ export function RoutineTemplateEditor({
   }
 
   function blockStructuralMutation(id: string) {
+    setExpandedExerciseId(id);
     setStatuses((current) => ({
       ...current,
       [id]: {
@@ -234,7 +234,7 @@ export function RoutineTemplateEditor({
 
   return (
     <>
-      <div className="space-y-2">
+      <div className="divide-y divide-border/70 rounded-xl border border-border/80 bg-card shadow-sm">
         {items.map((item, index) => {
           const payload = currentById[item.id] ?? initialById[item.id];
           const status = statuses[item.id];
@@ -245,58 +245,96 @@ export function RoutineTemplateEditor({
           const contentId = `routine-target-${item.id}`;
 
           return (
-            <Card key={item.id} className="relative overflow-hidden border-border/80 shadow-sm">
+            <article key={item.id} className="relative">
               <span
-                className={`absolute inset-y-3 left-0 w-[3px] rounded-r-full transition-opacity duration-200 motion-reduce:transition-none ${isOpen ? "opacity-100" : "opacity-55"}`}
+                className={`absolute inset-y-2 left-0 w-[3px] rounded-r-full transition-opacity duration-200 motion-reduce:transition-none ${isOpen ? "opacity-100" : "opacity-65"}`}
                 style={{ backgroundColor: routineColorCssVariable(routineColor) }}
                 aria-hidden
               />
-              <CardHeader className="p-0">
+              <div className="flex items-center pr-2">
                 <button
                   type="button"
                   aria-expanded={isOpen}
                   aria-controls={contentId}
                   onClick={() => setExpandedExerciseId((current) => nextExpandedRoutineExerciseId(current, item.id))}
-                  className="flex min-h-[76px] w-full items-start gap-3 px-4 py-3.5 pl-5 text-left outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="flex min-h-[72px] min-w-0 flex-1 items-start gap-2.5 py-2.5 pr-2 pl-4 text-left outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="metric-number mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+                  <span className="metric-number mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-base font-medium leading-snug">{item.exercise.nombre}</span>
-                    <span className="mt-1 block truncate text-xs text-muted-foreground">{identity}</span>
-                    <span className="mt-1.5 block truncate text-xs text-muted-foreground">
+                    <span className="block truncate text-sm font-semibold leading-5">{item.exercise.nombre}</span>
+                    <span className="block truncate text-xs leading-4 text-muted-foreground">{identity}</span>
+                    <span className="block truncate text-xs leading-4 text-muted-foreground">
                       {[summary.setLabel, ...summary.signals, summary.adjustmentLabel].filter(Boolean).join(" · ")}
-                    </span>
-                    <span className="mt-1.5 flex min-h-4 items-center gap-2 text-[11px] font-medium" aria-live="polite">
-                      {dirty ? <span className="text-amber-700 dark:text-amber-300">Sin guardar</span> : null}
-                      {!dirty && status?.saved ? <span className="text-emerald-700 dark:text-emerald-300">Guardado</span> : null}
                     </span>
                   </span>
                   <ChevronDown
-                    className={`mt-1 size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
+                    className={`mt-1 size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
                     aria-hidden
                   />
                 </button>
-              </CardHeader>
+
+                <details className="group/actions relative shrink-0">
+                  <summary
+                    aria-label={`Acciones de ${item.exercise.nombre}`}
+                    className="flex size-10 cursor-pointer list-none items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+                  >
+                    <MoreHorizontal className="size-4" aria-hidden />
+                  </summary>
+                  <div className="absolute top-11 right-0 z-30 w-48 rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg">
+                    <Button className="w-full justify-start" type="button" size="sm" variant="ghost" disabled={moving || index === 0} onClick={() => moveItem(item.id, -1)}>
+                      <ArrowUp className="size-3.5" aria-hidden />
+                      Mover arriba
+                    </Button>
+                    <Button className="w-full justify-start" type="button" size="sm" variant="ghost" disabled={moving || index === items.length - 1} onClick={() => moveItem(item.id, 1)}>
+                      <ArrowDown className="size-3.5" aria-hidden />
+                      Mover abajo
+                    </Button>
+                    <div className="my-1 border-t" />
+                    <Button className="w-full justify-start text-destructive hover:text-destructive" type="button" size="sm" variant="ghost" disabled={moving} onClick={() => requestRemove(item)}>
+                      <Trash2 className="size-3.5" aria-hidden />
+                      Quitar de la rutina
+                    </Button>
+                  </div>
+                </details>
+              </div>
 
               {isOpen ? (
-                <CardContent id={contentId} className="space-y-5 border-t pt-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200">
+                <div id={contentId} className="space-y-4 border-t px-4 pt-3 pb-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150">
+                  <div className="flex min-h-9 items-center justify-between gap-3" aria-live="polite">
+                    <p className="text-xs font-medium">
+                      {dirty ? (
+                        <span className="text-amber-700 dark:text-amber-300">Cambios sin guardar</span>
+                      ) : status?.saved ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                          <Check className="size-3.5" aria-hidden />
+                          Guardado
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Objetivo guardado</span>
+                      )}
+                    </p>
+                    <Button type="button" size="sm" disabled={!dirty || status?.pending} onClick={() => void saveItem(item.id)}>
+                      {status?.pending ? "Guardando…" : "Guardar cambios"}
+                    </Button>
+                  </div>
+
                   <section className="space-y-2.5" aria-labelledby={`sets-title-${item.id}`}>
                     <div className="flex items-baseline justify-between gap-3">
                       <h3 id={`sets-title-${item.id}`} className="text-sm font-semibold">Series</h3>
                       <p className="text-xs text-muted-foreground">Objetivo por serie</p>
                     </div>
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_2.25rem] items-center gap-2 px-0.5 text-[11px] font-medium text-muted-foreground">
+                    <div className="space-y-1.5">
+                      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3rem_2rem] items-center gap-1.5 text-center text-[11px] font-medium text-muted-foreground">
                         <span>#</span><span>Reps</span><span>Peso</span><span>RIR</span><span className="sr-only">Quitar</span>
                       </div>
                       {payload.sets.map((set, setIndex) => (
-                        <div key={set.set_number} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem_2.25rem] items-center gap-2">
+                        <div key={set.set_number} className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(0,1fr)_3rem_2rem] items-center gap-1.5">
                           <span className="metric-number text-center text-sm font-medium">{setIndex + 1}</span>
                           <Input
                             aria-label={`Repeticiones objetivo de serie ${setIndex + 1}`}
-                            className="h-10 min-w-0 px-2"
+                            className="metric-number h-10 min-w-0 px-1 text-center"
                             type="number"
                             min={0}
                             max={1000}
@@ -314,7 +352,7 @@ export function RoutineTemplateEditor({
                           />
                           <LocalizedDecimalInput
                             aria-label={`Peso objetivo de serie ${setIndex + 1}`}
-                            className="h-10 min-w-0 px-2"
+                            className="metric-number h-10 min-w-0 px-1 text-center"
                             min={0}
                             max={9999.99}
                             value={set.target_weight_kg}
@@ -329,7 +367,7 @@ export function RoutineTemplateEditor({
                           />
                           <Input
                             aria-label={`RIR objetivo de serie ${setIndex + 1}`}
-                            className="h-10 min-w-0 px-2 text-center"
+                            className="metric-number h-10 min-w-0 px-1 text-center"
                             type="number"
                             min={0}
                             max={10}
@@ -362,7 +400,7 @@ export function RoutineTemplateEditor({
                       ))}
                     </div>
                     <Button
-                      className="w-full"
+                      className="h-9 w-full"
                       type="button"
                       size="sm"
                       variant="outline"
@@ -389,18 +427,18 @@ export function RoutineTemplateEditor({
                     </Button>
                   </section>
 
-                  <section className="space-y-3 border-t pt-4" aria-labelledby={`configuration-title-${item.id}`}>
+                  <section className="space-y-2.5 border-t pt-3" aria-labelledby={`configuration-title-${item.id}`}>
                     <div className="flex items-baseline justify-between gap-3">
                       <h3 id={`configuration-title-${item.id}`} className="text-sm font-semibold">Descanso</h3>
                       <p className="text-xs text-muted-foreground">{formatRestRange(payload.rest_min_seconds, payload.rest_max_seconds) ?? "Sin objetivo"}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1"><Label htmlFor={`rest-min-${item.id}`} className="text-xs">Mínimo (seg)</Label><Input id={`rest-min-${item.id}`} type="number" min={0} max={3600} step={1} inputMode="numeric" value={payload.rest_min_seconds ?? ""} onChange={(event) => updatePayload(item.id, (current) => ({ ...current, rest_min_seconds: nullableNumberFromInput(event.target.value) }))} /></div>
-                      <div className="space-y-1"><Label htmlFor={`rest-max-${item.id}`} className="text-xs">Máximo (seg)</Label><Input id={`rest-max-${item.id}`} type="number" min={0} max={3600} step={1} inputMode="numeric" value={payload.rest_max_seconds ?? ""} onChange={(event) => updatePayload(item.id, (current) => ({ ...current, rest_max_seconds: nullableNumberFromInput(event.target.value) }))} /></div>
+                      <div className="space-y-1"><Label htmlFor={`rest-min-${item.id}`} className="text-xs">Mínimo (seg)</Label><Input id={`rest-min-${item.id}`} className="metric-number h-10 text-center" type="number" min={0} max={3600} step={1} inputMode="numeric" value={payload.rest_min_seconds ?? ""} onChange={(event) => updatePayload(item.id, (current) => ({ ...current, rest_min_seconds: nullableNumberFromInput(event.target.value) }))} /></div>
+                      <div className="space-y-1"><Label htmlFor={`rest-max-${item.id}`} className="text-xs">Máximo (seg)</Label><Input id={`rest-max-${item.id}`} className="metric-number h-10 text-center" type="number" min={0} max={3600} step={1} inputMode="numeric" value={payload.rest_max_seconds ?? ""} onChange={(event) => updatePayload(item.id, (current) => ({ ...current, rest_max_seconds: nullableNumberFromInput(event.target.value) }))} /></div>
                     </div>
                   </section>
 
-                  <section className="space-y-2 border-t pt-4" aria-labelledby={`next-time-title-${item.id}`}>
+                  <section className="space-y-2 border-t pt-3" aria-labelledby={`next-time-title-${item.id}`}>
                     <div className="flex items-baseline justify-between gap-3">
                       <h3 id={`next-time-title-${item.id}`} className="text-sm font-semibold">Próxima vez</h3>
                       {payload.next_adjustment === "custom" ? (
@@ -437,7 +475,7 @@ export function RoutineTemplateEditor({
                     </div>
                   </section>
 
-                  <details className="group border-t pt-3">
+                  <details className="group border-t pt-2">
                     <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       <span>Observaciones</span>
                       <span className="min-w-0 flex-1 truncate text-right text-xs font-normal text-muted-foreground">{payload.notes || "Opcional"}</span>
@@ -455,31 +493,12 @@ export function RoutineTemplateEditor({
                     </div>
                   </details>
 
-                  <Button className="h-11 w-full" type="button" disabled={!dirty || status?.pending} onClick={() => void saveItem(item.id)}>
-                    {status?.pending ? "Guardando…" : dirty ? "Guardar objetivo" : "Guardado"}
-                  </Button>
-
-                  <details className="group relative border-t pt-3">
-                    <span className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-destructive/80" aria-hidden />
-                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 rounded-lg pl-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      Más opciones
-                      <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-                    </summary>
-                    <div className="space-y-2 pt-3 pl-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button type="button" size="sm" variant="outline" disabled={moving || index === 0} onClick={() => moveItem(item.id, -1)}><ArrowUp className="size-3.5" aria-hidden />Mover arriba</Button>
-                        <Button type="button" size="sm" variant="outline" disabled={moving || index === items.length - 1} onClick={() => moveItem(item.id, 1)}><ArrowDown className="size-3.5" aria-hidden />Mover abajo</Button>
-                      </div>
-                      <Button className="h-10 w-full" type="button" size="sm" variant="destructive" disabled={moving} onClick={() => requestRemove(item)}><Trash2 className="size-3.5" aria-hidden />Quitar de la rutina</Button>
-                    </div>
-                  </details>
-
-                  <div className="min-h-5" aria-live="polite">
+                  <div aria-live="polite">
                     {status?.error ? <p className="text-sm text-destructive" role="alert">{status.error}</p> : null}
                   </div>
-                </CardContent>
+                </div>
               ) : null}
-            </Card>
+            </article>
           );
         })}
       </div>
