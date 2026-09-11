@@ -14,6 +14,7 @@ import {
 } from "./core";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SYSTEM_METRIC_KEYS = ["steps", "water", "mate", "sleep"] as const;
 
 function asNumber(value: unknown) {
   if (value === null) return null;
@@ -57,20 +58,30 @@ export async function getActiveDailyMetrics(
 ): Promise<DailyMetricWithValue[]> {
   if (!ISO_DATE.test(date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
   const { supabase, userId } = await context(auth);
-  const ensured = await supabase.rpc("ensure_user_metrics");
-  if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
-
-  const metrics = await supabase.from("user_metrics").select("*")
-    .eq("user_id", userId).eq("is_active", true)
-    .order("sort_order").order("created_at");
+  const readDefinitions = () => supabase.from("user_metrics").select("*")
+    .eq("user_id", userId).order("sort_order").order("created_at");
+  const [initialMetrics, values] = await Promise.all([
+    readDefinitions(),
+    supabase.from("daily_metric_values").select("metric_id,value")
+      .eq("user_id", userId).eq("metric_date", date),
+  ]);
+  let metrics = initialMetrics;
   if (metrics.error) throw new Error(`Leer métricas activas: ${metrics.error.message}`);
-
-  const rows = metrics.data ?? [];
-  if (!rows.length) return [];
-  const values = await supabase.from("daily_metric_values").select("metric_id,value")
-    .eq("user_id", userId).eq("metric_date", date)
-    .in("metric_id", rows.map((row) => row.id));
   if (values.error) throw new Error(`Leer valores diarios: ${values.error.message}`);
+
+  const definitions = metrics.data ?? [];
+  const hasSystemDefaults = SYSTEM_METRIC_KEYS.every((key) =>
+    definitions.some((row) => row.system_key === key)
+  );
+  if (!hasSystemDefaults) {
+    const ensured = await supabase.rpc("ensure_user_metrics");
+    if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
+    metrics = await readDefinitions();
+    if (metrics.error) throw new Error(`Leer métricas activas: ${metrics.error.message}`);
+  }
+
+  const rows = (metrics.data ?? []).filter((row) => row.is_active);
+  if (!rows.length) return [];
   const byMetric = new Map((values.data ?? []).map((row) => [String(row.metric_id), asNumber(row.value)]));
 
   return rows.map((row) => ({

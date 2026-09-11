@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  classifyRequestKind,
   logPerformance,
   measurePerformance,
   performanceErrorCategory,
@@ -26,6 +27,17 @@ describe("structured request performance logs", () => {
       region: process.env.VERCEL_REGION ?? "local",
       status: "ok",
     });
+  });
+
+  it.each([
+    [{ "next-router-prefetch": "1", rsc: "1" }, "prefetch"],
+    [{ purpose: "prefetch" }, "prefetch"],
+    [{ "sec-purpose": "prefetch;prerender" }, "prefetch"],
+    [{ rsc: "1" }, "rsc"],
+    [{}, "navigation"],
+  ] as const)("classifies request headers without logging their values", (input, expected) => {
+    const headers = new Headers(input);
+    expect(classifyRequestKind(headers)).toBe(expected);
   });
 
   it("classifies timeout and gateway failures without logging messages", () => {

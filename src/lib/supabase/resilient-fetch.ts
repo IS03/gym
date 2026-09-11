@@ -14,6 +14,18 @@ export const JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS = [
   1500,
 ] as const;
 
+export const TRANSIENT_READ_RETRY_DELAY_MS = 100;
+const TRANSIENT_READ_RESPONSE_STATUSES = new Set([
+  502,
+  503,
+  504,
+  520,
+  522,
+  523,
+  524,
+  530,
+]);
+
 export function totalRetryDelay(delaysMs: readonly number[]): number {
   return delaysMs.reduce((total, delayMs) => total + delayMs, 0);
 }
@@ -36,6 +48,7 @@ type ResilientFetchOptions = {
   sleep?: (delayMs: number) => Promise<void>;
   logger?: RetryLogger;
   requestTimeoutMs?: number;
+  transientReadRetryDelayMs?: number;
 };
 
 function defaultSleep(delayMs: number) {
@@ -75,13 +88,16 @@ function defaultRetryDelaysForMethod(method: string): readonly number[] {
     : JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS;
 }
 
+function isSafeDataApiRead(request: Request, pathname: string | null) {
+  return Boolean(pathname) && (request.method === "GET" || request.method === "HEAD");
+}
+
 /**
- * Reintenta únicamente el rechazo PGRST303 "JWT issued at future" del Data
- * API. El Request base nunca se envía directamente: cada intento recibe un
- * clone nuevo para que cuerpos de RPC/mutaciones puedan reproducirse sin
- * reutilizar un stream consumido. Las lecturas toleran hasta 8 s de skew; las
- * mutaciones conservan el budget previo de 2,5 s para no consumir el límite de
- * 12 s de save_workout_exercise antes de que el RPC pueda terminar.
+ * Preserva el retry acotado de PGRST303 "JWT issued at future" y permite un
+ * único retry corto de transporte sólo para GET/HEAD del Data API. El Request
+ * base nunca se envía directamente: cada intento recibe un clone nuevo para
+ * no reutilizar streams consumidos. Las mutaciones no reciben retries de
+ * transporte y conservan exactamente el comportamiento previo.
  */
 export function createResilientSupabaseFetch(
   fetchImplementation: typeof fetch = globalThis.fetch.bind(globalThis),
@@ -102,15 +118,62 @@ export function createResilientSupabaseFetch(
     const pathname = dataApiPathname(request);
     const retryDelaysMs =
       options.retryDelaysMs ?? defaultRetryDelaysForMethod(request.method);
+    const transientReadRetryDelayMs =
+      options.transientReadRetryDelayMs ?? TRANSIENT_READ_RETRY_DELAY_MS;
     let retryDelayTotalMs = 0;
+    let transientReadRetried = false;
+    let jwtAttempt = 1;
 
-    for (let attempt = 1; ; attempt += 1) {
-      const response = await fetchImplementation(request.clone());
+    for (;;) {
+      let response: Response;
+      try {
+        response = await fetchImplementation(request.clone());
+      } catch (error) {
+        if (
+          !transientReadRetried
+          && isSafeDataApiRead(request, pathname)
+          && !signal.aborted
+        ) {
+          transientReadRetried = true;
+          logger.warn("[supabase-read-retry] retry", {
+            pathname,
+            reason: "network",
+            delayMs: transientReadRetryDelayMs,
+          });
+          await sleep(transientReadRetryDelayMs);
+          signal.throwIfAborted();
+          continue;
+        }
+        throw error;
+      }
+
+      if (
+        !transientReadRetried
+        && isSafeDataApiRead(request, pathname)
+        && TRANSIENT_READ_RESPONSE_STATUSES.has(response.status)
+      ) {
+        transientReadRetried = true;
+        logger.warn("[supabase-read-retry] retry", {
+          pathname,
+          reason: "http",
+          status: response.status,
+          delayMs: transientReadRetryDelayMs,
+        });
+        await sleep(transientReadRetryDelayMs);
+        signal.throwIfAborted();
+        continue;
+      }
 
       if (!pathname || !(await isJwtIssuedAtFutureResponse(response))) {
-        if (attempt > 1 && response.ok) {
+        if (transientReadRetried && response.ok) {
+          logger.info("[supabase-read-retry] recovered", {
+            pathname,
+            status: response.status,
+          });
+        }
+        if (jwtAttempt > 1 && response.ok) {
           logger.info("[supabase-jwt-skew] recovered", {
-            attempt,
+            attempt: jwtAttempt,
             pathname,
             retryDelayTotalMs,
           });
@@ -118,18 +181,19 @@ export function createResilientSupabaseFetch(
         return response;
       }
 
-      const delayMs = retryDelaysMs[attempt - 1];
+      const delayMs = retryDelaysMs[jwtAttempt - 1];
       if (delayMs === undefined) return response;
 
       retryDelayTotalMs += delayMs;
       logger.warn("[supabase-jwt-skew] retry", {
-        attempt: attempt + 1,
+        attempt: jwtAttempt + 1,
         pathname,
         delayMs,
         retryDelayTotalMs,
       });
       await sleep(delayMs);
       signal.throwIfAborted();
+      jwtAttempt += 1;
     }
   };
 }

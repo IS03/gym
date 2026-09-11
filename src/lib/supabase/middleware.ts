@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { logPerformance, performanceErrorCategory } from "../request-performance";
+import {
+  classifyRequestKind,
+  logPerformance,
+  performanceErrorCategory,
+} from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
 
 function isProtectedPath(pathname: string) {
@@ -73,6 +77,7 @@ export async function updateSession(request: NextRequest) {
   // Debe ser la primera operación luego de crear el cliente: refresca una
   // sesión válida y copia las cookies resultantes al request y a la response.
   const authStartedAt = performance.now();
+  const requestKind = classifyRequestKind(request.headers);
   let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
   try {
     claimsResult = await supabase.auth.getClaims();
@@ -82,6 +87,7 @@ export async function updateSession(request: NextRequest) {
       operation: "proxy-auth",
       durationMs: performance.now() - authStartedAt,
       status: "error",
+      requestKind,
       errorCategory: performanceErrorCategory(error),
     });
     throw error;
@@ -91,6 +97,7 @@ export async function updateSession(request: NextRequest) {
     route: request.nextUrl.pathname,
     operation: "proxy-auth",
     durationMs: performance.now() - authStartedAt,
+    requestKind,
     status: claimsData?.claims?.sub
       ? "authenticated"
       : claimsError && isInvalidAuthSessionError(claimsError)
