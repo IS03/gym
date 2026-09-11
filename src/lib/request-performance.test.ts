@@ -31,6 +31,9 @@ describe("structured request performance logs", () => {
 
   it.each([
     [{ "next-router-prefetch": "1", rsc: "1" }, "prefetch"],
+    [{ "next-router-prefetch": "2", rsc: "1" }, "prefetch"],
+    [{ "next-router-prefetch": "3", rsc: "1" }, "prefetch"],
+    [{ "next-router-segment-prefetch": "/__PAGE__", rsc: "1" }, "prefetch"],
     [{ purpose: "prefetch" }, "prefetch"],
     [{ "sec-purpose": "prefetch;prerender" }, "prefetch"],
     [{ rsc: "1" }, "rsc"],

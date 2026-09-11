@@ -89,13 +89,17 @@ export function logPerformance(
 export function classifyRequestKind(
   headers: Pick<Headers, "get">,
 ): PerformanceRequestKind {
+  const routerPrefetch = headers.get("next-router-prefetch");
   const purpose = [headers.get("purpose"), headers.get("sec-purpose")]
     .filter(Boolean)
     .join(" ")
     .toLocaleLowerCase("en");
 
   if (
-    headers.get("next-router-prefetch") === "1"
+    routerPrefetch === "1"
+    || routerPrefetch === "2"
+    || routerPrefetch === "3"
+    || headers.get("next-router-segment-prefetch") !== null
     || purpose.includes("prefetch")
   ) {
     return "prefetch";
