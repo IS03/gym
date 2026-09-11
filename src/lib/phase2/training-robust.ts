@@ -1127,7 +1127,7 @@ export async function getTrainingHistoryDirectory(): Promise<TrainingHistoryDire
   const directory = buildTrainingHistoryDirectory({ catalog, ...data });
   return {
     ...directory,
-    routines: activeRoutines.map((routine) => ({ id: routine.id, name: routine.nombre })),
+    routines: activeRoutines.map((routine) => ({ id: routine.id, name: routine.nombre, color: routine.color })),
   };
 }
 

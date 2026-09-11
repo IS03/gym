@@ -1,13 +1,14 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { ChevronDown, ChevronRight, Dumbbell, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Dumbbell, Search, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { exerciseIdentityLabel } from "@/lib/phase2/exercise-library";
 import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import {
   DEFAULT_TRAINING_HISTORY_FILTERS,
   filterTrainingHistoryExercises,
@@ -30,12 +31,61 @@ const ORDER_OPTIONS: ReadonlyArray<{ value: TrainingHistoryOrder; label: string 
   { value: "stale", label: "Más tiempo sin realizar" },
 ];
 
-function chipClassName(selected: boolean) {
-  return `min-h-9 rounded-full border px-3 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
-    selected
-      ? "border-primary/25 bg-primary/10 text-primary"
-      : "border-border bg-background text-foreground hover:bg-muted"
-  }`;
+function FilterSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="space-y-3 border-b border-border/70 pb-5 last:border-b-0 last:pb-0">
+      <legend className="font-semibold">{title}</legend>
+      <p className="-mt-2 text-xs text-muted-foreground">{description}</p>
+      {children}
+    </fieldset>
+  );
+}
+
+function SelectableRow({ selected, onClick, children, leading }: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  leading?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary/35 bg-primary/10" : "border-border bg-background hover:bg-muted/55"}`}
+    >
+      {leading}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`} aria-hidden>
+        {selected ? <Check className="size-3.5" /> : null}
+      </span>
+    </button>
+  );
+}
+
+function ActivitySegmented({ value, onChange }: {
+  value: TrainingHistoryFilters["activity"];
+  onChange: (value: TrainingHistoryFilters["activity"]) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/45 p-1" role="radiogroup" aria-label="Actividad del ejercicio">
+      {([{ value: "recorded", label: "Con registros" }, { value: "all", label: "Todos" }] as const).map((option) => {
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option.value)}
+            className={`min-h-10 rounded-lg px-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-background text-primary shadow-sm ring-1 ring-primary/15" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function FilterSheet({
@@ -45,6 +95,7 @@ function FilterSheet({
   routines,
   count,
   onChange,
+  onClear,
   onApply,
 }: {
   open: boolean;
@@ -53,6 +104,7 @@ function FilterSheet({
   routines: TrainingHistoryRoutine[];
   count: number;
   onChange: (filters: TrainingHistoryFilters) => void;
+  onClear: () => void;
   onApply: () => void;
 }) {
   return (
@@ -61,45 +113,52 @@ function FilterSheet({
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
         <Dialog.Viewport className="fixed inset-0 z-[81] flex items-end justify-center overflow-hidden lg:items-center lg:p-6">
           <Dialog.Popup className="flex max-h-[min(86svh,46rem)] w-full flex-col overflow-hidden rounded-t-[1.75rem] bg-card text-card-foreground shadow-2xl outline-none transition-[transform,opacity] duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full motion-reduce:transition-none lg:max-w-lg lg:rounded-2xl lg:border lg:data-[ending-style]:translate-y-2 lg:data-[starting-style]:translate-y-2">
-            <header className="relative shrink-0 border-b border-border/70 px-4 pb-3 pt-3 sm:px-5 lg:pt-5">
+            <header className="shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5 lg:pt-5">
               <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
-              <Dialog.Title className="text-xl font-semibold tracking-tight">Filtrar ejercicios</Dialog.Title>
+              <div className="flex items-center gap-2">
+                <Dialog.Title className="min-w-0 flex-1 text-xl font-semibold tracking-tight">Filtrar ejercicios</Dialog.Title>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button type="button" onClick={onClear} aria-label="Limpiar filtros" className="flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">Limpiar</button>
+                  <Dialog.Close type="button" className="flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Cerrar filtros">
+                    <X className="size-5" aria-hidden />
+                  </Dialog.Close>
+                </div>
+              </div>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">Elegí varios filtros y combinalos.</Dialog.Description>
-              <Dialog.Close type="button" className="absolute right-2 top-3 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Cerrar filtros">
-                <X className="size-4" aria-hidden />
-              </Dialog.Close>
             </header>
 
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
-              <section aria-labelledby="history-routine-filter-title">
-                <h3 id="history-routine-filter-title" className="text-sm font-semibold">Rutina</h3>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" className={chipClassName(filters.routineIds.length === 0)} onClick={() => onChange({ ...filters, routineIds: [] })}>Todas</button>
-                  {routines.map((routine) => (
-                    <button key={routine.id} type="button" aria-pressed={filters.routineIds.includes(routine.id)} className={chipClassName(filters.routineIds.includes(routine.id))} onClick={() => onChange({ ...filters, routineIds: toggleTrainingHistoryFilter(filters.routineIds, routine.id) })}>{routine.name}</button>
-                  ))}
-                </div>
-              </section>
+            <div data-testid="history-filter-sheet-content" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+              <FilterSection title="Rutinas" description="No seleccionar ninguna muestra todas las rutinas.">
+                {routines.length ? (
+                  <div className="grid grid-cols-2 gap-2" aria-label="Filtrar por rutinas">
+                    {routines.map((routine) => {
+                      const selected = filters.routineIds.includes(routine.id);
+                      return (
+                        <SelectableRow
+                          key={routine.id}
+                          selected={selected}
+                          onClick={() => onChange({ ...filters, routineIds: toggleTrainingHistoryFilter(filters.routineIds, routine.id) })}
+                          leading={<span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: routineColorCssVariable(routine.color) }} aria-hidden />}
+                        >
+                          {routine.name}
+                        </SelectableRow>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No hay rutinas activas.</p>}
+              </FilterSection>
 
-              <section aria-labelledby="history-muscle-filter-title">
-                <h3 id="history-muscle-filter-title" className="text-sm font-semibold">Grupo muscular</h3>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" className={chipClassName(filters.muscleGroups.length === 0)} onClick={() => onChange({ ...filters, muscleGroups: [] })}>Todos</button>
+              <FilterSection title="Grupo muscular" description="Seleccioná uno o más grupos musculares.">
+                <div className="grid grid-cols-2 gap-2" aria-label="Filtrar por grupo muscular">
                   {MUSCLE_GROUP_OPTIONS.map((group) => (
-                    <button key={group.value} type="button" aria-pressed={filters.muscleGroups.includes(group.value)} className={chipClassName(filters.muscleGroups.includes(group.value))} onClick={() => onChange({ ...filters, muscleGroups: toggleTrainingHistoryFilter(filters.muscleGroups, group.value) })}>{group.label}</button>
+                    <SelectableRow key={group.value} selected={filters.muscleGroups.includes(group.value)} onClick={() => onChange({ ...filters, muscleGroups: toggleTrainingHistoryFilter(filters.muscleGroups, group.value) })}>{group.label}</SelectableRow>
                   ))}
                 </div>
-              </section>
+              </FilterSection>
 
-              <section aria-labelledby="history-activity-filter-title">
-                <h3 id="history-activity-filter-title" className="text-sm font-semibold">Actividad</h3>
-                <div className="mt-3 grid grid-cols-2 rounded-xl border bg-muted/30 p-1" role="radiogroup" aria-label="Actividad del ejercicio">
-                  {([{ value: "recorded", label: "Con registros" }, { value: "all", label: "Todos" }] as const).map((option) => (
-                    <button key={option.value} type="button" role="radio" aria-checked={filters.activity === option.value} className={`h-10 rounded-lg text-sm font-medium transition-colors ${filters.activity === option.value ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`} onClick={() => onChange({ ...filters, activity: option.value })}>{option.label}</button>
-                  ))}
-                </div>
-              </section>
-
+              <FilterSection title="Actividad" description="Muestra ejercicios con o sin registros.">
+                <ActivitySegmented value={filters.activity} onChange={(activity) => onChange({ ...filters, activity })} />
+              </FilterSection>
             </div>
 
             <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border/70 bg-card px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 lg:pb-3">
@@ -222,6 +281,11 @@ export function HistoryExerciseList({ exercises, routines, initialFilters = DEFA
         routines={routines}
         count={draftCount}
         onChange={setDraftFilters}
+        onClear={() => setDraftFilters({
+          ...DEFAULT_TRAINING_HISTORY_FILTERS,
+          query: filters.query,
+          order: filters.order,
+        })}
         onApply={() => {
           setFilters({ ...draftFilters, query: filters.query });
           setFiltersOpen(false);

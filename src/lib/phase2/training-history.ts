@@ -1,6 +1,7 @@
 import { buildExercisePerformance, type ExerciseReportSession } from "./exercise-insights";
 import { normalizeExerciseSearch } from "./exercise-library";
 import { MUSCLE_GROUP_OPTIONS } from "./muscle-groups";
+import type { RoutineColorKey } from "./routine-colors";
 import type {
   CompletedSessionSummary,
   Exercise,
@@ -33,7 +34,7 @@ export type TrainingHistoryExercise = {
   routineIds: string[];
 };
 
-export type TrainingHistoryRoutine = { id: string; name: string };
+export type TrainingHistoryRoutine = { id: string; name: string; color?: RoutineColorKey | null };
 
 export type TrainingHistoryDirectory = {
   exercises: TrainingHistoryExercise[];
