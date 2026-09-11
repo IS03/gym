@@ -33,6 +33,23 @@ export function nutritionMetricSamples(
   }));
 }
 
+const nutritionGoalFields = {
+  "nutrition.calories": "targetCalories",
+  "nutrition.protein": "targetProteinG",
+} as const satisfies Record<string, keyof NutritionReportDay>;
+
+export function nutritionGoalMetricSamples(
+  metricKey: keyof typeof nutritionGoalFields,
+  days: readonly NutritionReportDay[],
+): ProgressMetricSample[] {
+  const field = nutritionGoalFields[metricKey];
+  return days.map((day) => ({
+    date: day.date,
+    value: typeof day[field] === "number" ? day[field] : null,
+    context: { source: "historical_snapshot" },
+  }));
+}
+
 export function dailyMetricSamples(
   definitionId: string,
   values: readonly MetricReportValueFact[],

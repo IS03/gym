@@ -15,6 +15,17 @@ import {
   type MetricReportDefinition,
   type MetricReportValueFact,
 } from "./reports-core";
+import {
+  adaptDailyMetricDefinition,
+  dailyMetricSamples,
+  type ProgressMetricSample,
+} from "@/lib/progress/analytics";
+import {
+  buildProgressComparison,
+  resolveProgressComparisonReference,
+  type ProgressComparisonQuery,
+  type ProgressGoalReferenceInput,
+} from "@/lib/progress/comparisons";
 
 function numberOrNull(value: unknown) {
   if (value === null) return null;
@@ -23,14 +34,32 @@ function numberOrNull(value: unknown) {
 }
 
 export async function getDailyMetricsReport(
-  input: { period?: string; from?: string; to?: string; metricId?: string; compare?: boolean },
+  input: {
+    period?: string;
+    from?: string;
+    to?: string;
+    metricId?: string;
+    compare?: boolean;
+    progressComparison?: ProgressComparisonQuery | null;
+  },
   today: string,
   auth?: AuthenticatedRequestContext,
 ) {
   const { supabase, userId } = auth ?? await requireAuthenticatedRequestContext();
   const range = resolveNutritionReportRange(input, today);
   const previousRange = previousNutritionReportRange(range);
-  const readStart = input.compare ? previousRange.start : range.start;
+  const resolvedReference = input.progressComparison
+    ? resolveProgressComparisonReference({ query: input.progressComparison, primaryPeriod: range, today })
+    : null;
+  const temporalReference = resolvedReference?.reference.type === "previous_period" || resolvedReference?.reference.type === "other_period"
+    ? resolvedReference.reference.period
+    : null;
+  const readStart = temporalReference
+    ? [range.start, temporalReference.start].sort()[0]!
+    : input.compare ? previousRange.start : range.start;
+  const readEnd = temporalReference
+    ? [range.end, temporalReference.end].sort().at(-1)!
+    : range.end;
 
   const ensured = await supabase.rpc("ensure_user_metrics");
   if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
@@ -45,7 +74,7 @@ export async function getDailyMetricsReport(
       .select("metric_id,metric_date,value")
       .eq("user_id", userId)
       .gte("metric_date", readStart)
-      .lte("metric_date", range.end),
+      .lte("metric_date", readEnd),
   ]);
   if (metricResult.error) throw new Error(`Leer métricas para Progreso: ${metricResult.error.message}`);
   if (valueResult.error) throw new Error(`Leer valores para Progreso: ${valueResult.error.message}`);
@@ -62,11 +91,45 @@ export async function getDailyMetricsReport(
   const definitions = availableMetricDefinitions(metrics);
   const metric = selectMetricDefinition(definitions, input.metricId);
 
-  if (!metric) return { range, definitions, metric: null, days: [], summary: null, comparison: null };
+  if (!metric) return { range, definitions, metric: null, days: [], summary: null, comparison: null, progressComparison: null, progressMetrics: [], comparisonError: null };
 
   const days = buildMetricReportDays({ range, today, metricId: metric.id, values });
   const summary = aggregateMetricReport(days, metric.target_value);
-  if (!input.compare) return { range, definitions, metric, days, summary, comparison: null };
+  const progressMetrics = definitions.map(adaptDailyMetricDefinition);
+  let progressComparison = null;
+  if (resolvedReference) {
+    const samplesByMetric = new Map<string, readonly ProgressMetricSample[]>(progressMetrics.map((definition) => [
+      definition.key,
+      dailyMetricSamples(String(definition.source.field), values),
+    ]));
+    const goalsByMetric = new Map<string, ProgressGoalReferenceInput>(progressMetrics.flatMap((definition) => {
+      const target = definition.metadata?.targetValue;
+      if (!definition.goal || typeof target !== "number" || !Number.isFinite(target)) return [];
+      return [[definition.key, {
+        label: "Objetivo actual",
+        source: definition.goal.source,
+        rule: definition.goal.rule,
+        value: target,
+      }]];
+    }));
+    const requested = input.progressComparison?.selectedMetricKeys.filter((key) => progressMetrics.some((definition) => definition.key === key)) ?? [];
+    const selectedMetricKeys = requested.length ? requested : [`activity.daily.${metric.id}`];
+    progressComparison = buildProgressComparison({
+      metrics: resolvedReference.reference.type === "goal"
+        ? progressMetrics.filter((definition) => definition.supportsGoal)
+        : progressMetrics,
+      selectedMetricKeys,
+      samplesByMetric,
+      primaryPeriod: range,
+      primaryLabel: range.preset,
+      reference: resolvedReference.reference,
+      goalsByMetric,
+      inProgressDate: range.end === today ? today : null,
+      activeMetricKey: input.progressComparison?.activeMetricKey,
+      initialView: input.progressComparison?.initialView,
+    });
+  }
+  if (!input.compare) return { range, definitions, metric, days, summary, comparison: null, progressComparison, progressMetrics, comparisonError: resolvedReference?.error ?? null };
 
   const previousDays = buildMetricReportDays({
     range: previousRange,
@@ -82,5 +145,8 @@ export async function getDailyMetricsReport(
     days,
     summary,
     comparison: compareMetricReports(summary, previousSummary, previousRange, previousDays),
+    progressComparison,
+    progressMetrics,
+    comparisonError: resolvedReference?.error ?? null,
   };
 }

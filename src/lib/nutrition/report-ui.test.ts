@@ -92,14 +92,16 @@ describe("PR 10.7 — jerarquía de reportes", () => {
     expect(charts).toContain('touchAction: "pan-y"');
   });
 
-  it("integra Actual y Vs anterior dentro de Tendencias sin crear otra página", () => {
+  it("integra el sistema universal A/B sin crear otra página", () => {
     const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
     expect(charts).toContain('aria-label="Modo de tendencias"');
     expect(charts).toContain(">Actual<");
     expect(charts).toContain(">Vs anterior<");
     expect(charts).toContain("scroll={false}");
     expect(reportsPage).toContain("nutritionReportComparisonMode");
-    expect(reportsPage).toContain("getNutritionReportWithPrevious");
+    expect(reportsPage).toContain("getNutritionReportWithProgressComparison");
+    expect(reportsPage).toContain("<ComparisonConfigurator");
+    expect(reportsPage).toContain("<ComparisonWorkspace");
     expect(reportsPage).not.toContain("Comparar período");
   });
 
@@ -119,7 +121,7 @@ describe("PR 10.7 — jerarquía de reportes", () => {
   });
 
   it("preserva el reporte normal y sólo carga comparación cuando se solicita", () => {
-    expect(reportsPage).toContain('comparisonMode === "previous"');
+    expect(reportsPage).toContain("progressQuery.referenceType");
     expect(reportsPage).toContain("comparisonReport ?? await getNutritionReport");
     expect(reportsPage).toContain("<NutritionReportDailyBreakdown days={days} summary={summary}");
   });

@@ -2,6 +2,18 @@ import "server-only";
 
 import { createClient, type AuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
+  NUTRITION_PROGRESS_METRICS,
+  nutritionGoalMetricSamples,
+  nutritionMetricSamples,
+  type ProgressMetricSample,
+} from "@/lib/progress/analytics";
+import {
+  buildProgressComparison,
+  resolveProgressComparisonReference,
+  type ProgressComparisonQuery,
+  type ProgressGoalReferenceInput,
+} from "@/lib/progress/comparisons";
+import {
   aggregateNutritionReport,
   buildNutritionReportComparison,
   buildNutritionReportDays,
@@ -120,5 +132,99 @@ export async function getNutritionReportWithPrevious(
       currentDays,
       previousDays,
     }),
+  };
+}
+
+const DEFAULT_NUTRITION_COMPARISON_METRICS = [
+  "nutrition.calories",
+  "nutrition.protein",
+  "nutrition.carbs",
+  "nutrition.energy_balance",
+] as const;
+
+function nutritionSamplesByMetric(days: readonly ReturnType<typeof buildNutritionReportDays>[number][]) {
+  return new Map<string, readonly ProgressMetricSample[]>(NUTRITION_PROGRESS_METRICS.map((metric) => [
+    metric.key,
+    nutritionMetricSamples(metric.key as Parameters<typeof nutritionMetricSamples>[0], days),
+  ]));
+}
+
+function nutritionGoalsByMetric(days: readonly ReturnType<typeof buildNutritionReportDays>[number][]) {
+  return new Map<string, ProgressGoalReferenceInput>(NUTRITION_PROGRESS_METRICS.flatMap((metric) => {
+    if (!metric.goal || metric.goal.source !== "historical_snapshot") return [];
+    if (metric.key !== "nutrition.calories" && metric.key !== "nutrition.protein") return [];
+    return [[metric.key, {
+      label: "Objetivo del período",
+      source: metric.goal.source,
+      rule: metric.goal.rule,
+      samples: nutritionGoalMetricSamples(metric.key, days),
+    }]];
+  }));
+}
+
+export async function getNutritionReportWithProgressComparison(
+  input: {
+    period?: string;
+    from?: string;
+    to?: string;
+    comparison: ProgressComparisonQuery;
+  },
+  today: string,
+  context?: AuthenticatedRequestContext,
+) {
+  const range = resolveNutritionReportRange(input, today);
+  const auth = context ?? await getAuthedContext();
+  const resolved = resolveProgressComparisonReference({
+    query: input.comparison,
+    primaryPeriod: range,
+    today,
+  });
+  if (!resolved) return { ...(await getNutritionReport(input, today, auth)), progressComparison: null, comparisonError: null };
+
+  let currentFacts: Awaited<ReturnType<typeof readNutritionReportFacts>>;
+  let referenceFacts: Awaited<ReturnType<typeof readNutritionReportFacts>> | null = null;
+  if (resolved.reference.type === "previous_period") {
+    const facts = await readNutritionReportFacts({ start: resolved.reference.period.start, end: range.end }, auth);
+    currentFacts = facts;
+    referenceFacts = facts;
+  } else if (resolved.reference.type === "other_period") {
+    [currentFacts, referenceFacts] = await Promise.all([
+      readNutritionReportFacts(range, auth),
+      readNutritionReportFacts(resolved.reference.period, auth),
+    ]);
+  } else {
+    currentFacts = await readNutritionReportFacts(range, auth);
+  }
+
+  const days = buildNutritionReportDays({ range, today, ...currentFacts });
+  const referenceDays = resolved.reference.type === "goal"
+    ? []
+    : buildNutritionReportDays({ range: resolved.reference.period, today, ...(referenceFacts ?? currentFacts) });
+  const allowed = new Set(NUTRITION_PROGRESS_METRICS.map((metric) => metric.key));
+  const requested = input.comparison.selectedMetricKeys.filter((key) => allowed.has(key));
+  const selectedMetricKeys = requested.length ? requested : [...DEFAULT_NUTRITION_COMPARISON_METRICS];
+  const metrics = NUTRITION_PROGRESS_METRICS.filter((metric) => (
+    metric.key !== "nutrition.calorie_target" &&
+    (resolved.reference.type !== "goal" || metric.supportsGoal)
+  ));
+  const progressComparison = buildProgressComparison({
+    metrics,
+    selectedMetricKeys,
+    samplesByMetric: nutritionSamplesByMetric(days),
+    referenceSamplesByMetric: resolved.reference.type === "goal" ? undefined : nutritionSamplesByMetric(referenceDays),
+    goalsByMetric: nutritionGoalsByMetric(days),
+    primaryPeriod: range,
+    primaryLabel: range.preset,
+    reference: resolved.reference,
+    inProgressDate: range.end === today ? today : null,
+    activeMetricKey: input.comparison.activeMetricKey,
+    initialView: input.comparison.initialView,
+  });
+  return {
+    range,
+    days,
+    summary: aggregateNutritionReport(days),
+    progressComparison,
+    comparisonError: resolved.error,
   };
 }

@@ -8,6 +8,8 @@ export type ProgressCoverageMode = "eligible_days" | "samples_only" | "event_str
 export type ProgressRelationModel = "acute" | "chronic" | "configurable";
 export type ProgressBucketGranularity = "day" | "week" | "month";
 export type ProgressComparisonStatus = "comparable" | "not_comparable" | "insufficient_data";
+export type ProgressMetricGoalRule = "minimum" | "maximum" | "reference";
+export type ProgressMetricGoalSource = "historical_snapshot" | "current_reference";
 
 export type ProgressMetricSource = {
   adapter:
@@ -36,6 +38,16 @@ export type ProgressMetricDefinition = {
   supportsTemporalComparison: boolean;
   minimumSamples: number;
   comparisonScope: "same_metric" | "same_exercise_and_weight_mode";
+  comparison?: {
+    allowPercentDelta: boolean;
+    stablePercentThreshold: number;
+    stableAbsoluteThreshold?: number;
+    signSemantic?: "energy_balance";
+  };
+  goal?: {
+    rule: ProgressMetricGoalRule;
+    source: ProgressMetricGoalSource;
+  };
   relation: {
     model: ProgressRelationModel;
     suggestedLagDays: readonly number[];
@@ -91,7 +103,9 @@ export type ProgressComparisonEligibility = {
     | "current_period_empty"
     | "previous_period_empty"
     | "insufficient_current_samples"
-    | "insufficient_previous_samples";
+    | "insufficient_previous_samples"
+    | "metric_disallows_goal"
+    | "goal_unavailable";
 };
 
 export type ProgressMetricSeriesPoint = {

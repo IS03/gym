@@ -1,9 +1,9 @@
 import type { NutritionReportPreset, NutritionReportRange } from "./reports-core";
 
-export type NutritionReportComparisonMode = "previous" | null;
+export type NutritionReportComparisonMode = "previous" | "period" | "goal" | null;
 
 export function nutritionReportComparisonMode(value: string | null | undefined): NutritionReportComparisonMode {
-  return value === "previous" ? "previous" : null;
+  return value === "previous" || value === "period" || value === "goal" ? value : null;
 }
 
 export function nutritionReportPath(input: {
@@ -22,7 +22,7 @@ export function nutritionReportPath(input: {
     params.set("from", input.start);
     params.set("to", input.end);
   }
-  if (input.comparison === "previous") params.set("compare", "previous");
+  if (input.comparison) params.set("compare", input.comparison);
   return `${input.basePath ?? "/today/reports"}?${params.toString()}`;
 }
 
