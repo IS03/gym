@@ -13,6 +13,7 @@ import {
   requireAuthenticatedRequestContext,
   type AuthenticatedRequestContext,
 } from "@/lib/supabase/server";
+import { getPreviousProgressPeriod } from "../progress/analytics/periods";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -1276,10 +1277,12 @@ export async function getTrainingAnalysisWithPreviousPeriod(
     listRoutines({ includeArchived: true }),
   ]);
   const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
+  const previousRange = getPreviousProgressPeriod(current.range);
   const previous = buildTrainingAnalysis(data, {
-    today: addUtcDays(current.range.start, -1),
+    today: previousRange.end,
     period,
     routines,
+    range: previousRange,
   });
   return { current, previous };
 }

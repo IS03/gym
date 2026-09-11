@@ -1,4 +1,12 @@
 import type { MealEntryKind } from "@/lib/phase1/types";
+import {
+  addProgressIsoDays,
+  getPreviousProgressPeriod,
+  isValidProgressIsoDate,
+  progressRangeDays,
+  resolveProgressPeriod,
+  subtractProgressCalendarMonths,
+} from "../progress/analytics/periods";
 
 export const NUTRITION_REPORT_MAX_DAYS = 366;
 
@@ -162,36 +170,20 @@ export type NutritionReportSummary = {
 };
 
 function validIsoDate(value: string | undefined): value is string {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  return isValidProgressIsoDate(value);
 }
 
 export function addIsoDays(date: string, amount: number) {
-  const parsed = new Date(`${date}T00:00:00Z`);
-  parsed.setUTCDate(parsed.getUTCDate() + amount);
-  return parsed.toISOString().slice(0, 10);
+  return addProgressIsoDays(date, amount);
 }
 
 /** Subtracts calendar months from an ISO logical date, clamping to the target month's last day. */
 export function subtractCalendarMonthsClamped(date: string, months: number) {
-  if (!validIsoDate(date) || !Number.isInteger(months) || months < 0) {
-    throw new Error("Meses de calendario inválidos.");
-  }
-  const [year, month, day] = date.split("-").map(Number);
-  const targetMonthIndex = year * 12 + (month - 1) - months;
-  const targetYear = Math.floor(targetMonthIndex / 12);
-  const targetMonth = ((targetMonthIndex % 12) + 12) % 12 + 1;
-  const lastDay = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
-  const targetDay = Math.min(day, lastDay);
-  return `${targetYear.toString().padStart(4, "0")}-${targetMonth.toString().padStart(2, "0")}-${targetDay.toString().padStart(2, "0")}`;
+  return subtractProgressCalendarMonths(date, months);
 }
 
 function inclusiveDays(start: string, end: string) {
-  return Math.floor(
-    (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime())
-      / 86_400_000,
-  ) + 1;
+  return progressRangeDays({ start, end });
 }
 
 export function nutritionReportRangeDays(range: NutritionReportDateRange) {
@@ -200,9 +192,7 @@ export function nutritionReportRangeDays(range: NutritionReportDateRange) {
 
 /** Returns the immediately preceding inclusive range with exactly the same duration. */
 export function previousNutritionReportRange(range: NutritionReportDateRange): NutritionReportDateRange {
-  const duration = nutritionReportRangeDays(range);
-  const end = addIsoDays(range.start, -1);
-  return { start: addIsoDays(end, -(duration - 1)), end };
+  return getPreviousProgressPeriod(range);
 }
 
 function fallbackRange(today: string, error: string | null = null): NutritionReportRange {
@@ -215,43 +205,19 @@ export function resolveNutritionReportRange(
 ): NutritionReportRange {
   if (!validIsoDate(today)) throw new Error("Fecha lógica de Córdoba inválida.");
   const period = input.period ?? "7";
-
-  if (period === "7" || period === "14" || period === "30") {
-    return {
-      preset: period,
-      start: addIsoDays(today, -(Number(period) - 1)),
-      end: today,
-      error: null,
-    };
-  }
-
-  if (period === "3m" || period === "6m" || period === "1y") {
-    const months = period === "3m" ? 3 : period === "6m" ? 6 : 12;
-    return {
-      preset: period,
-      start: addIsoDays(subtractCalendarMonthsClamped(today, months), 1),
-      end: today,
-      error: null,
-    };
-  }
-
-  if (period !== "custom") return fallbackRange(today);
-  if (!validIsoDate(input.from) || !validIsoDate(input.to)) {
-    return fallbackRange(today, "Elegí fechas válidas para el período personalizado.");
-  }
-  if (input.from > input.to) {
-    return fallbackRange(today, "La fecha desde no puede ser posterior a la fecha hasta.");
-  }
-  if (input.from > today) {
-    return fallbackRange(today, "El período personalizado todavía no contiene días transcurridos.");
-  }
-
-  const end = input.to > today ? today : input.to;
-  if (inclusiveDays(input.from, end) > NUTRITION_REPORT_MAX_DAYS) {
-    return fallbackRange(today, `El período personalizado admite hasta ${NUTRITION_REPORT_MAX_DAYS} días.`);
-  }
-
-  return { preset: "custom", start: input.from, end, error: null };
+  const presetMap: Record<string, string> = { "7": "1w", "14": "2w", "30": "30d" };
+  const progressPreset = presetMap[period] ?? period;
+  const resolved = resolveProgressPeriod({ preset: progressPreset, from: input.from, to: input.to }, today);
+  if (resolved.error && resolved.preset !== "custom") return fallbackRange(today, resolved.error);
+  const preset = resolved.error
+    ? "7"
+    : (["7", "14", "30", "3m", "6m", "1y", "custom"].includes(period) ? period : "7");
+  return {
+    preset: preset as NutritionReportPreset,
+    start: resolved.current.start,
+    end: resolved.current.end,
+    error: resolved.error,
+  };
 }
 
 export function listIsoDates(start: string, end: string) {
