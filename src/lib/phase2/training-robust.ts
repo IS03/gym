@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  logPerformance,
+  performanceErrorCategory,
+} from "@/lib/request-performance";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import {
   buildHomeActiveSessionSummary,
@@ -90,10 +94,18 @@ async function getAuthedContext(): Promise<{
   userId: string;
 }> {
   const supabase = await createClient();
+  const authStartedAt = performance.now();
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser();
+  logPerformance({
+    route: "/train/session/[id]",
+    operation: "workout-save.auth",
+    durationMs: performance.now() - authStartedAt,
+    status: user ? "authenticated" : error ? "error" : "unauthenticated",
+    ...(error ? { errorCategory: performanceErrorCategory(error) } : {}),
+  });
   if (error) throw new Error(`Autenticación: ${error.message}`);
   if (!user) throw new Error("No autenticado.");
   return { supabase, userId: user.id };
@@ -479,6 +491,7 @@ export async function saveWorkoutExercise(input: {
     );
   }
   const { supabase } = await getAuthedContext();
+  const rpcStartedAt = performance.now();
   const { data, error } = await supabase
     .rpc("save_workout_exercise", {
       p_session_exercise_id: input.sessionExerciseId,
@@ -486,6 +499,13 @@ export async function saveWorkoutExercise(input: {
       p_payload: input.payload,
     })
     .abortSignal(AbortSignal.timeout(12_000));
+  logPerformance({
+    route: "/train/session/[id]",
+    operation: "workout-save.rpc",
+    durationMs: performance.now() - rpcStartedAt,
+    status: error ? "error" : "ok",
+    ...(error ? { errorCategory: performanceErrorCategory(error) } : {}),
+  });
   if (error) throwWorkoutSaveRpcError(error);
   if (typeof data !== "string") {
     throw new Error("Guardar ejercicio: respuesta inválida de la base.");

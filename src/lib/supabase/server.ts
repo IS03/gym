@@ -3,6 +3,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { cache } from "react";
+import { logPerformance, performanceErrorCategory } from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
 import { createResilientSupabaseFetch } from "./resilient-fetch";
 
@@ -52,7 +53,34 @@ export type AuthenticatedRequestContext = {
 export const getVerifiedRequestContext = cache(
   async (): Promise<AuthenticatedRequestContext | null> => {
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.getClaims();
+    const authStartedAt = performance.now();
+    let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
+    try {
+      claimsResult = await supabase.auth.getClaims();
+    } catch (error) {
+      logPerformance({
+        route: "(app)",
+        operation: "server-auth",
+        durationMs: performance.now() - authStartedAt,
+        status: "error",
+        errorCategory: performanceErrorCategory(error),
+      });
+      throw error;
+    }
+    const { data, error } = claimsResult;
+    logPerformance({
+      route: "(app)",
+      operation: "server-auth",
+      durationMs: performance.now() - authStartedAt,
+      status: data?.claims?.sub
+        ? "authenticated"
+        : error && isInvalidAuthSessionError(error)
+          ? "invalid_session"
+          : "unauthenticated",
+      ...(error && !isInvalidAuthSessionError(error)
+        ? { errorCategory: performanceErrorCategory(error) }
+        : {}),
+    });
 
     if (error) {
       if (isInvalidAuthSessionError(error)) return null;

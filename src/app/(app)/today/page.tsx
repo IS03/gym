@@ -10,6 +10,7 @@ import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { listActiveFoods } from "@/lib/nutrition/product";
 import { listActiveSavedMeals } from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { measurePerformance } from "@/lib/request-performance";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { TodayActivity } from "./today-activity";
 import { MealComposer } from "./meal-composer";
@@ -45,13 +46,29 @@ function formatProteinProgress(consumed: number, target: number | null) {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, metrics, quickMeals, foods, savedMeals] = await Promise.all([
-    getNutritionDay(today, undefined, auth),
-    getActiveDailyMetrics(today, auth),
-    getQuickMealCandidates(today, auth),
-    listActiveFoods(auth),
-    listActiveSavedMeals(auth),
-  ]);
+  const [{ dayLog, meals, context }, metrics, quickMeals, foods, savedMeals] =
+    await Promise.all([
+      measurePerformance(
+        { route: "/today", operation: "today.nutrition" },
+        () => getNutritionDay(today, undefined, auth),
+      ),
+      measurePerformance(
+        { route: "/today", operation: "today.metrics" },
+        () => getActiveDailyMetrics(today, auth),
+      ),
+      measurePerformance(
+        { route: "/today", operation: "today.quick-meals" },
+        () => getQuickMealCandidates(today, auth),
+      ),
+      measurePerformance(
+        { route: "/today", operation: "today.foods" },
+        () => listActiveFoods(auth),
+      ),
+      measurePerformance(
+        { route: "/today", operation: "today.saved-meals" },
+        () => listActiveSavedMeals(auth),
+      ),
+    ]);
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;
