@@ -17,6 +17,8 @@ describe("PR74 — integración de Progreso real", () => {
     expect(data).toContain("Promise.all");
     expect(data).not.toContain('.from("day_logs")');
     expect(data).not.toContain("metric.name ===");
+    expect(data).toContain("adaptDailyMetricDefinition");
+    expect(data).toContain("buildProgressComparison");
   });
 
   it("expone la ruta de métricas desde Progreso y preserva selector, métrica y comparación en URL", () => {
@@ -25,6 +27,8 @@ describe("PR74 — integración de Progreso real", () => {
     expect(page).toContain("query={query}");
     expect(report).toContain('next.set("metric", metricId)');
     expect(report).toContain("Vs anterior");
+    expect(page).toContain("<ComparisonConfigurator");
+    expect(report).toContain("<ComparisonWorkspace");
   });
 
   it("presenta promedio, cobertura, extremos, tendencia, objetivo actual y un gráfico principal", () => {

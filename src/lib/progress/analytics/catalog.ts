@@ -15,6 +15,8 @@ const nutritionMetric = (
   input: Pick<ProgressMetricDefinition, "key" | "label" | "unit" | "aggregation" | "supportsGoal" | "relation"> & {
     field: string;
     category?: string;
+    comparison?: ProgressMetricDefinition["comparison"];
+    goal?: ProgressMetricDefinition["goal"];
   },
 ): ProgressMetricDefinition => ({
   key: input.key,
@@ -31,18 +33,20 @@ const nutritionMetric = (
   supportsTemporalComparison: true,
   minimumSamples: 1,
   comparisonScope: "same_metric",
+  comparison: input.comparison ?? { allowPercentDelta: true, stablePercentThreshold: 3 },
+  goal: input.goal,
   relation: input.relation,
   format: { maximumFractionDigits: input.unit === "g" ? 1 : 0 },
 });
 
 export const NUTRITION_PROGRESS_METRICS = [
-  nutritionMetric({ key: "nutrition.calories", label: "Calorías consumidas", unit: "kcal", field: "calories", aggregation: "average", supportsGoal: true, relation: { model: "chronic", suggestedLagDays: [0, 7, 14], minimumWindowDays: 14 } }),
+  nutritionMetric({ key: "nutrition.calories", label: "Calorías consumidas", unit: "kcal", field: "calories", aggregation: "average", supportsGoal: true, goal: { rule: "reference", source: "historical_snapshot" }, relation: { model: "chronic", suggestedLagDays: [0, 7, 14], minimumWindowDays: 14 } }),
   nutritionMetric({ key: "nutrition.calorie_target", label: "Objetivo calórico", unit: "kcal", field: "targetCalories", aggregation: "average", supportsGoal: false, category: "target", relation: { model: "chronic", suggestedLagDays: [0], minimumWindowDays: 14 } }),
-  nutritionMetric({ key: "nutrition.protein", label: "Proteína", unit: "g", field: "proteinG", aggregation: "average", supportsGoal: true, relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 } }),
-  nutritionMetric({ key: "nutrition.carbs", label: "Carbohidratos", unit: "g", field: "carbsG", aggregation: "average", supportsGoal: true, relation: { model: "acute", suggestedLagDays: [0, 1], minimumWindowDays: 14 } }),
-  nutritionMetric({ key: "nutrition.fat", label: "Grasas", unit: "g", field: "fatG", aggregation: "average", supportsGoal: true, relation: { model: "chronic", suggestedLagDays: [0, 7], minimumWindowDays: 14 } }),
+  nutritionMetric({ key: "nutrition.protein", label: "Proteína", unit: "g", field: "proteinG", aggregation: "average", supportsGoal: true, goal: { rule: "minimum", source: "historical_snapshot" }, relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 } }),
+  nutritionMetric({ key: "nutrition.carbs", label: "Carbohidratos", unit: "g", field: "carbsG", aggregation: "average", supportsGoal: false, relation: { model: "acute", suggestedLagDays: [0, 1], minimumWindowDays: 14 } }),
+  nutritionMetric({ key: "nutrition.fat", label: "Grasas", unit: "g", field: "fatG", aggregation: "average", supportsGoal: false, relation: { model: "chronic", suggestedLagDays: [0, 7], minimumWindowDays: 14 } }),
   nutritionMetric({ key: "nutrition.expenditure", label: "Gasto estimado", unit: "kcal", field: "expenditureKcal", aggregation: "average", supportsGoal: false, category: "energy", relation: { model: "chronic", suggestedLagDays: [0, 7], minimumWindowDays: 14 } }),
-  nutritionMetric({ key: "nutrition.energy_balance", label: "Balance energético", unit: "kcal", field: "energyBalanceKcal", aggregation: "sum", supportsGoal: false, category: "energy", relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 } }),
+  nutritionMetric({ key: "nutrition.energy_balance", label: "Balance energético", unit: "kcal", field: "energyBalanceKcal", aggregation: "sum", supportsGoal: false, category: "energy", comparison: { allowPercentDelta: false, stablePercentThreshold: 3, stableAbsoluteThreshold: 50, signSemantic: "energy_balance" }, relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 } }),
 ] as const satisfies readonly ProgressMetricDefinition[];
 
 const bodyMetric = (field: "weight_kg" | BodyMeasurementField, label: string): ProgressMetricDefinition => ({
@@ -64,6 +68,7 @@ const bodyMetric = (field: "weight_kg" | BodyMeasurementField, label: string): P
   supportsTemporalComparison: true,
   minimumSamples: 2,
   comparisonScope: "same_metric",
+  comparison: { allowPercentDelta: false, stablePercentThreshold: 3 },
   relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 },
   format: { maximumFractionDigits: 2 },
 });
@@ -93,6 +98,7 @@ const trainingLoadMetric = (
   supportsTemporalComparison: true,
   minimumSamples: 1,
   comparisonScope: "same_metric",
+  comparison: { allowPercentDelta: true, stablePercentThreshold: 3 },
   relation: { model: "chronic", suggestedLagDays: [0, 7], minimumWindowDays: 14 },
   format: { maximumFractionDigits: 0 },
 });
@@ -118,6 +124,7 @@ const performanceMetric = (
   supportsTemporalComparison: true,
   minimumSamples: 1,
   comparisonScope: "same_exercise_and_weight_mode",
+  comparison: { allowPercentDelta: false, stablePercentThreshold: 3 },
   relation: { model: "chronic", suggestedLagDays: [7, 14, 28], minimumWindowDays: 28 },
   format: { maximumFractionDigits: unit === "kg" ? 2 : 0 },
   metadata: { requiresExerciseContext: true, respectsWeightMode: true },
@@ -164,6 +171,8 @@ export function adaptDailyMetricDefinition(metric: DynamicMetricDefinitionInput)
     supportsTemporalComparison: true,
     minimumSamples: 2,
     comparisonScope: "same_metric",
+    comparison: { allowPercentDelta: true, stablePercentThreshold: 3 },
+    goal: metric.target_value === null ? undefined : { rule: "minimum", source: "current_reference" },
     relation: { model: "configurable", suggestedLagDays: [0, 1, 7, 14], minimumWindowDays: 14 },
     format: { maximumFractionDigits: metric.value_type === "integer" || metric.value_type === "duration" ? 0 : 4 },
     metadata: {

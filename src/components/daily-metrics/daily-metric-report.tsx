@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartDetail } from "@/components/ui/chart-detail";
+import { ComparisonWorkspace } from "@/components/progress/comparison-workspace";
 import { formatDurationMinutes } from "@/lib/daily-metrics/core";
 import type {
   MetricReportComparison,
@@ -13,6 +14,7 @@ import type {
   MetricReportDefinition,
   MetricReportSummary,
 } from "@/lib/daily-metrics/reports-core";
+import type { ProgressComparisonReport } from "@/lib/progress/comparisons";
 import {
   alignNutritionComparisonBuckets,
   averageBucketValue,
@@ -141,6 +143,7 @@ export function DailyMetricReport({
   days,
   summary,
   comparison,
+  progressComparison,
   currentHref,
   previousHref,
 }: {
@@ -149,6 +152,7 @@ export function DailyMetricReport({
   days: MetricReportDay[];
   summary: MetricReportSummary;
   comparison: MetricReportComparison | null;
+  progressComparison: ProgressComparisonReport | null;
   currentHref: string;
   previousHref: string;
 }) {
@@ -164,6 +168,8 @@ export function DailyMetricReport({
   }
 
   return <div className="space-y-6" aria-busy={pending}>
+    {progressComparison ? <ComparisonWorkspace key={`${progressComparison.reference.type}:${progressComparison.selectedMetricKeys.join(",")}:${progressComparison.initialView}:${progressComparison.activeMetricKey}`} report={progressComparison} currentHref={currentHref} /> : null}
+
     <section className="space-y-3" aria-labelledby="metric-selector-title">
       <div>
         <h2 id="metric-selector-title" className="text-lg font-semibold tracking-tight">Métrica</h2>
@@ -200,7 +206,7 @@ export function DailyMetricReport({
       </CardContent></Card>
     </section>
 
-    <section className="space-y-3" aria-labelledby="metric-trend-title">
+    {progressComparison ? null : <section className="space-y-3" aria-labelledby="metric-trend-title">
       <div>
         <h2 id="metric-trend-title" className="text-lg font-semibold tracking-tight">Tendencia</h2>
         <p className="text-xs text-muted-foreground">Los huecos son días sin registro.</p>
@@ -217,7 +223,7 @@ export function DailyMetricReport({
         <p className="border-t pt-3 text-sm text-muted-foreground">Cambio promedio: <span className="font-semibold text-foreground">{formatSignedValue(comparison.averageDelta, metric)}</span>{comparison.averagePercentDelta === null ? "" : ` · ${signed.format(comparison.averagePercentDelta)}%`}</p>
       </CardContent></Card> : null}
       <Card className="surface-elevated"><CardContent className="p-3 sm:p-4"><MetricChart metric={metric} days={days} comparison={comparison} /></CardContent></Card>
-    </section>
+    </section>}
 
     <section className="space-y-3" aria-labelledby="metric-history-title">
       <h2 id="metric-history-title" className="text-lg font-semibold tracking-tight">Registros recientes</h2>

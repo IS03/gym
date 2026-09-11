@@ -5,13 +5,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { NutritionReportCharts } from "@/components/nutrition/nutrition-report-charts";
 import { NutritionReportDailyBreakdown } from "@/components/nutrition/nutrition-report-daily-breakdown";
 import { NutritionReportPeriodSelector } from "@/components/nutrition/nutrition-report-period-selector";
+import { ComparisonConfigurator } from "@/components/progress/comparison-configurator";
+import { ComparisonWorkspace } from "@/components/progress/comparison-workspace";
 import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
 import {
   nutritionReportComparisonMode,
   nutritionReportCurrentPath,
   nutritionReportPreviousPath,
 } from "@/lib/nutrition/report-navigation";
-import { getNutritionReport, getNutritionReportWithPrevious } from "@/lib/nutrition/reports";
+import { getNutritionReport, getNutritionReportWithProgressComparison } from "@/lib/nutrition/reports";
+import { NUTRITION_PROGRESS_METRICS } from "@/lib/progress/analytics";
+import { parseProgressComparisonQuery, progressComparisonQueryParams } from "@/lib/progress/comparisons";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 export const dynamic = "force-dynamic";
@@ -56,18 +60,23 @@ export default async function NutritionReportsPage({
   const sp = (await searchParams) ?? {};
   const value = (key: string) => typeof sp[key] === "string" ? sp[key] as string : undefined;
   const today = todayInCordoba();
+  const progressQuery = parseProgressComparisonQuery(sp);
   const comparisonMode = nutritionReportComparisonMode(value("compare"));
   const reportInput = {
     period: value("period"),
     from: value("from"),
     to: value("to"),
   };
-  const comparisonReport = comparisonMode === "previous"
-    ? await getNutritionReportWithPrevious(reportInput, today)
+  const comparisonReport = progressQuery.referenceType
+    ? await getNutritionReportWithProgressComparison({ ...reportInput, comparison: progressQuery }, today)
     : null;
   const report = comparisonReport ?? await getNutritionReport(reportInput, today);
   const { range, days, summary } = report;
-  const comparison = comparisonReport?.comparison ?? null;
+  const progressComparison = comparisonReport?.progressComparison ?? null;
+  const comparisonOptions = NUTRITION_PROGRESS_METRICS
+    .filter((metric) => metric.key !== "nutrition.calorie_target")
+    .map((metric) => ({ key: metric.key, label: metric.label, supportsGoal: metric.supportsGoal }));
+  const referencePeriod = progressComparison?.reference.type === "goal" ? null : progressComparison?.reference.period ?? null;
 
   return <div className="space-y-6">
     <header className="space-y-3">
@@ -89,10 +98,25 @@ export default async function NutritionReportsPage({
           today={today}
           rangeLabel={formatNutritionReportRange(range.start, range.end)}
           comparison={comparisonMode}
+          query={progressComparisonQueryParams(progressQuery)}
+        />
+        <ComparisonConfigurator
+          metrics={comparisonOptions}
+          primaryPeriod={range}
+          today={today}
+          selectedMetricKeys={progressComparison?.selectedMetricKeys ?? progressQuery.selectedMetricKeys}
+          referenceType={progressQuery.referenceType}
+          referencePreset={progressQuery.referencePreset}
+          referencePeriod={referencePeriod}
+          initialView={progressQuery.initialView}
+          activeMetricKey={progressComparison?.activeMetricKey ?? progressQuery.activeMetricKey}
         />
         {range.error ? <p className="mt-2 rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{range.error} Se muestran los últimos 7 días.</p> : null}
+        {comparisonReport?.comparisonError ? <p className="mt-2 rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive">{comparisonReport.comparisonError}</p> : null}
       </CardContent>
     </Card>
+
+    {progressComparison ? <ComparisonWorkspace key={`${progressComparison.reference.type}:${progressComparison.selectedMetricKeys.join(",")}:${progressComparison.initialView}:${progressComparison.activeMetricKey}`} report={progressComparison} currentHref={nutritionReportCurrentPath(range)} /> : null}
 
     <section className="space-y-3" aria-labelledby="nutrition-summary-title">
       <div>
@@ -129,13 +153,13 @@ export default async function NutritionReportsPage({
       </Card>
     </section>
 
-    <NutritionReportCharts
+    {progressComparison ? null : <NutritionReportCharts
       days={days}
-      comparison={comparison}
-      comparisonMode={comparisonMode}
+      comparison={null}
+      comparisonMode={null}
       currentHref={nutritionReportCurrentPath(range)}
       previousHref={nutritionReportPreviousPath(range)}
-    />
+    />}
 
     <NutritionReportDailyBreakdown days={days} summary={summary} />
   </div>;
