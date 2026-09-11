@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
 const weekdays = ["L", "M", "X", "J", "V", "S", "D"];
 const signals = [
   { key: "hasNutrition", label: "Nutrición", className: "bg-primary" },
-  { key: "hasTraining", label: "Entreno", className: "bg-chart-2" },
   { key: "hasMetrics", label: "Métricas", className: "bg-chart-3" },
+  { key: "hasTraining", label: "Entreno", className: "bg-chart-2" },
   { key: "hasBody", label: "Cuerpo", className: "bg-chart-5" },
 ] as const;
 
@@ -42,7 +42,6 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
     <div className="space-y-6 pb-2 lg:mx-auto lg:max-w-5xl">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Calendario</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Nutrición, métricas, entrenamiento y cuerpo, día por día.</p>
       </header>
 
       <Card className="surface-elevated">
@@ -51,10 +50,6 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
             <Link href={calendarHref(previousMonth)} aria-label="Mes anterior" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 justify-self-start")}><ChevronLeft className="size-5" aria-hidden /></Link>
             <h2 className="min-w-0 text-center text-base font-semibold tracking-tight sm:text-lg">{formatMonthLabel(month)}</h2>
             {canAdvance ? <Link href={calendarHref(nextMonth)} aria-label="Mes siguiente" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 justify-self-end")}><ChevronRight className="size-5" aria-hidden /></Link> : <span aria-disabled="true" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-11 justify-self-end cursor-not-allowed opacity-40")}><ChevronRight className="size-5" aria-hidden /></span>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-muted-foreground sm:flex sm:flex-wrap sm:gap-x-4">
-            {signals.map((signal) => <span key={signal.key} className="flex items-center gap-1.5"><span className={cn("size-2 rounded-full", signal.className)} aria-hidden />{signal.label}</span>)}
           </div>
 
           <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-muted-foreground" aria-hidden>
@@ -71,7 +66,10 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
               return isFuture ? <span key={day.date} aria-disabled="true" aria-label={aria} className={classes}>{contents}</span> : <Link key={day.date} href={dailyHistoryDetailHref(day.date, { source: "calendar", month })} aria-label={aria} className={classes}>{contents}</Link>;
             })}
           </div>
-          <p className="text-center text-xs text-muted-foreground">Tocá un día para ver el historial completo.</p>
+
+          <div className="flex flex-col gap-2 border-t pt-4 text-xs text-muted-foreground" aria-label="Indicadores del calendario">
+            {signals.map((signal) => <span key={signal.key} className="flex items-center gap-1.5"><span className={cn("size-2 rounded-full", signal.className)} aria-hidden />{signal.label}</span>)}
+          </div>
         </CardContent>
       </Card>
     </div>
