@@ -9,13 +9,14 @@ export type ExerciseLibraryRoutine = { id: string; nombre: string; color: Routin
 export type ExerciseLibraryMembership = ExerciseLibraryRoutine;
 export type ExerciseLibraryFilters = {
   routineIds: string[];
+  withRoutine: boolean;
   withoutRoutine: boolean;
   muscleGroups: ExerciseLibraryGroup[];
   implements: string[];
   status: ExerciseLibraryStatus;
 };
 export const DEFAULT_EXERCISE_LIBRARY_FILTERS: ExerciseLibraryFilters = {
-  routineIds: [], withoutRoutine: false, muscleGroups: [], implements: [], status: "active",
+  routineIds: [], withRoutine: false, withoutRoutine: false, muscleGroups: [], implements: [], status: "active",
 };
 export type ExerciseLibrarySection = { value: ExerciseLibraryGroup; label: string; exercises: ExerciseLibraryItem[] };
 export type ExerciseLibraryItem = Pick<Exercise,
@@ -89,7 +90,9 @@ export function filterExerciseLibrary(exercises: readonly ExerciseLibraryItem[],
   return exercises.filter((exercise) => {
     const statusMatches = input.filters.status === "all" || (input.filters.status === "active" ? exercise.is_active : !exercise.is_active);
     const routineMatches = input.filters.withoutRoutine ? exercise.memberships.length === 0
-      : input.filters.routineIds.length === 0 || exercise.memberships.some((membership) => input.filters.routineIds.includes(membership.id));
+      : input.filters.withRoutine
+        ? exercise.memberships.length > 0 && (input.filters.routineIds.length === 0 || exercise.memberships.some((membership) => input.filters.routineIds.includes(membership.id)))
+        : input.filters.routineIds.length === 0 || exercise.memberships.some((membership) => input.filters.routineIds.includes(membership.id));
     const muscleMatches = input.filters.muscleGroups.length === 0 || input.filters.muscleGroups.includes(exercise.grupo_muscular ?? "none");
     const implementMatches = selectedImplements.size === 0 || selectedImplements.has(normalizeExerciseSearch(exercise.implement ?? ""));
     return statusMatches && routineMatches && muscleMatches && implementMatches && exerciseSearchText(exercise).includes(query);
@@ -97,7 +100,7 @@ export function filterExerciseLibrary(exercises: readonly ExerciseLibraryItem[],
 }
 
 export function exerciseLibraryActiveFilterCount(filters: ExerciseLibraryFilters): number {
-  return filters.routineIds.length + Number(filters.withoutRoutine) + filters.muscleGroups.length
+  return filters.routineIds.length + Number(filters.withRoutine && filters.routineIds.length === 0) + Number(filters.withoutRoutine) + filters.muscleGroups.length
     + filters.implements.length + Number(filters.status !== "active");
 }
 
