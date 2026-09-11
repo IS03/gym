@@ -1,21 +1,24 @@
 import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "./muscle-groups";
-import { addUtcDays, buildWeeklyTrainingSummaries, formatTrainingMinutes } from "./training-progress-summary";
+import { buildWeeklyTrainingSummaries, formatTrainingMinutes } from "./training-progress-summary";
 import { normalizeExerciseSearch } from "./exercise-library";
 import { normalizeDisplayZero } from "../chart-core";
+import {
+  bucketProgressRange,
+  getPreviousProgressPeriod,
+  PROGRESS_PERIOD_PRESETS,
+  resolveProgressPeriod,
+} from "../progress/analytics/periods";
+import type { ProgressBucketGranularity } from "../progress/analytics/types";
 import type { Routine, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
-export const TRAINING_ANALYSIS_PERIODS = [
-  { value: "1w", label: "1 semana", days: 7, bucketDays: 1 },
-  { value: "2w", label: "2 semanas", days: 14, bucketDays: 1 },
-  { value: "3w", label: "3 semanas", days: 21, bucketDays: 1 },
-  { value: "4w", label: "4 semanas", days: 28, bucketDays: 7 },
-  { value: "8w", label: "8 semanas", days: 56, bucketDays: 7 },
-  { value: "3m", label: "3 meses", days: 90, bucketDays: 7 },
-  { value: "6m", label: "6 meses", days: 183, bucketDays: 14 },
-  { value: "1y", label: "1 año", days: 365, bucketDays: 28 },
-] as const;
+const TRAINING_ANALYSIS_PERIOD_VALUES = ["1w", "2w", "3w", "4w", "8w", "3m", "6m", "1y"] as const;
 
-export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIODS)[number]["value"];
+export const TRAINING_ANALYSIS_PERIODS = TRAINING_ANALYSIS_PERIOD_VALUES.map((value) => {
+  const definition = PROGRESS_PERIOD_PRESETS.find((period) => period.value === value)!;
+  return { value, label: definition.label };
+});
+
+export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIOD_VALUES)[number];
 export type TrainingAnalysisMetric = "volume" | "sets" | "sessions" | "minutes";
 
 export type TrainingAnalysisSummary = {
@@ -199,19 +202,12 @@ function summarize(records: readonly SessionRecord[], selector?: (record: Sessio
   return summary;
 }
 
-function dateForPeriod(period: TrainingAnalysisPeriod, today: string) {
-  const config = TRAINING_ANALYSIS_PERIODS.find((item) => item.value === period)!;
-  return addUtcDays(today, 1 - config.days);
-}
-
 export function trainingAnalysisPeriodRange(period: TrainingAnalysisPeriod, end: string): { start: string; end: string } {
-  return { start: dateForPeriod(period, end), end };
+  return resolveProgressPeriod({ preset: period }, end).current;
 }
 
 export function previousTrainingAnalysisPeriodRange(period: TrainingAnalysisPeriod, end: string): { start: string; end: string } {
-  const current = trainingAnalysisPeriodRange(period, end);
-  const previousEnd = addUtcDays(current.start, -1);
-  return trainingAnalysisPeriodRange(period, previousEnd);
+  return getPreviousProgressPeriod(trainingAnalysisPeriodRange(period, end));
 }
 
 export function isTrainingAnalysisPeriod(value: string | null | undefined): value is TrainingAnalysisPeriod {
@@ -273,13 +269,11 @@ export function filterTrainingAnalysisExercises(
 function buildTimeline(
   records: readonly SessionRecord[],
   range: { start: string; end: string },
-  bucketDays: number,
+  bucket: ProgressBucketGranularity,
   selector?: (record: SessionRecord) => ExerciseRecord[],
 ): TrainingAnalysisTimelinePoint[] {
   const buckets: TrainingAnalysisTimelinePoint[] = [];
-  for (let start = range.start; start <= range.end; start = addUtcDays(start, bucketDays)) {
-    const candidateEnd = addUtcDays(start, bucketDays - 1);
-    const end = candidateEnd < range.end ? candidateEnd : range.end;
+  for (const { start, end } of bucketProgressRange(range, bucket)) {
     const scoped = records.filter((record) => record.logDate >= start && record.logDate <= end);
     buckets.push({ id: start, start, end, ...summarize(scoped, selector) });
   }
@@ -374,10 +368,10 @@ function exerciseSummaries(
 function buildExerciseTimeline(
   records: readonly SessionRecord[],
   range: { start: string; end: string },
-  bucketDays: number,
+  bucket: ProgressBucketGranularity,
   exerciseId: string,
 ): TrainingAnalysisExerciseTimelinePoint[] {
-  return buildTimeline(records, range, bucketDays, (record) => record.exercises.filter((exercise) => exercise.id === exerciseId)).map((point) => {
+  return buildTimeline(records, range, bucket, (record) => record.exercises.filter((exercise) => exercise.id === exerciseId)).map((point) => {
     const completedSets = records
       .filter((record) => record.logDate >= point.start && record.logDate <= point.end)
       .flatMap((record) => record.exercises.filter((exercise) => exercise.id === exerciseId))
@@ -390,11 +384,19 @@ function buildExerciseTimeline(
 
 export function buildTrainingAnalysis(
   source: TrainingAnalysisSource,
-  input: { today: string; period: TrainingAnalysisPeriod; routines?: Array<Pick<Routine, "id" | "nombre"> & { is_active?: boolean }> },
+  input: {
+    today: string;
+    period: TrainingAnalysisPeriod;
+    routines?: Array<Pick<Routine, "id" | "nombre"> & { is_active?: boolean }>;
+    range?: { start: string; end: string };
+  },
 ): TrainingAnalysis {
-  const start = dateForPeriod(input.period, input.today);
-  const config = TRAINING_ANALYSIS_PERIODS.find((item) => item.value === input.period)!;
-  const range = { start, end: input.today, label: trainingAnalysisPeriodLabel(input.period) };
+  const resolvedPeriod = resolveProgressPeriod({ preset: input.period }, input.today);
+  const periodRange = input.range ?? resolvedPeriod.current;
+  const bucket = input.range
+    ? resolveProgressPeriod({ preset: "custom", from: input.range.start, to: input.range.end }, input.range.end).bucket
+    : resolvedPeriod.bucket;
+  const range = { ...periodRange, label: trainingAnalysisPeriodLabel(input.period) };
   const records = buildSessionRecords(source, range);
   const allRoutineNames = historicalRoutineNames(source);
   for (const routine of input.routines ?? []) {
@@ -402,7 +404,7 @@ export function buildTrainingAnalysis(
   }
 
   const summary = summarize(records);
-  const timeline = buildTimeline(records, range, config.bucketDays);
+  const timeline = buildTimeline(records, range, bucket);
   const weekly = buildWeeklyTrainingSummaries(source, input.today);
   const currentWeek = weekly[0];
   const previousWeek = weekly[1];
@@ -418,7 +420,7 @@ export function buildTrainingAnalysis(
         id,
         name,
         summary: routineSummary,
-        timeline: buildTimeline(routineRecords, range, config.bucketDays),
+        timeline: buildTimeline(routineRecords, range, bucket),
         muscles: [...new Set(routineRecords.flatMap((record) => record.exercises.filter((exercise) => exercise.sets.length > 0).map((exercise) => exercise.muscleKey)))].map((key) => {
           const scoped = summarize(routineRecords, (record) => record.exercises.filter((exercise) => exercise.muscleKey === key));
           const first = routineRecords.flatMap((record) => record.exercises).find((exercise) => exercise.muscleKey === key);
@@ -439,7 +441,7 @@ export function buildTrainingAnalysis(
         key,
         label,
         summary: summarize(records, selector),
-        timeline: buildTimeline(muscleRecords, range, config.bucketDays, selector),
+        timeline: buildTimeline(muscleRecords, range, bucket, selector),
         exerciseIds: exerciseSummaries(muscleRecords, selector).map((exercise) => exercise.id),
       };
     })
@@ -448,7 +450,7 @@ export function buildTrainingAnalysis(
   const activeRoutineIds = (input.routines ?? []).filter((routine) => routine.is_active !== false).map((routine) => routine.id);
   const exercises = exerciseSummaries(records).map((exercise) => ({
     ...exercise,
-    timeline: buildExerciseTimeline(records, range, config.bucketDays, exercise.id),
+    timeline: buildExerciseTimeline(records, range, bucket, exercise.id),
   }));
   return { period: input.period, range, summary, weekComparison, timeline, routines, activeRoutineIds, muscles, exercises };
 }
