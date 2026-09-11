@@ -7,6 +7,8 @@ import { logPerformance, performanceErrorCategory } from "../request-performance
 import { isInvalidAuthSessionError } from "./auth-errors";
 import { createResilientSupabaseFetch } from "./resilient-fetch";
 
+export const SUPABASE_SERVER_REQUEST_TIMEOUT_MS = 10_000;
+
 export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -21,7 +23,9 @@ export async function createClient() {
 
   return createServerClient(url, anonKey, {
     global: {
-      fetch: createResilientSupabaseFetch(),
+      fetch: createResilientSupabaseFetch(undefined, {
+        requestTimeoutMs: SUPABASE_SERVER_REQUEST_TIMEOUT_MS,
+      }),
     },
     cookies: {
       getAll() {

@@ -4,9 +4,15 @@ import { logPerformance, performanceErrorCategory } from "../request-performance
 import { isInvalidAuthSessionError } from "./auth-errors";
 
 function isProtectedPath(pathname: string) {
-  return ["/home", "/today", "/history", "/settings", "/train"].some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  return [
+    "/home",
+    "/today",
+    "/history",
+    "/settings",
+    "/train",
+    "/progress",
+    "/calendar",
+  ].some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 function copyAuthResponse(source: NextResponse, target: NextResponse) {

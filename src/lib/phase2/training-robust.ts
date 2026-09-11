@@ -9,8 +9,10 @@ import {
   buildHomeActiveSessionSummary,
   type HomeActiveSessionSummary,
 } from "@/lib/home-dashboard";
-import { createClient } from "@/lib/supabase/server";
-import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+import {
+  requireAuthenticatedRequestContext,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -55,8 +57,6 @@ import type {
 } from "./types";
 import type { RoutineColorKey } from "./routine-colors";
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
 type ErrorLike = {
   code?: string;
   message?: string;
@@ -90,25 +90,29 @@ function requireUuid(value: unknown, label: string): string {
 }
 
 async function getAuthedContext(): Promise<{
-  supabase: SupabaseServerClient;
+  supabase: AuthenticatedRequestContext["supabase"];
   userId: string;
 }> {
-  const supabase = await createClient();
   const authStartedAt = performance.now();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  logPerformance({
-    route: "/train/session/[id]",
-    operation: "workout-save.auth",
-    durationMs: performance.now() - authStartedAt,
-    status: user ? "authenticated" : error ? "error" : "unauthenticated",
-    ...(error ? { errorCategory: performanceErrorCategory(error) } : {}),
-  });
-  if (error) throw new Error(`Autenticación: ${error.message}`);
-  if (!user) throw new Error("No autenticado.");
-  return { supabase, userId: user.id };
+  try {
+    const context = await requireAuthenticatedRequestContext();
+    logPerformance({
+      route: "/train/session/[id]",
+      operation: "workout-save.auth",
+      durationMs: performance.now() - authStartedAt,
+      status: "authenticated",
+    });
+    return context;
+  } catch (error) {
+    logPerformance({
+      route: "/train/session/[id]",
+      operation: "workout-save.auth",
+      durationMs: performance.now() - authStartedAt,
+      status: "error",
+      errorCategory: performanceErrorCategory(error),
+    });
+    throw error;
+  }
 }
 
 function throwRpcError(label: string, value: unknown): never {
