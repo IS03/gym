@@ -3,12 +3,13 @@ import {
   addProgressIsoDays,
   getPreviousProgressPeriod,
   isValidProgressIsoDate,
+  PROGRESS_CUSTOM_RANGE_MAX_DAYS,
   progressRangeDays,
   resolveProgressPeriod,
   subtractProgressCalendarMonths,
 } from "../progress/analytics/periods";
 
-export const NUTRITION_REPORT_MAX_DAYS = 366;
+export const NUTRITION_REPORT_MAX_DAYS = PROGRESS_CUSTOM_RANGE_MAX_DAYS;
 
 export type NutritionReportPreset = "7" | "14" | "30" | "3m" | "6m" | "1y" | "custom";
 

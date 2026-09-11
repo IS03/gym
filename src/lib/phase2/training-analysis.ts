@@ -5,23 +5,20 @@ import { normalizeDisplayZero } from "../chart-core";
 import {
   bucketProgressRange,
   getPreviousProgressPeriod,
+  PROGRESS_PERIOD_PRESETS,
   resolveProgressPeriod,
 } from "../progress/analytics/periods";
 import type { ProgressBucketGranularity } from "../progress/analytics/types";
 import type { Routine, WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "./types";
 
-export const TRAINING_ANALYSIS_PERIODS = [
-  { value: "1w", label: "1 semana" },
-  { value: "2w", label: "2 semanas" },
-  { value: "3w", label: "3 semanas" },
-  { value: "4w", label: "4 semanas" },
-  { value: "8w", label: "8 semanas" },
-  { value: "3m", label: "3 meses" },
-  { value: "6m", label: "6 meses" },
-  { value: "1y", label: "1 año" },
-] as const;
+const TRAINING_ANALYSIS_PERIOD_VALUES = ["1w", "2w", "3w", "4w", "8w", "3m", "6m", "1y"] as const;
 
-export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIODS)[number]["value"];
+export const TRAINING_ANALYSIS_PERIODS = TRAINING_ANALYSIS_PERIOD_VALUES.map((value) => {
+  const definition = PROGRESS_PERIOD_PRESETS.find((period) => period.value === value)!;
+  return { value, label: definition.label };
+});
+
+export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIOD_VALUES)[number];
 export type TrainingAnalysisMetric = "volume" | "sets" | "sessions" | "minutes";
 
 export type TrainingAnalysisSummary = {
