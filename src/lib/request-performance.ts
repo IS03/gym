@@ -13,12 +13,15 @@ export type PerformanceErrorCategory =
   | "database"
   | "unknown";
 
+export type PerformanceRequestKind = "navigation" | "rsc" | "prefetch";
+
 export type PerformanceEvent = {
   route: string;
   operation: string;
   durationMs: number;
   status: PerformanceStatus;
   errorCategory?: PerformanceErrorCategory;
+  requestKind?: PerformanceRequestKind;
 };
 
 type PerformanceLogger = Pick<Console, "info">;
@@ -76,10 +79,29 @@ export function logPerformance(
     durationMs: Math.max(0, Math.round(event.durationMs)),
     region: process.env.VERCEL_REGION ?? "local",
     status: event.status,
+    ...(event.requestKind ? { requestKind: event.requestKind } : {}),
     ...(event.errorCategory
       ? { errorCategory: event.errorCategory }
       : {}),
   });
+}
+
+export function classifyRequestKind(
+  headers: Pick<Headers, "get">,
+): PerformanceRequestKind {
+  const purpose = [headers.get("purpose"), headers.get("sec-purpose")]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("en");
+
+  if (
+    headers.get("next-router-prefetch") === "1"
+    || purpose.includes("prefetch")
+  ) {
+    return "prefetch";
+  }
+
+  return headers.get("rsc") === "1" ? "rsc" : "navigation";
 }
 
 export async function measurePerformance<T>(

@@ -299,15 +299,55 @@ describe("Supabase Data API JWT clock-skew retry", () => {
     expect(response.status).toBe(401);
   });
 
-  it("propaga un error de red sin ampliar el scope de retry", async () => {
+  it("recupera una lectura después de un único error de red", async () => {
     const networkError = new TypeError("fetch failed");
     const implementation = vi
       .fn<typeof fetch>()
-      .mockRejectedValueOnce(networkError);
+      .mockRejectedValueOnce(networkError)
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
 
-    await expect(testFetch(implementation)(DATA_API_URL)).rejects.toBe(
-      networkError,
-    );
+    const response = await testFetch(implementation)(PROFILES_API_URL);
+
+    expect(response.status).toBe(200);
+    expect(implementation).toHaveBeenCalledTimes(2);
+  });
+
+  it("recupera una lectura del error 530 observado en Cloudflare", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("DNS resolution error", { status: 530 }))
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+    const response = await testFetch(implementation)(PROFILES_API_URL);
+
+    expect(response.status).toBe(200);
+    expect(implementation).toHaveBeenCalledTimes(2);
+  });
+
+  it("agota un único retry de red y propaga el segundo error", async () => {
+    const first = new TypeError("fetch failed");
+    const second = new TypeError("fetch failed again");
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(first)
+      .mockRejectedValueOnce(second);
+
+    await expect(testFetch(implementation)(PROFILES_API_URL)).rejects.toBe(second);
+    expect(implementation).toHaveBeenCalledTimes(2);
+  });
+
+  it("no reintenta transporte en mutaciones", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("DNS resolution error", { status: 530 }));
+
+    const response = await testFetch(implementation)(DATA_API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(530);
     expect(implementation).toHaveBeenCalledOnce();
   });
 
