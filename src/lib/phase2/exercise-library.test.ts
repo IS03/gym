@@ -39,11 +39,12 @@ describe("filterExerciseLibrary", () => {
   it("aplica OR dentro de rutina, grupo e implemento", () => {
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ routineIds: ["push", "pull"] }) }).map((item) => item.id)).toEqual(["PRESS", "REMO"]);
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ muscleGroups: ["pecho", "espalda"] }) })).toHaveLength(3);
+    expect(filterExerciseLibrary(entries, { query: "", filters: filters({ muscleGroups: ["pecho", "none"] }) }).map((item) => item.id)).toEqual(["PRESS", "APERTURAS", "MOVILIDAD"]);
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ implements: ["Máquina", "Mancuernas"] }) })).toHaveLength(3);
   });
 
   it("aplica AND entre categorías y combina búsqueda", () => {
-    expect(filterExerciseLibrary(entries, { query: "press", filters: filters({ routineIds: ["push", "pull"], muscleGroups: ["pecho"], implements: ["Mancuernas"] }) }).map((item) => item.id)).toEqual(["PRESS"]);
+    expect(filterExerciseLibrary(entries, { query: "press", filters: filters({ withRoutine: true, routineIds: ["push", "pull"], muscleGroups: ["pecho"], implements: ["Mancuernas", "Máquina"] }) }).map((item) => item.id)).toEqual(["PRESS"]);
     expect(filterExerciseLibrary(entries, { query: "remo", filters: filters({ routineIds: ["push"] }) })).toEqual([]);
   });
 
@@ -51,6 +52,12 @@ describe("filterExerciseLibrary", () => {
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ withoutRoutine: true, implements: ["Banda"] }) }).map((item) => item.id)).toEqual(["MOVILIDAD"]);
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ status: "archived" }) }).map((item) => item.id)).toEqual(["LEGACY"]);
     expect(filterExerciseLibrary(entries, { query: "", filters: filters({ status: "all" }) })).toHaveLength(5);
+  });
+
+  it("distingue cualquiera, en rutina y sin rutina sin estados contradictorios", () => {
+    expect(filterExerciseLibrary(entries, { query: "", filters: filters({ withRoutine: true }) }).map((item) => item.id)).toEqual(["PRESS", "APERTURAS", "REMO"]);
+    expect(filterExerciseLibrary(entries, { query: "", filters: filters({ withRoutine: true, routineIds: ["push", "pull"] }) }).map((item) => item.id)).toEqual(["PRESS", "REMO"]);
+    expect(filterExerciseLibrary(entries, { query: "", filters: filters({ withoutRoutine: true, implements: ["Máquina"] }) })).toEqual([]);
   });
 });
 
@@ -66,6 +73,8 @@ describe("exercise library presentation", () => {
   it("cuenta únicamente filtros no-default", () => {
     expect(exerciseLibraryActiveFilterCount(filters())).toBe(0);
     expect(exerciseLibraryActiveFilterCount(filters({ routineIds: ["push"], muscleGroups: ["pecho"], status: "all" }))).toBe(3);
+    expect(exerciseLibraryActiveFilterCount(filters({ withRoutine: true }))).toBe(1);
+    expect(exerciseLibraryActiveFilterCount(filters({ withRoutine: true, routineIds: ["push", "pull"] }))).toBe(2);
   });
   it("calcula altas y bajas de memberships sin duplicar", () => {
     expect(diffRoutineMemberships(["push", "pull"], ["pull", "legs"])).toEqual({ add: ["legs"], remove: ["push"] });

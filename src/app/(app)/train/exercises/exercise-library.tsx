@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { Archive, Check, ChevronDown, ChevronRight, Plus, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronRight, Dumbbell, Plus, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -21,15 +21,14 @@ import {
   type ExerciseLibraryStatus,
 } from "@/lib/phase2/exercise-library";
 import { MUSCLE_GROUP_OPTIONS, muscleGroupLabel } from "@/lib/phase2/muscle-groups";
+import { routineColorCssVariable } from "@/lib/phase2/routine-colors";
 import type { MuscleGroup } from "@/lib/phase2/types";
 import { EXERCISE_IMPLEMENT_SUGGESTIONS, EXERCISE_WEIGHT_MODE_SUGGESTIONS, type ExerciseMutationInput } from "@/lib/phase2/exercise-mutation";
 import { emptyForm, formFromExercise, mutationFromForm, type ExerciseFormValues as FormValues } from "@/lib/phase2/exercise-form";
 import { archiveExerciseAction, createExerciseAction, restoreExerciseAction, updateExerciseAction } from "../actions";
 
-const GROUP_OPTIONS: ReadonlyArray<{ value: ExerciseLibraryGroup; label: string }> = [
-  ...MUSCLE_GROUP_OPTIONS,
-  { value: "none", label: "Sin grupo" },
-];
+const GROUP_OPTIONS: ReadonlyArray<{ value: ExerciseLibraryGroup; label: string }> = MUSCLE_GROUP_OPTIONS;
+type RoutineUsage = "any" | "assigned" | "unassigned";
 
 function cloneFilters(filters: ExerciseLibraryFilters): ExerciseLibraryFilters {
   return { ...filters, routineIds: [...filters.routineIds], muscleGroups: [...filters.muscleGroups], implements: [...filters.implements] };
@@ -37,6 +36,18 @@ function cloneFilters(filters: ExerciseLibraryFilters): ExerciseLibraryFilters {
 
 function toggleValue<T>(values: readonly T[], value: T): T[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+function routineUsageFromFilters(filters: ExerciseLibraryFilters): RoutineUsage {
+  if (filters.withoutRoutine) return "unassigned";
+  if (filters.withRoutine || filters.routineIds.length > 0) return "assigned";
+  return "any";
+}
+
+function implementSelectionSummary(values: readonly string[]): string {
+  if (values.length === 0) return "Todos";
+  if (values.length <= 2) return values.join(", ");
+  return `${values.length} seleccionados`;
 }
 
 function Sheet({ children, open, onOpenChange, large = false, initialFocus }: {
@@ -63,15 +74,16 @@ function Sheet({ children, open, onOpenChange, large = false, initialFocus }: {
   );
 }
 
-function SheetHeader({ title, description, closeLabel, closeRef, pending, action }: {
+function SheetHeader({ title, description, closeLabel, closeRef, pending, action, inlineActions = false }: {
   title: string;
   description: string;
   closeLabel: string;
   closeRef?: React.RefObject<HTMLButtonElement | null>;
   pending?: boolean;
   action?: React.ReactNode;
+  inlineActions?: boolean;
 }) {
-  return (
+  if (!inlineActions) return (
     <header className="relative shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5">
       <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
       <Dialog.Title className="text-xl font-semibold tracking-tight">{title}</Dialog.Title>
@@ -81,6 +93,22 @@ function SheetHeader({ title, description, closeLabel, closeRef, pending, action
         className="absolute right-2 top-4 flex size-11 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
         <X className="size-5" aria-hidden />
       </Dialog.Close>
+    </header>
+  );
+  return (
+    <header className="shrink-0 border-b border-border/70 px-4 pb-4 pt-3 sm:px-5">
+      <span className="mx-auto mb-3 block h-1 w-10 rounded-full bg-muted-foreground/30 lg:hidden" aria-hidden />
+      <div className="flex items-center gap-2">
+        <Dialog.Title className="min-w-0 flex-1 text-xl font-semibold tracking-tight">{title}</Dialog.Title>
+        <div className="flex shrink-0 items-center gap-1">
+          {action}
+          <Dialog.Close ref={closeRef} type="button" disabled={pending} aria-label={closeLabel}
+            className="flex size-10 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+            <X className="size-5" aria-hidden />
+          </Dialog.Close>
+        </div>
+      </div>
+      <Dialog.Description className="mt-1 text-sm text-muted-foreground">{description}</Dialog.Description>
     </header>
   );
 }
@@ -197,8 +225,26 @@ function FilterChip({ children, onRemove }: { children: React.ReactNode; onRemov
   return <button type="button" onClick={onRemove} className="inline-flex min-h-8 items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 text-xs font-medium text-primary">{children}<X className="size-3" aria-hidden /></button>;
 }
 
-function FilterChoice({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-pressed={selected} onClick={onClick} className={`min-h-10 rounded-full border px-4 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted"}`}>{children}</button>;
+function FilterSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return <fieldset className="space-y-3 border-b border-border/70 pb-5 last:border-b-0 last:pb-0"><legend className="font-semibold">{title}</legend>{description ? <p className="-mt-2 text-xs text-muted-foreground">{description}</p> : null}{children}</fieldset>;
+}
+
+function SegmentedControl<T extends string>({ label, value, options, onChange }: {
+  label: string;
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return <div className="grid grid-cols-3 gap-1 rounded-xl border border-border bg-muted/45 p-1" role="group" aria-label={label}>{options.map((option) => {
+    const selected = value === option.value;
+    return <button key={option.value} type="button" aria-pressed={selected} onClick={() => onChange(option.value)} className={`min-h-10 rounded-lg px-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selected ? "bg-background text-primary shadow-sm ring-1 ring-primary/15" : "text-muted-foreground hover:text-foreground"}`}>{option.label}</button>;
+  })}</div>;
+}
+
+function SelectableRow({ selected, onClick, children, leading }: { selected: boolean; onClick: () => void; children: React.ReactNode; leading?: React.ReactNode }) {
+  return <button type="button" aria-pressed={selected} onClick={onClick} className={`flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary/35 bg-primary/10" : "border-border bg-background hover:bg-muted/55"}`}>
+    {leading}<span className="min-w-0 flex-1 truncate">{children}</span><span className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`} aria-hidden>{selected ? <Check className="size-3.5" /> : null}</span>
+  </button>;
 }
 
 export function ExerciseLibrary({ initialExercises, initialRoutines }: { initialExercises: ExerciseLibraryItem[]; initialRoutines: ExerciseLibraryRoutine[] }) {
@@ -212,6 +258,7 @@ export function ExerciseLibrary({ initialExercises, initialRoutines }: { initial
     return new Set(first ? [first.value] : []);
   });
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [implementsOpen, setImplementsOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ExerciseLibraryItem | null>(null);
   const [form, setForm] = useState<FormValues>(emptyForm);
@@ -231,8 +278,16 @@ export function ExerciseLibrary({ initialExercises, initialRoutines }: { initial
 
   function openCreate() { setEditing(null); setForm(emptyForm()); setSelectedRoutineIds([]); setError(null); setEditorOpen(true); }
   function openEdit(exercise: ExerciseLibraryItem) { setEditing(exercise); setForm(formFromExercise(exercise)); setSelectedRoutineIds(exercise.memberships.map((item) => item.id)); setError(null); setEditorOpen(true); }
-  function openFilters() { setDraftFilters(cloneFilters(filters)); setFiltersOpen(true); }
+  function openFilters() { setDraftFilters(cloneFilters(filters)); setImplementsOpen(false); setFiltersOpen(true); }
   function clearDraftFilters() { setDraftFilters(cloneFilters(DEFAULT_EXERCISE_LIBRARY_FILTERS)); }
+  function setRoutineUsage(value: RoutineUsage) {
+    setDraftFilters({
+      ...draftFilters,
+      withRoutine: value === "assigned",
+      withoutRoutine: value === "unassigned",
+      routineIds: [],
+    });
+  }
 
   function saveExercise(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (pending) return; setError(null);
@@ -264,6 +319,7 @@ export function ExerciseLibrary({ initialExercises, initialRoutines }: { initial
   }
 
   const statusHeading = filters.status === "active" ? "Ejercicios activos" : filters.status === "archived" ? "Ejercicios archivados" : "Todos los ejercicios";
+  const draftRoutineUsage = routineUsageFromFilters(draftFilters);
   return <div className="space-y-5 lg:mx-auto lg:max-w-3xl">
     <div className="flex items-start justify-between gap-4"><div className="space-y-1"><h1 className="text-2xl font-semibold tracking-tight">Biblioteca</h1><p className="text-sm text-muted-foreground">Buscá y organizá tus ejercicios.</p></div>
       <Button type="button" onClick={openCreate} className="shrink-0"><Plus className="size-4" aria-hidden />Nuevo</Button></div>
@@ -275,8 +331,9 @@ export function ExerciseLibrary({ initialExercises, initialRoutines }: { initial
 
     {activeFilterCount ? <div className="flex flex-wrap gap-2" aria-label="Filtros activos">
       {filters.withoutRoutine ? <FilterChip onRemove={() => setFilters({ ...filters, withoutRoutine: false })}>Sin rutina</FilterChip> : null}
+      {filters.withRoutine && filters.routineIds.length === 0 ? <FilterChip onRemove={() => setFilters({ ...filters, withRoutine: false })}>En rutina</FilterChip> : null}
       {filters.routineIds.map((id) => <FilterChip key={id} onRemove={() => setFilters({ ...filters, routineIds: filters.routineIds.filter((item) => item !== id) })}>{initialRoutines.find((routine) => routine.id === id)?.nombre ?? "Rutina"}</FilterChip>)}
-      {filters.muscleGroups.map((group) => <FilterChip key={group} onRemove={() => setFilters({ ...filters, muscleGroups: filters.muscleGroups.filter((item) => item !== group) })}>{group === "none" ? "Sin grupo" : muscleGroupLabel(group)}</FilterChip>)}
+      {filters.muscleGroups.map((group) => <FilterChip key={group} onRemove={() => setFilters({ ...filters, muscleGroups: filters.muscleGroups.filter((item) => item !== group) })}>{group === "none" ? "Sin clasificar" : muscleGroupLabel(group)}</FilterChip>)}
       {filters.implements.map((item) => <FilterChip key={item} onRemove={() => setFilters({ ...filters, implements: filters.implements.filter((value) => value !== item) })}>{item}</FilterChip>)}
       {filters.status !== "active" ? <FilterChip onRemove={() => setFilters({ ...filters, status: "active" })}>{filters.status === "archived" ? "Archivados" : "Todos"}</FilterChip> : null}
     </div> : null}
@@ -288,15 +345,53 @@ export function ExerciseLibrary({ initialExercises, initialRoutines }: { initial
           {open ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}<span className="flex-1 text-sm font-semibold uppercase tracking-wide">{section.label}</span><span className="rounded-full bg-muted px-2.5 py-1 text-xs">{section.exercises.length}</span></button>{open ? <ExerciseRows exercises={section.exercises} onEdit={openEdit} /> : null}</section>; })}</div>}
     </section>
 
-    <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-      <SheetHeader title="Filtrar ejercicios" description="Acotá la biblioteca por rutina, músculo e implemento." closeLabel="Cerrar filtros" action={<button type="button" onClick={clearDraftFilters} className="text-sm font-medium text-primary">Limpiar</button>} />
-      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
-        <fieldset><legend className="font-semibold">Rutina</legend><div className="mt-3 flex flex-wrap gap-2"><FilterChoice selected={!draftFilters.withoutRoutine && draftFilters.routineIds.length === 0} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: false, routineIds: [] })}>Todas</FilterChoice><FilterChoice selected={draftFilters.withoutRoutine} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: !draftFilters.withoutRoutine, routineIds: [] })}>Sin rutina</FilterChoice>{initialRoutines.map((routine) => <FilterChoice key={routine.id} selected={draftFilters.routineIds.includes(routine.id)} onClick={() => setDraftFilters({ ...draftFilters, withoutRoutine: false, routineIds: toggleValue(draftFilters.routineIds, routine.id) })}>{routine.nombre}</FilterChoice>)}</div></fieldset>
-        <fieldset><legend className="font-semibold">Grupo muscular</legend><div className="mt-3 flex flex-wrap gap-2"><FilterChoice selected={draftFilters.muscleGroups.length === 0} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: [] })}>Todos</FilterChoice>{GROUP_OPTIONS.map((group) => <FilterChoice key={group.value} selected={draftFilters.muscleGroups.includes(group.value)} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: toggleValue(draftFilters.muscleGroups, group.value) })}>{group.label}</FilterChoice>)}</div></fieldset>
-        <fieldset><legend className="font-semibold">Implemento</legend><div className="mt-3 flex flex-wrap gap-2">{implementOptions.map((item) => <FilterChoice key={item} selected={draftFilters.implements.includes(item)} onClick={() => setDraftFilters({ ...draftFilters, implements: toggleValue(draftFilters.implements, item) })}>{item}</FilterChoice>)}</div></fieldset>
-        <fieldset><legend className="font-semibold">Estado</legend><div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border">{([['active','Activos'],['archived','Archivados'],['all','Todos']] as const).map(([value,label]) => <button key={value} type="button" aria-pressed={draftFilters.status === value} onClick={() => setDraftFilters({ ...draftFilters, status: value as ExerciseLibraryStatus })} className={`min-h-11 border-r text-sm last:border-r-0 ${draftFilters.status === value ? "bg-primary/10 font-medium text-primary" : "bg-background"}`}>{label}</button>)}</div></fieldset>
+    <Sheet open={filtersOpen} onOpenChange={(open) => { setFiltersOpen(open); if (!open) setImplementsOpen(false); }}>
+      <SheetHeader inlineActions title="Filtrar ejercicios" description="Acotá la biblioteca por rutina, músculo e implemento." closeLabel="Cerrar filtros" action={<button type="button" onClick={clearDraftFilters} aria-label="Limpiar filtros" className="flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">Limpiar</button>} />
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+        <FilterSection title="Uso en rutinas" description="Filtrá por ejercicios que estén o no en tus rutinas.">
+          <SegmentedControl label="Uso en rutinas" value={draftRoutineUsage} onChange={setRoutineUsage} options={[
+            { value: "any", label: "Cualquiera" }, { value: "assigned", label: "En rutina" }, { value: "unassigned", label: "Sin rutina" },
+          ]} />
+          {draftRoutineUsage === "assigned" ? <div className="space-y-3">
+            <div><h4 className="text-sm font-semibold">Rutinas</h4><p className="text-xs text-muted-foreground">Seleccioná una o más rutinas.</p></div>
+            {initialRoutines.length ? <div className="grid grid-cols-2 gap-2" aria-label="Rutinas activas">{initialRoutines.map((routine) => {
+              const selected = draftFilters.routineIds.includes(routine.id);
+              return <SelectableRow key={routine.id} selected={selected} onClick={() => setDraftFilters({ ...draftFilters, withRoutine: true, withoutRoutine: false, routineIds: toggleValue(draftFilters.routineIds, routine.id) })} leading={<span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: routineColorCssVariable(routine.color) }} aria-hidden />}>{routine.nombre}</SelectableRow>;
+            })}</div> : <p className="text-sm text-muted-foreground">No hay rutinas activas.</p>}
+          </div> : null}
+        </FilterSection>
+
+        <FilterSection title="Grupo muscular" description="Seleccioná uno o más grupos musculares.">
+          <div className="grid grid-cols-2 gap-2" aria-label="Grupos musculares">{GROUP_OPTIONS.map((group) => <SelectableRow key={group.value} selected={draftFilters.muscleGroups.includes(group.value)} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: toggleValue(draftFilters.muscleGroups, group.value) })}>{group.label}</SelectableRow>)}</div>
+          <button type="button" aria-pressed={draftFilters.muscleGroups.includes("none")} onClick={() => setDraftFilters({ ...draftFilters, muscleGroups: toggleValue(draftFilters.muscleGroups, "none") })} className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${draftFilters.muscleGroups.includes("none") ? "border-primary/35 bg-primary/10" : "border-border bg-background hover:bg-muted/55"}`}>
+            <span className={`flex size-5 shrink-0 items-center justify-center rounded-md border ${draftFilters.muscleGroups.includes("none") ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`} aria-hidden>{draftFilters.muscleGroups.includes("none") ? <Check className="size-3.5" /> : null}</span>
+            <span className="min-w-0"><span className="block text-sm font-medium">Sin clasificar</span><span className="block text-xs text-muted-foreground">Mostrar ejercicios sin grupo muscular asignado.</span></span>
+          </button>
+        </FilterSection>
+
+        <FilterSection title="Implemento">
+          <button type="button" onClick={() => setImplementsOpen(true)} aria-haspopup="dialog" aria-label={`Implemento: ${implementSelectionSummary(draftFilters.implements)}`} className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-border bg-background px-3 text-left outline-none transition-colors hover:bg-muted/55 focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Dumbbell className="size-5" aria-hidden /></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Implemento</span><span className="block text-xs text-muted-foreground">Filtrá por tipo de implemento.</span></span>
+            <span className="max-w-[38%] truncate text-right text-sm text-muted-foreground">{implementSelectionSummary(draftFilters.implements)}</span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        </FilterSection>
+
+        <FilterSection title="Mostrar" description="Filtrá por estado del ejercicio.">
+          <SegmentedControl label="Estado del ejercicio" value={draftFilters.status} onChange={(status) => setDraftFilters({ ...draftFilters, status: status as ExerciseLibraryStatus })} options={[
+            { value: "active", label: "Activos" }, { value: "archived", label: "Archivados" }, { value: "all", label: "Todos" },
+          ]} />
+        </FilterSection>
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-4 border-t bg-card px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5"><span className="text-sm text-muted-foreground">{previewExercises.length} {previewExercises.length === 1 ? "ejercicio" : "ejercicios"}</span><Button type="button" onClick={() => { setFilters(cloneFilters(draftFilters)); setFiltersOpen(false); }}>Ver ejercicios</Button></footer>
+    </Sheet>
+
+    <Sheet open={implementsOpen} onOpenChange={setImplementsOpen}>
+      <SheetHeader inlineActions title="Implementos" description="Seleccioná uno o más implementos." closeLabel="Volver a filtros" action={draftFilters.implements.length ? <button type="button" onClick={() => setDraftFilters({ ...draftFilters, implements: [] })} className="flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-primary outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring">Limpiar</button> : null} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+        {implementOptions.length ? <div className="space-y-2" aria-label="Seleccionar implementos">{implementOptions.map((item) => <SelectableRow key={item} selected={draftFilters.implements.includes(item)} onClick={() => setDraftFilters({ ...draftFilters, implements: toggleValue(draftFilters.implements, item) })}>{item}</SelectableRow>)}</div> : <p className="text-sm text-muted-foreground">No hay implementos disponibles.</p>}
+      </div>
+      <footer className="shrink-0 border-t bg-card px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5"><Button type="button" className="h-11 w-full" onClick={() => setImplementsOpen(false)}>Listo</Button></footer>
     </Sheet>
 
     <Sheet open={editorOpen} large initialFocus={editorCloseRef} onOpenChange={(open) => { if (!pending) { setEditorOpen(open); if (!open) setError(null); } }}>
