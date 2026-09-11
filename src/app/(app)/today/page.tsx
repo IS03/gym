@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChartNoAxesCombined } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateFieldValue } from "@/lib/date-field-display";
@@ -74,8 +74,8 @@ export default async function TodayPage() {
           <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Nutrición de hoy</h1>
           <p className="text-sm text-muted-foreground">{formatDateFieldValue(dayLog.log_date)}</p>
         </div>
-        <Link href="/today/reports" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
-          <ChartNoAxesCombined className="size-4" aria-hidden /> Reportes
+        <Link href="/calendar" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
+          <CalendarDays className="size-4" aria-hidden /> Calendario
         </Link>
       </div>
 
