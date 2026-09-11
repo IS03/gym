@@ -57,4 +57,20 @@ describe("historial de entrenamiento v2", () => {
     expect(exercises).toContain("draftCount");
     expect(robust).toContain("listRoutines({ includeArchived: false }, context)");
   });
+
+  it("presenta filtros estructurados sin duplicar el ordenamiento", () => {
+    expect(exercises).toContain('title="Rutinas" description="No seleccionar ninguna muestra todas las rutinas."');
+    expect(exercises).toContain('className="grid grid-cols-2 gap-2" aria-label="Filtrar por rutinas"');
+    expect(exercises).toContain("routineColorCssVariable(routine.color)");
+    expect(robust).toContain("color: routine.color");
+    expect(exercises).toContain('title="Grupo muscular" description="Seleccioná uno o más grupos musculares."');
+    expect(exercises).toContain('className="grid grid-cols-2 gap-2" aria-label="Filtrar por grupo muscular"');
+    expect(exercises).toContain('title="Actividad" description="Muestra ejercicios con o sin registros."');
+    expect(exercises).toContain('aria-label="Limpiar filtros"');
+    expect(exercises).toContain("query: filters.query");
+    expect(exercises).toContain("order: filters.order");
+    expect(exercises).not.toContain('>Todas</button>');
+    expect(exercises).not.toContain('>Todos</button>');
+    expect(exercises).not.toContain(">Ordenar por<");
+  });
 });
