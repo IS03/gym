@@ -310,4 +310,27 @@ describe("Supabase Data API JWT clock-skew retry", () => {
     );
     expect(implementation).toHaveBeenCalledOnce();
   });
+
+  it("acota el transporte completo sin agregar retries", async () => {
+    const implementation = vi.fn<typeof fetch>((input) => {
+      const request = input as Request;
+      return new Promise<Response>((_resolve, reject) => {
+        request.signal.addEventListener(
+          "abort",
+          () => reject(request.signal.reason),
+          { once: true },
+        );
+      });
+    });
+
+    const boundedFetch = createResilientSupabaseFetch(implementation, {
+      requestTimeoutMs: 5,
+      logger: { info: vi.fn(), warn: vi.fn() },
+    });
+
+    await expect(boundedFetch(PROFILES_API_URL)).rejects.toMatchObject({
+      name: "TimeoutError",
+    });
+    expect(implementation).toHaveBeenCalledOnce();
+  });
 });

@@ -50,4 +50,18 @@ describe("updateSession redirects", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
+
+  it.each(["/progress", "/calendar"]) (
+    "redirects unauthenticated requests to the protected route %s",
+    async (pathname) => {
+      mocks.getClaims.mockResolvedValue({ data: { claims: null }, error: null });
+
+      const response = await updateSession(
+        new NextRequest(`https://ownlevel.fit${pathname}`),
+      );
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe("https://ownlevel.fit/login");
+    },
+  );
 });

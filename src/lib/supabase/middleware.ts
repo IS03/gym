@@ -1,11 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { logPerformance, performanceErrorCategory } from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
 
 function isProtectedPath(pathname: string) {
-  return ["/home", "/today", "/history", "/settings", "/train"].some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  return [
+    "/home",
+    "/today",
+    "/history",
+    "/settings",
+    "/train",
+    "/progress",
+    "/calendar",
+  ].some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
 function copyAuthResponse(source: NextResponse, target: NextResponse) {
@@ -65,10 +72,34 @@ export async function updateSession(request: NextRequest) {
 
   // Debe ser la primera operación luego de crear el cliente: refresca una
   // sesión válida y copia las cookies resultantes al request y a la response.
-  const {
-    data: claimsData,
-    error: claimsError,
-  } = await supabase.auth.getClaims();
+  const authStartedAt = performance.now();
+  let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
+  try {
+    claimsResult = await supabase.auth.getClaims();
+  } catch (error) {
+    logPerformance({
+      route: request.nextUrl.pathname,
+      operation: "proxy-auth",
+      durationMs: performance.now() - authStartedAt,
+      status: "error",
+      errorCategory: performanceErrorCategory(error),
+    });
+    throw error;
+  }
+  const { data: claimsData, error: claimsError } = claimsResult;
+  logPerformance({
+    route: request.nextUrl.pathname,
+    operation: "proxy-auth",
+    durationMs: performance.now() - authStartedAt,
+    status: claimsData?.claims?.sub
+      ? "authenticated"
+      : claimsError && isInvalidAuthSessionError(claimsError)
+        ? "invalid_session"
+        : "unauthenticated",
+    ...(claimsError && !isInvalidAuthSessionError(claimsError)
+      ? { errorCategory: performanceErrorCategory(claimsError) }
+      : {}),
+  });
 
   if (claimsError && !isInvalidAuthSessionError(claimsError)) {
     throw claimsError;

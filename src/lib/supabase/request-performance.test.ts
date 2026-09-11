@@ -65,9 +65,15 @@ describe("request-scoped authenticated reads", () => {
   });
 
   it("installs the Data API transport retry without changing middleware auth", () => {
-    expect(server).toContain("fetch: createResilientSupabaseFetch()");
+    expect(server).toContain("fetch: createResilientSupabaseFetch(undefined, {");
+    expect(server).toContain("requestTimeoutMs: SUPABASE_SERVER_REQUEST_TIMEOUT_MS");
     expect(browser).toContain("fetch: createResilientSupabaseFetch()");
     expect(middleware).not.toContain("createResilientSupabaseFetch");
     expect(middleware).toContain("supabase.auth.getClaims()");
+  });
+
+  it("uses verified claims instead of a remote getUser call in the training action path", () => {
+    expect(robustTraining).toContain("requireAuthenticatedRequestContext()");
+    expect(robustTraining).not.toContain("supabase.auth.getUser()");
   });
 });

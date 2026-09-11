@@ -9,7 +9,12 @@ vi.mock("@/lib/supabase/middleware", () => ({
   updateSession: mocks.updateSession,
 }));
 
-import { bypassesSessionProxy, proxy } from "./proxy";
+import {
+  bypassesSessionProxy,
+  config,
+  proxy,
+  requiresSessionProxy,
+} from "./proxy";
 
 describe("session proxy routing", () => {
   beforeEach(() => {
@@ -41,5 +46,49 @@ describe("session proxy routing", () => {
     expect(bypassesSessionProxy(request.nextUrl.pathname)).toBe(false);
     expect(mocks.updateSession).toHaveBeenCalledOnce();
     expect(mocks.updateSession).toHaveBeenCalledWith(request);
+  });
+
+  it.each([
+    "/home",
+    "/today",
+    "/progress",
+    "/calendar",
+    "/train",
+    "/train/exercises",
+    "/settings/account",
+  ])("keeps %s in the authenticated proxy boundary", (pathname) => {
+    expect(requiresSessionProxy(pathname)).toBe(true);
+  });
+
+  it.each([
+    "/sw.js",
+    "/manifest.webmanifest",
+    "/favicon.ico",
+    "/icons/icon-192.png",
+    "/_next/static/chunk.js",
+    "/_next/image",
+    "/auth/callback",
+    "/api/integrations/chatgpt/status",
+  ])("bypasses auth for public resource %s", async (pathname) => {
+    const request = new NextRequest(`https://www.ownlevel.fit${pathname}`);
+
+    await proxy(request);
+
+    expect(requiresSessionProxy(pathname)).toBe(false);
+    expect(mocks.updateSession).not.toHaveBeenCalled();
+  });
+
+  it("uses an allowlist matcher instead of a broad negative asset pattern", () => {
+    expect(config.matcher).toEqual([
+      "/",
+      "/login",
+      "/home/:path*",
+      "/today/:path*",
+      "/history/:path*",
+      "/settings/:path*",
+      "/train/:path*",
+      "/progress/:path*",
+      "/calendar/:path*",
+    ]);
   });
 });

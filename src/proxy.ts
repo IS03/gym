@@ -1,13 +1,33 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
+export const SESSION_PROXY_PATH_PREFIXES = [
+  "/home",
+  "/today",
+  "/history",
+  "/settings",
+  "/train",
+  "/progress",
+  "/calendar",
+] as const;
+
+export function requiresSessionProxy(pathname: string) {
+  if (pathname === "/" || pathname === "/login") return true;
+  return SESSION_PROXY_PATH_PREFIXES.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
+
 export function bypassesSessionProxy(pathname: string) {
   return pathname === "/api/integrations/chatgpt"
     || pathname.startsWith("/api/integrations/chatgpt/");
 }
 
 export async function proxy(request: NextRequest) {
-  if (bypassesSessionProxy(request.nextUrl.pathname)) {
+  if (
+    !requiresSessionProxy(request.nextUrl.pathname)
+    || bypassesSessionProxy(request.nextUrl.pathname)
+  ) {
     return NextResponse.next();
   }
 
@@ -16,9 +36,14 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Excluir estáticos y assets; el resto pasa por refresh de sesión.
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/",
+    "/login",
+    "/home/:path*",
+    "/today/:path*",
+    "/history/:path*",
+    "/settings/:path*",
+    "/train/:path*",
+    "/progress/:path*",
+    "/calendar/:path*",
   ],
 };

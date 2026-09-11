@@ -35,6 +35,7 @@ type ResilientFetchOptions = {
   retryDelaysMs?: readonly number[];
   sleep?: (delayMs: number) => Promise<void>;
   logger?: RetryLogger;
+  requestTimeoutMs?: number;
 };
 
 function defaultSleep(delayMs: number) {
@@ -90,7 +91,14 @@ export function createResilientSupabaseFetch(
   const logger = options.logger ?? console;
 
   return async (input, init) => {
-    const request = new Request(input, init);
+    const originalRequest = new Request(input, init);
+    const timeoutSignal = options.requestTimeoutMs
+      ? AbortSignal.timeout(options.requestTimeoutMs)
+      : null;
+    const signal = timeoutSignal
+      ? AbortSignal.any([originalRequest.signal, timeoutSignal])
+      : originalRequest.signal;
+    const request = new Request(originalRequest, { signal });
     const pathname = dataApiPathname(request);
     const retryDelaysMs =
       options.retryDelaysMs ?? defaultRetryDelaysForMethod(request.method);
@@ -121,6 +129,7 @@ export function createResilientSupabaseFetch(
         retryDelayTotalMs,
       });
       await sleep(delayMs);
+      signal.throwIfAborted();
     }
   };
 }

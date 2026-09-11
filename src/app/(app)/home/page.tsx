@@ -3,6 +3,7 @@ import { getCompactProfile } from "@/lib/home-header";
 import { getNutritionDaySummary } from "@/lib/nutrition/day";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { listWorkoutStartRoutines } from "@/lib/phase2/training";
+import { measurePerformance } from "@/lib/request-performance";
 import {
   getHomeActiveTrainingSnapshot,
   getHomeTrainingSnapshot,
@@ -17,11 +18,26 @@ export default async function HomePage() {
   const auth = await requireAuthenticatedRequestContext();
   const [profile, todayData, activeSession, training, workoutStartRoutines] =
     await Promise.all([
-      getMyProfile(auth),
-      getNutritionDaySummary(today, auth),
-      getHomeActiveTrainingSnapshot(auth),
-      getHomeTrainingSnapshot(today, auth),
-      listWorkoutStartRoutines(auth),
+      measurePerformance(
+        { route: "/home", operation: "home.profile" },
+        () => getMyProfile(auth),
+      ),
+      measurePerformance(
+        { route: "/home", operation: "home.nutrition" },
+        () => getNutritionDaySummary(today, auth),
+      ),
+      measurePerformance(
+        { route: "/home", operation: "home.active-session" },
+        () => getHomeActiveTrainingSnapshot(auth),
+      ),
+      measurePerformance(
+        { route: "/home", operation: "home.training" },
+        () => getHomeTrainingSnapshot(today, auth),
+      ),
+      measurePerformance(
+        { route: "/home", operation: "home.routines" },
+        () => listWorkoutStartRoutines(auth),
+      ),
     ]);
   const { dayLog, mealCount, context } = todayData;
 

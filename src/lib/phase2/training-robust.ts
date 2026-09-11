@@ -1,12 +1,18 @@
 import "server-only";
 
+import {
+  logPerformance,
+  performanceErrorCategory,
+} from "@/lib/request-performance";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import {
   buildHomeActiveSessionSummary,
   type HomeActiveSessionSummary,
 } from "@/lib/home-dashboard";
-import { createClient } from "@/lib/supabase/server";
-import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+import {
+  requireAuthenticatedRequestContext,
+  type AuthenticatedRequestContext,
+} from "@/lib/supabase/server";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -51,8 +57,6 @@ import type {
 } from "./types";
 import type { RoutineColorKey } from "./routine-colors";
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
 type ErrorLike = {
   code?: string;
   message?: string;
@@ -86,17 +90,29 @@ function requireUuid(value: unknown, label: string): string {
 }
 
 async function getAuthedContext(): Promise<{
-  supabase: SupabaseServerClient;
+  supabase: AuthenticatedRequestContext["supabase"];
   userId: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error) throw new Error(`Autenticación: ${error.message}`);
-  if (!user) throw new Error("No autenticado.");
-  return { supabase, userId: user.id };
+  const authStartedAt = performance.now();
+  try {
+    const context = await requireAuthenticatedRequestContext();
+    logPerformance({
+      route: "/train/session/[id]",
+      operation: "workout-save.auth",
+      durationMs: performance.now() - authStartedAt,
+      status: "authenticated",
+    });
+    return context;
+  } catch (error) {
+    logPerformance({
+      route: "/train/session/[id]",
+      operation: "workout-save.auth",
+      durationMs: performance.now() - authStartedAt,
+      status: "error",
+      errorCategory: performanceErrorCategory(error),
+    });
+    throw error;
+  }
 }
 
 function throwRpcError(label: string, value: unknown): never {
@@ -479,6 +495,7 @@ export async function saveWorkoutExercise(input: {
     );
   }
   const { supabase } = await getAuthedContext();
+  const rpcStartedAt = performance.now();
   const { data, error } = await supabase
     .rpc("save_workout_exercise", {
       p_session_exercise_id: input.sessionExerciseId,
@@ -486,6 +503,13 @@ export async function saveWorkoutExercise(input: {
       p_payload: input.payload,
     })
     .abortSignal(AbortSignal.timeout(12_000));
+  logPerformance({
+    route: "/train/session/[id]",
+    operation: "workout-save.rpc",
+    durationMs: performance.now() - rpcStartedAt,
+    status: error ? "error" : "ok",
+    ...(error ? { errorCategory: performanceErrorCategory(error) } : {}),
+  });
   if (error) throwWorkoutSaveRpcError(error);
   if (typeof data !== "string") {
     throw new Error("Guardar ejercicio: respuesta inválida de la base.");
