@@ -145,7 +145,10 @@ function routineName(session: WorkoutSession): string {
 
 function muscleIdentity(exercise: WorkoutSessionExercise): Pick<ExerciseRecord, "muscleKey" | "muscleLabel"> {
   const group = exercise.grupo_muscular_snapshot;
-  if (group) return { muscleKey: group, muscleLabel: clean(exercise.muscle_group_label_snapshot) ?? muscleGroupLabel(group) ?? "Sin grupo" };
+  // `grupo_muscular_snapshot` is the stable broad group. The free-text label is
+  // a specific detail (for example, "Abductores") and must never rename the
+  // aggregate group ("Piernas"). Progress V2 exposes that detail separately.
+  if (group) return { muscleKey: group, muscleLabel: muscleGroupLabel(group) ?? "Sin grupo" };
   const label = clean(exercise.muscle_group_label_snapshot);
   if (!label) return { muscleKey: "unassigned", muscleLabel: "Sin grupo" };
   return { muscleKey: `legacy:${label.toLocaleLowerCase("es-AR")}`, muscleLabel: label };
@@ -432,7 +435,9 @@ export function buildTrainingAnalysis(
     .sort((left, right) => Number(right.summary.hasData) - Number(left.summary.hasData) || right.summary.sessions - left.summary.sessions || left.name.localeCompare(right.name, "es-AR"));
 
   const muscleNames = new Map<string, string>(MUSCLE_GROUP_OPTIONS.map((item) => [item.value, item.label]));
-  for (const record of records) for (const exercise of record.exercises) muscleNames.set(exercise.muscleKey, exercise.muscleLabel);
+  for (const record of records) for (const exercise of record.exercises) {
+    if (!muscleNames.has(exercise.muscleKey)) muscleNames.set(exercise.muscleKey, exercise.muscleLabel);
+  }
   const muscles = [...muscleNames.entries()]
     .map(([key, label]) => {
       const selector = (record: SessionRecord) => record.exercises.filter((exercise) => exercise.muscleKey === key);

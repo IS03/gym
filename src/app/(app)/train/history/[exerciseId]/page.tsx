@@ -109,6 +109,7 @@ export default async function ExerciseHistoryPage({
   const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
   const progressRoutine = typeof sp.routine === "string" ? sp.routine : null;
   const progressMuscle = typeof sp.muscle === "string" ? sp.muscle : null;
+  const progressMuscleZone = typeof sp.zone === "string" ? sp.zone : null;
   const progressQuery = typeof sp.query === "string" ? sp.query : null;
   const progressRoutineFilter = typeof sp.routine_filter === "string" ? sp.routine_filter : null;
   const progressMuscleFilter = typeof sp.muscle_filter === "string" ? sp.muscle_filter : null;
@@ -119,6 +120,7 @@ export default async function ExerciseHistoryPage({
   }
   if (progressRoutine) progressParams.set("routine", progressRoutine);
   if (progressMuscle) progressParams.set("muscle", progressMuscle);
+  if (progressMuscleZone) progressParams.set("zone", progressMuscleZone);
   if (progressQuery) progressParams.set("query", progressQuery);
   if (progressRoutineFilter) progressParams.set("routine_filter", progressRoutineFilter);
   if (progressMuscleFilter) progressParams.set("muscle_filter", progressMuscleFilter);
@@ -157,7 +159,7 @@ export default async function ExerciseHistoryPage({
     source={cameFromProgress ? "progress" : "history"}
     range={currentRange}
     comparison={comparison}
-    progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter, periodFrom: currentRange?.start ?? null, periodTo: currentRange?.end ?? null } : undefined}
+    progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, muscleZoneKey: progressMuscleZone, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter, periodFrom: currentRange?.start ?? null, periodTo: currentRange?.end ?? null } : undefined}
     sessions={sessions}
     performanceSessions={serializeSessions(allHistoryItems)}
   />;

@@ -118,7 +118,7 @@ function EvolutionMode({ isPrevious, currentHref, previousHref }: { isPrevious: 
 export function ExerciseReportView({
   exerciseId, exerciseName, muscleLabel, period, routineId, routines, sessions, performanceSessions, backHref, backLabel, source, progressContext, range, comparison,
 }: {
-  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; performanceSessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null; periodFrom?: string | null; periodTo?: string | null };
+  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; performanceSessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; muscleZoneKey?: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null; periodFrom?: string | null; periodTo?: string | null };
 }) {
   const summary = useMemo(() => summarizeExerciseReport(sessions), [sessions]);
   const points = useMemo(() => buildExerciseReportPoints(sessions), [sessions]);
@@ -137,6 +137,7 @@ export function ExerciseReportView({
       }
       if (progressContext.routineId) params.set("routine", progressContext.routineId);
       if (progressContext.muscleKey) params.set("muscle", progressContext.muscleKey);
+      if (progressContext.muscleZoneKey) params.set("zone", progressContext.muscleZoneKey);
       if (progressContext.query) params.set("query", progressContext.query);
       if (progressContext.routineFilter) params.set("routine_filter", progressContext.routineFilter);
       if (progressContext.muscleFilter) params.set("muscle_filter", progressContext.muscleFilter);
