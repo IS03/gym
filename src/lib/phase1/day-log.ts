@@ -288,9 +288,9 @@ export async function listRecentDays(limit = 14): Promise<DayLog[]> {
   return (data ?? []) as DayLog[];
 }
 
-export async function listWeightHistory(limit = 366): Promise<WeightHistoryPoint[]> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+export async function listWeightHistory(limit = 366, context?: AuthenticatedRequestContext): Promise<WeightHistoryPoint[]> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
   const safeLimit = Math.min(Math.max(limit, 1), 1000);
 
   const { data, error } = await supabase

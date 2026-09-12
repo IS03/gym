@@ -5,8 +5,7 @@ const source = (path: string) => readFileSync(path, "utf8");
 const nutrition = source("src/components/nutrition/nutrition-report-charts.tsx");
 const training = source("src/components/training/training-insights.tsx");
 const exercise = source("src/components/training/exercise-report-view.tsx");
-const weight = source("src/components/body/weight-history.tsx");
-const measurements = source("src/components/body/body-measurements.tsx");
+const bodyChart = source("src/components/body/body-progress-chart.tsx");
 
 describe("PR 11.4 — gráficos autoexplicativos", () => {
   it("explicita ejes, unidades y detalle en nutrición", () => {
@@ -30,10 +29,9 @@ describe("PR 11.4 — gráficos autoexplicativos", () => {
     expect(exercise).not.toContain("<title>");
   });
   it("hace inspeccionables peso y medidas con fecha y unidad", () => {
-    expect(weight).toContain("Fecha · Peso (kg)");
-    expect(weight).toContain("ChartDetail");
-    expect(measurements).toContain("(cm)");
-    expect(measurements).toContain("chartTickIndexes");
-    expect(measurements).toContain("ChartDetail");
+    expect(bodyChart).toContain("Cada punto representa una medición real");
+    expect(bodyChart).toContain("xForDate");
+    expect(bodyChart).toContain("ChartDetail");
+    expect(bodyChart).toContain("metric.unit");
   });
 });
