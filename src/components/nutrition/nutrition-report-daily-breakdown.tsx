@@ -42,14 +42,8 @@ function DailyRow({ day }: { day: NutritionReportDay }) {
         {day.imported ? <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">Histórico</span> : null}
       </div>
       {!day.hasNutrition ? <p className="text-sm text-muted-foreground">Sin registro nutricional</p> : <>
-        <p className="metric-number text-sm font-medium">{formatValue(day.calories, "kcal", true)}{day.targetCalories === null ? "" : ` / ${integerFormatter.format(day.targetCalories)}`}<span className="px-1.5 text-muted-foreground">·</span>P {formatValue(day.proteinG, "g")}{day.targetProteinG === null ? "" : ` / ${numberFormatter.format(day.targetProteinG)}`}</p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {balance ? <span>{balance}</span> : null}
-          {day.expenditureKcal !== null ? <span>Gasto {integerFormatter.format(day.expenditureKcal)} kcal</span> : null}
-          {day.carbsG !== null ? <span>C {numberFormatter.format(day.carbsG)} g</span> : null}
-          {day.fatG !== null ? <span>G {numberFormatter.format(day.fatG)} g</span> : null}
-          {day.goalStage ? <span>Etapa: {day.goalStage}</span> : null}
-        </div>
+        <p className="metric-number text-sm font-medium">{formatValue(day.calories, "kcal", true)}<span className="px-1.5 text-muted-foreground">·</span>P {formatValue(day.proteinG, "g")}</p>
+        {balance ? <p className="text-xs text-muted-foreground">{balance}</p> : null}
       </>}
     </div>
     <ChevronRight className="mt-1.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />

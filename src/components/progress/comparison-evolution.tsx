@@ -57,7 +57,8 @@ export function ComparisonEvolution({
 
   if (!result) return <p className="py-8 text-sm text-muted-foreground">Elegí al menos una métrica comparable.</p>;
   const allValues = [...values, ...referenceValues];
-  const includeZero = allValues.some((value) => typeof value === "number" && value < 0);
+  const hasSemanticZero = result.metric.comparison?.signSemantic === "energy_balance";
+  const includeZero = hasSemanticZero || allValues.some((value) => typeof value === "number" && value < 0);
   const domain = chartDomain(allValues, includeZero);
   const primarySegments = lineSegments(values, domain, WIDTH, HEIGHT, LEFT, RIGHT, TOP, BOTTOM);
   const referenceSegments = lineSegments(referenceValues, domain, WIDTH, HEIGHT, LEFT, RIGHT, TOP, BOTTOM);
@@ -82,6 +83,7 @@ export function ComparisonEvolution({
           <line x1={LEFT} x2={WIDTH - RIGHT} y1={chartY(tick, domain, HEIGHT, TOP, BOTTOM)} y2={chartY(tick, domain, HEIGHT, TOP, BOTTOM)} className="stroke-border" strokeDasharray="2 3" />
           <text x={LEFT - 6} y={chartY(tick, domain, HEIGHT, TOP, BOTTOM) + 3} textAnchor="end" className="fill-muted-foreground text-[8px]">{axisLabel(tick, result)}</text>
         </g>)}
+        {hasSemanticZero ? <line x1={LEFT} x2={WIDTH - RIGHT} y1={chartY(0, domain, HEIGHT, TOP, BOTTOM)} y2={chartY(0, domain, HEIGHT, TOP, BOTTOM)} className="stroke-foreground/55" strokeDasharray="3 3" /> : null}
         {primarySegments.map((segment, index) => <polyline key={`a-${index}`} points={segment.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" className="text-primary" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />)}
         {showReference ? referenceSegments.map((segment, index) => <polyline key={`b-${index}`} points={segment.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" className="text-muted-foreground" stroke="currentColor" strokeWidth="2" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" />) : null}
         {values.map((value, index) => value === null ? null : <circle key={index} cx={chartX(index, values.length, WIDTH, LEFT, RIGHT)} cy={chartY(value, domain, HEIGHT, TOP, BOTTOM)} r={selectedIndex === index ? 4 : 2.5} className="fill-primary" />)}

@@ -1,9 +1,18 @@
+import type { ProgressComparisonQuery } from "../progress/comparisons";
 import type { NutritionReportPreset, NutritionReportRange } from "./reports-core";
 
 export type NutritionReportComparisonMode = "previous" | "period" | "goal" | null;
 
 export function nutritionReportComparisonMode(value: string | null | undefined): NutritionReportComparisonMode {
   return value === "previous" || value === "period" || value === "goal" ? value : null;
+}
+
+export function withDefaultNutritionComparison(
+  query: ProgressComparisonQuery,
+): ProgressComparisonQuery {
+  return query.referenceType
+    ? query
+    : { ...query, referenceType: "previous_period" };
 }
 
 export function nutritionReportPath(input: {

@@ -5,6 +5,7 @@ import {
   nutritionReportCurrentPath,
   nutritionReportPath,
   nutritionReportPreviousPath,
+  withDefaultNutritionComparison,
 } from "./report-navigation";
 
 describe("nutrition report comparison navigation", () => {
@@ -24,5 +25,19 @@ describe("nutrition report comparison navigation", () => {
 
   it("sigue permitiendo reutilizar el selector sin comparación en Pasos", () => {
     expect(nutritionReportPath({ preset: "7", start: "2026-09-01", end: "2026-09-07", basePath: "/today/steps" })).toBe("/today/steps?period=7");
+  });
+
+  it("usa el período anterior equivalente como referencia inicial de Nutrición V2", () => {
+    const base = {
+      referenceType: null,
+      referencePreset: null,
+      referenceFrom: null,
+      referenceTo: null,
+      selectedMetricKeys: [],
+      activeMetricKey: null,
+      initialView: "insights" as const,
+    };
+    expect(withDefaultNutritionComparison(base)).toMatchObject({ referenceType: "previous_period" });
+    expect(withDefaultNutritionComparison({ ...base, referenceType: "goal" })).toMatchObject({ referenceType: "goal" });
   });
 });
