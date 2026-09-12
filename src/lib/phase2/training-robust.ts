@@ -27,6 +27,10 @@ import {
   buildTrainingMusclesAnalytics,
   type TrainingMusclesAnalytics,
 } from "../progress/training-muscles";
+import {
+  buildTrainingExercisesAnalytics,
+  type TrainingExercisesAnalytics,
+} from "../progress/training-exercises";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -1414,6 +1418,48 @@ export async function getTrainingMusclesAnalysis(
       referenceDefinition,
       selectedMuscleKey: options.selectedMuscleKey,
       selectedSubzoneKey: options.selectedSubzoneKey,
+      selectedMetricKeys: options.selectedMetricKeys,
+      activeMetricKey: options.activeMetricKey,
+    }),
+  };
+}
+
+/**
+ * Read model for Exercises V2. Exploration, individual performance, marks,
+ * load and session history are derived from one grouped historical fetch.
+ */
+export async function getTrainingExercisesAnalysis(
+  period: TrainingAnalysisPeriod,
+  referenceDefinition: ProgressTemporalComparisonReference,
+  options: {
+    selectedExerciseId?: string | null;
+    routineId?: string | null;
+    selectedMetricKeys?: readonly string[];
+    activeMetricKey?: string | null;
+  } = {},
+  primaryRange?: { start: string; end: string },
+): Promise<{ current: TrainingAnalysis; reference: TrainingAnalysis; exercises: TrainingExercisesAnalytics }> {
+  const [data, catalogRoutines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines: catalogRoutines, range: primaryRange });
+  const reference = buildTrainingAnalysis(data, {
+    today: referenceDefinition.period.end,
+    period,
+    routines: catalogRoutines,
+    range: referenceDefinition.period,
+  });
+  return {
+    current,
+    reference,
+    exercises: buildTrainingExercisesAnalytics({
+      source: data,
+      primary: current,
+      reference,
+      referenceDefinition,
+      selectedExerciseId: options.selectedExerciseId,
+      routineId: options.routineId,
       selectedMetricKeys: options.selectedMetricKeys,
       activeMetricKey: options.activeMetricKey,
     }),

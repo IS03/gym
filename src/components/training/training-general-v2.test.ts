@@ -27,7 +27,7 @@ describe("Entrenamiento V2 — General", () => {
     expect(periodSelector).toContain("DateRangePicker");
     expect(periodSelector).toContain('next.set("period", "custom")');
     expect(workspace).toContain('view === "muscles" && musclesV2 ? <TrainingProgressPeriodSelector');
-    expect(workspace).toContain('view === "exercises" ? <PeriodSelector');
+    expect(workspace).toContain('view === "exercises" && exercisesV2 ? <TrainingProgressPeriodSelector');
     expect(page).toContain("resolveProgressComparisonReference");
   });
 

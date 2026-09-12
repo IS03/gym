@@ -78,6 +78,8 @@ export type ExerciseReportSession = {
   routineId: string | null;
   routineName: string;
   decision: TrainingAdjustment;
+  /** Historical snapshot; optional for older callers and fixtures. */
+  weightMode?: string | null;
   sets: ExerciseReportSet[];
 };
 

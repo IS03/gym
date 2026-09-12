@@ -7,12 +7,13 @@ import { getPreviousProgressPeriod, resolveProgressPeriod } from "@/lib/progress
 import { buildExerciseSessionSelfComparison, buildTrainingComparison } from "@/lib/phase2/training-comparison";
 import { MUSCLE_GROUP_OPTIONS } from "@/lib/phase2/muscle-groups";
 import {
-  getTrainingAnalysis,
+  getTrainingExercisesAnalysis,
   listRobustExerciseHistory,
   todayInCordoba,
   type RobustExerciseHistoryItem,
 } from "@/lib/phase2/training-robust";
 import type { ExerciseReportSession } from "@/lib/phase2/exercise-insights";
+import type { ProgressTemporalComparisonReference } from "@/lib/progress/comparisons";
 import { HistoryExerciseDetail } from "./history-exercise-detail";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ function serializeSessions(items: RobustExerciseHistoryItem[]): ExerciseReportSe
     routineId: item.session.routine_id,
     routineName: item.session.routine_name_snapshot ?? item.session.session_name ?? "Sesión libre",
     decision: item.exercise.decision,
+    weightMode: item.exercise.weight_mode_snapshot,
     sets: item.exercise.sets.map((set) => ({
       id: set.id,
       set_number: set.set_number,
@@ -85,25 +87,28 @@ export default async function ExerciseHistoryPage({
   const resolvedRange = analysisPeriod ? resolveProgressPeriod({ preset: analysisPeriod, from: customFrom, to: customTo }, today) : null;
   const currentRange = resolvedRange && !resolvedRange.error ? resolvedRange.current : null;
   const compare = sp.compare === "previous" ? "previous" : sp.compare === "exercises" ? "exercises" : null;
-  const previousRange = compare === "previous" && currentRange ? getPreviousProgressPeriod(currentRange) : null;
+  const previousRange = currentRange ? getPreviousProgressPeriod(currentRange) : null;
   const requestedA = typeof sp.a === "string" ? sp.a : exerciseId;
   const requestedB = typeof sp.b === "string" ? sp.b : null;
-  const [allExercises, items, previousItems, allHistoryItems, crossAnalysis] = await Promise.all([
-    listExercises({ includeArchived: true }),
-    listRobustExerciseHistory({ exerciseId, fromDate: currentRange?.start, toDate: currentRange?.end, routineId: routineId ?? undefined, limit: 100 }),
-    previousRange
-      ? listRobustExerciseHistory({ exerciseId, fromDate: previousRange.start, toDate: previousRange.end, routineId: routineId ?? undefined, limit: 100 })
-      : Promise.resolve([]),
-    listRobustExerciseHistory({ exerciseId, limit: 500 }),
-    compare === "exercises" && analysisPeriod ? getTrainingAnalysis(analysisPeriod, currentRange ?? undefined) : Promise.resolve(null),
-  ]);
-  const exercise = allExercises.find((item) => item.id === exerciseId) ?? null;
+  const referenceDefinition: ProgressTemporalComparisonReference | null = previousRange ? {
+    type: "previous_period",
+    period: previousRange,
+    label: "Período anterior",
+  } : null;
+  const exerciseData = analysisPeriod && currentRange && referenceDefinition
+    ? await getTrainingExercisesAnalysis(analysisPeriod, referenceDefinition, { selectedExerciseId: exerciseId, routineId }, currentRange)
+    : null;
+  const detail = exerciseData?.exercises.selected ?? null;
+  const exercise = exerciseData?.exercises.exercises.find((item) => item.id === exerciseId) ?? null;
+  const sessions = detail?.currentSessions ?? [];
+  const previousSessions = detail?.referenceSessions ?? [];
+  const allHistorySessions = detail?.allSessions ?? [];
   const routineOptions = [...new Map(
-    allHistoryItems
-      .filter((item) => item.session.routine_id)
-      .map((item) => [item.session.routine_id!, {
-        id: item.session.routine_id!,
-        nombre: item.session.routine_name_snapshot ?? item.session.session_name ?? "Rutina",
+    allHistorySessions
+      .filter((item) => item.routineId)
+      .map((item) => [item.routineId!, {
+        id: item.routineId!,
+        nombre: item.routineName,
       }]),
   ).values()].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
   const progressView = typeof sp.view === "string" && ["general", "routines", "muscles", "exercises"].includes(sp.view) ? sp.view : "general";
@@ -131,26 +136,25 @@ export default async function ExerciseHistoryPage({
       : progressView === "exercises"
         ? "Ejercicios"
         : "Entrenamiento";
-  const latestSnapshot = items[0]?.exercise ?? previousItems[0]?.exercise ?? null;
-  const exerciseName = exercise?.nombre ?? latestSnapshot?.nombre_snapshot ?? "Ejercicio";
-  const sessions = serializeSessions(items);
+  const exerciseName = exercise?.name ?? "Ejercicio";
   const comparison = compare === "previous" && currentRange && previousRange
     ? buildExerciseSessionSelfComparison({
       exerciseId,
       exerciseName,
       currentSessions: sessions,
-      previousSessions: serializeSessions(previousItems),
+      previousSessions,
       rangeA: currentRange,
       rangeB: previousRange,
     })
-    : compare === "exercises" && crossAnalysis
-      ? buildTrainingComparison({ kind: "exercises", analysis: crossAnalysis, requestedA, requestedB })
+    : compare === "exercises" && exerciseData
+      ? buildTrainingComparison({ kind: "exercises", analysis: exerciseData.current, requestedA, requestedB })
       : null;
 
   return <ExerciseReportView
     exerciseId={exerciseId}
     exerciseName={exerciseName}
-    muscleLabel={exercise?.muscle_group_label ?? exercise?.grupo_muscular ?? latestSnapshot?.muscle_group_label_snapshot ?? latestSnapshot?.grupo_muscular_snapshot ?? null}
+    muscleLabel={exercise?.muscleLabel ?? null}
+    weightMode={detail?.weightMode ?? exercise?.weightMode ?? null}
     period={period}
     routineId={routineId}
     routines={routineOptions}
@@ -159,8 +163,8 @@ export default async function ExerciseHistoryPage({
     source={cameFromProgress ? "progress" : "history"}
     range={currentRange}
     comparison={comparison}
+    analytics={detail}
     progressContext={cameFromProgress ? { view: progressView, routineId: progressRoutine, muscleKey: progressMuscle, muscleZoneKey: progressMuscleZone, query: progressQuery, routineFilter: progressRoutineFilter, muscleFilter: progressMuscleFilter, periodFrom: currentRange?.start ?? null, periodTo: currentRange?.end ?? null } : undefined}
     sessions={sessions}
-    performanceSessions={serializeSessions(allHistoryItems)}
   />;
 }
