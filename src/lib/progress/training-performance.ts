@@ -122,9 +122,14 @@ function signed(value: number, unit: string) {
   return `${prefix}${number(Math.abs(value))} ${unit}`;
 }
 
-function snapshotMap(source: TrainingAnalysisSource, range: ProgressPeriodRange) {
+function sessionMatchesRoutine(routineId: string | null, requestedRoutineId?: string) {
+  if (requestedRoutineId === undefined) return true;
+  return requestedRoutineId === "__free__" ? routineId === null : routineId === requestedRoutineId;
+}
+
+function snapshotMap(source: TrainingAnalysisSource, range: ProgressPeriodRange, routineId?: string) {
   const sessions = new Map(source.sessions
-    .filter((session) => session.status === "completed" && session.ended_at)
+    .filter((session) => session.status === "completed" && session.ended_at && sessionMatchesRoutine(session.routine_id, routineId))
     .flatMap((session) => {
       const date = source.dateByDayLog.get(session.day_log_id);
       return date && date >= range.start && date <= range.end ? [[session.id, date] as const] : [];
@@ -386,9 +391,13 @@ export function buildTrainingPerformanceComparison(input: {
   source: TrainingAnalysisSource;
   primaryPeriod: ProgressPeriodRange;
   referencePeriod: ProgressPeriodRange;
+  /** Optional historical routine identity. The comparison rules remain shared with General. */
+  routineId?: string;
 }): TrainingGeneralAnalytics["performance"] {
-  const primary = snapshotMap(input.source, input.primaryPeriod);
-  const reference = snapshotMap(input.source, input.referencePeriod);
+  const primary = snapshotMap(input.source, input.primaryPeriod, input.routineId);
+  const reference = snapshotMap(input.source, input.referencePeriod, input.routineId);
+  // PR evidence stays global to the exercise. A load already reached in another
+  // routine is not incorrectly announced as a new personal record.
   const history = snapshotMap(input.source, { start: "0001-01-01", end: input.primaryPeriod.start });
   const exerciseIds = new Set([...primary.keys(), ...reference.keys()]);
   const exercises = [...exerciseIds].flatMap((exerciseId) => {
@@ -421,12 +430,13 @@ export function buildTrainingLoadComparison(input: {
   referenceDefinition: ProgressTemporalComparisonReference;
   selectedMetricKeys?: readonly string[];
   activeMetricKey?: string | null;
+  routineId?: string;
 }): ProgressComparisonReport {
   const metrics = TRAINING_PROGRESS_METRICS.filter((metric) => metric.category === "load");
   const keys = new Set(input.selectedMetricKeys?.length ? input.selectedMetricKeys : metrics.map((metric) => metric.key));
   const requested = metrics.filter((metric) => keys.has(metric.key));
   const selected = requested.length ? requested : metrics;
-  const samples = trainingLoadSamples(input.source);
+  const samples = trainingLoadSamples(input.source, input.routineId);
   const primarySamples = new Map(selected.map((metric) => [metric.key, samples.get(metric.key) ?? []]));
   const referenceSamples = new Map(selected.map((metric) => [metric.key, samples.get(metric.key) ?? []]));
   return buildProgressComparison({
@@ -441,7 +451,7 @@ export function buildTrainingLoadComparison(input: {
   });
 }
 
-function trainingLoadSamples(source: TrainingAnalysisSource): Map<string, ProgressMetricSample[]> {
+function trainingLoadSamples(source: TrainingAnalysisSource, routineId?: string): Map<string, ProgressMetricSample[]> {
   const exerciseSession = new Map(source.sessionExercises.map((exercise) => [exercise.id, exercise.workout_session_id]));
   const setsBySession = new Map<string, { count: number; volume: number }>();
   for (const set of source.sets) {
@@ -461,7 +471,7 @@ function trainingLoadSamples(source: TrainingAnalysisSource): Map<string, Progre
   ]);
   for (const session of source.sessions) {
     const date = source.dateByDayLog.get(session.day_log_id);
-    if (session.status !== "completed" || !session.ended_at || !date) continue;
+    if (session.status !== "completed" || !session.ended_at || !date || !sessionMatchesRoutine(session.routine_id, routineId)) continue;
     const sets = setsBySession.get(session.id) ?? { count: 0, volume: 0 };
     const elapsed = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
     const minutes = Number.isFinite(elapsed) && elapsed > 0 ? Math.round(elapsed / 60_000) : 0;

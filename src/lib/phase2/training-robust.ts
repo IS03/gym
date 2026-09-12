@@ -19,6 +19,10 @@ import {
   buildTrainingGeneralAnalytics,
   type TrainingGeneralAnalytics,
 } from "../progress/training-performance";
+import {
+  buildTrainingRoutinesAnalytics,
+  type TrainingRoutinesAnalytics,
+} from "../progress/training-routines";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -1324,6 +1328,46 @@ export async function getTrainingGeneralAnalysis(
       primary: current,
       reference,
       referenceDefinition,
+      selectedMetricKeys: options.selectedMetricKeys,
+      activeMetricKey: options.activeMetricKey,
+    }),
+  };
+}
+
+/**
+ * Read model for Routines V2. The list, selected routine, A/B load and every
+ * exercise comparison share the same completed-session snapshot fetch.
+ */
+export async function getTrainingRoutinesAnalysis(
+  period: TrainingAnalysisPeriod,
+  referenceDefinition: ProgressTemporalComparisonReference,
+  options: {
+    selectedRoutineId?: string | null;
+    selectedMetricKeys?: readonly string[];
+    activeMetricKey?: string | null;
+  } = {},
+  primaryRange?: { start: string; end: string },
+): Promise<{ current: TrainingAnalysis; reference: TrainingAnalysis; routines: TrainingRoutinesAnalytics }> {
+  const [data, catalogRoutines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines: catalogRoutines, range: primaryRange });
+  const reference = buildTrainingAnalysis(data, {
+    today: referenceDefinition.period.end,
+    period,
+    routines: catalogRoutines,
+    range: referenceDefinition.period,
+  });
+  return {
+    current,
+    reference,
+    routines: buildTrainingRoutinesAnalytics({
+      source: data,
+      primary: current,
+      reference,
+      referenceDefinition,
+      selectedRoutineId: options.selectedRoutineId,
       selectedMetricKeys: options.selectedMetricKeys,
       activeMetricKey: options.activeMetricKey,
     }),

@@ -134,9 +134,9 @@ describe("training comparisons", () => {
     expect(trainingComparisonChartKind("bestReps")).toBe("line");
   });
 
-  it("compares only active routine selectors by default and never normalizes A and B to the same routine", () => {
+  it("compares routines with data, including historical ones, and never normalizes A and B to the same routine", () => {
     const comparison = buildTrainingComparison({ kind: "routines", analysis: analysis(), requestedA: "push", requestedB: "push" });
-    expect(comparison.options.map((option) => option.id)).toEqual(["push", "pull"]);
+    expect(comparison.options.map((option) => option.id)).toEqual(["push", "pull", "archived"]);
     expect(comparison.a?.label).toBe("PUSH snapshot");
     expect(comparison.b?.id).toBe("pull");
     expect(comparison.metrics).toEqual(["sessions", "sets", "minutes", "volume"]);
