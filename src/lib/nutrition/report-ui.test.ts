@@ -3,126 +3,84 @@ import { describe, expect, it } from "vitest";
 
 const source = (path: string) => readFileSync(path, "utf8");
 const reportsPage = source("src/app/(app)/today/reports/page.tsx");
+const overview = source("src/components/nutrition/nutrition-report-overview.tsx");
+const evolution = source("src/components/nutrition/nutrition-report-evolution-v2.tsx");
 const breakdown = source("src/components/nutrition/nutrition-report-daily-breakdown.tsx");
 const periodSelector = source("src/components/nutrition/nutrition-report-period-selector.tsx");
-const comparisonSummary = source("src/components/nutrition/nutrition-report-comparison.tsx");
-const reportCore = source("src/lib/nutrition/reports-core.ts");
-const reportNavigation = source("src/lib/nutrition/report-navigation.ts");
-const rangePicker = source("src/components/ui/date-range-picker.tsx");
+const sharedEvolution = source("src/components/progress/comparison-evolution.tsx");
 
-describe("PR 10.7 — jerarquía de reportes", () => {
-  it("deja el rango temporal en la card de período y no en el encabezado", () => {
-    expect(reportsPage).toContain(">Solo lectura<");
-    expect(reportsPage).toContain("formatNutritionReportRange(range.start, range.end)");
-    expect(reportsPage).not.toContain("{range.start} al {range.end}");
+describe("Progress V2 — reporte de nutrición", () => {
+  it("ordena interpretación, energía y macros antes del detalle diario", () => {
+    const findings = reportsPage.indexOf("<NutritionFindings");
+    const energy = reportsPage.indexOf("<NutritionEnergySummary");
+    const macros = reportsPage.indexOf("<NutritionMacroSummary");
+    const chart = reportsPage.indexOf("<NutritionReportEvolutionV2");
+    const breakdownIndex = reportsPage.indexOf("<NutritionReportDailyBreakdown");
+
+    expect(reportsPage).toContain("Progreso de nutrición");
+    expect(findings).toBeGreaterThan(0);
+    expect(findings).toBeLessThan(energy);
+    expect(energy).toBeLessThan(macros);
+    expect(macros).toBeLessThan(chart);
+    expect(chart).toBeLessThan(breakdownIndex);
   });
 
-  it("mantiene los presets en una fila compacta y el personalizado en una isla responsive", () => {
-    expect(reportsPage).toContain("<NutritionReportPeriodSelector");
-    expect(periodSelector).toContain("overflow-x-auto");
-    expect(periodSelector).toContain("shrink-0");
-    expect(periodSelector).toContain('aria-label="Período del reporte"');
+  it("usa un selector compacto con presets y rango personalizado canónico", () => {
+    expect(reportsPage).toContain("compact");
+    expect(periodSelector).toContain("CalendarRange");
     expect(periodSelector).toContain("ResponsiveDialog");
-    expect(periodSelector).toContain("<DateRangePicker");
-    expect(periodSelector).not.toContain("<DateField");
-  });
-
-  it("muestra seis opciones nuevas, el rango actual y no deja el formulario visible", () => {
-    for (const label of ["Semana", "2 semanas", "Mes", "3 meses", "6 meses", "1 año", "Personalizado"]) {
+    expect(periodSelector).toContain("previousNutritionReportRange");
+    expect(periodSelector).toContain("DateRangePicker");
+    expect(periodSelector).toContain("NUTRITION_REPORT_MAX_DAYS");
+    for (const label of ["Semana", "2 semanas", "Mes", "3 meses", "6 meses", "1 año"]) {
       expect(periodSelector).toContain(label);
     }
-    expect(periodSelector).toContain("rangeLabel");
-    expect(reportsPage).not.toContain('name="from"');
-    expect(reportsPage).not.toContain('name="to"');
   });
 
-  it("inicializa el personalizado desde el rango efectivo y conserva el contrato URL", () => {
-    expect(periodSelector).toContain('useState<DateRangeValue>({ start, end })');
-    expect(periodSelector).toContain('value={customRange}');
-    expect(periodSelector).toContain('NUTRITION_REPORT_MAX_DAYS');
-    expect(periodSelector).toContain('disabled={!customRange.start || !customRange.end}');
-    expect(periodSelector).toContain('basePath = "/today/reports"');
-    expect(periodSelector).toContain("useTransition");
-    expect(periodSelector).toContain("router.push");
-    expect(reportNavigation).toContain("URLSearchParams");
-    expect(periodSelector).toContain("Actualizando…");
-    expect(periodSelector).toContain('name="period" value="custom"');
-    expect(rangePicker).toContain('name={fromName}');
-    expect(rangePicker).toContain('name={toName}');
-    expect(periodSelector).toContain('name="period" value="custom"');
+  it("hace anterior equivalente la comparación por defecto y conserva el configurador universal", () => {
+    expect(reportsPage).toContain("withDefaultNutritionComparison");
+    expect(reportsPage).toContain("getNutritionReportWithProgressComparison");
+    expect(reportsPage).toContain("<ComparisonConfigurator");
+    expect(reportsPage).toContain('triggerLabel="Comparar"');
+    expect(reportsPage).not.toContain("<ComparisonWorkspace");
   });
 
-  it("permite reutilizar los presets y el rango personalizado para Pasos", () => {
-    const stepsPage = source("src/app/(app)/today/steps/page.tsx");
-    expect(stepsPage).toContain('basePath="/today/steps"');
-    expect(periodSelector).toContain("nutritionReportPath({");
-    expect(periodSelector).toContain("basePath,");
-  });
-
-  it("preserva proteína, carbos, grasas, gasto y balance dentro del resumen compacto", () => {
-    expect(reportsPage).toContain('label="Proteína promedio"');
-    expect(reportsPage).toContain('label="Carbos"');
-    expect(reportsPage).toContain('label="Grasas"');
-    expect(reportsPage).toContain("summary.protein.hitDays");
-    expect(reportsPage).toContain('label="Gasto estimado"');
-    expect(reportsPage).toContain('label="Balance promedio"');
-    expect(reportsPage).toContain("summary.goalStages");
-    for (const legacy of ["summary.hydration", "summary.activity", 'label="Trabajo"', 'label="Agua"', 'label="Pasos"']) {
-      expect(reportsPage).not.toContain(legacy);
+  it("separa consumo, objetivo, gasto y balance con la fórmula correcta", () => {
+    for (const label of ["Consumo promedio", "Objetivo del período", "Gasto estimado", "Balance promedio", "Balance acumulado"]) {
+      expect(overview).toContain(label);
     }
+    expect(overview).toContain("Balance energético = consumo − gasto estimado");
+    expect(overview).toContain("No es la diferencia contra el objetivo calórico");
+    expect(overview).toContain("Referencia histórica registrada");
   });
 
-  it("delega el desglose a una isla local con expansión accesible", () => {
-    expect(reportsPage).toContain("<NutritionReportDailyBreakdown");
+  it("presenta macros como filas compactas y sólo aplica el objetivo histórico existente a proteína", () => {
+    for (const label of ["Proteína", "Carbohidratos", "Grasas"]) expect(overview).toContain(label);
+    expect(overview).toContain("summary.protein.hitDays");
+    expect(overview).not.toContain("Objetivo de carbohidratos");
+    expect(overview).not.toContain("Objetivo de grasas");
+  });
+
+  it("reutiliza la evolución A/B, una métrica por eje y marca el cero semántico del balance", () => {
+    expect(evolution).toContain("ComparisonEvolution");
+    expect(evolution).toContain("Una métrica por vez");
+    expect(evolution).toContain("Vs anterior");
+    expect(evolution).toContain('activeMetric === "nutrition.energy_balance"');
+    expect(sharedEvolution).toContain("hasSemanticZero");
+  });
+
+  it("expone cobertura y explica que hoy en curso no altera los promedios", () => {
+    expect(overview).toContain("Consistencia y cobertura");
+    expect(overview).toContain("Los días sin dato no se convierten en cero");
+    expect(overview).toContain("Hoy figura como “En curso”");
+    expect(breakdown).toContain("En curso");
+  });
+
+  it("mantiene días destacados y desglose diario como drill-down final", () => {
+    expect(reportsPage).toContain("<NutritionHighlightedDays");
+    expect(overview).toContain("Días que explican el período");
     expect(breakdown).toContain("getVisibleNutritionReportDays");
     expect(breakdown).toContain("aria-expanded={expanded}");
     expect(breakdown).toContain("/history?date=${day.date}");
-    expect(breakdown).not.toContain("<Card");
-  });
-
-  it("concentra tendencias nutricionales en una única superficie", () => {
-    const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
-    expect(charts).toContain('role="tablist"');
-    for (const label of ["Energía", "Balance", "Proteína"]) {
-      expect(charts).toContain(label);
-    }
-    expect(charts).not.toContain('{ id: "water"');
-    expect(charts).not.toContain('{ id: "steps"');
-    expect(charts).toContain("bucketNutritionChartDays");
-    expect(charts).toContain('touchAction: "pan-y"');
-  });
-
-  it("integra el sistema universal A/B sin crear otra página", () => {
-    const charts = source("src/components/nutrition/nutrition-report-charts.tsx");
-    expect(charts).toContain('aria-label="Modo de tendencias"');
-    expect(charts).toContain(">Actual<");
-    expect(charts).toContain(">Vs anterior<");
-    expect(charts).toContain("scroll={false}");
-    expect(reportsPage).toContain("nutritionReportComparisonMode");
-    expect(reportsPage).toContain("getNutritionReportWithProgressComparison");
-    expect(reportsPage).toContain("<ComparisonConfigurator");
-    expect(reportsPage).toContain("<ComparisonWorkspace");
-    expect(reportsPage).not.toContain("Comparar período");
-  });
-
-  it("muestra una sola tabla compacta Actual/Anterior/Cambio y deltas neutrales", () => {
-    for (const label of ["Actual", "Anterior", "Cambio"]) {
-      expect(comparisonSummary).toContain(label);
-    }
-    for (const label of ["Calorías", "Objetivo", "Balance", "Gasto", "Proteína", "Carbos", "Grasas"]) {
-      expect(reportCore).toContain(label);
-    }
-    for (const legacy of ['comparisonRow("water"', 'comparisonRow("mate"', 'comparisonRow("steps"', 'comparisonRow("workouts"']) {
-      expect(reportCore).not.toContain(legacy);
-    }
-    expect(comparisonSummary).toContain("table-fixed");
-    expect(comparisonSummary).not.toContain("text-emerald");
-    expect(comparisonSummary).not.toContain("text-destructive");
-  });
-
-  it("preserva el reporte normal y sólo carga comparación cuando se solicita", () => {
-    expect(reportsPage).toContain("progressQuery.referenceType");
-    expect(reportsPage).toContain("comparisonReport ?? await getNutritionReport");
-    expect(reportsPage).toContain("<NutritionReportDailyBreakdown days={days} summary={summary}");
   });
 });

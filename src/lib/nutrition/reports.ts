@@ -137,9 +137,11 @@ export async function getNutritionReportWithPrevious(
 
 const DEFAULT_NUTRITION_COMPARISON_METRICS = [
   "nutrition.calories",
+  "nutrition.energy_balance",
   "nutrition.protein",
   "nutrition.carbs",
-  "nutrition.energy_balance",
+  "nutrition.fat",
+  "nutrition.expenditure",
 ] as const;
 
 function nutritionSamplesByMetric(days: readonly ReturnType<typeof buildNutritionReportDays>[number][]) {
