@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type AuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
   BODY_MEASUREMENT_FIELDS,
   type BodyMeasurement,
@@ -83,7 +83,8 @@ export function parseBodyMeasurementInput(input: RawMeasurementInput): BodyMeasu
   return result;
 }
 
-async function getAuthedContext() {
+async function getAuthedContext(context?: AuthenticatedRequestContext) {
+  if (context) return { supabase: context.supabase, userId: context.userId };
   const supabase = await createClient();
   const {
     data: { user },
@@ -114,8 +115,8 @@ function rowPayload(input: BodyMeasurementInput, { preserveLegacy = false } = {}
   };
 }
 
-export async function listBodyMeasurements(limit = 366): Promise<BodyMeasurement[]> {
-  const { supabase, userId } = await getAuthedContext();
+export async function listBodyMeasurements(limit = 366, context?: AuthenticatedRequestContext): Promise<BodyMeasurement[]> {
+  const { supabase, userId } = await getAuthedContext(context);
   const safeLimit = Math.min(Math.max(limit, 1), 1000);
   const { data, error } = await supabase
     .from("body_measurements")
