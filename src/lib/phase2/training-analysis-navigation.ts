@@ -11,6 +11,7 @@ export type TrainingAnalysisNavigationState = {
   customTo?: string | null;
   routineId: string | null;
   muscleKey: string | null;
+  muscleZoneKey?: string | null;
   exerciseQuery?: string;
   exerciseRoutineId?: string | "all";
   exerciseMuscleKey?: string | "all";
@@ -33,6 +34,7 @@ export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationS
   }
   if (state.routineId) params.set("routine", state.routineId);
   if (state.muscleKey) params.set("muscle", state.muscleKey);
+  if (state.muscleZoneKey) params.set("zone", state.muscleZoneKey);
   if (state.view === "exercises") {
     if (state.exerciseQuery) params.set("query", state.exerciseQuery);
     if (state.exerciseRoutineId && state.exerciseRoutineId !== "all") params.set("routine_filter", state.exerciseRoutineId);
@@ -93,6 +95,7 @@ export function trainingAnalysisExercisePath(exerciseId: string, state: Training
     if (state.routineId !== "__free__") params.set("routine_id", state.routineId);
   }
   if (state.muscleKey) params.set("muscle", state.muscleKey);
+  if (state.muscleZoneKey) params.set("zone", state.muscleZoneKey);
   if (state.view === "exercises") {
     if (state.exerciseQuery) params.set("query", state.exerciseQuery);
     if (state.exerciseRoutineId && state.exerciseRoutineId !== "all") params.set("routine_filter", state.exerciseRoutineId);

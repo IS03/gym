@@ -2,6 +2,7 @@ import { TRAINING_PROGRESS_METRICS } from "./analytics/catalog";
 import type { ProgressMetricSample, ProgressPeriodRange } from "./analytics/types";
 import { buildProgressComparison, type ProgressComparisonReport, type ProgressTemporalComparisonReference } from "./comparisons";
 import type { TrainingAnalysis, TrainingAnalysisSource } from "../phase2/training-analysis";
+import { muscleGroupLabel } from "../phase2/muscle-groups";
 
 export type TrainingPerformanceStatus = "improved" | "stable" | "declined" | "insufficient_data";
 export type TrainingPerformanceReason =
@@ -77,6 +78,15 @@ export type TrainingGeneralAnalytics = {
   feelings: TrainingFeelingMetric[];
 };
 
+export type TrainingPerformanceScope = {
+  /** Historical routine identity, including the synthetic free-session id. */
+  routineId?: string;
+  /** Stable broad group from `grupo_muscular_snapshot`. */
+  muscleKey?: string;
+  /** Normalized real free-text detail from `muscle_group_label_snapshot`. */
+  muscleDetailKey?: string;
+};
+
 type PerformanceStrategy = "load_reps" | "bodyweight_reps" | "unit_reps" | "time" | "unsupported";
 type ComparableSet = { reps: number; load: number | null; date: string };
 type ExerciseSnapshot = {
@@ -127,9 +137,19 @@ function sessionMatchesRoutine(routineId: string | null, requestedRoutineId?: st
   return requestedRoutineId === "__free__" ? routineId === null : routineId === requestedRoutineId;
 }
 
-function snapshotMap(source: TrainingAnalysisSource, range: ProgressPeriodRange, routineId?: string) {
+export function trainingMuscleDetailKey(value: string | null | undefined): string | null {
+  return normalize(value);
+}
+
+function exerciseMatchesScope(exercise: TrainingAnalysisSource["sessionExercises"][number], scope: TrainingPerformanceScope) {
+  if (scope.muscleKey && exercise.grupo_muscular_snapshot !== scope.muscleKey) return false;
+  if (scope.muscleDetailKey && trainingMuscleDetailKey(exercise.muscle_group_label_snapshot) !== scope.muscleDetailKey) return false;
+  return true;
+}
+
+function snapshotMap(source: TrainingAnalysisSource, range: ProgressPeriodRange, scope: TrainingPerformanceScope = {}) {
   const sessions = new Map(source.sessions
-    .filter((session) => session.status === "completed" && session.ended_at && sessionMatchesRoutine(session.routine_id, routineId))
+    .filter((session) => session.status === "completed" && session.ended_at && sessionMatchesRoutine(session.routine_id, scope.routineId))
     .flatMap((session) => {
       const date = source.dateByDayLog.get(session.day_log_id);
       return date && date >= range.start && date <= range.end ? [[session.id, date] as const] : [];
@@ -147,14 +167,14 @@ function snapshotMap(source: TrainingAnalysisSource, range: ProgressPeriodRange,
   const byExercise = new Map<string, ExerciseSnapshot[]>();
   for (const exercise of source.sessionExercises) {
     const date = sessions.get(exercise.workout_session_id);
-    if (!date || !exercise.is_completed) continue;
+    if (!date || !exercise.is_completed || !exerciseMatchesScope(exercise, scope)) continue;
     const sets = (setsByExercise.get(exercise.id) ?? []).map((set) => ({ ...set, date }));
     const mode = exercise.weight_mode_snapshot?.trim() || null;
     const item: ExerciseSnapshot = {
       exerciseId: exercise.exercise_id,
       name: exercise.nombre_snapshot,
       muscleKey: exercise.grupo_muscular_snapshot ?? "unassigned",
-      muscleLabel: exercise.muscle_group_label_snapshot?.trim() || "Sin grupo",
+      muscleLabel: muscleGroupLabel(exercise.grupo_muscular_snapshot) ?? (exercise.muscle_group_label_snapshot?.trim() || "Sin grupo"),
       mode,
       normalizedMode: normalize(mode),
       sets,
@@ -393,9 +413,12 @@ export function buildTrainingPerformanceComparison(input: {
   referencePeriod: ProgressPeriodRange;
   /** Optional historical routine identity. The comparison rules remain shared with General. */
   routineId?: string;
+  /** Optional reusable context. Routine compatibility remains supported above. */
+  scope?: TrainingPerformanceScope;
 }): TrainingGeneralAnalytics["performance"] {
-  const primary = snapshotMap(input.source, input.primaryPeriod, input.routineId);
-  const reference = snapshotMap(input.source, input.referencePeriod, input.routineId);
+  const scope = input.scope ?? { routineId: input.routineId };
+  const primary = snapshotMap(input.source, input.primaryPeriod, scope);
+  const reference = snapshotMap(input.source, input.referencePeriod, scope);
   // PR evidence stays global to the exercise. A load already reached in another
   // routine is not incorrectly announced as a new personal record.
   const history = snapshotMap(input.source, { start: "0001-01-01", end: input.primaryPeriod.start });
@@ -431,12 +454,15 @@ export function buildTrainingLoadComparison(input: {
   selectedMetricKeys?: readonly string[];
   activeMetricKey?: string | null;
   routineId?: string;
+  scope?: TrainingPerformanceScope;
+  metricKeys?: readonly string[];
 }): ProgressComparisonReport {
-  const metrics = TRAINING_PROGRESS_METRICS.filter((metric) => metric.category === "load");
+  const allowedKeys = input.metricKeys ? new Set(input.metricKeys) : null;
+  const metrics = TRAINING_PROGRESS_METRICS.filter((metric) => allowedKeys ? allowedKeys.has(metric.key) : metric.category === "load");
   const keys = new Set(input.selectedMetricKeys?.length ? input.selectedMetricKeys : metrics.map((metric) => metric.key));
   const requested = metrics.filter((metric) => keys.has(metric.key));
   const selected = requested.length ? requested : metrics;
-  const samples = trainingLoadSamples(input.source, input.routineId);
+  const samples = trainingLoadSamples(input.source, input.scope ?? { routineId: input.routineId });
   const primarySamples = new Map(selected.map((metric) => [metric.key, samples.get(metric.key) ?? []]));
   const referenceSamples = new Map(selected.map((metric) => [metric.key, samples.get(metric.key) ?? []]));
   return buildProgressComparison({
@@ -451,8 +477,10 @@ export function buildTrainingLoadComparison(input: {
   });
 }
 
-function trainingLoadSamples(source: TrainingAnalysisSource, routineId?: string): Map<string, ProgressMetricSample[]> {
-  const exerciseSession = new Map(source.sessionExercises.map((exercise) => [exercise.id, exercise.workout_session_id]));
+function trainingLoadSamples(source: TrainingAnalysisSource, scope: TrainingPerformanceScope = {}): Map<string, ProgressMetricSample[]> {
+  const exerciseSession = new Map(source.sessionExercises
+    .filter((exercise) => exercise.is_completed && exerciseMatchesScope(exercise, scope))
+    .map((exercise) => [exercise.id, exercise.workout_session_id]));
   const setsBySession = new Map<string, { count: number; volume: number }>();
   for (const set of source.sets) {
     if (!set.is_completed) continue;
@@ -468,11 +496,13 @@ function trainingLoadSamples(source: TrainingAnalysisSource, routineId?: string)
     ["training.load.sets", []],
     ["training.load.duration", []],
     ["training.load.volume", []],
+    ["training.load.sets_per_session", []],
   ]);
   for (const session of source.sessions) {
     const date = source.dateByDayLog.get(session.day_log_id);
-    if (session.status !== "completed" || !session.ended_at || !date || !sessionMatchesRoutine(session.routine_id, routineId)) continue;
+    if (session.status !== "completed" || !session.ended_at || !date || !sessionMatchesRoutine(session.routine_id, scope.routineId)) continue;
     const sets = setsBySession.get(session.id) ?? { count: 0, volume: 0 };
+    if ((scope.muscleKey || scope.muscleDetailKey) && sets.count === 0) continue;
     const elapsed = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
     const minutes = Number.isFinite(elapsed) && elapsed > 0 ? Math.round(elapsed / 60_000) : 0;
     const context = { sessionId: session.id };
@@ -480,6 +510,7 @@ function trainingLoadSamples(source: TrainingAnalysisSource, routineId?: string)
     result.get("training.load.sets")!.push({ date, value: sets.count, entityId: session.id, context });
     result.get("training.load.duration")!.push({ date, value: minutes, entityId: session.id, context });
     result.get("training.load.volume")!.push({ date, value: sets.volume, entityId: session.id, context });
+    result.get("training.load.sets_per_session")!.push({ date, value: sets.count, entityId: session.id, context });
   }
   return result;
 }

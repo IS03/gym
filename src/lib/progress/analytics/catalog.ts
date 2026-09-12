@@ -83,16 +83,21 @@ const trainingLoadMetric = (
   label: string,
   unit: string,
   field: string,
+  options: {
+    category?: string;
+    aggregation?: ProgressMetricDefinition["aggregation"];
+    missingData?: ProgressMetricDefinition["missingData"];
+  } = {},
 ): ProgressMetricDefinition => ({
   key,
   domain: "training",
-  category: "load",
+  category: options.category ?? "load",
   label,
   unit,
   source: { adapter: "training_load", canonicalTables: ["workout_sessions", "workout_session_exercises", "workout_sets"], field },
   temporalOrigin: field === "sets" || field === "volumeKg" ? "set" : "session",
-  aggregation: "sum",
-  missingData: "zero_when_no_event",
+  aggregation: options.aggregation ?? "sum",
+  missingData: options.missingData ?? "zero_when_no_event",
   coverageMode: "event_stream",
   supportsGoal: false,
   supportsTemporalComparison: true,
@@ -135,6 +140,11 @@ export const TRAINING_PROGRESS_METRICS = [
   trainingLoadMetric("training.load.sets", "Series", "series", "sets"),
   trainingLoadMetric("training.load.duration", "Duración", "min", "minutes"),
   trainingLoadMetric("training.load.volume", "Volumen", "kg", "volumeKg"),
+  trainingLoadMetric("training.load.sets_per_session", "Series por sesión", "series/sesión", "setsPerSession", {
+    category: "muscle_load",
+    aggregation: "average",
+    missingData: "exclude",
+  }),
   performanceMetric("training.performance.best_weight", "Mejor peso", "kg", "bestWeightKg"),
   performanceMetric("training.performance.best_reps", "Mejores repeticiones", "reps", "bestReps"),
   performanceMetric("training.performance.reps_same_load", "Repeticiones a igual carga", "reps", "repsAtSameLoad"),

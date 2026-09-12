@@ -23,6 +23,10 @@ import {
   buildTrainingRoutinesAnalytics,
   type TrainingRoutinesAnalytics,
 } from "../progress/training-routines";
+import {
+  buildTrainingMusclesAnalytics,
+  type TrainingMusclesAnalytics,
+} from "../progress/training-muscles";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -1368,6 +1372,48 @@ export async function getTrainingRoutinesAnalysis(
       reference,
       referenceDefinition,
       selectedRoutineId: options.selectedRoutineId,
+      selectedMetricKeys: options.selectedMetricKeys,
+      activeMetricKey: options.activeMetricKey,
+    }),
+  };
+}
+
+/**
+ * Read model for Muscles V2. Broad groups, real detail labels, A/B load and
+ * exercise performance all share the same completed-session snapshot fetch.
+ */
+export async function getTrainingMusclesAnalysis(
+  period: TrainingAnalysisPeriod,
+  referenceDefinition: ProgressTemporalComparisonReference,
+  options: {
+    selectedMuscleKey?: string | null;
+    selectedSubzoneKey?: string | null;
+    selectedMetricKeys?: readonly string[];
+    activeMetricKey?: string | null;
+  } = {},
+  primaryRange?: { start: string; end: string },
+): Promise<{ current: TrainingAnalysis; reference: TrainingAnalysis; muscles: TrainingMusclesAnalytics }> {
+  const [data, catalogRoutines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines: catalogRoutines, range: primaryRange });
+  const reference = buildTrainingAnalysis(data, {
+    today: referenceDefinition.period.end,
+    period,
+    routines: catalogRoutines,
+    range: referenceDefinition.period,
+  });
+  return {
+    current,
+    reference,
+    muscles: buildTrainingMusclesAnalytics({
+      source: data,
+      primary: current,
+      reference,
+      referenceDefinition,
+      selectedMuscleKey: options.selectedMuscleKey,
+      selectedSubzoneKey: options.selectedSubzoneKey,
       selectedMetricKeys: options.selectedMetricKeys,
       activeMetricKey: options.activeMetricKey,
     }),
