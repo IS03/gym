@@ -79,6 +79,8 @@ export type TrainingGeneralAnalytics = {
 };
 
 export type TrainingPerformanceScope = {
+  /** Stable catalog exercise identity. Used by the individual report. */
+  exerciseId?: string;
   /** Historical routine identity, including the synthetic free-session id. */
   routineId?: string;
   /** Stable broad group from `grupo_muscular_snapshot`. */
@@ -142,6 +144,7 @@ export function trainingMuscleDetailKey(value: string | null | undefined): strin
 }
 
 function exerciseMatchesScope(exercise: TrainingAnalysisSource["sessionExercises"][number], scope: TrainingPerformanceScope) {
+  if (scope.exerciseId && exercise.exercise_id !== scope.exerciseId) return false;
   if (scope.muscleKey && exercise.grupo_muscular_snapshot !== scope.muscleKey) return false;
   if (scope.muscleDetailKey && trainingMuscleDetailKey(exercise.muscle_group_label_snapshot) !== scope.muscleDetailKey) return false;
   return true;
@@ -502,7 +505,7 @@ function trainingLoadSamples(source: TrainingAnalysisSource, scope: TrainingPerf
     const date = source.dateByDayLog.get(session.day_log_id);
     if (session.status !== "completed" || !session.ended_at || !date || !sessionMatchesRoutine(session.routine_id, scope.routineId)) continue;
     const sets = setsBySession.get(session.id) ?? { count: 0, volume: 0 };
-    if ((scope.muscleKey || scope.muscleDetailKey) && sets.count === 0) continue;
+    if ((scope.exerciseId || scope.muscleKey || scope.muscleDetailKey) && sets.count === 0) continue;
     const elapsed = new Date(session.ended_at).getTime() - new Date(session.started_at).getTime();
     const minutes = Number.isFinite(elapsed) && elapsed > 0 ? Math.round(elapsed / 60_000) : 0;
     const context = { sessionId: session.id };

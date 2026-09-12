@@ -1,6 +1,6 @@
 export type ChartDomain = { min: number; max: number };
 export type ChartCoordinate = { index: number; x: number; y: number };
-export type ChartUnit = "kcal" | "g" | "L" | "pasos" | "kg" | "series" | "sesiones" | "min" | "cm" | "reps";
+export type ChartUnit = "kcal" | "g" | "L" | "pasos" | "kg" | "series" | "sesiones" | "min" | "cm" | "reps" | "s" | "lingotes";
 
 export function chartDomain(values: Array<number | null | undefined>, includeZero = false): ChartDomain {
   const finite = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
