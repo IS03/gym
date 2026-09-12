@@ -14,6 +14,11 @@ import {
   type AuthenticatedRequestContext,
 } from "@/lib/supabase/server";
 import { getPreviousProgressPeriod } from "../progress/analytics/periods";
+import type { ProgressTemporalComparisonReference } from "../progress/comparisons";
+import {
+  buildTrainingGeneralAnalytics,
+  type TrainingGeneralAnalytics,
+} from "../progress/training-performance";
 import { todayInCordoba } from "./cordoba-date";
 import { INITIAL_TRAINING_PLAN } from "./initial-plan";
 import {
@@ -1257,12 +1262,13 @@ export async function getTrainingProgress(): Promise<{
  */
 export async function getTrainingAnalysis(
   period: TrainingAnalysisPeriod,
+  range?: { start: string; end: string },
 ): Promise<TrainingAnalysis> {
   const [data, routines] = await Promise.all([
     loadCompletedTrainingData(),
     listRoutines({ includeArchived: true }),
   ]);
-  return buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
+  return buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines, range });
 }
 
 /**
@@ -1271,12 +1277,13 @@ export async function getTrainingAnalysis(
  */
 export async function getTrainingAnalysisWithPreviousPeriod(
   period: TrainingAnalysisPeriod,
+  range?: { start: string; end: string },
 ): Promise<{ current: TrainingAnalysis; previous: TrainingAnalysis }> {
   const [data, routines] = await Promise.all([
     loadCompletedTrainingData(),
     listRoutines({ includeArchived: true }),
   ]);
-  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines });
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines, range });
   const previousRange = getPreviousProgressPeriod(current.range);
   const previous = buildTrainingAnalysis(data, {
     today: previousRange.end,
@@ -1285,4 +1292,40 @@ export async function getTrainingAnalysisWithPreviousPeriod(
     range: previousRange,
   });
   return { current, previous };
+}
+
+/**
+ * Read model for General V2. Current, reference and per-exercise performance
+ * share one historical fetch, so changing the visible metric never creates an
+ * exercise-level query fan-out.
+ */
+export async function getTrainingGeneralAnalysis(
+  period: TrainingAnalysisPeriod,
+  referenceDefinition: ProgressTemporalComparisonReference,
+  options: { selectedMetricKeys?: readonly string[]; activeMetricKey?: string | null } = {},
+  primaryRange?: { start: string; end: string },
+): Promise<{ current: TrainingAnalysis; reference: TrainingAnalysis; general: TrainingGeneralAnalytics }> {
+  const [data, routines] = await Promise.all([
+    loadCompletedTrainingData(),
+    listRoutines({ includeArchived: true }),
+  ]);
+  const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines, range: primaryRange });
+  const reference = buildTrainingAnalysis(data, {
+    today: referenceDefinition.period.end,
+    period,
+    routines,
+    range: referenceDefinition.period,
+  });
+  return {
+    current,
+    reference,
+    general: buildTrainingGeneralAnalytics({
+      source: data,
+      primary: current,
+      reference,
+      referenceDefinition,
+      selectedMetricKeys: options.selectedMetricKeys,
+      activeMetricKey: options.activeMetricKey,
+    }),
+  };
 }

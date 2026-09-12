@@ -57,6 +57,10 @@ export function ComparisonConfigurator({
   referencePeriod,
   initialView,
   activeMetricKey,
+  viewParam = "view",
+  triggerLabel,
+  triggerClassName,
+  showViewSelection = true,
 }: {
   metrics: ComparisonMetricOption[];
   primaryPeriod: ProgressPeriodRange;
@@ -67,6 +71,10 @@ export function ComparisonConfigurator({
   referencePeriod?: ProgressPeriodRange | null;
   initialView: ProgressComparisonView;
   activeMetricKey: string | null;
+  viewParam?: string;
+  triggerLabel?: string;
+  triggerClassName?: string;
+  showViewSelection?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -105,7 +113,8 @@ export function ComparisonConfigurator({
     const next = new URLSearchParams(searchParams.toString());
     next.set("compare", draftReference === "previous_period" ? "previous" : draftReference === "other_period" ? "period" : "goal");
     next.set("metrics", chosen.join(","));
-    next.set("view", draftView);
+    if (showViewSelection) next.set(viewParam, draftView);
+    else next.delete(viewParam);
     const active = chosen.includes(activeMetricKey ?? "") ? activeMetricKey! : chosen[0]!;
     next.set("chartMetric", active);
     if (draftReference === "other_period") {
@@ -127,8 +136,8 @@ export function ComparisonConfigurator({
   };
 
   return <>
-    <Button type="button" variant="outline" className="mt-3 h-11 w-full justify-between" aria-expanded={open} onClick={() => { resetDraft(); setOpen(true); }} disabled={pending}>
-      <span className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-primary" aria-hidden />{referenceType ? "Editar comparación" : "Configurar comparación"}</span>
+    <Button type="button" variant="outline" className={cn("mt-3 h-11 w-full justify-between", triggerClassName)} aria-expanded={open} onClick={() => { resetDraft(); setOpen(true); }} disabled={pending}>
+      <span className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-primary" aria-hidden />{triggerLabel ?? (referenceType ? "Editar comparación" : "Configurar comparación")}</span>
       <span className="text-xs text-muted-foreground">{pending ? "Actualizando…" : "A/B"}</span>
     </Button>
     <ResponsiveDialog open={open} onOpenChange={setOpen} title="Configurar comparación" description="Elegí qué querés comparar sin mezclar métricas incompatibles." closeLabel="Cerrar configurador" footer={<Button type="button" className="h-11 w-full" onClick={apply} disabled={!effectiveMetrics.length && !applicableMetrics.length}>Aplicar comparación</Button>}>
@@ -164,10 +173,10 @@ export function ComparisonConfigurator({
             })}
           </div>
         </section>
-        <section className="space-y-2">
+        {showViewSelection ? <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">Vista inicial</p>
           <div className="grid grid-cols-3 rounded-xl border bg-muted/25 p-1">{viewOptions.map((option) => <button key={option.value} type="button" aria-pressed={draftView === option.value} className={cn("min-h-11 rounded-lg px-1 text-xs font-medium", draftView === option.value ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => setDraftView(option.value)}>{option.label}</button>)}</div>
-        </section>
+        </section> : null}
       </div>
     </ResponsiveDialog>
   </>;

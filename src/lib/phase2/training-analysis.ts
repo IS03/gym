@@ -18,7 +18,7 @@ export const TRAINING_ANALYSIS_PERIODS = TRAINING_ANALYSIS_PERIOD_VALUES.map((va
   return { value, label: definition.label };
 });
 
-export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIOD_VALUES)[number];
+export type TrainingAnalysisPeriod = (typeof TRAINING_ANALYSIS_PERIOD_VALUES)[number] | "custom";
 export type TrainingAnalysisMetric = "volume" | "sets" | "sessions" | "minutes";
 
 export type TrainingAnalysisSummary = {
@@ -211,11 +211,11 @@ export function previousTrainingAnalysisPeriodRange(period: TrainingAnalysisPeri
 }
 
 export function isTrainingAnalysisPeriod(value: string | null | undefined): value is TrainingAnalysisPeriod {
-  return TRAINING_ANALYSIS_PERIODS.some((period) => period.value === value);
+  return value === "custom" || TRAINING_ANALYSIS_PERIODS.some((period) => period.value === value);
 }
 
 export function trainingAnalysisPeriodLabel(period: TrainingAnalysisPeriod): string {
-  return TRAINING_ANALYSIS_PERIODS.find((item) => item.value === period)!.label;
+  return period === "custom" ? "Personalizado" : TRAINING_ANALYSIS_PERIODS.find((item) => item.value === period)!.label;
 }
 
 export function trainingAnalysisMetricValue(summary: TrainingAnalysisSummary, metric: TrainingAnalysisMetric): number {

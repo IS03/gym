@@ -7,6 +7,8 @@ export type TrainingAnalysisView = (typeof TRAINING_ANALYSIS_VIEWS)[number];
 export type TrainingAnalysisNavigationState = {
   view: TrainingAnalysisView;
   period: TrainingAnalysisPeriod;
+  customFrom?: string | null;
+  customTo?: string | null;
   routineId: string | null;
   muscleKey: string | null;
   exerciseQuery?: string;
@@ -25,6 +27,10 @@ export function isTrainingAnalysisView(value: string | null | undefined): value 
 
 export function trainingAnalysisWorkspacePath(state: TrainingAnalysisNavigationState): string {
   const params = new URLSearchParams({ view: state.view, period: state.period });
+  if (state.period === "custom" && state.customFrom && state.customTo) {
+    params.set("from", state.customFrom);
+    params.set("to", state.customTo);
+  }
   if (state.routineId) params.set("routine", state.routineId);
   if (state.muscleKey) params.set("muscle", state.muscleKey);
   if (state.view === "exercises") {
@@ -78,6 +84,10 @@ export function trainingAnalysisSelfComparisonPath(
 
 export function trainingAnalysisExercisePath(exerciseId: string, state: TrainingAnalysisNavigationState): string {
   const params = new URLSearchParams({ from: "progress", period: state.period, view: state.view });
+  if (state.period === "custom" && state.customFrom && state.customTo) {
+    params.set("period_from", state.customFrom);
+    params.set("period_to", state.customTo);
+  }
   if (state.routineId) {
     params.set("routine", state.routineId);
     if (state.routineId !== "__free__") params.set("routine_id", state.routineId);
