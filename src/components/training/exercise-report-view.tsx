@@ -118,7 +118,7 @@ function EvolutionMode({ isPrevious, currentHref, previousHref }: { isPrevious: 
 export function ExerciseReportView({
   exerciseId, exerciseName, muscleLabel, period, routineId, routines, sessions, performanceSessions, backHref, backLabel, source, progressContext, range, comparison,
 }: {
-  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; performanceSessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null };
+  exerciseId: string; exerciseName: string; muscleLabel: string | null; period: string; routineId: string | null; routines: Array<{ id: string; nombre: string }>; sessions: ExerciseReportSession[]; performanceSessions: ExerciseReportSession[]; backHref: string; backLabel: string; source: "progress" | "history"; range: { start: string; end: string } | null; comparison?: TrainingComparison | null; progressContext?: { view: string; routineId: string | null; muscleKey: string | null; query: string | null; routineFilter: string | null; muscleFilter: string | null; periodFrom?: string | null; periodTo?: string | null };
 }) {
   const summary = useMemo(() => summarizeExerciseReport(sessions), [sessions]);
   const points = useMemo(() => buildExerciseReportPoints(sessions), [sessions]);
@@ -131,6 +131,10 @@ export function ExerciseReportView({
     params.set("from", source);
     if (source === "progress" && progressContext) {
       params.set("view", progressContext.view);
+      if (nextPeriod === "custom" && progressContext.periodFrom && progressContext.periodTo) {
+        params.set("period_from", progressContext.periodFrom);
+        params.set("period_to", progressContext.periodTo);
+      }
       if (progressContext.routineId) params.set("routine", progressContext.routineId);
       if (progressContext.muscleKey) params.set("muscle", progressContext.muscleKey);
       if (progressContext.query) params.set("query", progressContext.query);

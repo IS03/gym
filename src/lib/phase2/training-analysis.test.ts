@@ -179,6 +179,7 @@ describe("training analysis", () => {
     expect(isTrainingAnalysisPeriod("2w")).toBe(true);
     expect(isTrainingAnalysisPeriod("3w")).toBe(true);
     expect(isTrainingAnalysisPeriod("8w")).toBe(true);
+    expect(isTrainingAnalysisPeriod("custom")).toBe(true);
     expect(isTrainingAnalysisPeriod("90d")).toBe(false);
     expect(TRAINING_ANALYSIS_RECENT_EXERCISE_LIMIT).toBe(6);
     expect(formatTrainingVolumeKg(960)).toBe("960 kg");
@@ -194,6 +195,24 @@ describe("training analysis", () => {
     expect(formatTrainingVolumeKg(-5)).toBe("−5 kg");
     expect(formatTrainingAnalysisMetric(12_900, "volume")).toBe("12,9 mil kg");
     expect(formatTrainingAnalysisMetric(0, "sets")).toBe("0 series");
+  });
+
+  it("uses the canonical custom range and preserves it across tabs and exercise navigation", () => {
+    const result = buildTrainingAnalysis({
+      sessions: [session()],
+      sessionExercises: [exercise({ weight_mode_snapshot: "Peso total" })],
+      sets: [set()],
+      dateByDayLog: new Map([["day-1", "2026-08-10"]]),
+    }, {
+      today: "2026-08-25",
+      period: "custom",
+      range: { start: "2026-08-01", end: "2026-08-15" },
+    });
+    expect(result.range).toEqual({ start: "2026-08-01", end: "2026-08-15", label: "Personalizado" });
+    expect(trainingAnalysisWorkspacePath({ view: "muscles", period: "custom", customFrom: result.range.start, customTo: result.range.end, routineId: null, muscleKey: null })).toContain("period=custom&from=2026-08-01&to=2026-08-15");
+    const exerciseHref = trainingAnalysisExercisePath("press-machine", { view: "general", period: "custom", customFrom: result.range.start, customTo: result.range.end, routineId: null, muscleKey: null });
+    expect(exerciseHref).toContain("period_from=2026-08-01");
+    expect(exerciseHref).toContain("period_to=2026-08-15");
   });
 
   it("pluralizes sessions by absolute value, including comparison deltas", () => {
