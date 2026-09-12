@@ -6,7 +6,7 @@ import {
 import { filterTrainingAnalysisExercises, isTrainingAnalysisPeriod, type TrainingAnalysisPeriod } from "@/lib/phase2/training-analysis";
 import { isTrainingAnalysisView } from "@/lib/phase2/training-analysis-navigation";
 import { buildTrainingComparison, buildTrainingSelfComparison, isTrainingComparisonKind, isTrainingComparisonSubjectType } from "@/lib/phase2/training-comparison";
-import { getTrainingAnalysis, getTrainingAnalysisWithPreviousPeriod, getTrainingGeneralAnalysis } from "@/lib/phase2/training-robust";
+import { getTrainingAnalysis, getTrainingAnalysisWithPreviousPeriod, getTrainingGeneralAnalysis, getTrainingRoutinesAnalysis } from "@/lib/phase2/training-robust";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { getPreviousProgressPeriod, resolveProgressPeriod } from "@/lib/progress/analytics";
 import {
@@ -65,6 +65,7 @@ export default async function TrainingProgressPage({
     || (parsedComparison === "exercises" && view === "exercises")
     ? parsedComparison
     : null;
+  const requestedRoutine = typeof sp.routine === "string" ? sp.routine : null;
   const generalData = view === "general"
     ? await getTrainingGeneralAnalysis(period, temporalReference, {
       selectedMetricKeys: progressQuery.selectedMetricKeys,
@@ -72,9 +73,15 @@ export default async function TrainingProgressPage({
     }, period === "custom" ? primaryRange : undefined)
     : null;
   const customRange = period === "custom" ? primaryRange : undefined;
-  const comparisonData = view !== "general" && comparisonKind === "previous" ? await getTrainingAnalysisWithPreviousPeriod(period, customRange) : null;
-  const analysis = generalData?.current ?? comparisonData?.current ?? await getTrainingAnalysis(period, customRange);
-  const requestedRoutine = typeof sp.routine === "string" ? sp.routine : null;
+  const routinesData = view === "routines"
+    ? await getTrainingRoutinesAnalysis(period, temporalReference, {
+      selectedRoutineId: requestedRoutine,
+      selectedMetricKeys: progressQuery.selectedMetricKeys,
+      activeMetricKey: progressQuery.activeMetricKey,
+    }, customRange)
+    : null;
+  const comparisonData = view !== "general" && view !== "routines" && comparisonKind === "previous" ? await getTrainingAnalysisWithPreviousPeriod(period, customRange) : null;
+  const analysis = generalData?.current ?? routinesData?.current ?? comparisonData?.current ?? await getTrainingAnalysis(period, customRange);
   const requestedMuscle = typeof sp.muscle === "string" ? sp.muscle : null;
   const exerciseQuery = typeof sp.query === "string" ? sp.query : undefined;
   const exerciseRoutineId = typeof sp.routine_filter === "string" ? sp.routine_filter : undefined;
@@ -89,7 +96,7 @@ export default async function TrainingProgressPage({
   const subjectType = requestedSubjectType ?? defaultSubjectType;
   const explicitSubject = typeof sp.subject === "string" ? sp.subject : null;
   const subjectId = explicitSubject ?? (subjectType === "routine" ? routineId : subjectType === "muscle" ? muscleKey : null);
-  const comparison = view !== "general" && comparisonKind === "previous" && comparisonData
+  const comparison = view !== "general" && view !== "routines" && comparisonKind === "previous" && comparisonData
     ? buildTrainingSelfComparison({ analysis, previousAnalysis: comparisonData.previous, subjectType, subjectId })
     : comparisonKind && comparisonKind !== "previous"
       ? buildTrainingComparison({
@@ -114,6 +121,6 @@ export default async function TrainingProgressPage({
       <p className="mt-1 text-sm text-muted-foreground">Analizá tus sesiones finalizadas, rutinas, músculos y ejercicios.</p>
       </div>
     </header>
-    <TrainingAnalysisWorkspace analysis={analysis} view={view} routineId={routineId} muscleKey={muscleKey} exerciseQuery={exerciseQuery} exerciseRoutineId={exerciseRoutineId} exerciseMuscleKey={exerciseMuscleKey} comparison={comparison} generalV2={generalData ? { analytics: generalData.general, reference: temporalReference, comparisonQuery: progressQuery, today, comparisonError } : null} />
+    <TrainingAnalysisWorkspace analysis={analysis} view={view} routineId={routineId} muscleKey={muscleKey} exerciseQuery={exerciseQuery} exerciseRoutineId={exerciseRoutineId} exerciseMuscleKey={exerciseMuscleKey} comparison={comparison} generalV2={generalData ? { analytics: generalData.general, reference: temporalReference, comparisonQuery: progressQuery, today, comparisonError } : null} routinesV2={routinesData ? { analytics: routinesData.routines, reference: temporalReference, comparisonQuery: progressQuery, today, comparisonError } : null} />
   </div>;
 }

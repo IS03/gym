@@ -384,7 +384,12 @@ export function buildTrainingComparison(input: {
   exerciseIds?: string[];
 }): TrainingComparison {
   if (input.kind === "routines") {
-    const subjects = uniqueSubjects(input.analysis.activeRoutineIds.map((id) => subjectForRoutine(input.analysis, id)));
+    const routinesWithData = new Set(input.analysis.routines.filter((routine) => routine.summary.hasData).map((routine) => routine.id));
+    const routineIds = [
+      ...input.analysis.activeRoutineIds.filter((id) => routinesWithData.has(id)),
+      ...input.analysis.routines.filter((routine) => routine.summary.hasData && !input.analysis.activeRoutineIds.includes(routine.id)).map((routine) => routine.id),
+    ];
+    const subjects = uniqueSubjects(routineIds.map((id) => subjectForRoutine(input.analysis, id)));
     return comparisonFromSubjects({ kind: "routines", title: "Comparar rutinas", subjectType: "routine", metrics: ["sessions", "sets", "minutes", "volume"], chartMetrics: ["volume", "sets", "minutes"], subjects, requestedA: input.requestedA, requestedB: input.requestedB, range: input.analysis.range });
   }
 

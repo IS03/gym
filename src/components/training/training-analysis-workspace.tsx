@@ -16,7 +16,6 @@ import {
   type TrainingAnalysis,
   type TrainingAnalysisMetric,
   type TrainingAnalysisMuscle,
-  type TrainingAnalysisRoutine,
   type TrainingAnalysisSummary,
   type TrainingAnalysisTimelinePoint,
 } from "@/lib/phase2/training-analysis";
@@ -32,8 +31,11 @@ import {
 import { type TrainingComparison, type TrainingComparisonSubjectType } from "@/lib/phase2/training-comparison";
 import { TrainingComparisonWorkspace, TrainingSelfComparisonContent } from "@/components/training/training-comparison-workspace";
 import { TrainingGeneralV2 } from "@/components/training/training-general-v2";
+import { TrainingProgressPeriodSelector } from "@/components/training/training-progress-period-selector";
+import { TrainingRoutinesV2 } from "@/components/training/training-routines-v2";
 import type { ProgressComparisonQuery, ProgressTemporalComparisonReference } from "@/lib/progress/comparisons";
 import type { TrainingGeneralAnalytics } from "@/lib/progress/training-performance";
+import type { TrainingRoutinesAnalytics } from "@/lib/progress/training-routines";
 import { cn } from "@/lib/utils";
 
 type WorkspaceState = TrainingAnalysisNavigationState;
@@ -171,35 +173,8 @@ function AnalysisRow({ href, title, description, value }: { href: string; title:
   return <Link href={href} className="group flex min-h-14 items-center gap-3 border-b border-border/70 py-3 outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{title}</span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span></span><span className="metric-number shrink-0 text-right text-sm font-medium">{value}</span><ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden /></Link>;
 }
 
-function Breakdown({
-  title,
-  empty,
-  rows,
-  moreHref,
-  moreLabel,
-}: {
-  title: string;
-  empty: string;
-  rows: Array<{ href: string; title: string; description: string; value: string }>;
-  moreHref?: string;
-  moreLabel?: string;
-}) {
-  return <section className="space-y-2" aria-label={title}><div className="flex items-baseline justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">{title}</h2>{moreHref && rows.length > 0 && <Link href={moreHref} className="text-sm font-medium text-primary hover:underline">{moreLabel ?? "Ver todo"}</Link>}</div>{rows.length === 0 ? <p className="text-sm text-muted-foreground">{empty}</p> : <div>{rows.map((row) => <AnalysisRow key={row.href} {...row} />)}</div>}</section>;
-}
-
-function RoutineList({ analysis, state }: { analysis: TrainingAnalysis; state: WorkspaceState }) {
-  const activeRoutines = analysis.routines.filter((routine) => analysis.activeRoutineIds.includes(routine.id));
-  return <section className="space-y-3"><div><h2 className="text-lg font-semibold tracking-tight">Elegí una rutina</h2><p className="mt-1 text-sm text-muted-foreground">Cada rutina se analiza con sus sesiones y ejercicios históricos.</p></div>{activeRoutines.length === 0 ? <EmptyState>No hay rutinas activas para analizar.</EmptyState> : <div>{activeRoutines.map((routine) => <AnalysisRow key={routine.id} href={trainingAnalysisWorkspacePath({ view: "routines", period: state.period, customFrom: state.customFrom, customTo: state.customTo, routineId: routine.id, muscleKey: null })} title={routine.name} description={routine.summary.hasData ? `${routine.summary.sets} ${routine.summary.sets === 1 ? "serie" : "series"} · ${routine.summary.exerciseCount} ${routine.summary.exerciseCount === 1 ? "ejercicio" : "ejercicios"}` : `Sin sesiones en ${analysis.range.label.toLocaleLowerCase("es-AR")}`} value={routine.summary.hasData ? summaryMetricValue(routine.summary, "sessions") : "Sin datos"} />)}</div>}</section>;
-}
-
 function OtherComparisons({ href, label }: { href: string; label: string }) {
   return <section className="space-y-1 border-t border-border/70 pt-4"><h2 className="text-base font-semibold tracking-tight">Otras comparaciones</h2><Link href={href} className="inline-flex min-h-10 items-center text-sm font-medium text-primary hover:underline">{label}</Link></section>;
-}
-
-function RoutineView({ analysis, routine, state, comparison }: { analysis: TrainingAnalysis; routine: TrainingAnalysisRoutine; state: WorkspaceState; comparison?: TrainingComparison | null }) {
-  const exercises = analysis.exercises.filter((exercise) => exercise.routineIds.includes(routine.id));
-  const crossHref = trainingAnalysisComparisonPath(state, "routines", { a: routine.id });
-  return <div className="space-y-6"><div><h2 className="text-xl font-semibold tracking-tight">{routine.name}</h2><p className="mt-1 text-sm text-muted-foreground">{analysisRangeLabel(analysis)} · datos de sesiones finalizadas.</p></div>{routine.summary.hasData ? <MetricGrid items={[{ label: "Sesiones", value: summaryMetricValue(routine.summary, "sessions") }, { label: "Series", value: summaryMetricValue(routine.summary, "sets") }, { label: "Duración", value: summaryMetricValue(routine.summary, "minutes") }, { label: "Volumen", value: summaryMetricValue(routine.summary, "volume") }]} /> : <EmptyState>No hay sesiones finalizadas de esta rutina en este período.</EmptyState>}<AnalysisEvolution title="Evolución" description="Actividad por día, semana o tramo de la rutina." points={routine.timeline} metrics={["volume", "sets", "minutes"]} defaultMetric="volume" state={state} subjectType="routine" subjectId={routine.id} comparison={comparison} />{routine.summary.hasData && <><Breakdown title="Músculos trabajados" empty="No hay series musculares registradas para esta rutina." rows={routine.muscles.map((muscle) => ({ href: trainingAnalysisWorkspacePath({ view: "muscles", period: state.period, customFrom: state.customFrom, customTo: state.customTo, routineId: null, muscleKey: muscle.key }), title: muscle.label, description: "Abrir análisis muscular", value: `${muscle.sets} ${muscle.sets === 1 ? "serie" : "series"}` }))} /><ExerciseRows title="Ejercicios de esta rutina" empty="No hay ejercicios históricos con series realizadas." exercises={exercises} state={state} /></>}<OtherComparisons href={crossHref} label="Comparar con otra rutina" /></div>;
 }
 
 function MuscleList({ analysis, state }: { analysis: TrainingAnalysis; state: WorkspaceState }) {
@@ -230,12 +205,12 @@ function ExercisesView({ analysis, state }: { analysis: TrainingAnalysis; state:
   return <section className="space-y-4"><div><h2 className="text-lg font-semibold tracking-tight">Encontrá un ejercicio</h2><p className="mt-1 text-sm text-muted-foreground">Abrí su reporte completo de peso, reps, volumen y sesiones.</p></div><label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden /><Input value={query} onChange={(event) => { setQuery(event.target.value); setShowAll(true); }} placeholder="Buscar ejercicio" className="h-11 pl-9" aria-label="Buscar ejercicio" /></label><div className="grid gap-2 sm:grid-cols-2"><label className="space-y-1 text-xs font-medium text-muted-foreground">Rutina<select value={routineId} onChange={(event) => { setRoutineId(event.target.value); setShowAll(true); }} className="h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="all">Todas las rutinas</option>{activeRoutines.map((routine) => <option key={routine.id} value={routine.id}>{routine.name}</option>)}</select></label><label className="space-y-1 text-xs font-medium text-muted-foreground">Músculo<select value={muscleKey} onChange={(event) => { setMuscleKey(event.target.value); setShowAll(true); }} className="h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value="all">Todos los músculos</option>{analysis.muscles.map((muscle) => <option key={muscle.key} value={muscle.key}>{muscle.label}</option>)}</select></label></div><div className="flex items-center justify-between gap-3 text-xs text-muted-foreground"><span>{isCompact ? `${rendered.length} ejercicios recientes` : `${visible.length} ${visible.length === 1 ? "ejercicio" : "ejercicios"}`}</span>{isCompact && visible.length > rendered.length && <button type="button" onClick={() => setShowAll(true)} className="min-h-9 text-sm font-medium text-primary hover:underline">Ver todos</button>}</div>{rendered.length === 0 ? <EmptyState>No encontramos ejercicios con esos filtros.</EmptyState> : <div>{rendered.map((exercise) => <AnalysisRow key={exercise.id} href={trainingAnalysisExercisePath(exercise.id, exerciseState)} title={exercise.name} description={`${exercise.muscleLabel} · última sesión ${shortDate(exercise.lastDate)} · ${exercise.sessions} ${exercise.sessions === 1 ? "sesión" : "sesiones"}`} value={exercise.bestWeightKg === null ? `${exercise.sets} series` : `${formatNumber(exercise.bestWeightKg, 1)} kg`} />)}</div>}</section>;
 }
 
-export function TrainingAnalysisWorkspace({ analysis, view, routineId, muscleKey, exerciseQuery, exerciseRoutineId, exerciseMuscleKey, comparison, generalV2 }: { analysis: TrainingAnalysis; view: TrainingAnalysisView; routineId: string | null; muscleKey: string | null; exerciseQuery?: string; exerciseRoutineId?: string | "all"; exerciseMuscleKey?: string | "all"; comparison?: TrainingComparison | null; generalV2?: { analytics: TrainingGeneralAnalytics; reference: ProgressTemporalComparisonReference; comparisonQuery: ProgressComparisonQuery; today: string; comparisonError?: string | null } | null }) {
+export function TrainingAnalysisWorkspace({ analysis, view, routineId, muscleKey, exerciseQuery, exerciseRoutineId, exerciseMuscleKey, comparison, generalV2, routinesV2 }: { analysis: TrainingAnalysis; view: TrainingAnalysisView; routineId: string | null; muscleKey: string | null; exerciseQuery?: string; exerciseRoutineId?: string | "all"; exerciseMuscleKey?: string | "all"; comparison?: TrainingComparison | null; generalV2?: { analytics: TrainingGeneralAnalytics; reference: ProgressTemporalComparisonReference; comparisonQuery: ProgressComparisonQuery; today: string; comparisonError?: string | null } | null; routinesV2?: { analytics: TrainingRoutinesAnalytics; reference: ProgressTemporalComparisonReference; comparisonQuery: ProgressComparisonQuery; today: string; comparisonError?: string | null } | null }) {
   const state: WorkspaceState = { view, period: analysis.period, customFrom: analysis.period === "custom" ? analysis.range.start : null, customTo: analysis.period === "custom" ? analysis.range.end : null, routineId, muscleKey, exerciseQuery, exerciseRoutineId, exerciseMuscleKey, comparison: comparison?.kind, comparisonA: comparison?.mode === "cross" ? comparison.a?.id : null, comparisonB: comparison?.mode === "cross" ? comparison.b?.id : null, comparisonSubjectType: comparison?.mode === "self" ? comparison.subjectType : null, comparisonSubject: comparison?.mode === "self" ? comparison.subjectId : null };
   const selectedRoutine = routineId ? analysis.routines.find((routine) => routine.id === routineId) ?? null : null;
   const selectedMuscle = muscleKey ? analysis.muscles.find((muscle) => muscle.key === muscleKey) ?? null : null;
   const comparisonBackLabel = view === "routines" ? selectedRoutine?.name ?? "Rutinas" : view === "muscles" ? selectedMuscle?.label ?? "Músculos" : view === "exercises" ? "Ejercicios" : "Entrenamiento";
   const selfComparison = comparison?.mode === "self" ? comparison : null;
   const crossComparison = comparison?.mode === "cross" ? comparison : null;
-  return <div className="space-y-6"><div className="space-y-3"><ContextTabs state={state} />{view !== "general" ? <PeriodSelector state={state} /> : null}</div>{crossComparison ? <TrainingComparisonWorkspace comparison={crossComparison} state={state} backLabel={comparisonBackLabel} /> : <>{view === "general" && generalV2 ? <TrainingGeneralV2 analysis={analysis} analytics={generalV2.analytics} state={state} reference={generalV2.reference} comparisonQuery={generalV2.comparisonQuery} today={generalV2.today} comparisonError={generalV2.comparisonError} /> : null}{view === "routines" && (selectedRoutine ? <RoutineView analysis={analysis} routine={selectedRoutine} state={state} comparison={selfComparison} /> : <RoutineList analysis={analysis} state={state} />)}{view === "muscles" && (selectedMuscle ? <MuscleView analysis={analysis} muscle={selectedMuscle} state={state} comparison={selfComparison} /> : <MuscleList analysis={analysis} state={state} />)}{view === "exercises" && <ExercisesView analysis={analysis} state={state} />}</>}</div>;
+  return <div className="space-y-6"><div className="space-y-3"><ContextTabs state={state} />{view === "routines" && routinesV2 ? <TrainingProgressPeriodSelector analysis={analysis} reference={routinesV2.reference} today={routinesV2.today} view="routines" /> : view === "muscles" || view === "exercises" ? <PeriodSelector state={state} /> : null}</div>{crossComparison ? <TrainingComparisonWorkspace comparison={crossComparison} state={state} backLabel={comparisonBackLabel} /> : <>{view === "general" && generalV2 ? <TrainingGeneralV2 analysis={analysis} analytics={generalV2.analytics} state={state} reference={generalV2.reference} comparisonQuery={generalV2.comparisonQuery} today={generalV2.today} comparisonError={generalV2.comparisonError} /> : null}{view === "routines" && routinesV2 ? <TrainingRoutinesV2 analysis={analysis} analytics={routinesV2.analytics} state={state} reference={routinesV2.reference} comparisonQuery={routinesV2.comparisonQuery} today={routinesV2.today} comparisonError={routinesV2.comparisonError} /> : null}{view === "muscles" && (selectedMuscle ? <MuscleView analysis={analysis} muscle={selectedMuscle} state={state} comparison={selfComparison} /> : <MuscleList analysis={analysis} state={state} />)}{view === "exercises" && <ExercisesView analysis={analysis} state={state} />}</>}</div>;
 }

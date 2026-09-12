@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const general = readFileSync("src/components/training/training-general-v2.tsx", "utf8");
+const periodSelector = readFileSync("src/components/training/training-progress-period-selector.tsx", "utf8");
 const workspace = readFileSync("src/components/training/training-analysis-workspace.tsx", "utf8");
 const page = readFileSync("src/app/(app)/train/progress/page.tsx", "utf8");
 
@@ -22,10 +23,10 @@ describe("Entrenamiento V2 — General", () => {
     expect(general).toContain('viewParam="comparisonView"');
     expect(general).toContain('setMode("current")');
     expect(general).toContain('setMode("comparison")');
-    expect(general).toContain("PeriodButton");
-    expect(general).toContain("DateRangePicker");
-    expect(general).toContain('next.set("period", "custom")');
-    expect(workspace).toContain('view !== "general" ? <PeriodSelector');
+    expect(general).toContain("TrainingProgressPeriodSelector");
+    expect(periodSelector).toContain("DateRangePicker");
+    expect(periodSelector).toContain('next.set("period", "custom")');
+    expect(workspace).toContain('view === "muscles" || view === "exercises" ? <PeriodSelector');
     expect(page).toContain("resolveProgressComparisonReference");
   });
 
