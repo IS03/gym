@@ -1,96 +1,83 @@
 <p align="center">
-  <img src="./public/brand/ownlevel-lockup-horizontal.png" alt="OWNLEVEL" width="320" />
+  <img src="./public/brand/ownlevel-lockup-horizontal.png" alt="OWNLEVEL" width="340" />
 </p>
 
-# OWNLEVEL
+<p align="center">
+  <strong>Entrenamiento, nutrición, cuerpo y progreso en una sola experiencia.</strong>
+</p>
 
-OWNLEVEL es una PWA personal de seguimiento físico que centraliza entrenamiento, nutrición y evolución corporal en una sola experiencia mobile-first.
+<p align="center">
+  PWA personal mobile-first para registrar lo que hacés, seguir cómo cambiás y entender qué hábitos parecen acompañar tu progreso.
+</p>
 
-**Producción:** https://ownlevel.fit
+<p align="center">
+  <a href="https://ownlevel.fit">ownlevel.fit</a> ·
+  <a href="./docs/ownlevel-architecture.md">Arquitectura</a> ·
+  <a href="./docs/progress-v2.md">Progress V2</a> ·
+  <a href="./docs/README.md">Documentación</a>
+</p>
 
-## Qué incluye
+---
 
-### Entrenamiento
+## Qué es OWNLEVEL
 
-- Rutinas editables y ordenables.
-- Biblioteca de ejercicios con objetivos por serie.
-- Inicio rápido desde rutina o sesión libre.
-- Una única sesión activa por usuario.
-- Registro de peso, repeticiones, RIR objetivo, descansos y series completadas.
-- Draft local y autosave no bloqueante durante el entrenamiento.
-- Historial de sesiones y corrección controlada de registros completados.
-- Historial, progreso y marcas personales por ejercicio.
-- Calendario de entrenamiento, continuidad y reportes semanales.
-- Recordatorios de progresión para la próxima sesión.
+OWNLEVEL centraliza el seguimiento físico diario y transforma registros de entrenamiento, nutrición, métricas personales y cuerpo en historial y análisis comparables en el tiempo.
 
-### Nutrición
+La aplicación está diseñada principalmente para iPhone/mobile y funciona como PWA, con una experiencia enfocada en registrar rápido durante el día y profundizar después cuando hace falta.
 
-- Registro diario de comidas.
-- Calorías y proteína por entrada.
-- Totales diarios contra objetivos.
-- Edición y eliminación controlada de registros.
-- Base preparada para ampliar reportes nutricionales sin duplicar la fuente de verdad.
+## Áreas principales
 
-### Progreso
+| Área | Qué permite hacer |
+| --- | --- |
+| **Entrenamiento** | Crear rutinas y ejercicios, entrenar con series, peso, repeticiones y RIR, controlar descansos y conservar el historial de cada sesión. |
+| **Nutrición** | Registrar comidas, alimentos y cantidades, seguir calorías/macros y trabajar con objetivos y gasto energético del día. |
+| **Métricas** | Configurar y registrar métricas personales diarias como pasos, agua, sueño u otras métricas personalizadas. |
+| **Cuerpo** | Registrar peso y medidas corporales, conservar observaciones históricas y revisar su evolución. |
+| **Historial** | Reconstruir qué ocurrió en una fecha concreta entre nutrición, entrenamiento, métricas y cuerpo. |
+| **Progress** | Comparar períodos, analizar entrenamiento, nutrición, cuerpo y hábitos, y explorar relaciones entre variables registradas. |
 
-- Análisis de entrenamiento general, por rutina, músculo y ejercicio.
-- Duración, volumen, series y distribución muscular por período.
-- Comparación breve de la semana actual con la anterior.
-- Evolución de peso, reps y volumen por ejercicio.
+### Progress V2
 
-### Cuerpo
+Progress es la capa analítica de OWNLEVEL. Parte de los datos reales registrados por cada dominio y permite responder tres preguntas:
 
-- Historial de peso corporal por fecha.
-- Peso actual sincronizado con la última medición.
-- Medidas de cintura, pecho, brazo, muslo y cadera.
+1. **¿Estoy mejorando?**
+2. **¿Dónde estoy mejorando?**
+3. **¿Qué parece relacionado con esa mejora?**
 
-### Experiencia
+Incluye análisis por períodos, comparaciones A/B, entrenamiento general y por rutina/músculo/ejercicio, nutrición, cuerpo, actividad y hábitos, además de **Relationships** para explorar asociaciones observacionales entre variables sin tratarlas como causalidad.
 
-- PWA responsive, diseñada primero para iPhone/mobile.
-- Navegación dedicada para mobile y desktop.
-- Tema claro/oscuro.
-- Autenticación con Supabase Auth.
-- Zona horaria de producto: `America/Argentina/Cordoba`.
+La arquitectura y semántica completa están documentadas en [`docs/progress-v2.md`](./docs/progress-v2.md).
 
 ## Stack
 
 | Capa | Tecnología |
 | --- | --- |
-| Framework | Next.js 16 (App Router) |
-| UI | React 19, TypeScript, Tailwind CSS 4 |
-| Componentes | Base UI / shadcn, Lucide |
-| Backend | Supabase Postgres + Auth + RLS |
-| Hosting | Vercel |
+| Framework | Next.js 16 · App Router |
+| Frontend | React 19 · TypeScript · Tailwind CSS 4 |
+| UI | Base UI / shadcn · Lucide |
+| Backend | Supabase Postgres · Auth · RLS |
+| Deploy | Vercel |
 | PWA | `@ducanh2912/next-pwa` |
 | Tests | Vitest |
 
-## Estructura principal
+## Estructura
 
 ```text
 src/
-  app/                 rutas y pantallas
-  components/          UI compartida
-  lib/                 dominio, acceso a datos y utilidades
+├── app/          rutas, layouts y pantallas
+├── components/   componentes y UI compartida
+└── lib/          dominio, datos, analytics y utilidades
+
 supabase/
-  migrations/          esquema y cambios de base de datos
-public/
-  brand/               identidad visual de OWNLEVEL
-docs/
-  product/             definición funcional
-  architecture/        decisiones de arquitectura
-  development/         reglas de ingeniería
-  history/             decisiones históricas consolidadas
-  archive/             documentación histórica no vigente
+└── migrations/   esquema y evolución de la base de datos
+
+docs/             documentación técnica y de producto
+public/           assets e identidad visual
 ```
 
 ## Desarrollo local
 
-### Requisitos
-
-- Node.js 20+
-- Un proyecto de Supabase con Auth habilitado
-
-### Instalación
+**Requisitos:** Node.js 20+ y un proyecto Supabase con Auth habilitado.
 
 ```bash
 git clone https://github.com/IS03/gym.git
@@ -102,54 +89,51 @@ npm run dev
 
 La aplicación queda disponible en `http://localhost:3000`.
 
-## Variables de entorno
+Variables públicas mínimas:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-Usar únicamente la clave pública `anon`/`publishable` en el cliente. La `service_role` no debe exponerse en frontend.
+La `service_role` nunca debe exponerse en frontend.
 
-Para autenticación local y producción, configurar en Supabase los callbacks correspondientes, incluyendo:
-
-```text
-http://localhost:3000/auth/callback
-https://ownlevel.fit/auth/callback
-```
-
-## Scripts
+### Scripts
 
 ```bash
 npm run dev      # desarrollo
-npm run test     # tests
+npm run test     # Vitest
 npm run lint     # ESLint
-npm run build    # build de producción con Webpack
+npm run build    # build de producción
 npm run start    # servidor de producción
 ```
 
-`npm run build` utiliza `next build --webpack` por compatibilidad con la configuración PWA actual.
-
-## Principios de arquitectura
-
-- Rutina y sesión son entidades distintas.
-- Una sesión iniciada conserva snapshots históricos.
-- Una sesión completada no se reabre para corregirla.
-- La interfaz puede trabajar de forma optimista, pero la finalización exige persistencia confirmada.
-- Las mutaciones de datos respetan ownership y RLS.
-- Las fechas lógicas del producto se resuelven en horario de Córdoba.
-- Mobile no debe degradarse para mejorar desktop.
-
 ## Documentación
 
-La documentación vigente está indexada en [`docs/README.md`](./docs/README.md).
+La puerta de entrada a toda la documentación es [`docs/README.md`](./docs/README.md).
 
-Documentos principales:
+| Documento | Fuente de verdad para |
+| --- | --- |
+| [`docs/ownlevel-architecture.md`](./docs/ownlevel-architecture.md) | Arquitectura general de OWNLEVEL, dominios, rutas, auth, datos y extensibilidad. |
+| [`docs/progress-v2.md`](./docs/progress-v2.md) | Analytics, períodos, coverage, Comparisons, Relationships y contratos de Progress. |
+| [`docs/design/principles.md`](./docs/design/principles.md) | Principios visuales y de interacción. |
+| [`docs/design/patterns.md`](./docs/design/patterns.md) | Patrones reutilizables de interfaz. |
+| [`docs/architecture/training-system.md`](./docs/architecture/training-system.md) | Arquitectura vigente del sistema de entrenamiento. |
+| [`docs/integrations/chatgpt-nutrition.md`](./docs/integrations/chatgpt-nutrition.md) | Integración privada entre ChatGPT y el registro nutricional. |
 
-- [Visión de producto](./docs/product/product-overview.md)
-- [Arquitectura de entrenamiento](./docs/architecture/training-system.md)
-- [Flujo de datos y fuentes de verdad](./docs/architecture/data-flow.md)
-- [Guía de ingeniería](./docs/development/engineering-guidelines.md)
-- [Historial de decisiones](./docs/history/technical-decisions.md)
+Ante contradicciones, el código y los tests actuales tienen prioridad sobre documentación histórica. Los documentos de `docs/archive/` se conservan sólo como contexto.
 
-Los documentos históricos anteriores se conservan en `docs/archive/` y no deben utilizarse como fuente de verdad sin contrastarlos con el código actual.
+## Principios del proyecto
+
+- **Mobile-first:** la experiencia principal se diseña para uso real desde el teléfono.
+- **Una fuente de verdad:** historial y analytics derivan de datos canónicos, evitando sistemas paralelos.
+- **Historia preservada:** los cambios actuales no deben reescribir silenciosamente lo que ocurrió en el pasado.
+- **Datos antes que conclusiones:** ausencia de registro no equivale automáticamente a cero y Progress evita fabricar conclusiones con evidencia insuficiente.
+- **Profundidad progresiva:** registrar debe ser rápido; analizar puede ser detallado cuando el usuario decide profundizar.
+
+---
+
+<p align="center">
+  <strong>OWNLEVEL</strong><br />
+  Registrar · Comparar · Entender · Progresar
+</p>
