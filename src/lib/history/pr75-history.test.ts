@@ -11,6 +11,7 @@ const page = source("src/app/(app)/history/page.tsx");
 const loader = source("src/lib/history/daily-history.ts");
 const metricServer = source("src/lib/daily-metrics/server.ts");
 const editor = source("src/app/(app)/history/historical-metrics-editor.tsx");
+const mealList = source("src/app/(app)/today/meal-list.tsx");
 
 function metric(overrides: Partial<UserMetric> = {}): UserMetric {
   return {
@@ -80,16 +81,22 @@ describe("PR75 · reconstrucción y densidad del día", () => {
     expect(page).toContain("context.metrics.energyBalanceKcal");
     expect(page).toContain("dayLog.nutrition_target_override_kcal !== null");
     expect(page).toContain("dayLog.expenditure_override_kcal !== null");
-    expect(page).toContain("Ajustado para este día");
+    expect(page).toContain('dayLog.nutrition_target_override_kcal !== null ? " ajustado"');
+    expect(page).toContain('dayLog.expenditure_override_kcal !== null ? " ajustado"');
   });
 
-  it("presenta comidas como rows agrupadas con detalle inline preservado", () => {
-    expect(page).toContain("<details key={meal.id}");
+  it("presenta comidas como rows agrupadas, editables o históricas de solo lectura", () => {
+    expect(page).toContain("<MealList meals={mealItems}");
+    expect(page).toContain("editable: !legacy");
     expect(page).toContain("meal.description");
     expect(page).toContain("meal.final_calories");
     expect(page).toContain("meal.final_protein_g");
     expect(page).toContain("meal.final_carbs_g");
     expect(page).toContain("meal.final_fat_g");
+    expect(mealList).toContain('meal.editable === false');
+    expect(mealList).toContain("setEditingMeal(meal)");
+    expect(loader).toContain('.from("meal_entries")');
+    expect(loader).toContain("item.mealCount += 1");
   });
 
   it("elimina Trabajo/Gym visuales y usa la sesión real para Entrenamiento", () => {
@@ -102,9 +109,17 @@ describe("PR75 · reconstrucción y densidad del día", () => {
   });
 
   it("muestra Cuerpo sólo con información real y conserva navegación inferior", () => {
-    expect(page).toContain("if (!values.length && !measurement?.condition && !measurement?.notes");
+    expect(page).toMatch(/if \(\s*!values\.length\s*&& !measurement\?\.condition\s*&& !measurement\?\.notes/);
     expect(page).toContain("{hasBody ? <BodySection");
     expect(page).toContain("Día anterior");
     expect(page).toContain("Día siguiente");
+  });
+
+  it("usa labels integrados, unidades dentro del campo y un único CTA", () => {
+    expect(editor).toContain("<fieldset");
+    expect(editor).toContain("<legend");
+    expect(editor).toContain("{metric.unit}");
+    expect(editor).toContain("Guardar cambios");
+    expect(editor).not.toContain("<Label");
   });
 });
