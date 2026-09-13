@@ -440,6 +440,8 @@ export function SessionEditor({
   detail,
   libraryExercises,
   recentHistoryByExerciseId,
+  returnHref,
+  returnLabel,
 }: {
   detail: WorkoutSessionClientDetail;
   libraryExercises: Array<{
@@ -451,6 +453,8 @@ export function SessionEditor({
     weight_mode: string | null;
   }>;
   recentHistoryByExerciseId: Record<string, ExerciseReportSession[]>;
+  returnHref?: string | null;
+  returnLabel?: string;
 }) {
   const router = useRouter();
   const readOnly = detail.session.status !== "in_progress";
@@ -1225,6 +1229,7 @@ export function SessionEditor({
             dateLabel={formatSessionDate(detail.logDate)}
             timingLabel={formatWorkoutTimeRange(detail.session.started_at, detail.session.ended_at)}
             completedSets={stats.completedSets}
+            returnHref={returnHref}
           />
         ) : null}
       </header>
@@ -1995,10 +2000,10 @@ export function SessionEditor({
 
       {readOnly ? (
         <Link
-          href="/train"
+          href={returnHref ?? "/train"}
           className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
         >
-          Volver a Entrenar
+          {returnLabel ?? "Volver a Entrenar"}
         </Link>
       ) : null}
 

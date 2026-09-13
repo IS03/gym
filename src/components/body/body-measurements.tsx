@@ -38,7 +38,7 @@ function toValues(entry: BodyMeasurement | null): Values {
 }
 
 function Sheet({ children, open, onOpenChange }: { children: ReactNode; open: boolean; onOpenChange: (open: boolean) => void }) {
-  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-[82] bg-black/45 backdrop-blur-[2px]" /><Dialog.Viewport className="fixed inset-0 z-[83] flex items-end justify-center overflow-hidden sm:items-center sm:p-6"><Dialog.Popup className="max-h-[calc(100dvh-env(safe-area-inset-bottom))] w-full overflow-y-auto rounded-t-[1.5rem] bg-card p-5 text-card-foreground shadow-2xl outline-none sm:max-w-2xl sm:rounded-2xl sm:border">{children}</Dialog.Popup></Dialog.Viewport></Dialog.Portal></Dialog.Root>;
+  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Backdrop className="fixed inset-0 z-[82] bg-black/45 backdrop-blur-[2px]" /><Dialog.Viewport className="fixed inset-0 z-[83] flex items-end justify-center overflow-hidden sm:items-center sm:p-6"><Dialog.Popup className="max-h-[calc(100dvh-env(safe-area-inset-top))] w-full overflow-y-auto overscroll-contain rounded-t-[1.5rem] bg-card px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 text-card-foreground shadow-2xl outline-none sm:max-w-2xl sm:rounded-2xl sm:border sm:p-5">{children}</Dialog.Popup></Dialog.Viewport></Dialog.Portal></Dialog.Root>;
 }
 
 function FloatingField({ label, unit, children, className }: { label: string; unit?: string; children: ReactNode; className?: string }) {
@@ -90,7 +90,7 @@ export function BodyMeasurements({ entries, today, onEntriesChange }: { entries:
     </div>)}{ordered.length === 0 ? <p className="py-4 text-sm text-muted-foreground">Todavía no registraste medidas.</p> : null}</div></details>
     {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
     <Sheet open={formOpen} onOpenChange={(open) => { if (!pending) setFormOpen(open); }}>
-      <div className="flex items-center justify-between"><Dialog.Title className="font-semibold">{editing ? "Editar medidas" : "Registrar medidas"}</Dialog.Title><Dialog.Close className="flex size-10 items-center justify-center rounded-full"><X className="size-4" /><span className="sr-only">Cerrar</span></Dialog.Close></div>
+      <div className="flex items-center justify-between"><Dialog.Title className="font-semibold">{editing ? "Editar medidas" : "Registrar medidas"}</Dialog.Title><Dialog.Close className="flex size-11 items-center justify-center rounded-full"><X className="size-4" /><span className="sr-only">Cerrar</span></Dialog.Close></div>
       <div className="mt-5 space-y-4">
         <FloatingField label="Fecha"><DateField value={date} onChange={(event) => setDate(event.target.value)} className="h-10 border-0 px-0 focus-within:ring-0" /></FloatingField>
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">{EDITABLE_BODY_MEASUREMENT_FIELDS.map((field) => <FloatingField key={field} label={labels[field]} unit="cm"><input value={values[field]} onChange={(event) => setValues((current) => ({ ...current, [field]: event.target.value }))} inputMode="decimal" placeholder="—" className="h-10 w-full min-w-0 bg-transparent text-base outline-none" /></FloatingField>)}</div>

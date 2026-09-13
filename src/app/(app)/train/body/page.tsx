@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { BodyProgressPeriodSelector } from "@/components/body/body-progress-period-selector";
@@ -9,6 +11,7 @@ import { listWeightHistory } from "@/lib/phase1/day-log";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { bodyAvailableMetricDefinitions } from "@/lib/progress/body";
 import { getPreviousProgressPeriod, resolveProgressPeriod } from "@/lib/progress/analytics";
+import { progressHomeHref } from "@/lib/progress/home";
 import {
   parseProgressComparisonQuery,
   resolveProgressComparisonReference,
@@ -60,9 +63,11 @@ export default async function BodyPage({ searchParams }: { searchParams: Promise
   const activeMetricKey = availableMetrics.some((metric) => metric.key === comparisonQuery.activeMetricKey)
     ? comparisonQuery.activeMetricKey
     : selectedMetricKeys[0] ?? null;
+  const homeHref = progressHomeHref({ preset: period.preset, start: period.current.start, end: period.current.end });
 
   return <div className="space-y-7 pb-16 lg:pb-0">
     <header className="space-y-4">
+      <Link href={homeHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link>
       <div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso corporal</h1><p className="mt-1 text-sm text-muted-foreground">Estado, cambios y tendencia a partir de mediciones reales.</p></div>
       <BodyProgressPeriodSelector period={period} reference={referencePeriod} referenceLabel={referenceLabel} today={today} />
       {period.error ? <p className="text-sm text-destructive" role="alert">{period.error}</p> : null}

@@ -30,7 +30,7 @@ function RelationshipVisualization({ result }: { result: RelationshipAnalysis })
       { label: `Menor ${result.variableA.label}`, group: result.groups.lower },
       { label: `Mayor ${result.variableA.label}`, group: result.groups.higher },
     ].map(({ label, group }) => <div key={label} className="space-y-1.5">
-      <div className="flex items-baseline justify-between gap-3 text-sm"><span className="font-medium">{label}</span><span className="metric-number font-semibold">{formatValue(group.bMedian, result.variableB)}</span></div>
+      <div className="flex items-baseline justify-between gap-3 text-sm"><span className="min-w-0 break-words font-medium">{label}</span><span className="metric-number shrink-0 font-semibold">{formatValue(group.bMedian, result.variableB)}</span></div>
       <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: width(group.bMedian) }} /></div>
       <p className="text-xs text-muted-foreground">Mediana de B · {group.count} observaciones</p>
     </div>)}
@@ -43,7 +43,7 @@ export function RelationshipResult({ result }: { result: RelationshipAnalysis })
   return <section aria-labelledby="relationship-result-title" className="space-y-6">
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Variables analizadas</p>
-      <h2 id="relationship-result-title" className="flex items-center gap-2 text-xl font-semibold tracking-tight"><span>{result.variableA.label}</span><ArrowRight className="size-4 shrink-0 text-primary" aria-hidden /><span>{result.variableB.label}</span></h2>
+      <h2 id="relationship-result-title" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold tracking-tight"><span className="min-w-0 break-words">{result.variableA.label}</span><ArrowRight className="size-4 shrink-0 text-primary" aria-hidden /><span className="min-w-0 break-words">{result.variableB.label}</span></h2>
       <p className="text-sm text-muted-foreground">{result.period.start} — {result.period.end} · {result.pair.temporal.label}</p>
     </div>
 

@@ -10,6 +10,7 @@ import { getDailyMetricsReport } from "@/lib/daily-metrics/reports";
 import { formatNutritionReportRange } from "@/lib/nutrition/report-display";
 import { nutritionReportComparisonMode, nutritionReportPath } from "@/lib/nutrition/report-navigation";
 import { parseProgressComparisonQuery, progressComparisonQueryParams } from "@/lib/progress/comparisons";
+import { progressHomeHref } from "@/lib/progress/home";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { getVerifiedRequestContext } from "@/lib/supabase/server";
 
@@ -51,10 +52,11 @@ export default async function DailyMetricsProgressPage({
     comparison: comparisonMode,
     query: comparisonQuery,
   });
+  const homeHref = progressHomeHref(report.range);
 
   return <div className="space-y-6">
     <header className="space-y-3">
-      <Link href={isDetail ? overviewHref : "/progress"} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> {isDetail ? "Actividad y hábitos" : "Progreso"}</Link>
+      <Link href={isDetail ? overviewHref : homeHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> {isDetail ? "Actividad y hábitos" : "Progreso"}</Link>
       <div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">{isDetail && report.metric ? report.metric.name : "Actividad y hábitos"}</h1><p className="mt-1 text-sm text-muted-foreground">{isDetail ? "Evolución, cobertura y registros reales." : "Tus variables diarias, cambios y consistencia."}</p></div>
     </header>
     <div className="space-y-2">

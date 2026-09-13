@@ -99,7 +99,7 @@ export function HistoryExerciseDetail({
   return (
     <div className="space-y-6 pb-2 lg:mx-auto lg:max-w-3xl">
       <header className="space-y-4">
-        <Link href={returnHref} className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+        <Link href={returnHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
           <ArrowLeft className="size-4" aria-hidden /> Ejercicios
         </Link>
         <div className="flex items-start justify-between gap-3">

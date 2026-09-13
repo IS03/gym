@@ -87,8 +87,8 @@ export function BodyProgressChart({
         </select>
       </label>
       <div className="grid grid-cols-2 rounded-xl border bg-muted/25 p-1" role="group" aria-label="Referencia del gráfico">
-        <button type="button" className={cn("min-h-9 rounded-lg px-2 text-xs font-medium", !showReference ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => setShowReference(false)}>Actual</button>
-        <button type="button" className={cn("min-h-9 rounded-lg px-2 text-xs font-medium", showReference ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => setShowReference(true)}>Vs anterior</button>
+        <button type="button" className={cn("min-h-11 rounded-lg px-2 text-xs font-medium", !showReference ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => setShowReference(false)}>Actual</button>
+        <button type="button" className={cn("min-h-11 rounded-lg px-2 text-xs font-medium", showReference ? "bg-primary text-primary-foreground" : "text-muted-foreground")} onClick={() => setShowReference(true)}>Vs anterior</button>
       </div>
     </div>
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

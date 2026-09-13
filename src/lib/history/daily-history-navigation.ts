@@ -40,6 +40,11 @@ export function dailyHistoryDetailHref(date: string, origin: DailyHistoryOrigin 
   return `/history?${params.toString()}`;
 }
 
+export function dailyHistorySessionHref(sessionId: string, date: string, origin: DailyHistoryOrigin | null = null) {
+  const returnHref = dailyHistoryDetailHref(date, origin);
+  return `/train/session/${sessionId}?${new URLSearchParams({ return: returnHref }).toString()}`;
+}
+
 export function dailyHistoryReturnTarget(origin: DailyHistoryOrigin | null) {
   if (origin?.source === "calendar") {
     return { href: `/calendar?month=${origin.month}`, label: "Calendario" };

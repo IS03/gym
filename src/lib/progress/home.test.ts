@@ -10,6 +10,7 @@ import {
   PROGRESS_HOME_SECTION_ORDER,
   buildProgressHomeModel,
   progressHomeDestinationHref,
+  progressHomeHref,
 } from "./home";
 import { resolveProgressPeriod } from "./analytics";
 
@@ -186,5 +187,13 @@ describe("Progress Home period inheritance", () => {
       expect(href).toContain("from=2026-08-01");
       expect(href).toContain("to=2026-08-31");
     }
+  });
+
+  it("returns from every domain without losing the resolved period", () => {
+    expect(progressHomeHref({ preset: "8w", start: "2026-07-20", end: today })).toBe("/progress?period=8w");
+    expect(progressHomeHref({ preset: "30", start: "2026-08-15", end: today })).toBe("/progress?period=30d");
+    expect(progressHomeHref({ preset: "custom", start: "2026-08-01", end: "2026-08-31" })).toBe(
+      "/progress?period=custom&from=2026-08-01&to=2026-08-31",
+    );
   });
 });
