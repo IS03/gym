@@ -892,7 +892,7 @@ export async function listRobustExerciseHistoryRoutineOptions(exerciseId: string
   return [...routines.values()].sort((left, right) => left.nombre.localeCompare(right.nombre, "es-AR"));
 }
 
-type CompletedTrainingData = {
+export type CompletedTrainingData = {
   sessions: WorkoutSession[];
   sessionExercises: WorkoutSessionExercise[];
   sets: WorkoutSet[];
@@ -1085,7 +1085,7 @@ export async function getHomeTrainingSnapshot(
   return buildHomeTrainingSnapshot(source, today);
 }
 
-async function loadCompletedTrainingData(
+export async function loadCompletedTrainingData(
   context?: AuthenticatedRequestContext,
 ): Promise<CompletedTrainingData> {
   const { supabase, userId } = context ?? await getAuthedContext();
