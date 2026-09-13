@@ -24,4 +24,15 @@ describe("daily history session summaries", () => {
     item.ended_at = null;
     expect(summarizeDailyHistorySessions({ sessions: [item], exercises: [], sets: [] })[0].durationMilliseconds).toBeNull();
   });
+
+  it("conserva hora y sensaciones reales, incluido dolor cero", () => {
+    const item = session("push");
+    item.energy_level = 4;
+    item.performance_level = 5;
+    item.pain_level = 0;
+    expect(summarizeDailyHistorySessions({ sessions: [item], exercises: [], sets: [] })[0]).toMatchObject({
+      startedAt: "2026-08-20T12:00:00Z",
+      feedback: { energy: 4, performance: 5, pain: 0 },
+    });
+  });
 });

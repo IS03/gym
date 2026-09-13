@@ -3,10 +3,16 @@ import type { WorkoutSession, WorkoutSessionExercise, WorkoutSet } from "@/lib/p
 export type DailyHistorySession = {
   id: string;
   name: string;
+  startedAt: string;
   durationMilliseconds: number | null;
   completedSets: number;
   completedExercises: number;
   volumeKg: number;
+  feedback: {
+    energy: number | null;
+    performance: number | null;
+    pain: number | null;
+  };
 };
 
 export function sessionDurationMilliseconds(session: Pick<WorkoutSession, "started_at" | "ended_at">) {
@@ -47,10 +53,16 @@ export function summarizeDailyHistorySessions(input: {
       return {
         id: session.id,
         name: session.routine_name_snapshot ?? session.session_name ?? "Sesión libre",
+        startedAt: session.started_at,
         durationMilliseconds: sessionDurationMilliseconds(session),
         completedSets: completedSets.length,
         completedExercises: exercises.filter((exercise) => (setsByExercise.get(exercise.id)?.length ?? 0) > 0).length,
         volumeKg: completedSets.reduce((total, set) => total + completedSetVolume(set), 0),
+        feedback: {
+          energy: session.energy_level,
+          performance: session.performance_level,
+          pain: session.pain_level,
+        },
       };
     });
 }

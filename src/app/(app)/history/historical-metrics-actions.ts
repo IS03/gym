@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { saveHistoricalDailyMetricValues } from "@/lib/daily-metrics/server";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -10,6 +11,9 @@ export async function saveHistoricalDailyMetricsAction(input: {
   values: Record<string, string>;
 }): Promise<Result> {
   try {
+    if (input.date > todayInCordoba()) {
+      return { ok: false, error: "No se pueden registrar métricas en una fecha futura." };
+    }
     await saveHistoricalDailyMetricValues(input);
     revalidatePath("/history");
     revalidatePath("/calendar");

@@ -22,6 +22,7 @@ export type DailyHistoryListItem = {
   workoutNames: string[];
   measurement: BodyMeasurement | null;
   metricCount: number;
+  mealCount: number;
 };
 
 export async function listDailyHistoryDays(input: {
@@ -32,7 +33,7 @@ export async function listDailyHistoryDays(input: {
   const limit = Math.min(Math.max(input.limit ?? 60, 1), 366);
   const start = addIsoDays(input.today, -(limit - 1));
   const { supabase, userId } = input.context;
-  const [dayResult, sessionResult, bodyResult, metricResult] = await Promise.all([
+  const [dayResult, sessionResult, bodyResult, metricResult, mealResult] = await Promise.all([
     supabase.from("day_logs")
       .select("id,log_date,total_calories_consumed,nutrition_target_kcal_snapshot,total_protein_g,weight_kg")
       .eq("user_id", userId).gte("log_date", start).lte("log_date", input.today),
@@ -44,35 +45,49 @@ export async function listDailyHistoryDays(input: {
       .select("*").eq("user_id", userId).gte("measured_on", start).lte("measured_on", input.today),
     supabase.from("daily_metric_values")
       .select("metric_date,value").eq("user_id", userId).gte("metric_date", start).lte("metric_date", input.today),
+    supabase.from("meal_entries")
+      .select("day_log:day_logs!inner(log_date)")
+      .eq("user_id", userId)
+      .in("entry_kind", ["meal", "legacy_daily_summary"])
+      .is("deleted_at", null)
+      .gte("day_logs.log_date", start).lte("day_logs.log_date", input.today),
   ]);
   if (dayResult.error) throw new Error(`Leer días de historial: ${dayResult.error.message}`);
   if (sessionResult.error) throw new Error(`Leer entrenamientos de historial: ${sessionResult.error.message}`);
   if (bodyResult.error) throw new Error(`Leer medidas de historial: ${bodyResult.error.message}`);
   if (metricResult.error) throw new Error(`Leer métricas de historial: ${metricResult.error.message}`);
+  if (mealResult.error) throw new Error(`Leer comidas de historial: ${mealResult.error.message}`);
 
   const byDate = new Map<string, DailyHistoryListItem>();
   for (const rawDay of (dayResult.data ?? []) as Array<Pick<DayLog, "id" | "log_date" | "total_calories_consumed" | "nutrition_target_kcal_snapshot" | "total_protein_g" | "weight_kg">>) {
     const { nutrition_target_kcal_snapshot: targetKcal, ...day } = rawDay;
     if (!day) continue;
-    byDate.set(day.log_date, { date: day.log_date, dayLog: { ...day, targetKcal }, workoutNames: [], measurement: null, metricCount: 0 });
+    byDate.set(day.log_date, { date: day.log_date, dayLog: { ...day, targetKcal }, workoutNames: [], measurement: null, metricCount: 0, mealCount: 0 });
   }
   for (const row of (sessionResult.data ?? []) as Array<{ routine_name_snapshot: string | null; session_name: string | null; day_log: { log_date: string } | Array<{ log_date: string }> | null }>) {
     const date = firstRelation(row.day_log)?.log_date;
     if (!date) continue;
-    const item = byDate.get(date) ?? { date, dayLog: null, workoutNames: [], measurement: null, metricCount: 0 };
+    const item = byDate.get(date) ?? { date, dayLog: null, workoutNames: [], measurement: null, metricCount: 0, mealCount: 0 };
     const name = row.routine_name_snapshot ?? row.session_name ?? "Sesión libre";
     if (!item.workoutNames.includes(name)) item.workoutNames.push(name);
     byDate.set(date, item);
   }
   for (const measurement of (bodyResult.data ?? []) as BodyMeasurement[]) {
-    const item = byDate.get(measurement.measured_on) ?? { date: measurement.measured_on, dayLog: null, workoutNames: [], measurement: null, metricCount: 0 };
+    const item = byDate.get(measurement.measured_on) ?? { date: measurement.measured_on, dayLog: null, workoutNames: [], measurement: null, metricCount: 0, mealCount: 0 };
     item.measurement = measurement;
     byDate.set(measurement.measured_on, item);
   }
   for (const metric of (metricResult.data ?? []) as Array<{ metric_date: string; value: number }>) {
-    const item = byDate.get(metric.metric_date) ?? { date: metric.metric_date, dayLog: null, workoutNames: [], measurement: null, metricCount: 0 };
+    const item = byDate.get(metric.metric_date) ?? { date: metric.metric_date, dayLog: null, workoutNames: [], measurement: null, metricCount: 0, mealCount: 0 };
     item.metricCount += 1;
     byDate.set(metric.metric_date, item);
+  }
+  for (const row of (mealResult.data ?? []) as Array<{ day_log: { log_date: string } | Array<{ log_date: string }> | null }>) {
+    const date = firstRelation(row.day_log)?.log_date;
+    if (!date) continue;
+    const item = byDate.get(date) ?? { date, dayLog: null, workoutNames: [], measurement: null, metricCount: 0, mealCount: 0 };
+    item.mealCount += 1;
+    byDate.set(date, item);
   }
   return [...byDate.values()].sort((left, right) => right.date.localeCompare(left.date));
 }

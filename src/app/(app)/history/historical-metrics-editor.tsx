@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ResponsiveDialog } from "@/app/(app)/today/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { formatDateFieldValue } from "@/lib/date-field-display";
 import type { DailyMetricWithValue } from "@/lib/daily-metrics/core";
 import { saveHistoricalDailyMetricsAction } from "./historical-metrics-actions";
@@ -65,10 +64,11 @@ export function HistoricalMetricsEditor({ date, metrics }: Props) {
   }
 
   if (!metrics.length) return null;
+  const hasRecordedValues = metrics.some((metric) => metric.value !== null);
   return (
     <>
       <Button type="button" variant="ghost" size="sm" className="-mr-2" onClick={() => onOpenChange(true)}>
-        Editar
+        {hasRecordedValues ? "Editar" : "Agregar"}
       </Button>
       <ResponsiveDialog
         open={open}
@@ -77,30 +77,66 @@ export function HistoricalMetricsEditor({ date, metrics }: Props) {
         description={formatDateFieldValue(date)}
         closeLabel="Cerrar edición de métricas"
       >
-        <form className="space-y-4" onSubmit={submit}>
-          <div className="divide-y overflow-hidden rounded-xl border">
+        <form className="space-y-4 pb-[env(safe-area-inset-bottom)]" onSubmit={submit}>
+          <div className="space-y-3">
             {metrics.map((metric) => {
               const raw = values[metric.id] ?? "";
               const duration = durationParts(raw);
               return (
-                <div key={metric.id} className="space-y-2 p-3">
-                  <p className="text-sm font-medium">{metric.name}</p>
+                <div key={metric.id}>
                   {metric.value_type === "duration" ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor={`history-metric-${metric.id}-hours`} className="text-xs text-muted-foreground">Horas</Label>
-                        <Input id={`history-metric-${metric.id}-hours`} inputMode="numeric" min={0} value={duration.hours} onChange={(event) => changeDuration(metric.id, event.target.value, duration.minutes)} placeholder="—" />
+                    <fieldset className="group rounded-xl border border-input bg-background px-3 pb-1.5 transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35 dark:bg-input/30">
+                      <legend className="ml-[-0.25rem] px-1 text-xs font-normal leading-4 text-muted-foreground transition-colors group-focus-within:text-primary">
+                        {metric.name}
+                      </legend>
+                      <div className="grid grid-cols-2 divide-x">
+                        <div className="flex min-w-0 items-center gap-2 pr-3">
+                          <Input
+                            id={`history-metric-${metric.id}-hours`}
+                            aria-label={`${metric.name}, horas`}
+                            inputMode="numeric"
+                            min={0}
+                            value={duration.hours}
+                            onChange={(event) => changeDuration(metric.id, event.target.value, duration.minutes)}
+                            placeholder="—"
+                            className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+                          />
+                          <span className="shrink-0 text-sm text-muted-foreground">h</span>
+                        </div>
+                        <div className="flex min-w-0 items-center gap-2 pl-3">
+                          <Input
+                            id={`history-metric-${metric.id}-minutes`}
+                            aria-label={`${metric.name}, minutos`}
+                            inputMode="numeric"
+                            min={0}
+                            max={59}
+                            value={duration.minutes}
+                            onChange={(event) => changeDuration(metric.id, duration.hours, event.target.value)}
+                            placeholder="—"
+                            className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+                          />
+                          <span className="shrink-0 text-sm text-muted-foreground">min</span>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`history-metric-${metric.id}-minutes`} className="text-xs text-muted-foreground">Minutos</Label>
-                        <Input id={`history-metric-${metric.id}-minutes`} inputMode="numeric" min={0} max={59} value={duration.minutes} onChange={(event) => changeDuration(metric.id, duration.hours, event.target.value)} placeholder="—" />
-                      </div>
-                    </div>
+                    </fieldset>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Input id={`history-metric-${metric.id}`} inputMode={metric.value_type === "integer" ? "numeric" : "decimal"} value={raw} onChange={(event) => change(metric.id, event.target.value)} placeholder="—" />
-                      {metric.unit ? <span className="shrink-0 text-sm text-muted-foreground">{metric.unit}</span> : null}
-                    </div>
+                    <fieldset className="group rounded-xl border border-input bg-background px-3 pb-1.5 transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/35 dark:bg-input/30">
+                      <legend className="ml-[-0.25rem] px-1 text-xs font-normal leading-4 text-muted-foreground transition-colors group-focus-within:text-primary">
+                        {metric.name}
+                      </legend>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Input
+                          id={`history-metric-${metric.id}`}
+                          aria-label={metric.name}
+                          inputMode={metric.value_type === "integer" ? "numeric" : "decimal"}
+                          value={raw}
+                          onChange={(event) => change(metric.id, event.target.value)}
+                          placeholder="—"
+                          className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+                        />
+                        {metric.unit ? <span className="shrink-0 text-sm text-muted-foreground">{metric.unit}</span> : null}
+                      </div>
+                    </fieldset>
                   )}
                 </div>
               );
