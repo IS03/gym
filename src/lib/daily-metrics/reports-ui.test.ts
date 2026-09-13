@@ -22,7 +22,7 @@ describe("PR74 — integración de Progreso real", () => {
   });
 
   it("expone la ruta de métricas desde Progreso y preserva selector, métrica y comparación en URL", () => {
-    expect(progress).toContain('href="/progress/metrics"');
+    expect(progress).toContain('progressHomeDestinationHref("activity", period)');
     expect(page).toContain('basePath="/progress/metrics"');
     expect(page).toContain("query={query}");
     expect(report).toContain('next.set("metric", metricIdValue)');

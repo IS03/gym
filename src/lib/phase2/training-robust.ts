@@ -1316,10 +1316,11 @@ export async function getTrainingGeneralAnalysis(
   referenceDefinition: ProgressTemporalComparisonReference,
   options: { selectedMetricKeys?: readonly string[]; activeMetricKey?: string | null } = {},
   primaryRange?: { start: string; end: string },
+  context?: AuthenticatedRequestContext,
 ): Promise<{ current: TrainingAnalysis; reference: TrainingAnalysis; general: TrainingGeneralAnalytics }> {
   const [data, routines] = await Promise.all([
-    loadCompletedTrainingData(),
-    listRoutines({ includeArchived: true }),
+    loadCompletedTrainingData(context),
+    listRoutines({ includeArchived: true }, context),
   ]);
   const current = buildTrainingAnalysis(data, { today: todayInCordoba(), period, routines, range: primaryRange });
   const reference = buildTrainingAnalysis(data, {

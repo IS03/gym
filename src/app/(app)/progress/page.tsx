@@ -1,128 +1,119 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Activity,
   Apple,
+  ArrowRight,
   CalendarDays,
   ChartNoAxesColumnIncreasing,
   ChevronRight,
   Dumbbell,
   History,
-  Link2,
   Scale,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getNutritionReport } from "@/lib/nutrition/reports";
-import { getMyProfile } from "@/lib/phase1/profile";
-import { formatTrainingMinutes } from "@/lib/phase2/training-progress-summary";
-import { getHomeTrainingSnapshot, todayInCordoba } from "@/lib/phase2/training-robust";
+
+import { ProgressHomePeriodSelector } from "@/components/progress/progress-home-period-selector";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { progressHomeDestinationHref, type ProgressHomeRow } from "@/lib/progress/home";
+import { getProgressHomeData } from "@/lib/progress/home-server";
 import { getVerifiedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const integer = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
-const decimal = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 });
+type Icon = React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
-function balanceLabel(value: number | null) {
-  if (value === null) return "Sin días comparables";
-  if (value < 0) return `Déficit estimado: ${integer.format(Math.abs(value))} kcal`;
-  if (value > 0) return `Superávit estimado: ${integer.format(value)} kcal`;
-  return "Balance estimado: 0 kcal";
+function SectionTitle({ id, children, detail }: { id: string; children: React.ReactNode; detail?: string }) {
+  return <div><h2 id={id} className="text-lg font-semibold tracking-tight">{children}</h2>{detail ? <p className="mt-0.5 text-sm text-muted-foreground">{detail}</p> : null}</div>;
 }
 
-type ProgressLinkProps = {
-  href: string;
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  title: string;
-  description: string;
-};
-
-function ProgressLink({ href, icon: Icon, title, description }: ProgressLinkProps) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-3 rounded-xl bg-card px-4 py-3 shadow-sm ring-1 ring-foreground/8 outline-none transition-[background-color,transform] hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]"
-    >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Icon className="size-5" aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-semibold">{title}</span>
-        <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
-      </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
-    </Link>
-  );
+function DataRows({ rows }: { rows: ProgressHomeRow[] }) {
+  return <div className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/8">{rows.map((row) => <Link key={row.id} href={row.href} className="group flex min-h-16 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+    <span className="min-w-0 flex-1">
+      <span className="block text-xs font-medium text-muted-foreground">{row.label}</span>
+      <span className="mt-0.5 block font-semibold tracking-tight">{row.value}</span>
+      {row.detail ? <span className="mt-0.5 block text-xs text-muted-foreground">{row.detail}</span> : null}
+    </span>
+    <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+  </Link>)}</div>;
 }
 
-export default async function ProgressPage() {
-  const today = todayInCordoba();
+function NavigationRow({ href, icon: Icon, label, detail }: { href: string; icon: Icon; label: string; detail: string }) {
+  return <Link href={href} className="group flex min-h-14 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+    <Icon className="size-4 shrink-0 text-primary" aria-hidden />
+    <span className="min-w-0 flex-1"><span className="block font-medium">{label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{detail}</span></span>
+    <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+  </Link>;
+}
+
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const search = (await searchParams) ?? {};
+  const value = (key: string) => typeof search[key] === "string" ? search[key] as string : undefined;
   const auth = await getVerifiedRequestContext();
   if (!auth) redirect("/login");
-  const [nutrition, training, profile] = await Promise.all([
-    getNutritionReport({ period: "7" }, today, auth),
-    getHomeTrainingSnapshot(today, auth),
-    getMyProfile(auth),
-  ]);
-  const week = training.currentWeek;
+  const today = todayInCordoba();
+  const { period, model } = await getProgressHomeData({
+    period: value("period"),
+    from: value("from"),
+    to: value("to"),
+  }, today, auth);
 
-  return (
-    <div className="space-y-6 pb-2">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Seguimiento de nutrición, entrenamiento y cuerpo.</p>
-      </header>
+  const links = {
+    training: progressHomeDestinationHref("training", period),
+    nutrition: progressHomeDestinationHref("nutrition", period),
+    body: progressHomeDestinationHref("body", period),
+    activity: progressHomeDestinationHref("activity", period),
+    relationships: progressHomeDestinationHref("relationships", period),
+    calendar: progressHomeDestinationHref("calendar", period),
+    history: progressHomeDestinationHref("history", period),
+  };
 
-      <section aria-labelledby="progress-overview-title" className="space-y-3">
-        <div>
-          <h2 id="progress-overview-title" className="text-lg font-semibold tracking-tight">Vista general</h2>
-          <p className="text-sm text-muted-foreground">Una lectura breve de tus últimos días.</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="surface-elevated">
-            <CardHeader className="pb-0"><CardTitle className="flex items-center gap-2"><Apple className="size-4 text-primary" aria-hidden /> Nutrición</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <p className="metric-number text-2xl font-semibold">{nutrition.summary.calories.averageConsumed === null ? "—" : `${integer.format(nutrition.summary.calories.averageConsumed)} kcal`}</p>
-              <p className="text-xs text-muted-foreground">Promedio de los últimos 7 días · {nutrition.summary.completedRegisteredDays} con nutrición registrada</p>
-              <p className="text-xs text-muted-foreground">{balanceLabel(nutrition.summary.energy.accumulatedBalance)}</p>
-            </CardContent>
-          </Card>
-          <Card className="surface-elevated">
-            <CardHeader className="pb-0"><CardTitle className="flex items-center gap-2"><Dumbbell className="size-4 text-primary" aria-hidden /> Entrenamiento</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <p className="metric-number text-2xl font-semibold">{week.sessions} {week.sessions === 1 ? "sesión" : "sesiones"}</p>
-              <p className="text-xs text-muted-foreground">Esta semana · {week.sets} {week.sets === 1 ? "serie" : "series"}</p>
-              <p className="text-xs text-muted-foreground">{formatTrainingMinutes(week.minutes)} de entrenamiento</p>
-            </CardContent>
-          </Card>
-          <Card className="surface-elevated sm:col-span-2 lg:col-span-1">
-            <CardHeader className="pb-0"><CardTitle className="flex items-center gap-2"><Scale className="size-4 text-primary" aria-hidden /> Cuerpo</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <p className="metric-number text-2xl font-semibold">{profile?.current_weight_kg == null ? "Sin peso actual" : `${decimal.format(profile.current_weight_kg)} kg`}</p>
-              <p className="text-xs text-muted-foreground">Peso actual de tu perfil.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+  return <div className="space-y-7 pb-16 lg:mx-auto lg:max-w-4xl lg:pb-0">
+    <header className="space-y-4">
+      <div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso</h1><p className="mt-1 text-sm text-muted-foreground">Cómo estás cambiando, qué lo acompaña y dónde profundizar.</p></div>
+      <ProgressHomePeriodSelector period={period} today={today} />
+      {period.error ? <p className="rounded-lg bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">{period.error}</p> : null}
+    </header>
 
-      <section aria-labelledby="progress-analyze-title" className="space-y-3">
-        <div><h2 id="progress-analyze-title" className="text-lg font-semibold tracking-tight">Analizar</h2></div>
-        <div className="grid gap-2 lg:grid-cols-2">
-          <ProgressLink href="/today/reports" icon={Apple} title="Nutrición" description="Tendencias, objetivos y balance" />
-          <ProgressLink href="/progress/metrics" icon={ChartNoAxesColumnIncreasing} title="Métricas diarias" description="Pasos, agua, sueño y métricas personalizadas" />
-          <ProgressLink href="/train/progress" icon={Dumbbell} title="Entrenamiento" description="Sesiones, volumen y ejercicios" />
-          <ProgressLink href="/train/body" icon={Activity} title="Cuerpo" description="Peso y medidas" />
-          <ProgressLink href="/progress/relationships" icon={Link2} title="Relaciones" description="Asociaciones personales entre variables compatibles" />
-        </div>
-      </section>
+    <section aria-labelledby="progress-evolution-title" className="space-y-3">
+      <SectionTitle id="progress-evolution-title" detail="Resultados principales sostenidos por datos comparables.">Tu evolución</SectionTitle>
+      {model.evolution.length ? <DataRows rows={model.evolution} /> : <p className="rounded-xl bg-muted/25 px-4 py-5 text-sm text-muted-foreground">{model.hasAnyData ? "Todavía no hay resultados comparables para destacar en este período." : "Registrá algunos días para empezar a ver tu evolución."}</p>}
+    </section>
 
-      <section aria-labelledby="progress-more-title" className="space-y-3">
-        <h2 id="progress-more-title" className="text-lg font-semibold tracking-tight">Más</h2>
-        <div className="grid gap-2 lg:grid-cols-2">
-          <ProgressLink href="/calendar" icon={CalendarDays} title="Calendario" description="Revisá nutrición, actividad, entrenamiento y cuerpo por día" />
-          <ProgressLink href="/history" icon={History} title="Historial diario" description="Revisá el detalle de una fecha" />
-        </div>
-      </section>
-    </div>
-  );
+    <section aria-labelledby="progress-changes-title" className="space-y-3">
+      <SectionTitle id="progress-changes-title">Qué cambió</SectionTitle>
+      {model.changes.length ? <div className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/8">{model.changes.map((insight) => <Link key={insight.id} href={insight.href} className="group flex min-h-16 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="block text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{insight.label}</span><span className="mt-1 block text-sm font-medium">{insight.description}</span></span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden /></Link>)}</div> : <p className="rounded-xl bg-muted/25 px-4 py-5 text-sm text-muted-foreground">No hubo cambios relevantes con cobertura suficiente en este período.</p>}
+    </section>
+
+    <section aria-labelledby="progress-relationships-title" className="space-y-3">
+      <SectionTitle id="progress-relationships-title" detail="Asociaciones observadas; no implican causalidad.">Relaciones</SectionTitle>
+      {model.relationships.length ? <div className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/8">{model.relationships.map((relationship) => <Link key={`${relationship.pair.aKey}:${relationship.pair.bKey}`} href={progressHomeDestinationHref("relationships", period, { aKey: relationship.pair.aKey, bKey: relationship.pair.bKey })} className="group flex min-h-16 items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><span className="min-w-0 flex-1"><span className="flex items-center gap-1.5 font-medium"><span className="truncate">{relationship.variableA.label}</span><ArrowRight className="size-3.5 shrink-0 text-primary" aria-hidden /><span className="truncate">{relationship.variableB.label}</span></span><span className="mt-1 block text-xs text-muted-foreground">{relationship.conclusion} · {relationship.sampleSize} {relationship.observationUnit}</span></span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden /></Link>)}</div> : <p className="rounded-xl bg-muted/25 px-4 py-5 text-sm text-muted-foreground">Todavía no hay relaciones con señal suficiente para este período.</p>}
+      <Link href={links.relationships} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">Explorar relaciones <ChevronRight className="size-4" aria-hidden /></Link>
+    </section>
+
+    <section aria-labelledby="progress-habits-title" className="space-y-3">
+      <SectionTitle id="progress-habits-title" detail="Una síntesis de lo que registraste e hiciste.">Tus hábitos</SectionTitle>
+      {model.habits.length ? <DataRows rows={model.habits} /> : <p className="rounded-xl bg-muted/25 px-4 py-5 text-sm text-muted-foreground">Todavía no hay hábitos con registros suficientes para resumir.</p>}
+    </section>
+
+    <section aria-labelledby="progress-explore-title" className="space-y-3">
+      <SectionTitle id="progress-explore-title">Explorar tu progreso</SectionTitle>
+      <div className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/8">
+        <NavigationRow href={links.training} icon={Dumbbell} label="Entrenamiento" detail="Rendimiento, rutinas, músculos y ejercicios" />
+        <NavigationRow href={links.nutrition} icon={Apple} label="Nutrición" detail="Energía, macros y evolución" />
+        <NavigationRow href={links.body} icon={Scale} label="Cuerpo" detail="Estado, tendencia y medidas" />
+        <NavigationRow href={links.activity} icon={ChartNoAxesColumnIncreasing} label="Actividad y hábitos" detail="Métricas personales, consistencia y objetivos" />
+      </div>
+    </section>
+
+    <section aria-labelledby="progress-review-title" className="space-y-3">
+      <SectionTitle id="progress-review-title" detail="Revisá los datos reales que alimentan tus análisis.">Revisar datos</SectionTitle>
+      <div className="divide-y overflow-hidden rounded-xl bg-card/70 ring-1 ring-foreground/8">
+        <NavigationRow href={links.calendar} icon={CalendarDays} label="Calendario" detail="Ubicá rápidamente una fecha" />
+        <NavigationRow href={links.history} icon={History} label="Historial diario" detail="Reconstruí y corregí un día" />
+      </div>
+    </section>
+  </div>;
 }
