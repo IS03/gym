@@ -19,6 +19,7 @@ import {
 } from "@/lib/nutrition/report-navigation";
 import { getNutritionReportWithProgressComparison } from "@/lib/nutrition/reports";
 import { NUTRITION_PROGRESS_METRICS } from "@/lib/progress/analytics";
+import { progressHomeHref } from "@/lib/progress/home";
 import { parseProgressComparisonQuery, progressComparisonQueryParams } from "@/lib/progress/comparisons";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 
@@ -53,11 +54,12 @@ export default async function NutritionReportsPage({
       supportsGoal: metric.supportsGoal,
     }));
   const referencePeriod = progressComparison?.reference.type === "goal" ? null : progressComparison?.reference.period ?? null;
+  const homeHref = progressHomeHref(range);
 
   return <div className="space-y-6">
     <header className="space-y-3">
-      <Link href="/today" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-        <ArrowLeft className="size-4" aria-hidden /> Nutrición
+      <Link href={homeHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <ArrowLeft className="size-4" aria-hidden /> Progreso
       </Link>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Progreso de nutrición</h1>

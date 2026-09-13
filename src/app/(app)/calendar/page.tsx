@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { getGlobalCalendar } from "@/lib/calendar/global-calendar";
@@ -40,7 +40,8 @@ export default async function CalendarPage({ searchParams }: { searchParams?: Pr
 
   return (
     <div className="space-y-6 pb-2 lg:mx-auto lg:max-w-5xl">
-      <header>
+      <header className="space-y-3">
+        <Link href="/progress" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link>
         <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Calendario</h1>
       </header>
 

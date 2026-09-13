@@ -9,6 +9,7 @@ import { buildTrainingComparison, buildTrainingSelfComparison, isTrainingCompari
 import { getTrainingAnalysis, getTrainingExercisesAnalysis, getTrainingGeneralAnalysis, getTrainingMusclesAnalysis, getTrainingRoutinesAnalysis } from "@/lib/phase2/training-robust";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { getPreviousProgressPeriod, resolveProgressPeriod } from "@/lib/progress/analytics";
+import { progressHomeHref } from "@/lib/progress/home";
 import {
   parseProgressComparisonQuery,
   resolveProgressComparisonReference,
@@ -124,10 +125,11 @@ export default async function TrainingProgressPage({
           : undefined,
       })
       : null;
+  const homeHref = progressHomeHref({ preset: analysis.period, start: analysis.range.start, end: analysis.range.end });
 
   return <div className="space-y-6 lg:mx-auto lg:max-w-6xl">
     <header className="space-y-3">
-      <Link href="/progress" className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-primary hover:underline">
+      <Link href={homeHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline">
         <ArrowLeft className="size-4" aria-hidden />
         Progreso
       </Link>

@@ -42,10 +42,15 @@ function serializeRecentHistory(
 
 export default async function SessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const search = (await searchParams) ?? {};
+  const requestedReturn = typeof search.return === "string" ? search.return : null;
+  const historyReturnHref = requestedReturn?.startsWith("/history?") ? requestedReturn : null;
   const auth = await requireAuthenticatedRequestContext();
   const [detail, exercises] = await Promise.all([
     getWorkoutSessionDetail(id, auth),
@@ -69,6 +74,8 @@ export default async function SessionPage({
         key={editorKey}
         detail={clientDetail}
         recentHistoryByExerciseId={serializeRecentHistory(recentHistory)}
+        returnHref={historyReturnHref}
+        returnLabel={historyReturnHref ? "Volver al día" : undefined}
         libraryExercises={exercises.map((exercise) => ({
           id: exercise.id,
           nombre: exercise.nombre,

@@ -6,6 +6,7 @@ import { RelationshipExplorer } from "@/components/progress/relationship-explore
 import { RelationshipPeriodSelector } from "@/components/progress/relationship-period-selector";
 import { RelationshipResult } from "@/components/progress/relationship-result";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { progressHomeHref } from "@/lib/progress/home";
 import { getRelationshipsWorkspace } from "@/lib/progress/relationships/server";
 import { getVerifiedRequestContext } from "@/lib/supabase/server";
 
@@ -48,10 +49,11 @@ export default async function RelationshipsPage({
   const hasAvailablePair = workspace.compatiblePairs.some((pair) => (
     (sampleSizeByKey.get(pair.aKey) ?? 0) > 0 && (sampleSizeByKey.get(pair.bKey) ?? 0) > 0
   ));
+  const homeHref = progressHomeHref(workspace.period);
 
   return <div className="space-y-7 pb-16 lg:pb-0">
     <header className="space-y-4">
-      <Link href="/progress" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link>
+      <Link href={homeHref} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden /> Progreso</Link>
       <div><h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Relaciones</h1><p className="mt-1 text-sm text-muted-foreground">Explorá qué variables parecen acompañarse en tus registros, sin asumir causalidad.</p></div>
       <RelationshipPeriodSelector preset={workspace.period.preset} start={workspace.period.start} end={workspace.period.end} aKey={workspace.selectedAKey} bKey={workspace.selectedBKey} analyzed={analyzed} />
       {workspace.period.error ? <p className="rounded-xl bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">{workspace.period.error}</p> : null}
@@ -75,7 +77,7 @@ export default async function RelationshipsPage({
     <section aria-labelledby="highlighted-relationships-title" className="space-y-3">
       <div><h2 id="highlighted-relationships-title" className="text-lg font-semibold tracking-tight">Relaciones destacadas</h2><p className="text-sm text-muted-foreground">Sólo candidatas aprobadas con cobertura y señal suficientes.</p></div>
       {workspace.highlights.length ? <div className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/8">{workspace.highlights.map((highlight) => <Link key={`${highlight.pair.aKey}:${highlight.pair.bKey}`} href={relationshipHref({ a: highlight.pair.aKey, b: highlight.pair.bKey, period: workspace.period.preset, from: workspace.period.start, to: workspace.period.end })} className="flex min-h-16 items-center gap-3 px-4 py-3 outline-none hover:bg-muted/40 focus-visible:bg-muted/40">
-        <span className="min-w-0 flex-1"><span className="flex items-center gap-1.5 font-medium"><span className="truncate">{highlight.variableA.label}</span><ArrowRight className="size-3.5 shrink-0 text-primary" aria-hidden /><span className="truncate">{highlight.variableB.label}</span></span><span className="mt-1 block text-xs text-muted-foreground">{highlight.conclusion} · {highlight.sampleSize} {highlight.observationUnit}</span></span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center gap-1.5 font-medium"><span className="min-w-0 flex-1 truncate">{highlight.variableA.label}</span><ArrowRight className="size-3.5 shrink-0 text-primary" aria-hidden /><span className="min-w-0 flex-1 truncate">{highlight.variableB.label}</span></span><span className="mt-1 block text-xs text-muted-foreground">{highlight.conclusion} · {highlight.sampleSize} {highlight.observationUnit}</span></span><ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </Link>)}</div> : <p className="rounded-xl border bg-muted/20 px-4 py-5 text-sm text-muted-foreground">No hay relaciones con señal suficiente en este período.</p>}
     </section>
   </div>;

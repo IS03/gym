@@ -35,7 +35,7 @@ function ContextTabs({ state }: { state: WorkspaceState }) {
   ];
   return <nav className="grid grid-cols-4 rounded-xl border bg-muted/35 p-1" aria-label="Contexto de análisis">{contexts.map((context) => {
     const selected = state.view === context.value;
-    return <Link key={context.value} href={trainingAnalysisWorkspacePath({ view: context.value, period: state.period, customFrom: state.customFrom, customTo: state.customTo, routineId: null, muscleKey: null })} className={cn("flex h-10 min-w-0 items-center justify-center rounded-lg px-1 text-center text-xs font-medium transition-colors sm:text-sm", selected ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{context.label}</Link>;
+    return <Link key={context.value} href={trainingAnalysisWorkspacePath({ view: context.value, period: state.period, customFrom: state.customFrom, customTo: state.customTo, routineId: null, muscleKey: null })} className={cn("flex min-h-11 min-w-0 items-center justify-center rounded-lg px-1 text-center text-xs font-medium transition-colors sm:text-sm", selected ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} aria-current={selected ? "page" : undefined}>{context.label}</Link>;
   })}</nav>;
 }
 

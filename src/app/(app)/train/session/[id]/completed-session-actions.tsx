@@ -14,12 +14,14 @@ export function CompletedSessionActions({
   dateLabel,
   timingLabel,
   completedSets,
+  returnHref,
 }: {
   sessionId: string;
   sessionName: string;
   dateLabel: string;
   timingLabel: string | null;
   completedSets: number;
+  returnHref?: string | null;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -36,23 +38,23 @@ export function CompletedSessionActions({
         return;
       }
       setDiscardOpen(false);
-      router.replace("/train/history?view=sessions&notice=discarded");
+      router.replace(returnHref ?? "/train/history?view=sessions&notice=discarded");
       router.refresh();
     });
   }
 
   return <>
     <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
-      <Dialog.Trigger render={<Button type="button" size="sm" variant="outline" />}>
+      <Dialog.Trigger render={<Button type="button" size="sm" variant="outline" className="min-h-11" />}>
         <MoreHorizontal className="size-4" aria-hidden /> Más opciones
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-[2px] transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none" />
         <Dialog.Viewport className="fixed inset-0 z-[81] flex items-end justify-center overflow-hidden sm:items-center sm:p-6">
           <Dialog.Popup className="w-full rounded-t-[1.5rem] bg-card p-4 shadow-2xl outline-none transition-[transform,opacity] duration-200 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full motion-reduce:transition-none sm:max-w-sm sm:rounded-2xl sm:border sm:data-[ending-style]:translate-y-2 sm:data-[starting-style]:translate-y-2">
-            <div className="mb-3 flex items-center justify-between gap-3"><Dialog.Title className="text-base font-semibold">Más opciones</Dialog.Title><Dialog.Close className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" aria-hidden /></Dialog.Close></div>
+            <div className="mb-3 flex items-center justify-between gap-3"><Dialog.Title className="text-base font-semibold">Más opciones</Dialog.Title><Dialog.Close className="flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"><X className="size-4" aria-hidden /></Dialog.Close></div>
             <div className="space-y-1">
-              <Dialog.Close render={<Link href={`/train/session/${sessionId}/correct`} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors hover:bg-muted" />}><Pencil className="size-4 text-muted-foreground" aria-hidden />Corregir sesión</Dialog.Close>
+              <Dialog.Close render={<Link href={`/train/session/${sessionId}/correct${returnHref ? `?${new URLSearchParams({ return: returnHref }).toString()}` : ""}`} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors hover:bg-muted" />}><Pencil className="size-4 text-muted-foreground" aria-hidden />Corregir sesión</Dialog.Close>
               <Dialog.Close render={<button type="button" className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10" onClick={() => setDiscardOpen(true)} />}><Trash2 className="size-4" aria-hidden />Eliminar sesión</Dialog.Close>
             </div>
           </Dialog.Popup>

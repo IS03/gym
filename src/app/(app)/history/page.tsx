@@ -13,6 +13,7 @@ import {
   adjacentHistoryDate,
   dailyHistoryDetailHref,
   dailyHistoryReturnTarget,
+  dailyHistorySessionHref,
   isHistoryDate,
   parseDailyHistoryOrigin,
 } from "@/lib/history/daily-history-navigation";
@@ -196,7 +197,7 @@ export default async function HistoryPage({
     return (
       <div className="space-y-6">
         <header className="space-y-3">
-          <Link href="/progress" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+          <Link href="/progress" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline">
             <ArrowLeft className="size-4" aria-hidden /> Progreso
           </Link>
           <div>
@@ -301,7 +302,7 @@ export default async function HistoryPage({
   return (
     <div className="space-y-6 pb-2">
       <header className="space-y-3">
-        <Link href={returnTarget.href} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <Link href={returnTarget.href} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary hover:underline">
           <ArrowLeft className="size-4" aria-hidden /> {returnTarget.label}
         </Link>
         <div className="flex flex-wrap items-center gap-2">
@@ -371,7 +372,7 @@ export default async function HistoryPage({
                 session.feedback.pain === null ? null : `Dolor ${session.feedback.pain}/10`,
               ].filter((value): value is string => Boolean(value));
               return (
-                <Link key={session.id} href={`/train/session/${session.id}`} className="group flex min-h-[76px] items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-label={`Ver sesión ${session.name}`}>
+                <Link key={session.id} href={dailyHistorySessionHref(session.id, requestedDate, origin)} className="group flex min-h-[76px] items-center gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-label={`Ver sesión ${session.name}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="break-words font-semibold">{session.name}</p>

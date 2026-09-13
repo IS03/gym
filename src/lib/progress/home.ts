@@ -5,7 +5,7 @@ import type { BodyProgressReport } from "@/lib/progress/body";
 import type { ProgressComparisonReport } from "@/lib/progress/comparisons";
 import type { HighlightedRelationship } from "@/lib/progress/relationships";
 import type { TrainingGeneralAnalytics } from "@/lib/progress/training-performance";
-import type { ProgressResolvedPeriod } from "@/lib/progress/analytics";
+import { PROGRESS_PERIOD_PRESETS, type ProgressResolvedPeriod } from "./analytics";
 
 export const PROGRESS_HOME_SECTION_ORDER = [
   "Tu evolución",
@@ -68,6 +68,22 @@ const nativePeriods: Record<Exclude<ProgressHomeDestination, "calendar" | "histo
   activity: { "1w": "7", "2w": "14", "30d": "30", "3m": "3m", "6m": "6m", "1y": "1y" },
   relationships: { "1w": "1w", "2w": "2w", "3w": "3w", "4w": "4w", "30d": "30d", "8w": "8w", "3m": "3m", "6m": "6m", "1y": "1y" },
 };
+
+const homePeriodAliases: Readonly<Record<string, string>> = {
+  "7": "1w",
+  "14": "2w",
+  "30": "30d",
+};
+const homePeriodPresets: ReadonlySet<string> = new Set(PROGRESS_PERIOD_PRESETS.map((preset) => preset.value));
+
+/** Returns to Home without losing the period resolved by a destination screen. */
+export function progressHomeHref(period: { preset: string; start: string; end: string }) {
+  const preset = homePeriodAliases[period.preset] ?? period.preset;
+  if (preset !== "custom" && homePeriodPresets.has(preset)) {
+    return `/progress?${new URLSearchParams({ period: preset }).toString()}`;
+  }
+  return `/progress?${new URLSearchParams({ period: "custom", from: period.start, to: period.end }).toString()}`;
+}
 
 /** Keeps the exact selected dates when a destination lacks the same named preset. */
 export function progressHomePeriodQuery(
