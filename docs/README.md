@@ -33,6 +33,12 @@ rediseños.
 
 ## Arquitectura
 
+### [`ownlevel-architecture.md`](./ownlevel-architecture.md)
+
+Documento canónico general y puerta de entrada técnica: producto, stack, app
+shell, rutas, auth, fuentes canónicas, dominios, data access, extensibilidad y
+mapa de documentación.
+
 ### [`progress-v2.md`](./progress-v2.md)
 
 Documento canónico de Progress V2: fuentes de datos, catálogo de métricas,
