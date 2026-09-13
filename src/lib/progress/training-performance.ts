@@ -480,7 +480,7 @@ export function buildTrainingLoadComparison(input: {
   });
 }
 
-function trainingLoadSamples(source: TrainingAnalysisSource, scope: TrainingPerformanceScope = {}): Map<string, ProgressMetricSample[]> {
+export function trainingLoadSamples(source: TrainingAnalysisSource, scope: TrainingPerformanceScope = {}): Map<string, ProgressMetricSample[]> {
   const exerciseSession = new Map(source.sessionExercises
     .filter((exercise) => exercise.is_completed && exerciseMatchesScope(exercise, scope))
     .map((exercise) => [exercise.id, exercise.workout_session_id]));

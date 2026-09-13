@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Dumbbell,
   History,
+  Link2,
   Scale,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,6 +112,7 @@ export default async function ProgressPage() {
           <ProgressLink href="/progress/metrics" icon={ChartNoAxesColumnIncreasing} title="Métricas diarias" description="Pasos, agua, sueño y métricas personalizadas" />
           <ProgressLink href="/train/progress" icon={Dumbbell} title="Entrenamiento" description="Sesiones, volumen y ejercicios" />
           <ProgressLink href="/train/body" icon={Activity} title="Cuerpo" description="Peso y medidas" />
+          <ProgressLink href="/progress/relationships" icon={Link2} title="Relaciones" description="Asociaciones personales entre variables compatibles" />
         </div>
       </section>
 
