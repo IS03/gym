@@ -58,7 +58,10 @@ describe("PR74 — reportes genéricos de métricas", () => {
       maximum: 3,
       trendDelta: 3,
       trendPercentDelta: null,
-      currentTargetHitDays: 1,
+      eligibleDays: 3,
+      coverageRatio: 2 / 3,
+      median: 1.5,
+      currentTargetHitDays: null,
     });
   });
 
@@ -84,7 +87,27 @@ describe("PR74 — reportes genéricos de métricas", () => {
       maximum: null,
       trendDelta: null,
       currentTargetReference: 10,
-      currentTargetHitDays: 0,
+      eligibleDays: 3,
+      coverageRatio: 0,
+      currentTargetHitDays: null,
+    });
+  });
+
+  it("no penaliza el día en curso y conserva cero como observación real", () => {
+    const days = buildMetricReportDays({
+      range,
+      today: "2026-09-03",
+      metricId: "focus",
+      values: [
+        { metric_id: "focus", metric_date: "2026-09-01", value: 0 },
+        { metric_id: "focus", metric_date: "2026-09-03", value: 10 },
+      ],
+    });
+    expect(aggregateMetricReport(days, null, { excludeInProgressDay: true })).toMatchObject({
+      registeredDays: 1,
+      eligibleDays: 2,
+      coverageRatio: 0.5,
+      average: 0,
     });
   });
 

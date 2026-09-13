@@ -3,7 +3,6 @@ import "server-only";
 import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import {
-  previousNutritionReportRange,
   resolveNutritionReportRange,
 } from "@/lib/nutrition/reports-core";
 import {
@@ -26,6 +25,7 @@ import {
   type ProgressComparisonQuery,
   type ProgressGoalReferenceInput,
 } from "@/lib/progress/comparisons";
+import { getPreviousProgressPeriod } from "@/lib/progress/analytics";
 
 function numberOrNull(value: unknown) {
   if (value === null) return null;
@@ -47,19 +47,15 @@ export async function getDailyMetricsReport(
 ) {
   const { supabase, userId } = auth ?? await requireAuthenticatedRequestContext();
   const range = resolveNutritionReportRange(input, today);
-  const previousRange = previousNutritionReportRange(range);
   const resolvedReference = input.progressComparison
     ? resolveProgressComparisonReference({ query: input.progressComparison, primaryPeriod: range, today })
     : null;
   const temporalReference = resolvedReference?.reference.type === "previous_period" || resolvedReference?.reference.type === "other_period"
     ? resolvedReference.reference.period
     : null;
-  const readStart = temporalReference
-    ? [range.start, temporalReference.start].sort()[0]!
-    : input.compare ? previousRange.start : range.start;
-  const readEnd = temporalReference
-    ? [range.end, temporalReference.end].sort().at(-1)!
-    : range.end;
+  const defaultReference = getPreviousProgressPeriod(range);
+  const readStart = [range.start, defaultReference.start, temporalReference?.start ?? range.start].sort()[0]!;
+  const readEnd = [range.end, temporalReference?.end ?? range.end].sort().at(-1)!;
 
   const ensured = await supabase.rpc("ensure_user_metrics");
   if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
@@ -91,33 +87,47 @@ export async function getDailyMetricsReport(
   const definitions = availableMetricDefinitions(metrics);
   const metric = selectMetricDefinition(definitions, input.metricId);
 
-  if (!metric) return { range, definitions, metric: null, days: [], summary: null, comparison: null, progressComparison: null, progressMetrics: [], comparisonError: null };
+  if (!metric) return { range, definitions, metric: null, days: [], summary: null, comparison: null, defaultComparison: null, progressComparison: null, progressMetrics: [], comparisonError: null };
 
   const days = buildMetricReportDays({ range, today, metricId: metric.id, values });
-  const summary = aggregateMetricReport(days, metric.target_value);
+  const excludeInProgressDay = range.end === today;
+  const summary = aggregateMetricReport(days, metric.target_value, { excludeInProgressDay });
   const progressMetrics = definitions.map(adaptDailyMetricDefinition);
+  const scopedProgressMetrics = progressMetrics.filter((definition) => (
+    definition.metadata?.isActive !== false || definition.metadata?.definitionId === metric.id
+  ));
+  const samplesByMetric = new Map<string, readonly ProgressMetricSample[]>(progressMetrics.map((definition) => [
+    definition.key,
+    dailyMetricSamples(String(definition.source.field), values),
+  ]));
+  const goalsByMetric = new Map<string, ProgressGoalReferenceInput>(progressMetrics.flatMap((definition) => {
+    const target = definition.metadata?.targetValue;
+    if (!definition.goal || typeof target !== "number" || !Number.isFinite(target)) return [];
+    return [[definition.key, {
+      label: "Objetivo actual",
+      source: definition.goal.source,
+      rule: definition.goal.rule,
+      value: target,
+    }]];
+  }));
+  const defaultComparison = buildProgressComparison({
+    metrics: scopedProgressMetrics,
+    selectedMetricKeys: scopedProgressMetrics.map((definition) => definition.key),
+    samplesByMetric,
+    primaryPeriod: range,
+    primaryLabel: range.preset,
+    reference: { type: "previous_period", period: defaultReference, label: "Período anterior" },
+    inProgressDate: excludeInProgressDay ? today : null,
+    activeMetricKey: `activity.daily.${metric.id}`,
+  });
   let progressComparison = null;
   if (resolvedReference) {
-    const samplesByMetric = new Map<string, readonly ProgressMetricSample[]>(progressMetrics.map((definition) => [
-      definition.key,
-      dailyMetricSamples(String(definition.source.field), values),
-    ]));
-    const goalsByMetric = new Map<string, ProgressGoalReferenceInput>(progressMetrics.flatMap((definition) => {
-      const target = definition.metadata?.targetValue;
-      if (!definition.goal || typeof target !== "number" || !Number.isFinite(target)) return [];
-      return [[definition.key, {
-        label: "Objetivo actual",
-        source: definition.goal.source,
-        rule: definition.goal.rule,
-        value: target,
-      }]];
-    }));
     const requested = input.progressComparison?.selectedMetricKeys.filter((key) => progressMetrics.some((definition) => definition.key === key)) ?? [];
     const selectedMetricKeys = requested.length ? requested : [`activity.daily.${metric.id}`];
     progressComparison = buildProgressComparison({
       metrics: resolvedReference.reference.type === "goal"
-        ? progressMetrics.filter((definition) => definition.supportsGoal)
-        : progressMetrics,
+        ? scopedProgressMetrics.filter((definition) => definition.supportsGoal)
+        : scopedProgressMetrics,
       selectedMetricKeys,
       samplesByMetric,
       primaryPeriod: range,
@@ -129,10 +139,8 @@ export async function getDailyMetricsReport(
       initialView: input.progressComparison?.initialView,
     });
   }
-  if (!input.compare) return { range, definitions, metric, days, summary, comparison: null, progressComparison, progressMetrics, comparisonError: resolvedReference?.error ?? null };
-
   const previousDays = buildMetricReportDays({
-    range: previousRange,
+    range: defaultReference,
     today,
     metricId: metric.id,
     values,
@@ -144,7 +152,8 @@ export async function getDailyMetricsReport(
     metric,
     days,
     summary,
-    comparison: compareMetricReports(summary, previousSummary, previousRange, previousDays),
+    comparison: compareMetricReports(summary, previousSummary, defaultReference, previousDays),
+    defaultComparison,
     progressComparison,
     progressMetrics,
     comparisonError: resolvedReference?.error ?? null,

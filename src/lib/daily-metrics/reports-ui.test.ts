@@ -25,19 +25,27 @@ describe("PR74 — integración de Progreso real", () => {
     expect(progress).toContain('href="/progress/metrics"');
     expect(page).toContain('basePath="/progress/metrics"');
     expect(page).toContain("query={query}");
-    expect(report).toContain('next.set("metric", metricId)');
+    expect(report).toContain('next.set("metric", metricIdValue)');
     expect(report).toContain("Vs anterior");
     expect(page).toContain("<ComparisonConfigurator");
-    expect(report).toContain("<ComparisonWorkspace");
+    expect(report).toContain("defaultComparison");
   });
 
-  it("presenta promedio, cobertura, extremos, tendencia, objetivo actual y un gráfico principal", () => {
-    for (const label of ["Promedio", "Días registrados", "Mínimo", "Máximo", "Tendencia del período", "Objetivo actual"] ) {
+  it("presenta la jerarquía V2 dinámica, cobertura, objetivo descriptivo y un gráfico por escala", () => {
+    for (const label of ["Cómo venís", "Qué cambió", "Consistencia", "Objetivos", "Evolución", "Gestionar métricas", "Registros recientes"] ) {
       expect(report).toContain(label);
     }
-    expect(report).toContain("Sin dato no cuenta como cero");
-    expect(report).toContain("referencia, no objetivo histórico");
-    expect(report.match(/<MetricChart/g)).toHaveLength(1);
+    expect(report).toContain("los huecos no se convierten en cero");
+    expect(report).toContain("referencia sin dirección configurada");
+    expect(report).toContain("visibleResults.map");
+    expect(report).not.toContain('metric.name === "Pasos"');
+    expect(report).not.toContain('metric.name === "Sueño"');
+  });
+
+  it("mantiene el día en curso fuera del promedio elegible y no inventa dirección del objetivo", () => {
+    expect(data).toContain("excludeInProgressDay");
+    expect(data).toContain("defaultComparison");
+    expect(source("src/lib/progress/analytics/catalog.ts")).toContain('rule: "reference"');
   });
 
   it("mantiene Nutrición libre de Agua, Pasos, Trabajo y Entrenamiento legacy", () => {
