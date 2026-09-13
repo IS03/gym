@@ -33,6 +33,12 @@ rediseños.
 
 ## Arquitectura
 
+### [`progress-v2.md`](./progress-v2.md)
+
+Documento canónico de Progress V2: fuentes de datos, catálogo de métricas,
+períodos, coverage, Comparaciones, dominios, Relaciones, Home, extensibilidad y
+antipatrones semánticos.
+
 ### [`architecture/data-flow.md`](./architecture/data-flow.md)
 
 Define fuentes de verdad, sincronización de peso, snapshots nutricionales,
