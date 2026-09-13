@@ -36,7 +36,7 @@ describe("navegación del calendario global", () => {
   });
 
   it("lo expone desde Progreso y el sidebar, separado del acceso rápido de Entrenar", () => {
-    expect(progress).toContain('href="/calendar"');
+    expect(progress).toContain('progressHomeDestinationHref("calendar", period)');
     expect(sidebar).toContain('href: "/calendar", label: "Calendario"');
     expect(preview).toContain('trainingDayHref(day.date, { source: "train" })');
     expect(preview).not.toContain('href={`/train/calendar?month=${month}`}');

@@ -77,7 +77,7 @@ describe("PR20 — Today UX polish", () => {
     expect(activityEditor).not.toContain("Prom. 7 días");
     expect(activityEditor).not.toContain("Historial");
     expect(todayPage).not.toContain("getStepsOverview");
-    expect(progressPage).toContain('href="/progress/metrics"');
+    expect(progressPage).toContain('progressHomeDestinationHref("activity", period)');
     expect(metricsProgressPage).toContain("getDailyMetricsReport");
   });
 
