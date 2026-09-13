@@ -27,13 +27,16 @@ export type MetricReportDay = {
 
 export type MetricReportSummary = {
   registeredDays: number;
+  eligibleDays: number;
+  coverageRatio: number | null;
   average: number | null;
+  median: number | null;
   minimum: number | null;
   maximum: number | null;
   trendDelta: number | null;
   trendPercentDelta: number | null;
   currentTargetReference: number | null;
-  currentTargetHitDays: number;
+  currentTargetHitDays: number | null;
 };
 
 export type MetricReportComparison = {
@@ -84,9 +87,18 @@ export function buildMetricReportDays(input: {
 export function aggregateMetricReport(
   days: MetricReportDay[],
   target: number | null,
+  options: { excludeInProgressDay?: boolean } = {},
 ): MetricReportSummary {
-  const values = known(days.map((day) => day.value));
-  const chronological = days
+  const eligible = options.excludeInProgressDay ? days.filter((day) => !day.isToday) : days;
+  const values = known(eligible.map((day) => day.value));
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length === 0
+    ? null
+    : sorted.length % 2
+      ? sorted[middle]!
+      : (sorted[middle - 1]! + sorted[middle]!) / 2;
+  const chronological = eligible
     .filter((day): day is MetricReportDay & { value: number } => day.value !== null && Number.isFinite(day.value))
     .sort((left, right) => left.date.localeCompare(right.date));
   const first = chronological[0]?.value ?? null;
@@ -94,7 +106,10 @@ export function aggregateMetricReport(
   const trendDelta = first === null || last === null || chronological.length < 2 ? null : last - first;
   return {
     registeredDays: values.length,
+    eligibleDays: eligible.length,
+    coverageRatio: eligible.length ? values.length / eligible.length : null,
     average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null,
+    median,
     minimum: values.length ? Math.min(...values) : null,
     maximum: values.length ? Math.max(...values) : null,
     trendDelta,
@@ -102,7 +117,9 @@ export function aggregateMetricReport(
       ? null
       : trendDelta / Math.abs(first) * 100,
     currentTargetReference: target,
-    currentTargetHitDays: target === null ? 0 : values.filter((value) => value >= target).length,
+    // The canonical definition currently has no target direction. A numeric
+    // target is therefore a reference, not a minimum-compliance rule.
+    currentTargetHitDays: null,
   };
 }
 

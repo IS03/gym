@@ -182,7 +182,10 @@ export function adaptDailyMetricDefinition(metric: DynamicMetricDefinitionInput)
     minimumSamples: 2,
     comparisonScope: "same_metric",
     comparison: { allowPercentDelta: true, stablePercentThreshold: 3 },
-    goal: metric.target_value === null ? undefined : { rule: "minimum", source: "current_reference" },
+    // user_metrics stores a numeric reference but no minimum/maximum/range
+    // direction. Keep it descriptive so custom metrics (for example pain or
+    // caffeine) never inherit an invented "higher is better" rule.
+    goal: metric.target_value === null ? undefined : { rule: "reference", source: "current_reference" },
     relation: { model: "configurable", suggestedLagDays: [0, 1, 7, 14], minimumWindowDays: 14 },
     format: { maximumFractionDigits: metric.value_type === "integer" || metric.value_type === "duration" ? 0 : 4 },
     metadata: {

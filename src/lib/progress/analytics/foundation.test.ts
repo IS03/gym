@@ -89,6 +89,7 @@ describe("Progress metric catalog", () => {
     expect(energy?.source.canonicalTables).toEqual(["user_metrics", "daily_metric_values"]);
     expect(energy?.relation.model).toBe("configurable");
     expect(archived?.metadata).toMatchObject({ isActive: false, archivedAt: "2026-09-01T00:00:00Z" });
+    expect(archived?.goal).toEqual({ rule: "reference", source: "current_reference" });
     expect(catalog.some((metric) => metric.key === "training.load.volume")).toBe(true);
     expect(catalog.some((metric) => metric.key === "training.performance.best_weight")).toBe(true);
   });
