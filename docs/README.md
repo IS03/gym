@@ -56,6 +56,12 @@ reglas para extender el schema sin romper historia.
 Documento complementario sobre sincronización de peso, snapshots nutricionales,
 flujo de entrenamiento, fechas e invariantes entre estado actual e historial.
 
+### [`architecture/history-calendar.md`](./architecture/history-calendar.md)
+
+Referencia canónica de Historial diario y Calendario: reconstrucción factual por
+fecha, señales de presencia, navegación, edición histórica, fechas de Córdoba y
+límite con Progress V2.
+
 ### [`architecture/training-system.md`](./architecture/training-system.md)
 
 Referencia canónica de la lógica operativa de Entrenamiento: biblioteca, rutinas,
