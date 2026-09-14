@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import {
   formatDailyMetricProgress,
   parseDailyMetricValue,
 } from "@/lib/daily-metrics/core";
 import type { DailyActivityDraft } from "@/lib/nutrition/activity-autosave";
+import type { ReadResult } from "@/lib/resilient-read";
 import {
   ActivityContextSummary,
   DayActivityPanel,
@@ -15,7 +17,9 @@ import { DayContextEditor } from "./day-context-editor";
 import { ResponsiveDialog } from "./responsive-dialog";
 
 type EditorProps = Omit<React.ComponentProps<typeof DayContextEditor>, "onMetricsChange">;
-type TodayActivityProps = EditorProps & ActivityContextValues;
+type TodayActivityProps = Omit<EditorProps, "metrics"> & ActivityContextValues & {
+  metrics: ReadResult<EditorProps["metrics"]>;
+};
 
 function draftValue(value: string, type: EditorProps["metrics"][number]["value_type"]) {
   try {
@@ -25,7 +29,10 @@ function draftValue(value: string, type: EditorProps["metrics"][number]["value_t
   }
 }
 
-export function TodayActivity({ metrics, ...props }: TodayActivityProps) {
+function LoadedTodayActivity({
+  metrics,
+  ...props
+}: EditorProps & ActivityContextValues) {
   const [open, setOpen] = useState(false);
   const [activity, setActivity] = useState<DailyActivityDraft>(() => Object.fromEntries(
     metrics.map((metric) => [metric.id, metric.value === null ? "" : String(metric.value)]),
@@ -71,4 +78,10 @@ export function TodayActivity({ metrics, ...props }: TodayActivityProps) {
       </ResponsiveDialog>
     </>
   );
+}
+
+export function TodayActivity({ metrics, ...props }: TodayActivityProps) {
+  return metrics.status === "ok"
+    ? <LoadedTodayActivity {...props} metrics={metrics.data} />
+    : <ReadUnavailable message="No pudimos cargar tus métricas de hoy." />;
 }

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import { isLocalizedDecimalDraft } from "@/lib/localized-decimal";
 import type { SavedMealWithItems } from "@/lib/phase1/types";
 import {
@@ -20,6 +21,7 @@ import {
 import { type QuickMealCandidate } from "@/lib/nutrition/quick-meals-core";
 import { filterQuickAddItems } from "@/lib/nutrition/quick-add-core";
 import { cn } from "@/lib/utils";
+import type { ReadResult } from "@/lib/resilient-read";
 import {
   addAdjustedSavedMealAction,
   getSavedMealAdjustmentAction,
@@ -151,13 +153,15 @@ function AdjustSavedMeal({ meal, pending, error, quantities, onQuantityChange, o
 
 export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedded = false }: {
   date: string;
-  suggestedMeals: QuickMealCandidate[];
-  initialSavedMeals: SavedMealSummary[];
+  suggestedMeals: ReadResult<QuickMealCandidate[]>;
+  initialSavedMeals: ReadResult<SavedMealSummary[]>;
   embedded?: boolean;
 }) {
   const router = useRouter();
-  const [savedMeals, setSavedMeals] = useState(initialSavedMeals);
-  const [tab, setTab] = useState<QuickAddTab>(() => defaultQuickAddTab(initialSavedMeals.length, suggestedMeals.length));
+  const suggestedMealData = suggestedMeals.status === "ok" ? suggestedMeals.data : [];
+  const initialSavedMealData = initialSavedMeals.status === "ok" ? initialSavedMeals.data : [];
+  const [savedMeals, setSavedMeals] = useState(initialSavedMealData);
+  const [tab, setTab] = useState<QuickAddTab>(() => defaultQuickAddTab(initialSavedMealData.length, suggestedMealData.length));
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,7 +176,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const filteredSavedMeals = filterQuickAddItems(savedMeals, search, (meal) => meal.name);
-  const filteredSuggestedMeals = filterQuickAddItems(suggestedMeals, search, (meal) => meal.label);
+  const filteredSuggestedMeals = filterQuickAddItems(suggestedMealData, search, (meal) => meal.label);
 
   useEffect(() => () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -258,7 +262,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
   function handleQuickAddOpenChange(open: boolean) {
     setQuickAddOpen(open);
     if (!open) return;
-    setTab(defaultQuickAddTab(savedMeals.length, suggestedMeals.length));
+    setTab(defaultQuickAddTab(savedMeals.length, suggestedMealData.length));
     setSearch("");
     setError(null);
     setNotice(null);
@@ -283,7 +287,17 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
         <div className="grid grid-cols-2 rounded-xl bg-muted p-1" role="tablist" aria-label="Tipo de agregado rápido">{tabButton("saved", "Habituales")}{tabButton("suggested", "Sugeridas")}</div>
       </div>
       <div id={`quick-add-panel-${tab}`} role="tabpanel" aria-labelledby={`quick-add-tab-${tab}`}>
-        {tab === "saved" ? (filteredSavedMeals.length > 0 ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} successKey={successKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed /> : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>) : (filteredSuggestedMeals.length > 0 ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} successKey={successKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed /> : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>)}
+        {tab === "saved"
+          ? initialSavedMeals.status === "unavailable"
+            ? <ReadUnavailable message="No pudimos cargar tus comidas habituales." />
+            : filteredSavedMeals.length > 0
+              ? <SavedRows meals={filteredSavedMeals} pendingKey={pendingKey} successKey={successKey} onAdd={(meal) => void addSaved(meal)} onAdjust={(meal) => void openAdjust(meal)} framed />
+              : <div className="rounded-xl border bg-card p-4 text-sm"><p className="text-muted-foreground">{emptySaved}</p>{!search ? <Link href="/settings/nutrition/meals" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}>Administrar comidas</Link> : null}</div>
+          : suggestedMeals.status === "unavailable"
+            ? <ReadUnavailable message="No pudimos cargar tus comidas sugeridas." />
+            : filteredSuggestedMeals.length > 0
+              ? <SuggestedRows meals={filteredSuggestedMeals} pendingKey={pendingKey} successKey={successKey} savedSourceId={savedSourceId} onAdd={(meal) => void addSuggested(meal)} onSave={(meal) => void saveSuggested(meal)} framed />
+              : <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{emptySuggested}</p>}
       </div>
       <p className="sr-only" aria-live="polite" role="status">{successAnnouncement}</p>
       {notice || error ? <div className="text-xs" aria-live="polite">{notice ? <p className="inline-flex items-center gap-1 text-primary" role="status"><Check className="size-3.5" aria-hidden />{notice}</p> : null}{error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}</div> : null}

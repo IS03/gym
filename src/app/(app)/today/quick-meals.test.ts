@@ -51,7 +51,7 @@ describe("PR30.1 — Agregar rápido compacto", () => {
   it("busca en la pestaña abierta sin pedir datos por tecla y permite limpiar", () => {
     expect(quickAdd).toContain('id="quick-add-search"');
     expect(quickAdd).toContain("filterQuickAddItems(savedMeals, search");
-    expect(quickAdd).toContain("filterQuickAddItems(suggestedMeals, search");
+    expect(quickAdd).toContain("filterQuickAddItems(suggestedMealData, search");
     expect(quickAdd).toContain('aria-label="Limpiar búsqueda"');
     expect(quickAdd).toContain('setSearch("")');
     expect(quickAdd).toContain("No encontramos comidas habituales con esa búsqueda.");
@@ -90,7 +90,7 @@ describe("PR30.1 — Agregar rápido compacto", () => {
     expect(quickAdd).toContain("Todavía no guardaste comidas habituales.");
     expect(quickAdd).toContain("Todavía no hay suficientes comidas anteriores para sugerir.");
     expect(quickAdd).toContain("Administrar comidas");
-    expect(quickAdd).toContain("defaultQuickAddTab(savedMeals.length, suggestedMeals.length)");
+    expect(quickAdd).toContain("defaultQuickAddTab(savedMeals.length, suggestedMealData.length)");
     expect(savedDomain).not.toContain("buildQuickMealCandidates");
   });
 });

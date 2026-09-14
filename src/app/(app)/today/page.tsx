@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import { formatDateFieldValue } from "@/lib/date-field-display";
 import { cn } from "@/lib/utils";
 import { getActiveDailyMetrics } from "@/lib/daily-metrics/server";
@@ -10,7 +11,7 @@ import { getQuickMealCandidates } from "@/lib/nutrition/quick-meals";
 import { listActiveFoods } from "@/lib/nutrition/product";
 import { listActiveSavedMeals } from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
-import { measurePerformance } from "@/lib/request-performance";
+import { resilientRead } from "@/lib/resilient-read";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 import { TodayActivity } from "./today-activity";
 import { MealComposer } from "./meal-composer";
@@ -46,9 +47,9 @@ function formatProteinProgress(consumed: number, target: number | null) {
 export default async function TodayPage() {
   const today = todayInCordoba();
   const auth = await requireAuthenticatedRequestContext();
-  const [{ dayLog, meals, context }, metrics, quickMeals, foods, savedMeals] =
+  const [nutrition, metrics, quickMeals, foods, savedMeals] =
     await Promise.all([
-      measurePerformance(
+      resilientRead(
         {
           route: "/today",
           operation: "today.nutrition",
@@ -57,7 +58,7 @@ export default async function TodayPage() {
         },
         () => getNutritionDay(today, undefined, auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/today",
           operation: "today.metrics",
@@ -66,7 +67,7 @@ export default async function TodayPage() {
         },
         () => getActiveDailyMetrics(today, auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/today",
           operation: "today.quick-meals",
@@ -75,7 +76,7 @@ export default async function TodayPage() {
         },
         () => getQuickMealCandidates(today, auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/today",
           operation: "today.foods",
@@ -84,7 +85,7 @@ export default async function TodayPage() {
         },
         () => listActiveFoods(auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/today",
           operation: "today.saved-meals",
@@ -94,6 +95,25 @@ export default async function TodayPage() {
         () => listActiveSavedMeals(auth),
       ),
     ]);
+
+  if (nutrition.status === "unavailable") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Nutrición de hoy</h1>
+            <p className="text-sm text-muted-foreground">{formatDateFieldValue(today)}</p>
+          </div>
+          <Link href="/calendar" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>
+            <CalendarDays className="size-4" aria-hidden /> Calendario
+          </Link>
+        </div>
+        <ReadUnavailable message="No pudimos cargar los datos de hoy." />
+      </div>
+    );
+  }
+
+  const { dayLog, meals, context } = nutrition.data;
   const calories = dayLog.total_calories_consumed ?? 0;
   const target = context.targets.calories;
   const progress = target && target > 0 ? Math.min((calories / target) * 100, 100) : 0;

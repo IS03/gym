@@ -12,8 +12,16 @@ import { buildBodyProgressReport } from "@/lib/progress/body";
 import type { ProgressComparisonQuery, ProgressTemporalComparisonReference } from "@/lib/progress/comparisons";
 import { buildProgressHomeModel, progressHomePeriodQuery } from "@/lib/progress/home";
 import { getHighlightedRelationshipsForUser } from "@/lib/progress/relationships/server";
-import { measurePerformance, type RequestPerformanceContext } from "@/lib/request-performance";
+import type { RequestPerformanceContext } from "@/lib/request-performance";
+import { resilientRead, type ReadResult } from "@/lib/resilient-read";
 import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+
+export type ProgressHomeDomain =
+  | "training"
+  | "nutrition"
+  | "activity"
+  | "body"
+  | "relationships";
 
 const previousComparison: ProgressComparisonQuery = {
   referenceType: "previous_period",
@@ -29,20 +37,16 @@ async function isolated<T>(
   operation: string,
   task: () => Promise<T>,
   requestPerformance?: RequestPerformanceContext,
-): Promise<T | null> {
-  try {
-    return await measurePerformance(
-      {
-        route: "/progress",
-        operation,
-        layer: "database",
-        ...requestPerformance,
-      },
-      task,
-    );
-  } catch {
-    return null;
-  }
+): Promise<ReadResult<T>> {
+  return resilientRead(
+    {
+      route: "/progress",
+      operation,
+      layer: "database",
+      ...requestPerformance,
+    },
+    task,
+  );
 }
 
 function trainingPeriod(period: ProgressResolvedPeriod): { preset: TrainingAnalysisPeriod; range?: { start: string; end: string } } {
@@ -99,20 +103,24 @@ export async function getProgressHomeData(
       auth.requestPerformance,
     ),
   ]);
+  const domainReads = { training, nutrition, activity, body, relationships };
+  const unavailableDomains = (Object.keys(domainReads) as ProgressHomeDomain[])
+    .filter((domain) => domainReads[domain].status === "unavailable");
 
   return {
     period,
+    unavailableDomains,
     model: buildProgressHomeModel({
       period,
-      training: training?.general ?? null,
-      nutrition: nutrition?.progressComparison
-        ? { summary: nutrition.summary, comparison: nutrition.progressComparison }
+      training: training.status === "ok" ? training.data.general : null,
+      nutrition: nutrition.status === "ok" && nutrition.data.progressComparison
+        ? { summary: nutrition.data.summary, comparison: nutrition.data.progressComparison }
         : null,
-      body,
-      activity: activity?.defaultComparison
-        ? { definitions: activity.definitions, comparison: activity.defaultComparison }
+      body: body.status === "ok" ? body.data : null,
+      activity: activity.status === "ok" && activity.data.defaultComparison
+        ? { definitions: activity.data.definitions, comparison: activity.data.defaultComparison }
         : null,
-      relationships: relationships ?? [],
+      relationships: relationships.status === "ok" ? relationships.data : [],
     }),
   };
 }

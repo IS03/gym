@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { TrainingMonthPreview } from "@/components/training/training-month-preview";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import {
   getInProgressSessionForUser,
   listTrainingDaysInMonth,
@@ -18,7 +19,7 @@ import {
 import { todayInCordoba } from "@/lib/phase2/training-robust";
 import { formatSessionDate } from "@/lib/phase2/session-history";
 import { toWorkoutStartActiveSession } from "@/lib/phase2/workout-start";
-import { measurePerformance } from "@/lib/request-performance";
+import { mapReadResult, resilientRead } from "@/lib/resilient-read";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -56,8 +57,16 @@ export default async function TrainPage() {
   const month = today.slice(0, 7) as `${number}-${number}`;
   const auth = await requireAuthenticatedRequestContext();
   const [inProgress, workoutStartRoutines, trainedDays] = await Promise.all([
-    getInProgressSessionForUser(auth),
-    measurePerformance(
+    resilientRead(
+      {
+        route: "/train",
+        operation: "train.active-session",
+        layer: "database",
+        ...auth.requestPerformance,
+      },
+      () => getInProgressSessionForUser(auth),
+    ),
+    resilientRead(
       {
         route: "/train",
         operation: "train.routines",
@@ -66,9 +75,20 @@ export default async function TrainPage() {
       },
       () => listWorkoutStartRoutines(auth),
     ),
-    listTrainingDaysInMonth({ month }, auth),
+    resilientRead(
+      {
+        route: "/train",
+        operation: "train.calendar",
+        layer: "database",
+        ...auth.requestPerformance,
+      },
+      () => listTrainingDaysInMonth({ month }, auth),
+    ),
   ]);
-  const activeSession = inProgress ? toWorkoutStartActiveSession(inProgress) : null;
+  const activeSession = mapReadResult(
+    inProgress,
+    (session) => session ? toWorkoutStartActiveSession(session) : null,
+  );
 
   return (
     <div className="space-y-6 pb-16 lg:pb-0">
@@ -79,7 +99,15 @@ export default async function TrainPage() {
         </p>
       </header>
 
-      {activeSession ? (
+      {activeSession.status === "unavailable" ? (
+        <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
+          <h2 id="train-action-title" className="text-base font-semibold">Sesión en curso</h2>
+          <ReadUnavailable
+            className="mt-3"
+            message="No pudimos verificar si tenés una sesión en curso."
+          />
+        </section>
+      ) : activeSession.data ? (
         <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -89,15 +117,15 @@ export default async function TrainPage() {
               <div className="min-w-0">
                 <p id="train-action-title" className="text-sm font-medium text-primary">Sesión en curso</p>
                 <h2 className="truncate text-lg font-semibold tracking-tight">
-                  {activeSession.name}
+                  {activeSession.data.name}
                 </h2>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  Iniciada {formatSessionDate(activeSession.logDate)}
+                  Iniciada {formatSessionDate(activeSession.data.logDate)}
                 </p>
               </div>
             </div>
             <Link
-              href={`/train/session/${activeSession.id}`}
+              href={`/train/session/${activeSession.data.id}`}
               className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
             >
               Continuar entrenamiento
@@ -105,9 +133,17 @@ export default async function TrainPage() {
             </Link>
           </div>
         </section>
+      ) : workoutStartRoutines.status === "unavailable" ? (
+        <section aria-labelledby="train-action-title" className="surface-elevated rounded-xl border bg-card p-4 sm:p-5">
+          <h2 id="train-action-title" className="text-base font-semibold">Nueva sesión</h2>
+          <ReadUnavailable
+            className="mt-3"
+            message="No pudimos cargar las opciones para iniciar una sesión."
+          />
+        </section>
       ) : (
         <StartWorkoutSheet
-          routines={workoutStartRoutines}
+          routines={workoutStartRoutines.data}
           activeSession={null}
           triggerAriaLabel="Iniciar entrenamiento"
           triggerClassName="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none transition-[background-color,transform] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:w-auto"
@@ -119,7 +155,11 @@ export default async function TrainPage() {
 
       <div className="space-y-6 lg:grid lg:grid-cols-12 lg:items-start lg:gap-6 lg:space-y-0">
         <section className="lg:col-span-7" aria-label="Calendario de entrenamiento de este mes">
-          <TrainingMonthPreview month={month} today={today} trainedDays={trainedDays} />
+          {trainedDays.status === "ok" ? (
+            <TrainingMonthPreview month={month} today={today} trainedDays={trainedDays.data} />
+          ) : (
+            <ReadUnavailable message="No pudimos cargar el calendario de este mes." />
+          )}
         </section>
 
         <div className="space-y-6 lg:col-span-5">

@@ -3,12 +3,12 @@ import { getCompactProfile } from "@/lib/home-header";
 import { getNutritionDaySummary } from "@/lib/nutrition/day";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { listWorkoutStartRoutines } from "@/lib/phase2/training";
-import { measurePerformance } from "@/lib/request-performance";
 import {
   getHomeActiveTrainingSnapshot,
   getHomeTrainingSnapshot,
   todayInCordoba,
 } from "@/lib/phase2/training-robust";
+import { mapReadResult, resilientRead } from "@/lib/resilient-read";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export default async function HomePage() {
   const auth = await requireAuthenticatedRequestContext();
   const [profile, todayData, activeSession, training, workoutStartRoutines] =
     await Promise.all([
-      measurePerformance(
+      resilientRead(
         {
           route: "/home",
           operation: "home.profile",
@@ -27,7 +27,7 @@ export default async function HomePage() {
         },
         () => getMyProfile(auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/home",
           operation: "home.nutrition",
@@ -36,7 +36,7 @@ export default async function HomePage() {
         },
         () => getNutritionDaySummary(today, auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/home",
           operation: "home.active-session",
@@ -45,7 +45,7 @@ export default async function HomePage() {
         },
         () => getHomeActiveTrainingSnapshot(auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/home",
           operation: "home.training",
@@ -54,7 +54,7 @@ export default async function HomePage() {
         },
         () => getHomeTrainingSnapshot(today, auth),
       ),
-      measurePerformance(
+      resilientRead(
         {
           route: "/home",
           operation: "home.routines",
@@ -64,15 +64,14 @@ export default async function HomePage() {
         () => listWorkoutStartRoutines(auth),
       ),
     ]);
-  const { dayLog, mealCount, context } = todayData;
 
   return (
     <HomeDashboard
       today={today}
-      profile={getCompactProfile(profile?.display_name)}
+      profile={getCompactProfile(profile.status === "ok" ? profile.data?.display_name : undefined)}
       activeSession={activeSession}
       workoutStartRoutines={workoutStartRoutines}
-      nutrition={{
+      nutrition={mapReadResult(todayData, ({ dayLog, mealCount, context }) => ({
         calories: dayLog.total_calories_consumed ?? 0,
         calorieTarget: context.targets.calories,
         proteinG: dayLog.total_protein_g ?? 0,
@@ -81,9 +80,11 @@ export default async function HomePage() {
         waterL: context.consumption.waterL,
         waterTargetL: context.targets.waterL,
         energyBalanceKcal: context.metrics.energyBalanceKcal,
-      }}
-      week={training.currentWeek}
-      todaySessions={training.todaySessions}
+      }))}
+      training={mapReadResult(training, ({ currentWeek, todaySessions }) => ({
+        week: currentWeek,
+        todaySessions,
+      }))}
     />
   );
 }

@@ -40,6 +40,15 @@ describe("Progress Home V2 UI contract", () => {
     expect(server).toContain("buildBodyProgressReport");
   });
 
+  it("keeps failed domains explicit without replacing them with no-data copy", () => {
+    expect(server).toContain("Promise<ReadResult<T>>");
+    expect(server).toContain("unavailableDomains");
+    expect(server).toContain('status === "unavailable"');
+    expect(page).toContain("No pudimos actualizar");
+    expect(page).toContain('unavailable.has("relationships")');
+    expect(page).toContain('isIncomplete("nutrition", "activity")');
+  });
+
   it("does not hardcode personal metric names or introduce causal copy", () => {
     for (const fixedName of ["Pasos", "Sueño", "Agua", "Energía"]) expect(model).not.toContain(fixedName);
     for (const causal of ["causó", "provocó", "hizo que", "gracias a", "debido a"]) {
