@@ -1,8 +1,7 @@
 import "server-only";
 
 import {
-  logPerformance,
-  performanceErrorCategory,
+  measurePerformance,
 } from "@/lib/request-performance";
 import { getOrCreateDayLog } from "@/lib/phase1/day-log";
 import {
@@ -107,30 +106,8 @@ function requireUuid(value: unknown, label: string): string {
   return value;
 }
 
-async function getAuthedContext(): Promise<{
-  supabase: AuthenticatedRequestContext["supabase"];
-  userId: string;
-}> {
-  const authStartedAt = performance.now();
-  try {
-    const context = await requireAuthenticatedRequestContext();
-    logPerformance({
-      route: "/train/session/[id]",
-      operation: "workout-save.auth",
-      durationMs: performance.now() - authStartedAt,
-      status: "authenticated",
-    });
-    return context;
-  } catch (error) {
-    logPerformance({
-      route: "/train/session/[id]",
-      operation: "workout-save.auth",
-      durationMs: performance.now() - authStartedAt,
-      status: "error",
-      errorCategory: performanceErrorCategory(error),
-    });
-    throw error;
-  }
+async function getAuthedContext(): Promise<AuthenticatedRequestContext> {
+  return requireAuthenticatedRequestContext();
 }
 
 function throwRpcError(label: string, value: unknown): never {
@@ -138,9 +115,10 @@ function throwRpcError(label: string, value: unknown): never {
   if (code === "40001") {
     throw new Error(
       "Este ejercicio cambió en otro dispositivo. Recargá la sesión antes de guardar.",
+      { cause: value },
     );
   }
-  throw new Error(`${label}: ${message ?? "error inesperado."}`);
+  throw new Error(`${label}: ${message ?? "error inesperado."}`, { cause: value });
 }
 
 export type WorkoutSaveErrorCategory =
@@ -154,8 +132,9 @@ export class WorkoutSaveError extends Error {
   constructor(
     public readonly category: WorkoutSaveErrorCategory,
     message: string,
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, { cause });
     this.name = "WorkoutSaveError";
   }
 }
@@ -171,6 +150,7 @@ function throwWorkoutSaveRpcError(value: unknown): never {
     throw new WorkoutSaveError(
       "conflict",
       "Este ejercicio cambió en otra pestaña. Estamos comprobando la versión guardada.",
+      value,
     );
   }
   if (
@@ -184,6 +164,7 @@ function throwWorkoutSaveRpcError(value: unknown): never {
     throw new WorkoutSaveError(
       "timeout",
       "El guardado demoró demasiado. Tus cambios siguen acá; reintentá.",
+      value,
     );
   }
   if (
@@ -194,17 +175,20 @@ function throwWorkoutSaveRpcError(value: unknown): never {
     throw new WorkoutSaveError(
       "session_closed",
       "La sesión ya fue finalizada. Actualizá para ver el estado guardado.",
+      value,
     );
   }
   if (code === "P0001" || code === "22P02" || code === "23514") {
     throw new WorkoutSaveError(
       "validation",
       message ?? "Los datos del ejercicio no son válidos.",
+      value,
     );
   }
   throw new WorkoutSaveError(
     "transient",
     "No se pudo guardar. Revisá la conexión y reintentá.",
+    value,
   );
 }
 
@@ -463,40 +447,47 @@ export async function getWorkoutExerciseSyncState(input: {
   sessionId: string;
   sessionExerciseId: string;
 }): Promise<WorkoutExerciseSyncState> {
-  const { supabase, userId } = await getAuthedContext();
-  const { data: session, error: sessionError } = await supabase
-    .from("workout_sessions")
-    .select("status")
-    .eq("id", input.sessionId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (sessionError) {
-    throw new Error(`Comprobar sesión: ${sessionError.message}`);
-  }
-  if (!session) return { status: "removed" };
-  if ((session as { status: string }).status !== "in_progress") {
-    return { status: "session_closed" };
-  }
+  const { supabase, userId, requestPerformance } = await getAuthedContext();
+  return measurePerformance({
+    route: "/train/session/[id]",
+    operation: "workout.save-exercise-readback",
+    layer: "database",
+    ...requestPerformance,
+  }, async () => {
+    const { data: session, error: sessionError } = await supabase
+      .from("workout_sessions")
+      .select("status")
+      .eq("id", input.sessionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (sessionError) {
+      throw new Error(`Comprobar sesión: ${sessionError.message}`, { cause: sessionError });
+    }
+    if (!session) return { status: "removed" };
+    if ((session as { status: string }).status !== "in_progress") {
+      return { status: "session_closed" };
+    }
 
-  const { data, error } = await supabase
-    .from("workout_session_exercises")
-    .select("*, sets:workout_sets(*)")
-    .eq("id", input.sessionExerciseId)
-    .eq("workout_session_id", input.sessionId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) throw new Error(`Comprobar ejercicio: ${error.message}`);
-  if (!data) return { status: "removed" };
+    const { data, error } = await supabase
+      .from("workout_session_exercises")
+      .select("*, sets:workout_sets(*)")
+      .eq("id", input.sessionExerciseId)
+      .eq("workout_session_id", input.sessionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(`Comprobar ejercicio: ${error.message}`, { cause: error });
+    if (!data) return { status: "removed" };
 
-  const exercise = data as RawSessionExercise;
-  return {
-    status: "active",
-    payload: syncPayloadFromExercise({
-      ...exercise,
-      sets: exercise.sets ?? [],
-    }),
-    updatedAt: exercise.updated_at,
-  };
+    const exercise = data as RawSessionExercise;
+    return {
+      status: "active",
+      payload: syncPayloadFromExercise({
+        ...exercise,
+        sets: exercise.sets ?? [],
+      }),
+      updatedAt: exercise.updated_at,
+    };
+  });
 }
 
 export async function saveWorkoutExercise(input: {
@@ -512,27 +503,54 @@ export async function saveWorkoutExercise(input: {
       error instanceof Error ? error.message : "Los datos del ejercicio no son válidos.",
     );
   }
-  const { supabase } = await getAuthedContext();
-  const rpcStartedAt = performance.now();
-  const { data, error } = await supabase
-    .rpc("save_workout_exercise", {
-      p_session_exercise_id: input.sessionExerciseId,
-      p_expected_updated_at: input.expectedUpdatedAt,
-      p_payload: input.payload,
-    })
-    .abortSignal(AbortSignal.timeout(12_000));
-  logPerformance({
+  const { supabase, requestPerformance } = await getAuthedContext();
+  return measurePerformance({
     route: "/train/session/[id]",
     operation: "workout-save.rpc",
-    durationMs: performance.now() - rpcStartedAt,
-    status: error ? "error" : "ok",
-    ...(error ? { errorCategory: performanceErrorCategory(error) } : {}),
+    layer: "database",
+    ...requestPerformance,
+  }, async () => {
+    const { data, error } = await supabase
+      .rpc("save_workout_exercise", {
+        p_session_exercise_id: input.sessionExerciseId,
+        p_expected_updated_at: input.expectedUpdatedAt,
+        p_payload: input.payload,
+      })
+      .abortSignal(AbortSignal.timeout(12_000));
+    if (error) throwWorkoutSaveRpcError(error);
+    if (typeof data !== "string") {
+      throw new Error("Guardar ejercicio: respuesta inválida de la base.");
+    }
+    return data;
   });
-  if (error) throwWorkoutSaveRpcError(error);
-  if (typeof data !== "string") {
-    throw new Error("Guardar ejercicio: respuesta inválida de la base.");
-  }
-  return data;
+}
+
+export type WorkoutSessionCompletionState =
+  | "completed"
+  | "in_progress"
+  | "not_confirmed";
+
+export async function getWorkoutSessionCompletionState(
+  sessionId: string,
+): Promise<WorkoutSessionCompletionState> {
+  const { supabase, userId, requestPerformance } = await getAuthedContext();
+  return measurePerformance({
+    route: "/train/session/[id]",
+    operation: "workout.finish-readback",
+    layer: "database",
+    ...requestPerformance,
+  }, async () => {
+    const { data, error } = await supabase
+      .from("workout_sessions")
+      .select("status")
+      .eq("id", sessionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw new Error(`Comprobar finalización: ${error.message}`, { cause: error });
+    const status = (data as { status?: string } | null)?.status;
+    if (status === "completed" || status === "in_progress") return status;
+    return "not_confirmed";
+  });
 }
 
 export async function finishWorkoutSession(input: {
@@ -540,13 +558,20 @@ export async function finishWorkoutSession(input: {
   metadata: SessionMetadataInput;
 }): Promise<string> {
   validateSessionMetadata(input.metadata);
-  const { supabase } = await getAuthedContext();
-  const { data, error } = await supabase.rpc("finish_workout_session", {
-    p_session_id: input.sessionId,
-    p_metadata: input.metadata,
+  const { supabase, requestPerformance } = await getAuthedContext();
+  return measurePerformance({
+    route: "/train/session/[id]",
+    operation: "workout.finish",
+    layer: "database",
+    ...requestPerformance,
+  }, async () => {
+    const { data, error } = await supabase.rpc("finish_workout_session", {
+      p_session_id: input.sessionId,
+      p_metadata: input.metadata,
+    });
+    if (error) throwRpcError("Finalizar sesión", error);
+    return requireUuid(data, "Finalizar sesión");
   });
-  if (error) throwRpcError("Finalizar sesión", error);
-  return requireUuid(data, "Finalizar sesión");
 }
 
 export async function cancelWorkoutSession(sessionId: string) {

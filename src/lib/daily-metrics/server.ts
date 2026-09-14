@@ -12,6 +12,7 @@ import {
   type MetricValueType,
   type UserMetric,
 } from "./core";
+import { measurePerformance } from "@/lib/request-performance";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SYSTEM_METRIC_KEYS = ["steps", "water", "mate", "sleep"] as const;
@@ -262,7 +263,8 @@ async function saveDailyMetricValuesInternal(input: {
   date: string;
   values: Record<string, unknown>;
 }, historical: boolean): Promise<void> {
-  const { supabase, userId } = await context();
+  const auth = await context();
+  const { supabase, userId } = auth;
   if (!ISO_DATE.test(input.date)) throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
   const metricIds = Object.keys(input.values);
   if (!metricIds.length) return;
@@ -291,22 +293,19 @@ async function saveDailyMetricValuesInternal(input: {
     metricId: String(metric.id),
     value: parseDailyMetricValue(input.values[String(metric.id)], metric.value_type as MetricValueType),
   }));
-  const rows = parsed.filter((item) => item.value !== null).map((item) => ({
-    user_id: userId,
-    metric_id: item.metricId,
-    metric_date: input.date,
-    value: item.value,
-  }));
-  if (rows.length) {
-    const saved = await supabase.from("daily_metric_values").upsert(rows, {
-      onConflict: "user_id,metric_date,metric_id",
+  await measurePerformance({
+    route: historical ? "/history" : "/today",
+    operation: "metrics.save",
+    layer: "database",
+    ...auth.requestPerformance,
+  }, async () => {
+    const saved = await supabase.rpc("save_daily_metric_values", {
+      p_metric_date: input.date,
+      p_values: Object.fromEntries(parsed.map((item) => [item.metricId, item.value])),
+      p_historical: historical,
     });
-    if (saved.error) throw new Error(`Guardar valores diarios: ${saved.error.message}`);
-  }
-  const emptyIds = parsed.filter((item) => item.value === null).map((item) => item.metricId);
-  if (emptyIds.length) {
-    const removed = await supabase.from("daily_metric_values").delete()
-      .eq("user_id", userId).eq("metric_date", input.date).in("metric_id", emptyIds);
-    if (removed.error) throw new Error(`Borrar valores diarios: ${removed.error.message}`);
-  }
+    if (saved.error) {
+      throw new Error(`Guardar valores diarios: ${saved.error.message}`, { cause: saved.error });
+    }
+  });
 }

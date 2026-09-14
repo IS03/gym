@@ -65,7 +65,17 @@ export type CreateMealInput = {
   precision_level?: NutritionPrecision | null;
   context_type?: string | null;
   source_note?: string | null;
+  idempotencyKey?: string;
 };
+
+function normalizedIdempotencyKey(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  const key = value.trim();
+  if (!key || key.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(key)) {
+    throw new Error("La operación de creación no es válida.");
+  }
+  return key;
+}
 
 /** Título o descripción nuevos coinciden con el registro (ya normalizado en BD). */
 function newMealTextMatchesExisting(
@@ -147,6 +157,7 @@ export async function createMeal(
   const protein = optionalMealMacro(input.final_protein_g, "Proteína");
   const carbs = optionalMealMacro(input.final_carbs_g, "Carbohidratos");
   const fat = optionalMealMacro(input.final_fat_g, "Grasas");
+  const idempotencyKey = normalizedIdempotencyKey(input.idempotencyKey);
   const dayLog = await getOrCreateDayLog(input.date, context);
   const supabase = context?.supabase ?? await createClient();
   const userId = context?.userId ?? await getAuthedUserId();
@@ -168,11 +179,21 @@ export async function createMeal(
       source_note: input.source_note ?? null,
       source_type: "manual",
       entry_kind: "meal",
+      idempotency_key: idempotencyKey,
     })
     .select("*")
     .single();
 
-  if (error) throw new Error(`Crear meal_entries: ${error.message}`);
+  if (error && idempotencyKey) {
+    const existing = await supabase
+      .from("meal_entries")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    if (!existing.error && existing.data) return existing.data as MealEntry;
+  }
+  if (error) throw new Error(`Crear meal_entries: ${error.message}`, { cause: error });
   return data as MealEntry;
 }
 
@@ -185,6 +206,7 @@ export async function quickAddMeal(
   sourceMealId: string,
   date: string,
   context?: AuthenticatedRequestContext,
+  idempotencyKey?: string,
 ): Promise<MealEntry> {
   if (!sourceMealId) throw new Error("Comida rápida inválida.");
   assertIsoDate(date);
@@ -212,6 +234,7 @@ export async function quickAddMeal(
     final_protein_g: data.final_protein_g,
     final_carbs_g: data.final_carbs_g,
     final_fat_g: data.final_fat_g,
+    idempotencyKey,
   }, context);
 }
 
@@ -226,14 +249,17 @@ export type UpdateMealInput = {
   final_fat_g?: number | null;
 };
 
-export async function updateMeal(input: UpdateMealInput): Promise<MealEntry> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+export async function updateMeal(
+  input: UpdateMealInput,
+  context?: AuthenticatedRequestContext,
+): Promise<MealEntry> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   const patch: Record<string, unknown> = {};
   if (input.date !== undefined) {
     assertIsoDate(input.date);
-    const destinationDay = await getOrCreateDayLog(input.date);
+    const destinationDay = await getOrCreateDayLog(input.date, context);
     patch.day_log_id = destinationDay.id;
   }
   if (input.title !== undefined) patch.title = input.title;

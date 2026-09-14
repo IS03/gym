@@ -115,6 +115,16 @@ function rowPayload(input: BodyMeasurementInput, { preserveLegacy = false } = {}
   };
 }
 
+export function bodyMeasurementMatchesInput(
+  measurement: BodyMeasurement,
+  input: BodyMeasurementInput,
+): boolean {
+  const expected = rowPayload(input);
+  return Object.entries(expected).every(
+    ([field, value]) => measurement[field as keyof BodyMeasurement] === value,
+  );
+}
+
 export async function listBodyMeasurements(limit = 366, context?: AuthenticatedRequestContext): Promise<BodyMeasurement[]> {
   const { supabase, userId } = await getAuthedContext(context);
   const safeLimit = Math.min(Math.max(limit, 1), 1000);
@@ -141,22 +151,38 @@ export async function getLatestBodyMeasurement(): Promise<BodyMeasurement | null
   return (data as BodyMeasurement | null) ?? null;
 }
 
-export async function upsertBodyMeasurement(input: BodyMeasurementInput): Promise<BodyMeasurement> {
-  const { supabase, userId } = await getAuthedContext();
+export async function upsertBodyMeasurement(
+  input: BodyMeasurementInput,
+  context?: AuthenticatedRequestContext,
+): Promise<BodyMeasurement> {
+  const { supabase, userId } = await getAuthedContext(context);
   const { data, error } = await supabase
     .from("body_measurements")
     .insert({ user_id: userId, ...rowPayload(input) })
     .select("*")
     .single();
-  if (error?.message.includes("body_measurements_user_date_unique")) {
-    throw new Error("Ya existe una medición para esa fecha. Editá la existente o elegí otra fecha.");
+  if (error) {
+    const existing = await supabase
+      .from("body_measurements")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("measured_on", input.measuredOn)
+      .maybeSingle();
+    if (!existing.error && existing.data) {
+      const measurement = existing.data as BodyMeasurement;
+      if (bodyMeasurementMatchesInput(measurement, input)) return measurement;
+      throw new Error("Ya existe una medición para esa fecha. Editá la existente o elegí otra fecha.");
+    }
+    throw new Error(`Guardar medidas corporales: ${error.message}`, { cause: error });
   }
-  if (error) throw new Error(`Guardar medidas corporales: ${error.message}`);
   return data as BodyMeasurement;
 }
 
-export async function updateBodyMeasurement(input: BodyMeasurementInput & { id: string }): Promise<BodyMeasurement> {
-  const { supabase, userId } = await getAuthedContext();
+export async function updateBodyMeasurement(
+  input: BodyMeasurementInput & { id: string },
+  context?: AuthenticatedRequestContext,
+): Promise<BodyMeasurement> {
+  const { supabase, userId } = await getAuthedContext(context);
   const { data, error } = await supabase
     .from("body_measurements")
     .update(rowPayload(input, { preserveLegacy: true }))

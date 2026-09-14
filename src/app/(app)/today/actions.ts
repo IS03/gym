@@ -23,6 +23,22 @@ import {
 } from "@/lib/nutrition/saved-meals";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
+import { measurePerformance } from "@/lib/request-performance";
+
+type TodayAuth = Awaited<ReturnType<typeof requireAuthenticatedRequestContext>>;
+
+function measuredMealWrite<T>(
+  auth: TodayAuth,
+  operation: string,
+  write: () => Promise<T>,
+) {
+  return measurePerformance({
+    route: "/today",
+    operation,
+    layer: "database",
+    ...auth.requestPerformance,
+  }, write);
+}
 
 function revalidateMealPages() {
   revalidatePath("/today");
@@ -42,10 +58,12 @@ export async function addFoodToDayAction(input: {
   foodId: string;
   quantity: unknown;
   date: string;
+  idempotencyKey?: string;
 }): Promise<MealMutationActionResult> {
   try {
     const auth = await requireAuthenticatedRequestContext();
-    await createMealFromFood(input, auth);
+    await measuredMealWrite(auth, "nutrition.create-food-meal", () =>
+      createMealFromFood(input, auth));
     revalidateMealPages();
     return { ok: true };
   } catch (error) {
@@ -55,7 +73,6 @@ export async function addFoodToDayAction(input: {
     if (error instanceof Error && error.message === "Este alimento ya no está disponible.") {
       return { ok: false, error: error.message };
     }
-    console.warn("[food-quantity] add_failed");
     return { ok: false, error: "No pudimos agregar el alimento." };
   }
 }
@@ -63,15 +80,16 @@ export async function addFoodToDayAction(input: {
 /** La comida se vuelve a leer con ownership en el servidor antes de copiarse. */
 export async function quickAddMealAction(
   sourceMealId: string,
+  idempotencyKey?: string,
 ): Promise<QuickAddMealActionResult> {
   if (!sourceMealId.trim()) return { ok: false, error: "Comida sugerida inválida." };
   try {
     const auth = await requireAuthenticatedRequestContext();
-    await quickAddMeal(sourceMealId, todayInCordoba(), auth);
+    await measuredMealWrite(auth, "nutrition.quick-add-meal", () =>
+      quickAddMeal(sourceMealId, todayInCordoba(), auth, idempotencyKey));
     revalidateMealPages();
     return { ok: true };
   } catch {
-    console.warn("[quick-meal] add_failed");
     return {
       ok: false,
       error: "No pudimos agregar la comida.",
@@ -79,14 +97,14 @@ export async function quickAddMealAction(
   }
 }
 
-export async function quickAddSavedMealAction(input: { savedMealId: string; date: string }) {
+export async function quickAddSavedMealAction(input: { savedMealId: string; date: string; idempotencyKey?: string }) {
   try {
     const auth = await requireAuthenticatedRequestContext();
-    await quickAddSavedMeal(input.savedMealId, input.date, auth);
+    await measuredMealWrite(auth, "nutrition.quick-add-saved-meal", () =>
+      quickAddSavedMeal(input.savedMealId, input.date, auth, input.idempotencyKey));
     revalidateMealPages();
     return { ok: true as const };
   } catch (error) {
-    console.warn("[saved-meals] quick_add_failed");
     return {
       ok: false as const,
       error: error instanceof SavedMealProductError
@@ -100,14 +118,15 @@ export async function addAdjustedSavedMealAction(input: {
   savedMealId: string;
   date: string;
   items: Array<{ itemId: string; quantity: string }>;
+  idempotencyKey?: string;
 }) {
   try {
     const auth = await requireAuthenticatedRequestContext();
-    await addAdjustedSavedMeal(input, auth);
+    await measuredMealWrite(auth, "nutrition.add-adjusted-saved-meal", () =>
+      addAdjustedSavedMeal(input, auth));
     revalidateMealPages();
     return { ok: true as const };
   } catch (error) {
-    console.warn("[saved-meals] adjusted_add_failed");
     return {
       ok: false as const,
       error: error instanceof SavedMealProductError
@@ -220,7 +239,8 @@ export async function createMealAction(
     }
   }
 
-  await createMeal({
+  const auth = await requireAuthenticatedRequestContext();
+  await measuredMealWrite(auth, "nutrition.create-meal", () => createMeal({
     date,
     title: title || undefined,
     description: description || undefined,
@@ -228,7 +248,8 @@ export async function createMealAction(
     final_protein_g: protein,
     final_carbs_g: carbs,
     final_fat_g: fat,
-  });
+    idempotencyKey: String(formData.get("idempotency_key") ?? "") || undefined,
+  }, auth));
 
   revalidateMealPages();
   return { ok: true };
@@ -244,11 +265,11 @@ export async function updateMealAction(formData: FormData): Promise<MealMutation
     const protein = optionalMealMacro(formData.get("final_protein_g"), "Proteína");
     const carbs = optionalMealMacro(formData.get("final_carbs_g"), "Carbohidratos");
     const fat = optionalMealMacro(formData.get("final_fat_g"), "Grasas");
-    await updateMeal({ id, date, title: title || null, description: description || null, final_calories: calories, final_protein_g: protein, final_carbs_g: carbs, final_fat_g: fat });
+    const auth = await requireAuthenticatedRequestContext();
+    await measuredMealWrite(auth, "nutrition.update-meal", () => updateMeal({ id, date, title: title || null, description: description || null, final_calories: calories, final_protein_g: protein, final_carbs_g: carbs, final_fat_g: fat }, auth));
     revalidateMealPages();
     return { ok: true };
   } catch {
-    console.warn("[today] update_meal_failed");
     return { ok: false, error: "No pudimos guardar los cambios. Intentá nuevamente." };
   }
 }

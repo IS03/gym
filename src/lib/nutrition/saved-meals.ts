@@ -27,8 +27,8 @@ const SAVED_MEAL_SUMMARY_SELECT = "id,name,description,template_type,calories,pr
 const SAVED_MEAL_ITEM_SELECT = "id,saved_meal_id,user_id,label,quantity,unit,base_quantity,base_calories,base_protein_g,base_carbs_g,base_fat_g,source_food_id,position,created_at,updated_at";
 
 export class SavedMealProductError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
     this.name = "SavedMealProductError";
   }
 }
@@ -119,8 +119,7 @@ async function readSavedMeal(
   if (activeOnly) query = query.eq("is_active", true);
   const { data, error } = await query.maybeSingle();
   if (error) {
-    console.warn("[saved-meals] canonical_read_failed", { code: error.code });
-    throw new SavedMealProductError("No pudimos leer la comida habitual.");
+    throw new SavedMealProductError("No pudimos leer la comida habitual.", error);
   }
   return data ? normalizeNestedItems(data as never) : null;
 }
@@ -355,6 +354,7 @@ async function createMealFromSavedMeal(
   date: string,
   adjustedItems?: Array<{ itemId: string; quantity: unknown }>,
   context?: AuthenticatedRequestContext,
+  idempotencyKey?: string,
 ) {
   const reason = savedMealRegistrability(meal);
   if (reason) throw new SavedMealProductError(reason);
@@ -393,6 +393,7 @@ async function createMealFromSavedMeal(
     final_carbs_g: totals.carbsG,
     final_fat_g: totals.fatG,
     context_type: "saved_meal",
+    idempotencyKey,
   }, context);
 }
 
@@ -400,15 +401,16 @@ export async function quickAddSavedMeal(
   savedMealId: string,
   date: string,
   context?: AuthenticatedRequestContext,
+  idempotencyKey?: string,
 ) {
   const auth = context ?? await requireAuthenticatedRequestContext();
   const meal = await readSavedMeal(savedMealId, auth, true);
   if (!meal) throw new SavedMealProductError("Esta comida habitual ya no está disponible.");
-  return createMealFromSavedMeal(meal, date, undefined, auth);
+  return createMealFromSavedMeal(meal, date, undefined, auth, idempotencyKey);
 }
 
 export async function addAdjustedSavedMeal(
-  input: { savedMealId: string; date: string; items: Array<{ itemId: string; quantity: unknown }> },
+  input: { savedMealId: string; date: string; items: Array<{ itemId: string; quantity: unknown }>; idempotencyKey?: string },
   context?: AuthenticatedRequestContext,
 ) {
   const auth = context ?? await requireAuthenticatedRequestContext();
@@ -417,7 +419,7 @@ export async function addAdjustedSavedMeal(
   if (meal.items.length === 0) {
     throw new SavedMealProductError("Esta comida no tiene ingredientes para ajustar.");
   }
-  return createMealFromSavedMeal(meal, input.date, input.items, auth);
+  return createMealFromSavedMeal(meal, input.date, input.items, auth, input.idempotencyKey);
 }
 
 export async function getSavedMealAdjustment(

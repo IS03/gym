@@ -64,4 +64,39 @@ describe("updateSession redirects", () => {
       expect(response.headers.get("location")).toBe("https://ownlevel.fit/login");
     },
   );
+
+  it("redirects and clears auth cookies only for a genuinely invalid session", async () => {
+    mocks.getClaims.mockResolvedValue({
+      data: { claims: null },
+      error: { code: "refresh_token_not_found", message: "Refresh token not found" },
+    });
+    const request = new NextRequest("https://ownlevel.fit/home", {
+      headers: { cookie: "sb-project-auth-token=invalid; preference=compact" },
+    });
+
+    const response = await updateSession(request);
+
+    expect(response.status).toBe(307);
+    expect(response.cookies.get("sb-project-auth-token")?.value).toBe("");
+    expect(mocks.getClaims).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { message: "Gateway Timeout", status: 504 },
+    { message: "fetch failed: network unavailable", code: "ECONNRESET" },
+  ])("never clears cookies or simulates logout for transient auth errors", async (error) => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    mocks.getClaims.mockResolvedValue({ data: { claims: null }, error });
+    const request = new NextRequest("https://ownlevel.fit/home", {
+      headers: { cookie: "sb-project-auth-token=still-valid" },
+    });
+
+    await expect(updateSession(request)).rejects.toEqual(error);
+    expect(request.cookies.get("sb-project-auth-token")?.value).toBe("still-valid");
+    expect(mocks.getClaims).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith("[perf]", expect.objectContaining({
+      status: "error",
+    }));
+    log.mockRestore();
+  });
 });

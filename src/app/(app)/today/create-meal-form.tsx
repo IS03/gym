@@ -24,17 +24,28 @@ type Props = {
 function buildFormData(
   el: HTMLFormElement,
   forceDuplicate: boolean,
+  idempotencyKey: string,
 ): FormData {
   const fd = new FormData(el);
   fd.set("force_duplicate", forceDuplicate ? "1" : "0");
+  fd.set("idempotency_key", idempotencyKey);
   return fd;
 }
 
 export function CreateMealForm({ date, onSuccess }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const savingRef = useRef(false);
+  const mutationKeyRef = useRef<string | null>(null);
+  const retryingAmbiguousRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [showDup, setShowDup] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function mutationKey() {
+    mutationKeyRef.current ??= crypto.randomUUID();
+    return mutationKeyRef.current;
+  }
 
   return (
     <>
@@ -42,23 +53,33 @@ export function CreateMealForm({ date, onSuccess }: Props) {
         id="today-create-meal-form"
         ref={formRef}
         className="min-w-0 space-y-3"
+        onInput={() => {
+          if (!savingRef.current) {
+            mutationKeyRef.current = null;
+            retryingAmbiguousRef.current = false;
+          }
+        }}
         onSubmit={async (e) => {
           e.preventDefault();
           const el = formRef.current;
           if (!el) return;
-          if (saving) return;
+          if (savingRef.current) return;
           if (el.checkValidity() === false) {
             el.reportValidity();
             return;
           }
 
+          savingRef.current = true;
           setSaving(true);
+          setError(null);
           try {
-            const fd = buildFormData(el, false);
-            const { duplicate } = await checkRecentDuplicateMealAction(fd);
-            if (duplicate) {
-              setShowDup(true);
-              return;
+            const fd = buildFormData(el, retryingAmbiguousRef.current, mutationKey());
+            if (!retryingAmbiguousRef.current) {
+              const { duplicate } = await checkRecentDuplicateMealAction(fd);
+              if (duplicate) {
+                setShowDup(true);
+                return;
+              }
             }
             const result = await createMealAction(fd);
             if (result.ok === false && result.reason === "duplicate") {
@@ -66,9 +87,15 @@ export function CreateMealForm({ date, onSuccess }: Props) {
               return;
             }
             el.reset();
+            mutationKeyRef.current = null;
+            retryingAmbiguousRef.current = false;
             onSuccess?.();
             router.refresh();
+          } catch {
+            retryingAmbiguousRef.current = true;
+            setError("No pudimos confirmar si la comida se guardó. Reintentá para comprobarla.");
           } finally {
+            savingRef.current = false;
             setSaving(false);
           }
         }}
@@ -162,6 +189,9 @@ export function CreateMealForm({ date, onSuccess }: Props) {
             {saving ? "Guardando…" : "Agregar comida"}
           </Button>
         </ResponsiveDialogFooter>
+        <div className="min-h-5" aria-live="polite">
+          {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+        </div>
       </form>
 
       {showDup ? (
@@ -185,8 +215,10 @@ export function CreateMealForm({ date, onSuccess }: Props) {
                 variant="secondary"
                 className="h-11 w-full sm:w-auto"
                 onClick={() => {
-                  if (saving) return;
+                  if (savingRef.current) return;
                   setShowDup(false);
+                  mutationKeyRef.current = null;
+                  retryingAmbiguousRef.current = false;
                 }}
                 disabled={saving}
               >
@@ -197,7 +229,7 @@ export function CreateMealForm({ date, onSuccess }: Props) {
                 className="h-11 w-full sm:w-auto"
                 disabled={saving}
                 onClick={async () => {
-                  if (saving) return;
+                  if (savingRef.current) return;
                   const el = formRef.current;
                   if (!el) return;
                   if (el.checkValidity() === false) {
@@ -205,19 +237,27 @@ export function CreateMealForm({ date, onSuccess }: Props) {
                     el.reportValidity();
                     return;
                   }
+                  savingRef.current = true;
                   setSaving(true);
+                  setError(null);
                   try {
-                    const fd = buildFormData(el, true);
+                    const fd = buildFormData(el, true, mutationKey());
                     const result = await createMealAction(fd);
                     if (result.ok) {
                       setShowDup(false);
                       el.reset();
+                      mutationKeyRef.current = null;
+                      retryingAmbiguousRef.current = false;
                       onSuccess?.();
                       router.refresh();
                     } else if (result.ok === false) {
                       setShowDup(true);
                     }
+                  } catch {
+                    retryingAmbiguousRef.current = true;
+                    setError("No pudimos confirmar si la comida se guardó. Reintentá para comprobarla.");
                   } finally {
+                    savingRef.current = false;
                     setSaving(false);
                   }
                 }}

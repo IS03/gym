@@ -68,7 +68,7 @@ describe("PR30.1 — Agregar rápido compacto", () => {
   });
 
   it("conserva el + sugerido y agrega Guardar como habitual como acción distinta", () => {
-    expect(quickAdd).toContain("quickAddMealAction(meal.sourceMealId)");
+    expect(quickAdd).toContain("quickAddMealAction(meal.sourceMealId, idempotencyKey)");
     expect(quickAdd).toContain("saveSuggestedMealAction(meal.sourceMealId)");
     expect(quickAdd).toContain("Guardar ${meal.label} como habitual");
     expect(actions).toContain("saveSuggestedMeal(sourceMealId, todayInCordoba(), auth)");
@@ -77,13 +77,15 @@ describe("PR30.1 — Agregar rápido compacto", () => {
   });
 
   it("one-tap y Ajustar envían IDs/cantidades y el servidor relee snapshots", () => {
-    expect(quickAdd).toContain("quickAddSavedMealAction({ savedMealId: meal.id, date })");
+    expect(quickAdd).toContain("quickAddSavedMealAction({ savedMealId: meal.id, date, idempotencyKey })");
     expect(quickAdd).toContain("itemId: item.id, quantity:");
     expect(quickAdd).not.toContain("final_calories:");
-    expect(actions).toContain("quickAddSavedMeal(input.savedMealId, input.date, auth)");
+    expect(actions).toContain("quickAddSavedMeal(input.savedMealId, input.date, auth, input.idempotencyKey)");
     expect(actions).toContain("addAdjustedSavedMeal(input, auth)");
     expect(savedDomain).toContain("readSavedMeal(savedMealId, auth, true)");
     expect(savedDomain).toContain("scaleSavedMealItem(item, byId.get(item.id))");
+    expect(quickAdd).toContain("mutationKeysRef");
+    expect(quickAdd).toContain("crypto.randomUUID()");
   });
 
   it("ofrece empty states de ambos conceptos sin auto-guardar sugerencias", () => {

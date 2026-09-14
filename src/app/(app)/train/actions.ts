@@ -36,6 +36,7 @@ import {
   discardCompletedWorkoutSession,
   finishWorkoutSession,
   getWorkoutExerciseSyncState,
+  getWorkoutSessionCompletionState,
   importInitialTrainingPlan,
   moveRoutineExerciseTarget,
   saveRoutineExerciseTarget,
@@ -47,6 +48,7 @@ import {
 import type {
   WorkoutExerciseSyncState,
   WorkoutSaveErrorCategory,
+  WorkoutSessionCompletionState,
 } from "@/lib/phase2/training-robust";
 import {
   toWorkoutStartActiveSession,
@@ -482,29 +484,27 @@ export async function saveWorkoutExerciseAction(input: {
   | { ok: true; data: { updatedAt: string } }
   | { ok: false; error: string; errorCategory: WorkoutSaveErrorCategory }
 > {
-  const startedAt = Date.now();
   try {
     const updatedAt = await saveWorkoutExercise(input);
-    const durationMs = Date.now() - startedAt;
-    if (durationMs >= 2_000) {
-      console.warn("[workout-exercise-save] slow", {
-        operation: "save_workout_exercise",
-        durationMs,
-        sessionExerciseId: input.sessionExerciseId,
-      });
-    }
     // Background autosave reconciles this exercise in the client. Structural
     // changes and finalization still revalidate the session explicitly.
     return { ok: true, data: { updatedAt } };
   } catch (error) {
     const errorCategory = workoutSaveErrorCategory(error);
-    console.error("[workout-exercise-save] failed", {
-      operation: "save_workout_exercise",
-      durationMs: Date.now() - startedAt,
-      errorCategory,
-      sessionExerciseId: input.sessionExerciseId,
-    });
     return { ok: false, error: actionError(error), errorCategory };
+  }
+}
+
+export async function getWorkoutSessionCompletionStateAction(input: {
+  sessionId: string;
+}): Promise<TrainingActionResult<WorkoutSessionCompletionState>> {
+  try {
+    return {
+      ok: true,
+      data: await getWorkoutSessionCompletionState(input.sessionId),
+    };
+  } catch (error) {
+    return { ok: false, error: actionError(error) };
   }
 }
 
