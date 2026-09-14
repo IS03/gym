@@ -11,6 +11,7 @@ const session = readFileSync("src/app/(app)/train/session/[id]/page.tsx", "utf8"
 const nutritionDay = readFileSync("src/lib/nutrition/day.ts", "utf8");
 const robustTraining = readFileSync("src/lib/phase2/training-robust.ts", "utf8");
 const nutritionReports = readFileSync("src/lib/nutrition/reports.ts", "utf8");
+const progressHome = readFileSync("src/lib/progress/home-server.ts", "utf8");
 
 describe("request-scoped authenticated reads", () => {
   it("shares one verified context across Home loaders and uses its bounded training read model", () => {
@@ -37,12 +38,25 @@ describe("request-scoped authenticated reads", () => {
     expect(train).toContain("getInProgressSessionForUser(auth)");
     expect(train).toContain("listWorkoutStartRoutines(auth)");
     expect(train).toContain("listTrainingDaysInMonth({ month }, auth)");
+    expect(train).toContain('operation: "train.routines"');
     expect(session).toContain("const auth = await requireAuthenticatedRequestContext()");
     expect(session).toContain("const [detail, exercises] = await Promise.all([");
     expect(session).toContain("getWorkoutSessionDetail(id, auth)");
     expect(session).toContain("listExercises({ includeArchived: false }, auth)");
     expect(session).toContain("listRecentRobustExerciseHistoryByExercise({");
     expect(session).toContain("}, auth)");
+  });
+
+  it("propagates bounded request metadata and keeps Progress errors on the canonical logger", () => {
+    expect(server).toContain("const requestPerformance = requestPerformanceContext(requestHeaders)");
+    expect(server).toContain("return { supabase, userId, requestPerformance }");
+    expect(middleware).toContain("requestPerformanceContext(request.headers)");
+    expect(progressHome).toContain("operation,");
+    expect(progressHome).toContain('layer: "database"');
+    expect(progressHome).toContain("...requestPerformance");
+    expect(progressHome).toContain('isolated("progress.activity-values"');
+    expect(progressHome).not.toContain("console.error");
+    expect(progressHome).not.toContain("[progress-home]");
   });
 
   it("keeps Home payloads bounded to a meal count and summary columns", () => {

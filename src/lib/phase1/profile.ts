@@ -53,7 +53,9 @@ export async function getProfileForUser(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) throw new Error(`Leer profiles: ${error.message}`);
+  if (error) {
+    throw new Error(`Leer profiles: ${error.message}`, { cause: error });
+  }
   return (data ?? null) as Profile | null;
 }
 

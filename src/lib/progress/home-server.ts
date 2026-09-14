@@ -12,6 +12,7 @@ import { buildBodyProgressReport } from "@/lib/progress/body";
 import type { ProgressComparisonQuery, ProgressTemporalComparisonReference } from "@/lib/progress/comparisons";
 import { buildProgressHomeModel, progressHomePeriodQuery } from "@/lib/progress/home";
 import { getHighlightedRelationshipsForUser } from "@/lib/progress/relationships/server";
+import { measurePerformance, type RequestPerformanceContext } from "@/lib/request-performance";
 import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 
 const previousComparison: ProgressComparisonQuery = {
@@ -24,11 +25,22 @@ const previousComparison: ProgressComparisonQuery = {
   initialView: "insights",
 };
 
-async function isolated<T>(label: string, task: Promise<T>): Promise<T | null> {
+async function isolated<T>(
+  operation: string,
+  task: () => Promise<T>,
+  requestPerformance?: RequestPerformanceContext,
+): Promise<T | null> {
   try {
-    return await task;
-  } catch (error) {
-    console.error(`[progress-home] ${label}`, error);
+    return await measurePerformance(
+      {
+        route: "/progress",
+        operation,
+        layer: "database",
+        ...requestPerformance,
+      },
+      task,
+    );
+  } catch {
     return null;
   }
 }
@@ -55,22 +67,22 @@ export async function getProgressHomeData(
   const relationshipPeriod = progressHomePeriodQuery("relationships", period);
 
   const [training, nutrition, activity, body, relationships] = await Promise.all([
-    isolated("training", getTrainingGeneralAnalysis(
+    isolated("progress.training", () => getTrainingGeneralAnalysis(
       trainingInput.preset,
       trainingReference,
       {},
       trainingInput.range,
       auth,
-    )),
-    isolated("nutrition", getNutritionReportWithProgressComparison({
+    ), auth.requestPerformance),
+    isolated("progress.nutrition", () => getNutritionReportWithProgressComparison({
       ...nutritionPeriod,
       comparison: previousComparison,
-    }, today, auth)),
-    isolated("activity", getDailyMetricsReport({
+    }, today, auth), auth.requestPerformance),
+    isolated("progress.activity-values", () => getDailyMetricsReport({
       ...activityPeriod,
       progressComparison: previousComparison,
-    }, today, auth)),
-    isolated("body", Promise.all([
+    }, today, auth), auth.requestPerformance),
+    isolated("progress.body", () => Promise.all([
       getMyProfile(auth),
       listWeightHistory(1000, auth),
       listBodyMeasurements(1000, auth),
@@ -80,8 +92,12 @@ export async function getProgressHomeData(
       measurements,
       period: period.current,
       referencePeriod: period.previous,
-    }))),
-    isolated("relationships", getHighlightedRelationshipsForUser(relationshipPeriod, today, auth)),
+    })), auth.requestPerformance),
+    isolated(
+      "progress.relationships",
+      () => getHighlightedRelationshipsForUser(relationshipPeriod, today, auth),
+      auth.requestPerformance,
+    ),
   ]);
 
   return {

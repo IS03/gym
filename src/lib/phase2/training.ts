@@ -400,7 +400,9 @@ export async function listRoutines(
   if (!params?.includeArchived) q = q.eq("is_active", true);
 
   const { data, error } = await q;
-  if (error) throw new Error(`Leer routines: ${error.message}`);
+  if (error) {
+    throw new Error(`Leer routines: ${error.message}`, { cause: error });
+  }
   return (data ?? []) as Routine[];
 }
 

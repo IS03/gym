@@ -73,7 +73,11 @@ export async function getDailyMetricsReport(
       .lte("metric_date", readEnd),
   ]);
   if (metricResult.error) throw new Error(`Leer métricas para Progreso: ${metricResult.error.message}`);
-  if (valueResult.error) throw new Error(`Leer valores para Progreso: ${valueResult.error.message}`);
+  if (valueResult.error) {
+    throw new Error(`Leer valores para Progreso: ${valueResult.error.message}`, {
+      cause: valueResult.error,
+    });
+  }
 
   const metrics = (metricResult.data ?? []).map((row) => ({
     ...row,

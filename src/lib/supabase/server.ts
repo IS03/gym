@@ -1,9 +1,14 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
-import { logPerformance, performanceErrorCategory } from "../request-performance";
+import {
+  logPerformance,
+  performanceErrorMetadata,
+  requestPerformanceContext,
+  type RequestPerformanceContext,
+} from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
 import { createResilientSupabaseFetch } from "./resilient-fetch";
 
@@ -47,6 +52,7 @@ export async function createClient() {
 export type AuthenticatedRequestContext = {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
+  requestPerformance?: RequestPerformanceContext;
 };
 
 /**
@@ -56,18 +62,27 @@ export type AuthenticatedRequestContext = {
  */
 export const getVerifiedRequestContext = cache(
   async (): Promise<AuthenticatedRequestContext | null> => {
-    const supabase = await createClient();
+    const [supabase, requestHeaders] = await Promise.all([
+      createClient(),
+      headers(),
+    ]);
+    const requestPerformance = requestPerformanceContext(requestHeaders);
     const authStartedAt = performance.now();
     let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
     try {
       claimsResult = await supabase.auth.getClaims();
     } catch (error) {
+      const status = isInvalidAuthSessionError(error)
+        ? "invalid_session"
+        : "error";
       logPerformance({
         route: "(app)",
         operation: "server-auth",
         durationMs: performance.now() - authStartedAt,
-        status: "error",
-        errorCategory: performanceErrorCategory(error),
+        status,
+        layer: "auth",
+        ...requestPerformance,
+        ...performanceErrorMetadata(error, { layer: "auth", status }),
       });
       throw error;
     }
@@ -76,13 +91,15 @@ export const getVerifiedRequestContext = cache(
       route: "(app)",
       operation: "server-auth",
       durationMs: performance.now() - authStartedAt,
+      layer: "auth",
+      ...requestPerformance,
       status: data?.claims?.sub
         ? "authenticated"
         : error && isInvalidAuthSessionError(error)
           ? "invalid_session"
           : "unauthenticated",
       ...(error && !isInvalidAuthSessionError(error)
-        ? { errorCategory: performanceErrorCategory(error) }
+        ? performanceErrorMetadata(error, { layer: "auth" })
         : {}),
     });
 
@@ -93,7 +110,7 @@ export const getVerifiedRequestContext = cache(
 
     const userId = data?.claims?.sub;
     if (typeof userId !== "string" || !userId) return null;
-    return { supabase, userId };
+    return { supabase, userId, requestPerformance };
   },
 );
 

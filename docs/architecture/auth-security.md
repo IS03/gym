@@ -875,7 +875,15 @@ Los logs internos pueden identificar categoría/operación, pero no deben conver
 
 ## Performance logs
 
-Proxy/server auth registran duración y estado lógico, no credenciales.
+`[perf]` es el contrato canónico para observabilidad de requests. Proxy y server
+auth conservan `proxy-auth` / `server-auth` y registran duración, estado lógico,
+`layer`, categoría técnica y `errorCode` estable. Cuando el request lo expone,
+el contexto request-scoped añade `requestKind` y `vercelId` desde `x-vercel-id`.
+
+El payload es allowlisted: puede incluir `httpStatus` y `providerCode` acotados,
+pero nunca serializa el mensaje raw, headers, cookies, tokens, bodies ni datos de
+usuario. Una sesión inválida continúa como `invalid_session`; un timeout de Auth
+se clasifica como `AUTH_TIMEOUT` y no se confunde con `DATABASE_TIMEOUT`.
 
 ---
 
