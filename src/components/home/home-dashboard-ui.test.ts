@@ -13,7 +13,17 @@ describe("Home V2", () => {
     expect(dashboard).toContain("Elegí una rutina o empezá una sesión libre.");
     expect(dashboard).toContain("<StartWorkoutSheet");
     expect(dashboard).toContain("Continuar entrenamiento");
-    expect(dashboard).toContain("href={`/train/session/${activeSession.id}`}");
+    expect(dashboard).toContain("href={`/train/session/${session.id}`}");
+  });
+
+  it("isolates secondary reads without treating an unknown session or unavailable summaries as empty", () => {
+    expect(page.match(/resilientRead\(/g)).toHaveLength(5);
+    expect(dashboard).toContain('activeSession.status === "unavailable"');
+    expect(dashboard).toContain('workoutStartRoutines.status === "unavailable"');
+    expect(dashboard).toContain('nutrition.status === "unavailable"');
+    expect(dashboard).toContain('training.status === "unavailable"');
+    expect(dashboard).toContain("No pudimos verificar si tenés una sesión en curso.");
+    expect(dashboard).not.toContain("routines={[]}");
   });
 
   it("loads one bounded active-session projection with real set progress", () => {

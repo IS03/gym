@@ -13,6 +13,7 @@ import {
 import { BrandSymbol } from "@/components/brand/brand-symbol";
 import { StartWorkoutSheet } from "@/components/training/start-workout-sheet";
 import { Card, CardContent } from "@/components/ui/card";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import {
   formatHomeActiveSessionMeta,
   formatHomeActiveSessionTime,
@@ -32,6 +33,7 @@ import type {
   WeeklyTrainingSummary,
 } from "@/lib/phase2/types";
 import type { WorkoutStartRoutine } from "@/lib/phase2/workout-start";
+import type { ReadResult } from "@/lib/resilient-read";
 import {
   formatWorkoutDuration,
   formatWorkoutTimeRange,
@@ -54,11 +56,13 @@ type HomeNutritionSummary = {
 type HomeDashboardProps = {
   today: string;
   profile: CompactProfile;
-  activeSession: HomeActiveSessionSummary | null;
-  workoutStartRoutines: WorkoutStartRoutine[];
-  nutrition: HomeNutritionSummary;
-  week: WeeklyTrainingSummary;
-  todaySessions: CompletedSessionSummary[];
+  activeSession: ReadResult<HomeActiveSessionSummary | null>;
+  workoutStartRoutines: ReadResult<WorkoutStartRoutine[]>;
+  nutrition: ReadResult<HomeNutritionSummary>;
+  training: ReadResult<{
+    week: WeeklyTrainingSummary;
+    todaySessions: CompletedSessionSummary[];
+  }>;
 };
 
 function plural(value: number, singular: string, pluralValue = `${singular}s`) {
@@ -117,8 +121,9 @@ function PrimaryTrainingCard({
   activeSession,
   workoutStartRoutines,
 }: Pick<HomeDashboardProps, "today" | "activeSession" | "workoutStartRoutines">) {
-  const progressLabel = activeSession
-    ? `${activeSession.exercisesCompleted}/${activeSession.totalExercises} ${activeSession.totalExercises === 1 ? "ejercicio" : "ejercicios"} · ${activeSession.completedSets}/${activeSession.totalSets} ${activeSession.totalSets === 1 ? "serie" : "series"}`
+  const session = activeSession.status === "ok" ? activeSession.data : null;
+  const progressLabel = session
+    ? `${session.exercisesCompleted}/${session.totalExercises} ${session.totalExercises === 1 ? "ejercicio" : "ejercicios"} · ${session.completedSets}/${session.totalSets} ${session.totalSets === 1 ? "serie" : "series"}`
     : null;
 
   return (
@@ -128,23 +133,33 @@ function PrimaryTrainingCard({
         <span className="pointer-events-none absolute right-9 top-3 size-16 rounded-full bg-primary-foreground/7" aria-hidden />
         <span className="pointer-events-none absolute right-3 top-20 size-10 rounded-full bg-primary-foreground/10" aria-hidden />
         <CardContent className="relative flex min-h-[11rem] flex-col justify-between gap-4">
-          {activeSession ? (
+          {activeSession.status === "unavailable" ? (
+            <div className="space-y-3">
+              <p id="home-training-title" className="text-lg font-semibold tracking-tight">
+                Estado de entrenamiento no disponible
+              </p>
+              <ReadUnavailable
+                message="No pudimos verificar si tenés una sesión en curso."
+                inverted
+              />
+            </div>
+          ) : session ? (
             <div className="space-y-2">
               <span className="inline-flex rounded-full bg-primary-foreground/14 px-2.5 py-1 text-[11px] font-semibold text-primary-foreground">
                 Sesión en curso
               </span>
               <div>
                 <h1 id="home-training-title" className="max-w-[80%] truncate text-2xl font-semibold tracking-tight">
-                  {activeSession.name}
+                  {session.name}
                 </h1>
                 <p className="mt-0.5 text-sm text-primary-foreground/75">
-                  {formatHomeActiveSessionMeta(activeSession, today)}
+                  {formatHomeActiveSessionMeta(session, today)}
                 </p>
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3 text-xs font-medium text-primary-foreground/80">
                   <span>{progressLabel}</span>
-                  <span className="metric-number shrink-0">{activeSession.progressPercent}%</span>
+                  <span className="metric-number shrink-0">{session.progressPercent}%</span>
                 </div>
                 <div
                   className="h-2 overflow-hidden rounded-full bg-primary-foreground/20"
@@ -152,11 +167,11 @@ function PrimaryTrainingCard({
                   aria-label="Progreso de la sesión"
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={activeSession.progressPercent}
+                  aria-valuenow={session.progressPercent}
                 >
                   <div
                     className="h-full rounded-full bg-primary-foreground/90"
-                    style={{ width: `${activeSession.progressPercent}%` }}
+                    style={{ width: `${session.progressPercent}%` }}
                   />
                 </div>
               </div>
@@ -173,16 +188,21 @@ function PrimaryTrainingCard({
             </div>
           )}
 
-          {activeSession ? (
+          {activeSession.status === "unavailable" ? null : session ? (
             <Link
-              href={`/train/session/${activeSession.id}`}
+              href={`/train/session/${session.id}`}
               className="flex h-11 items-center justify-center rounded-lg bg-primary-foreground px-3 text-sm font-semibold text-primary outline-none transition-[background-color,transform] duration-150 hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
             >
               Continuar entrenamiento
             </Link>
+          ) : workoutStartRoutines.status === "unavailable" ? (
+            <ReadUnavailable
+              message="No pudimos cargar las opciones para iniciar una sesión."
+              inverted
+            />
           ) : (
             <StartWorkoutSheet
-              routines={workoutStartRoutines}
+              routines={workoutStartRoutines.data}
               activeSession={null}
               triggerAriaLabel="Iniciar entrenamiento"
               triggerClassName="flex h-11 items-center justify-center rounded-lg bg-primary-foreground px-3 text-sm font-semibold text-primary outline-none transition-[background-color,transform] duration-150 hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]"
@@ -196,18 +216,28 @@ function PrimaryTrainingCard({
   );
 }
 
-function TodaySummary({ nutrition }: { nutrition: HomeNutritionSummary }) {
+function TodaySummary({ nutrition }: Pick<HomeDashboardProps, "nutrition">) {
+  if (nutrition.status === "unavailable") {
+    return (
+      <section aria-labelledby="home-today-title" className="space-y-3 lg:col-span-5">
+        <SectionHeader id="home-today-title" title="Resumen de hoy" href="/today" action="Ver nutrición" />
+        <ReadUnavailable message="No pudimos cargar el resumen de hoy." />
+      </section>
+    );
+  }
+
+  const summary = nutrition.data;
   const calorieProgress = progressPercent(
-    nutrition.calories,
-    nutrition.calorieTarget ?? 0,
+    summary.calories,
+    summary.calorieTarget ?? 0,
   );
   const proteinProgress = progressPercent(
-    nutrition.proteinG,
-    nutrition.proteinTargetG ?? 0,
+    summary.proteinG,
+    summary.proteinTargetG ?? 0,
   );
   const waterProgress = progressPercent(
-    nutrition.waterL ?? 0,
-    nutrition.waterTargetL ?? 0,
+    summary.waterL ?? 0,
+    summary.waterTargetL ?? 0,
   );
 
   return (
@@ -224,24 +254,24 @@ function TodaySummary({ nutrition }: { nutrition: HomeNutritionSummary }) {
                 <p className="text-xs text-muted-foreground">Calorías consumidas</p>
                 <div className="flex items-end justify-between gap-3">
                   <p className="metric-number truncate text-2xl font-semibold tracking-tight">
-                    {integer.format(nutrition.calories)} <span className="text-sm font-medium text-muted-foreground">kcal</span>
+                    {integer.format(summary.calories)} <span className="text-sm font-medium text-muted-foreground">kcal</span>
                   </p>
                   <p className="shrink-0 pb-0.5 text-right text-xs text-muted-foreground">
-                    {nutrition.calorieTarget && nutrition.calorieTarget > 0
-                      ? `de ${integer.format(nutrition.calorieTarget)} kcal`
+                    {summary.calorieTarget && summary.calorieTarget > 0
+                      ? `de ${integer.format(summary.calorieTarget)} kcal`
                       : "Sin objetivo"}
                   </p>
                 </div>
               </div>
             </div>
-            {nutrition.calorieTarget && nutrition.calorieTarget > 0 ? (
+            {summary.calorieTarget && summary.calorieTarget > 0 ? (
               <div
                 className="h-2 overflow-hidden rounded-full bg-muted"
                 role="progressbar"
                 aria-label="Calorías consumidas"
                 aria-valuemin={0}
-                aria-valuemax={nutrition.calorieTarget}
-                aria-valuenow={nutrition.calories}
+                aria-valuemax={summary.calorieTarget}
+                aria-valuenow={summary.calories}
               >
                 <div className="h-full rounded-full bg-primary" style={{ width: `${calorieProgress}%` }} />
               </div>
@@ -251,25 +281,25 @@ function TodaySummary({ nutrition }: { nutrition: HomeNutritionSummary }) {
           <div className="grid grid-cols-3 divide-x divide-border">
             <div className="min-w-0 pr-2.5">
               <p className="metric-number truncate text-[15px] font-semibold">
-                {metricWithTarget(nutrition.proteinG, nutrition.proteinTargetG, "g")}
+                {metricWithTarget(summary.proteinG, summary.proteinTargetG, "g")}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Proteína</p>
-              {nutrition.proteinTargetG && nutrition.proteinTargetG > 0 ? (
+              {summary.proteinTargetG && summary.proteinTargetG > 0 ? (
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${proteinProgress}%` }} />
                 </div>
               ) : null}
             </div>
             <div className="min-w-0 px-2.5">
-              <p className="metric-number text-[15px] font-semibold">{nutrition.mealCount}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{nutrition.mealCount === 1 ? "cargada" : "cargadas"}</p>
+              <p className="metric-number text-[15px] font-semibold">{summary.mealCount}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{summary.mealCount === 1 ? "cargada" : "cargadas"}</p>
             </div>
             <div className="min-w-0 pl-2.5">
               <p className="metric-number truncate text-[15px] font-semibold">
-                {metricWithTarget(nutrition.waterL, nutrition.waterTargetL, "L")}
+                {metricWithTarget(summary.waterL, summary.waterTargetL, "L")}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Agua</p>
-              {nutrition.waterTargetL && nutrition.waterTargetL > 0 ? (
+              {summary.waterTargetL && summary.waterTargetL > 0 ? (
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${waterProgress}%` }} />
                 </div>
@@ -287,7 +317,7 @@ function TodaySummary({ nutrition }: { nutrition: HomeNutritionSummary }) {
             <span className="min-w-0 flex-1">
               <span className="block text-xs text-muted-foreground">Balance estimado</span>
               <span className="metric-number mt-0.5 block font-semibold">
-                {formatHomeEnergyBalance(nutrition.energyBalanceKcal)}
+                {formatHomeEnergyBalance(summary.energyBalanceKcal)}
               </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -336,13 +366,24 @@ function WeekDayIndicator({
 
 function WeeklyProgress({
   today,
-  week,
+  training,
   activeSession,
-}: Pick<HomeDashboardProps, "today" | "week" | "activeSession">) {
+}: Pick<HomeDashboardProps, "today" | "training" | "activeSession">) {
+  if (training.status === "unavailable") {
+    return (
+      <section aria-labelledby="home-week-title" className="space-y-3 lg:col-span-7">
+        <SectionHeader id="home-week-title" title="Progreso de la semana" href="/train/progress?period=1w" action="Ver reporte" />
+        <ReadUnavailable message="No pudimos cargar el resumen semanal." />
+      </section>
+    );
+  }
+
+  const week = training.data.week;
+  const session = activeSession.status === "ok" ? activeSession.data : null;
   const weekStart = week.weekStart ?? mondayOfIsoDate(today);
   const weekEnd = addUtcDays(weekStart, 6);
-  const activeThisWeek = activeSession && isDateInRange(activeSession.logDate, weekStart, weekEnd)
-    ? activeSession
+  const activeThisWeek = session && isDateInRange(session.logDate, weekStart, weekEnd)
+    ? session
     : null;
   const completedDays = new Set(week.trainingDays);
   const routines = entriesByValue(week.routines);
@@ -487,13 +528,12 @@ function CompletedSessionRow({ session }: { session: CompletedSessionSummary }) 
 function TodaySessions({
   today,
   activeSession,
-  sessions,
-}: {
-  today: string;
-  activeSession: HomeActiveSessionSummary | null;
-  sessions: CompletedSessionSummary[];
-}) {
-  const activeToday = activeSession?.logDate === today ? activeSession : null;
+  training,
+}: Pick<HomeDashboardProps, "today" | "activeSession" | "training">) {
+  if (training.status === "unavailable") return null;
+  const session = activeSession.status === "ok" ? activeSession.data : null;
+  const sessions = training.data.todaySessions;
+  const activeToday = session?.logDate === today ? session : null;
   if (!activeToday && sessions.length === 0) return null;
 
   return (
@@ -549,8 +589,7 @@ export function HomeDashboard({
   activeSession,
   workoutStartRoutines,
   nutrition,
-  week,
-  todaySessions,
+  training,
 }: HomeDashboardProps) {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-2">
@@ -575,8 +614,8 @@ export function HomeDashboard({
       <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         <PrimaryTrainingCard today={today} activeSession={activeSession} workoutStartRoutines={workoutStartRoutines} />
         <TodaySummary nutrition={nutrition} />
-        <WeeklyProgress today={today} week={week} activeSession={activeSession} />
-        <TodaySessions today={today} activeSession={activeSession} sessions={todaySessions} />
+        <WeeklyProgress today={today} training={training} activeSession={activeSession} />
+        <TodaySessions today={today} activeSession={activeSession} training={training} />
         <QuickAccesses />
       </div>
     </div>

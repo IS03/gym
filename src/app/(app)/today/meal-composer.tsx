@@ -3,9 +3,11 @@
 import { ChevronRight, Plus, Scale, Zap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ReadUnavailable } from "@/components/ui/read-unavailable";
 import type { Food } from "@/lib/phase1/types";
 import type { QuickMealCandidate } from "@/lib/nutrition/quick-meals-core";
 import type { SavedMealSummary } from "@/lib/nutrition/saved-meal-core";
+import type { ReadResult } from "@/lib/resilient-read";
 import { CreateMealForm } from "./create-meal-form";
 import { FoodMealForm } from "./food-meal-form";
 import { QuickAddMeals } from "./quick-meals";
@@ -20,17 +22,19 @@ const modeCopy: Record<AddMode, { title: string; description: string }> = {
   food: { title: "Alimento por cantidad", description: "Elegí un alimento y calculá la porción que vas a registrar." },
 };
 
-function AddChoice({ icon: Icon, title, description, onClick }: {
+function AddChoice({ icon: Icon, title, description, onClick, disabled }: {
   icon: typeof Plus;
   title: string;
   description: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="flex min-h-20 w-full items-center gap-3 rounded-xl border bg-background/45 p-3 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-20 w-full items-center gap-3 rounded-xl border bg-background/45 p-3 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-55"
       onClick={onClick}
+      disabled={disabled}
     >
       <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <Icon className="size-5" aria-hidden />
@@ -44,10 +48,19 @@ function AddChoice({ icon: Icon, title, description, onClick }: {
   );
 }
 
-export function MealComposer({ date, quickMeals, foods, savedMeals }: { date: string; quickMeals: QuickMealCandidate[]; foods: Food[]; savedMeals: SavedMealSummary[] }) {
+export function MealComposer({ date, quickMeals, foods, savedMeals }: {
+  date: string;
+  quickMeals: ReadResult<QuickMealCandidate[]>;
+  foods: ReadResult<Food[]>;
+  savedMeals: ReadResult<SavedMealSummary[]>;
+}) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<AddMode>("menu");
   const copy = modeCopy[mode];
+  const quickAvailable = quickMeals.status === "ok" || savedMeals.status === "ok";
+  const hasUnavailableSource = quickMeals.status === "unavailable"
+    || foods.status === "unavailable"
+    || savedMeals.status === "unavailable";
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -78,15 +91,18 @@ export function MealComposer({ date, quickMeals, foods, savedMeals }: { date: st
         {mode === "menu" ? (
           <div className="space-y-3 pb-4">
             <AddChoice icon={Plus} title="Nueva comida" description="Cargá título, calorías y macros manualmente." onClick={() => setMode("manual")} />
-            <AddChoice icon={Zap} title="Agregar rápido" description="Usá una comida habitual o una sugerencia." onClick={() => setMode("quick")} />
-            <AddChoice icon={Scale} title="Alimento por cantidad" description="Elegí un alimento, indicá la cantidad y calculá la porción." onClick={() => setMode("food")} />
+            <AddChoice icon={Zap} title="Agregar rápido" description={quickAvailable ? "Usá una comida habitual o una sugerencia." : "Estas opciones no están disponibles en este momento."} onClick={() => setMode("quick")} disabled={!quickAvailable} />
+            <AddChoice icon={Scale} title="Alimento por cantidad" description={foods.status === "ok" ? "Elegí un alimento, indicá la cantidad y calculá la porción." : "El catálogo no está disponible en este momento."} onClick={() => setMode("food")} disabled={foods.status === "unavailable"} />
+            {hasUnavailableSource ? <ReadUnavailable message="Algunas opciones rápidas no pudieron cargarse." /> : null}
           </div>
         ) : mode === "manual" ? (
           <CreateMealForm date={date} onSuccess={() => handleOpenChange(false)} />
-        ) : mode === "quick" ? (
+        ) : mode === "quick" && quickAvailable ? (
           <QuickAddMeals date={date} suggestedMeals={quickMeals} initialSavedMeals={savedMeals} embedded />
+        ) : mode === "food" && foods.status === "ok" ? (
+          <FoodMealForm date={date} foods={foods.data} onSuccess={() => handleOpenChange(false)} />
         ) : (
-          <FoodMealForm date={date} foods={foods} onSuccess={() => handleOpenChange(false)} />
+          <ReadUnavailable message="Esta opción no está disponible en este momento." />
         )}
       </ResponsiveDialog>
     </>

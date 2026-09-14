@@ -46,6 +46,20 @@ describe("PR20 — Today UX polish", () => {
     expect(meals).toBeGreaterThan(activity);
   });
 
+  it("keeps nutrition core explicit and isolates metrics and composer catalogs", () => {
+    const composer = source("src/app/(app)/today/meal-composer.tsx");
+    const quickMeals = source("src/app/(app)/today/quick-meals.tsx");
+    expect(todayPage.match(/resilientRead\(/g)).toHaveLength(5);
+    expect(todayPage).toContain('nutrition.status === "unavailable"');
+    expect(todayPage).toContain("No pudimos cargar los datos de hoy.");
+    expect(todayActivity).toContain('metrics.status === "ok"');
+    expect(todayActivity).toContain("No pudimos cargar tus métricas de hoy.");
+    expect(composer).toContain("Algunas opciones rápidas no pudieron cargarse.");
+    expect(composer).toContain('foods.status === "unavailable"');
+    expect(quickMeals).toContain('initialSavedMeals.status === "unavailable"');
+    expect(quickMeals).toContain('suggestedMeals.status === "unavailable"');
+  });
+
   it("renders active metric ids with generic integer, decimal and duration controls", () => {
     expect(activityEditor).toContain("metrics.map");
     expect(activityEditor).toContain("daily-metric-${metric.id}");

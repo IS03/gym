@@ -5,12 +5,13 @@ const page = readFileSync("src/app/(app)/train/page.tsx", "utf8");
 
 describe("hub operativo de Entrenar", () => {
   it("mantiene la acción de nueva sesión sólo cuando no hay una sesión en curso", () => {
-    expect(page).toContain("activeSession ? (");
+    expect(page).toContain('activeSession.status === "unavailable"');
+    expect(page).toContain("activeSession.data ? (");
     expect(page).toContain("Continuar entrenamiento");
     expect(page).toContain("Nueva sesión");
     expect(page).toContain("activeSession={null}");
-    expect(page).toContain("href={`/train/session/${activeSession.id}`}");
-    expect(page).toContain("activeSession ? (");
+    expect(page).toContain("href={`/train/session/${activeSession.data.id}`}");
+    expect(page).toContain('workoutStartRoutines.status === "unavailable"');
     expect(page).toContain("triggerClassName=\"inline-flex h-11 w-full");
     expect(page).not.toContain("Elegí una rutina o empezá una sesión libre.");
   });
@@ -30,5 +31,10 @@ describe("hub operativo de Entrenar", () => {
     expect(page).toContain("getInProgressSessionForUser(auth)");
     expect(page).toContain("listWorkoutStartRoutines(auth)");
     expect(page).toContain("listTrainingDaysInMonth({ month }, auth)");
+    expect(page.match(/resilientRead\(/g)).toHaveLength(3);
+    expect(page).toContain('operation: "train.active-session"');
+    expect(page).toContain('operation: "train.calendar"');
+    expect(page).toContain('trainedDays.status === "ok"');
+    expect(page).not.toContain("new Map()");
   });
 });
