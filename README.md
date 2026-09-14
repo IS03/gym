@@ -118,6 +118,7 @@ La puerta de entrada a toda la documentación es [`docs/README.md`](./docs/READM
 | [`docs/progress-v2.md`](./docs/progress-v2.md) | Analytics, períodos, coverage, Comparisons, Relationships y contratos de Progress. |
 | [`docs/architecture/training-system.md`](./docs/architecture/training-system.md) | Lógica operativa vigente de Entrenamiento. |
 | [`docs/architecture/nutrition-system.md`](./docs/architecture/nutrition-system.md) | Lógica operativa vigente de Nutrición, Plan V2, gasto, comidas y snapshots. |
+| [`docs/architecture/auth-security.md`](./docs/architecture/auth-security.md) | Google OAuth, sesión, RLS, ownership, secretos e integraciones privadas. |
 | [`docs/design/principles.md`](./docs/design/principles.md) | Principios visuales y de interacción. |
 | [`docs/design/patterns.md`](./docs/design/patterns.md) | Patrones reutilizables de interfaz. |
 | [`docs/integrations/chatgpt-nutrition.md`](./docs/integrations/chatgpt-nutrition.md) | Integración privada entre ChatGPT y el registro nutricional. |
