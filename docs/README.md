@@ -45,9 +45,15 @@ Documento canónico de Progress V2: fuentes de datos, catálogo de métricas,
 períodos, coverage, Comparaciones, dominios, Relaciones, Home, extensibilidad y
 antipatrones semánticos.
 
+### [`architecture/data-model.md`](./architecture/data-model.md)
+
+Referencia canónica del modelo de datos: clases de entidades, ownership, fuentes
+de verdad, relaciones, snapshots, lifecycle, fechas, missing vs zero, legacy y
+reglas para extender el schema sin romper historia.
+
 ### [`architecture/data-flow.md`](./architecture/data-flow.md)
 
-Define fuentes de verdad, sincronización de peso, snapshots nutricionales,
+Documento complementario sobre sincronización de peso, snapshots nutricionales,
 flujo de entrenamiento, fechas e invariantes entre estado actual e historial.
 
 ### [`architecture/training-system.md`](./architecture/training-system.md)
