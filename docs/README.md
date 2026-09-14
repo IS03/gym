@@ -62,6 +62,12 @@ Referencia canónica de la lógica operativa de Nutrición: día nutricional,
 comidas, Foods, comidas habituales, Plan V2, gasto energético, snapshots,
 overrides, historial, importación e integración externa.
 
+### [`architecture/auth-security.md`](./architecture/auth-security.md)
+
+Referencia canónica de autenticación y seguridad: Google OAuth, sesión, proxy,
+clientes Supabase, RLS, ownership, service role, credenciales de integración,
+headers, PWA privada y reglas para extender límites de confianza.
+
 ## Desarrollo
 
 ### [`development/engineering-guidelines.md`](./development/engineering-guidelines.md)
