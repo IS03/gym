@@ -116,9 +116,10 @@ La puerta de entrada a toda la documentación es [`docs/README.md`](./docs/READM
 | --- | --- |
 | [`docs/ownlevel-architecture.md`](./docs/ownlevel-architecture.md) | Arquitectura general de OWNLEVEL, dominios, rutas, auth, datos y extensibilidad. |
 | [`docs/progress-v2.md`](./docs/progress-v2.md) | Analytics, períodos, coverage, Comparisons, Relationships y contratos de Progress. |
+| [`docs/architecture/training-system.md`](./docs/architecture/training-system.md) | Lógica operativa vigente de Entrenamiento. |
+| [`docs/architecture/nutrition-system.md`](./docs/architecture/nutrition-system.md) | Lógica operativa vigente de Nutrición, Plan V2, gasto, comidas y snapshots. |
 | [`docs/design/principles.md`](./docs/design/principles.md) | Principios visuales y de interacción. |
 | [`docs/design/patterns.md`](./docs/design/patterns.md) | Patrones reutilizables de interfaz. |
-| [`docs/architecture/training-system.md`](./docs/architecture/training-system.md) | Arquitectura vigente del sistema de entrenamiento. |
 | [`docs/integrations/chatgpt-nutrition.md`](./docs/integrations/chatgpt-nutrition.md) | Integración privada entre ChatGPT y el registro nutricional. |
 
 Ante contradicciones, el código y los tests actuales tienen prioridad sobre documentación histórica. Los documentos de `docs/archive/` se conservan sólo como contexto.
