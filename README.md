@@ -115,6 +115,7 @@ La puerta de entrada a toda la documentación es [`docs/README.md`](./docs/READM
 | Documento | Fuente de verdad para |
 | --- | --- |
 | [`docs/ownlevel-architecture.md`](./docs/ownlevel-architecture.md) | Arquitectura general de OWNLEVEL, dominios, rutas, auth, datos y extensibilidad. |
+| [`docs/architecture/data-model.md`](./docs/architecture/data-model.md) | Modelo de datos canónico, ownership, relaciones, snapshots, lifecycle y reglas de schema. |
 | [`docs/progress-v2.md`](./docs/progress-v2.md) | Analytics, períodos, coverage, Comparisons, Relationships y contratos de Progress. |
 | [`docs/architecture/training-system.md`](./docs/architecture/training-system.md) | Lógica operativa vigente de Entrenamiento. |
 | [`docs/architecture/nutrition-system.md`](./docs/architecture/nutrition-system.md) | Lógica operativa vigente de Nutrición, Plan V2, gasto, comidas y snapshots. |
