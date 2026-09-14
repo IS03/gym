@@ -45,7 +45,8 @@ describe("PR28 — lista y edición de comidas", () => {
   it("mantiene el editor abierto ante error y expone sólo mensajes públicos", () => {
     expect(mealList).toContain("No pudimos guardar los cambios. Intentá nuevamente.");
     expect(mealList).toContain("No pudimos eliminar la comida. Intentá nuevamente.");
-    expect(actions).toContain("[today] update_meal_failed");
+    expect(actions).not.toContain("[today] update_meal_failed");
+    expect(actions).toContain('measuredMealWrite(auth, "nutrition.update-meal"');
     expect(actions).toContain("[today] soft_delete_meal_failed");
   });
 });

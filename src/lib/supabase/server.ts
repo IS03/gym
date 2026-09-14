@@ -93,10 +93,12 @@ export const getVerifiedRequestContext = cache(
       durationMs: performance.now() - authStartedAt,
       layer: "auth",
       ...requestPerformance,
-      status: data?.claims?.sub
-        ? "authenticated"
-        : error && isInvalidAuthSessionError(error)
+      status: error
+        ? isInvalidAuthSessionError(error)
           ? "invalid_session"
+          : "error"
+        : data?.claims?.sub
+          ? "authenticated"
           : "unauthenticated",
       ...(error && !isInvalidAuthSessionError(error)
         ? performanceErrorMetadata(error, { layer: "auth" })

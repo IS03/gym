@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 
 import {
+  bodyMeasurementMatchesInput,
   deleteBodyMeasurement,
   listBodyMeasurements,
   parseBodyMeasurementInput,
@@ -21,11 +22,12 @@ type QueryResult = { data: unknown; error: { message: string } | null };
 function query(result: QueryResult) {
   const builder = {
     select: vi.fn(), insert: vi.fn(), update: vi.fn(), delete: vi.fn(),
-    eq: vi.fn(), order: vi.fn(), limit: vi.fn(), single: vi.fn(),
+    eq: vi.fn(), order: vi.fn(), limit: vi.fn(), single: vi.fn(), maybeSingle: vi.fn(),
     then: (resolve: (value: QueryResult) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(result).then(resolve, reject),
   };
   for (const method of ["select", "insert", "update", "delete", "eq", "order", "limit"] as const) builder[method].mockReturnValue(builder);
   builder.single.mockResolvedValue(result);
+  builder.maybeSingle.mockResolvedValue(result);
   return builder;
 }
 
@@ -75,6 +77,38 @@ describe("medidas corporales", () => {
     builder.single.mockResolvedValue({ data: row, error: null });
     await expect(upsertBodyMeasurement(input)).resolves.toEqual(row);
     expect(builder.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: "user-1", measured_on: "2026-08-13", waist_cm: 78 }));
+  });
+
+  it("recupera una creación ambigua sólo cuando la fila propia coincide", async () => {
+    const failedInsert = query({
+      data: null,
+      error: { message: "body_measurements_user_date_unique" },
+    });
+    const sameMeasurement = query({ data: row, error: null });
+    client.from
+      .mockReturnValueOnce(failedInsert)
+      .mockReturnValueOnce(sameMeasurement);
+
+    await expect(upsertBodyMeasurement(input)).resolves.toEqual(row);
+    expect(sameMeasurement.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(sameMeasurement.eq).toHaveBeenCalledWith("measured_on", input.measuredOn);
+    expect(bodyMeasurementMatchesInput(row, input)).toBe(true);
+  });
+
+  it("keeps a same-date measurement with different values as a real conflict", async () => {
+    const failedInsert = query({
+      data: null,
+      error: { message: "body_measurements_user_date_unique" },
+    });
+    const differentMeasurement = query({ data: { ...row, waist_cm: 79 }, error: null });
+    client.from
+      .mockReturnValueOnce(failedInsert)
+      .mockReturnValueOnce(differentMeasurement);
+
+    await expect(upsertBodyMeasurement(input)).rejects.toThrow(
+      "Ya existe una medición para esa fecha",
+    );
+    expect(bodyMeasurementMatchesInput({ ...row, waist_cm: 79 }, input)).toBe(false);
   });
 
   it("acota editar y eliminar al usuario autenticado sin borrar medidas históricas", async () => {

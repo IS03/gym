@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { AlertTriangle, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { deleteBodyMeasurementAction, saveBodyMeasurementAction } from "@/app/(app)/train/body/actions";
 import { Button } from "@/components/ui/button";
@@ -59,18 +59,29 @@ export function BodyMeasurements({ entries, today, onEntriesChange }: { entries:
   const [deleteTarget, setDeleteTarget] = useState<BodyMeasurement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const savePendingRef = useRef(false);
   const ordered = useMemo(() => [...entries].reverse(), [entries]);
 
   const openCreate = () => { setError(null); setEditing(null); setDate(today); setValues(emptyValues()); setCondition(""); setNotes(""); setFormOpen(true); };
   const openEdit = (entry: BodyMeasurement) => { setError(null); setEditing(entry); setDate(entry.measured_on); setValues(toValues(entry)); setCondition(entry.condition ?? ""); setNotes(entry.notes ?? ""); setFormOpen(true); };
-  const save = () => startTransition(async () => {
-    const payload: Record<string, string | undefined> = { id: editing?.id, measuredOn: date, condition, notes };
-    for(const field of BODY_MEASUREMENT_FIELDS) payload[inputNames[field]] = values[field];
-    const result = await saveBodyMeasurementAction(payload as Parameters<typeof saveBodyMeasurementAction>[0]);
-    if (!result.ok || !result.entry) { setError(result.ok ? "No se pudieron guardar las medidas." : result.error); return; }
-    onEntriesChange([...entries.filter((entry) => entry.id !== result.entry!.id && entry.measured_on !== result.entry!.measured_on), result.entry!].sort((a, b) => a.measured_on.localeCompare(b.measured_on)));
-    setFormOpen(false);
-  });
+  const save = () => {
+    if (savePendingRef.current) return;
+    savePendingRef.current = true;
+    startTransition(async () => {
+      const payload: Record<string, string | undefined> = { id: editing?.id, measuredOn: date, condition, notes };
+      for(const field of BODY_MEASUREMENT_FIELDS) payload[inputNames[field]] = values[field];
+      try {
+        const result = await saveBodyMeasurementAction(payload as Parameters<typeof saveBodyMeasurementAction>[0]);
+        if (!result.ok || !result.entry) { setError(result.ok ? "No se pudieron guardar las medidas." : result.error); return; }
+        onEntriesChange([...entries.filter((entry) => entry.id !== result.entry!.id && entry.measured_on !== result.entry!.measured_on), result.entry!].sort((a, b) => a.measured_on.localeCompare(b.measured_on)));
+        setFormOpen(false);
+      } catch {
+        setError("No pudimos confirmar si las medidas se guardaron. Reintentá para comprobarlas.");
+      } finally {
+        savePendingRef.current = false;
+      }
+    });
+  };
   const remove = () => {
     if (!deleteTarget) return;
     startTransition(async () => {

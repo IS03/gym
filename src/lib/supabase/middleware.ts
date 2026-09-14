@@ -103,10 +103,12 @@ export async function updateSession(request: NextRequest) {
     durationMs: performance.now() - authStartedAt,
     layer: "auth",
     ...requestPerformance,
-    status: claimsData?.claims?.sub
-      ? "authenticated"
-      : claimsError && isInvalidAuthSessionError(claimsError)
+    status: claimsError
+      ? isInvalidAuthSessionError(claimsError)
         ? "invalid_session"
+        : "error"
+      : claimsData?.claims?.sub
+        ? "authenticated"
         : "unauthenticated",
     ...(claimsError && !isInvalidAuthSessionError(claimsError)
       ? performanceErrorMetadata(claimsError, { layer: "auth" })

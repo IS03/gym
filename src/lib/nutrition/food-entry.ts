@@ -13,6 +13,7 @@ export type AddFoodToDayInput = {
   foodId: string;
   quantity: unknown;
   date: string;
+  idempotencyKey?: string;
 };
 
 export async function createMealFromFood(
@@ -33,8 +34,7 @@ export async function createMealFromFood(
     .maybeSingle();
 
   if (error) {
-    console.warn("[food-quantity] canonical_read_failed", { code: error.code });
-    throw new Error("No pudimos leer el alimento.");
+    throw new Error("No pudimos leer el alimento.", { cause: error });
   }
   if (!data) {
     throw new Error("Este alimento ya no está disponible.");
@@ -71,6 +71,7 @@ export async function createMealFromFood(
       precision_level: food.precision_level,
       context_type: "food_quantity",
       source_note: food.source_note,
+      idempotencyKey: input.idempotencyKey,
     },
     context,
   );

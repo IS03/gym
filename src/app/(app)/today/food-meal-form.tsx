@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,8 @@ export function FoodMealForm({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quantity, setQuantity] = useState("");
   const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  const mutationKeyRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const visibleFoods = useMemo(
     () => filterFoodCatalog(foods, "active", search),
@@ -77,11 +79,13 @@ export function FoodMealForm({
     if (foodRegistrability(food)) return;
     setSelectedId(food.id);
     setQuantity(String(food.serving_quantity).replace(".", ","));
+    mutationKeyRef.current = null;
     setError(null);
   }
 
   async function add() {
-    if (!selected || !quantity.trim() || pending) return;
+    if (!selected || !quantity.trim() || pendingRef.current) return;
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     try {
@@ -89,6 +93,7 @@ export function FoodMealForm({
         foodId: selected.id,
         quantity,
         date,
+        idempotencyKey: mutationKeyRef.current ??= crypto.randomUUID(),
       });
       if (!result.ok) {
         setError(result.error);
@@ -96,11 +101,13 @@ export function FoodMealForm({
       }
       setSelectedId(null);
       setQuantity("");
+      mutationKeyRef.current = null;
       onSuccess?.();
       router.refresh();
     } catch {
       setError("No pudimos agregar el alimento.");
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
@@ -165,7 +172,7 @@ export function FoodMealForm({
           <div className="space-y-1">
             <Label htmlFor="food-meal-quantity">Cantidad</Label>
             <div className="flex items-center gap-2">
-              <Input id="food-meal-quantity" type="text" inputMode="decimal" value={quantity} onChange={(event) => { if (isLocalizedDecimalDraft(event.target.value)) setQuantity(event.target.value); }} pattern="[0-9]*[.,]?[0-9]*" disabled={pending} />
+              <Input id="food-meal-quantity" type="text" inputMode="decimal" value={quantity} onChange={(event) => { if (isLocalizedDecimalDraft(event.target.value)) { mutationKeyRef.current = null; setQuantity(event.target.value); } }} pattern="[0-9]*[.,]?[0-9]*" disabled={pending} />
               <span className="min-w-16 text-sm font-medium text-muted-foreground">{selected.serving_unit}</span>
             </div>
             <p className="text-xs text-muted-foreground">Misma unidad que la porción base: {formatFoodQuantity(selected.serving_quantity, selected.serving_unit)}.</p>

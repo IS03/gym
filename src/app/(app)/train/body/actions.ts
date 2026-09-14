@@ -14,6 +14,8 @@ import {
   type BodyMeasurement,
 } from "@/lib/body-measurements";
 import { parseOptionalWeight, type WeightHistoryPoint } from "@/lib/weight-history";
+import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
+import { measurePerformance } from "@/lib/request-performance";
 
 type ActionError = { ok: false; error: string };
 type WeightActionSuccess = {
@@ -105,9 +107,15 @@ export async function saveBodyMeasurementAction(
 ): Promise<MeasurementActionSuccess | ActionError> {
   try {
     const parsed = parseBodyMeasurementInput(input);
-    const entry = input.id
-      ? await updateBodyMeasurement({ ...parsed, id: input.id })
-      : await upsertBodyMeasurement(parsed);
+    const auth = await requireAuthenticatedRequestContext();
+    const entry = await measurePerformance({
+      route: "/train/body",
+      operation: "body.save",
+      layer: "database",
+      ...auth.requestPerformance,
+    }, () => input.id
+      ? updateBodyMeasurement({ ...parsed, id: input.id }, auth)
+      : upsertBodyMeasurement(parsed, auth));
     revalidatePath("/train/body");
     return { ok: true, entry };
   } catch (error) {

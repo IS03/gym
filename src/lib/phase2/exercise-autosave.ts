@@ -432,6 +432,69 @@ export class ExerciseAutosaveQueue<Payload> {
     return "error";
   }
 
+  private async reconcileAmbiguousSave(
+    exerciseId: string,
+    entry: AutosaveEntry<Payload>,
+    savedRevision: number,
+    savedPayload: Payload,
+    originalError: ReturnType<typeof errorDetails>,
+  ): Promise<DrainOutcome> {
+    let state: ExerciseAutosaveServerState<Payload>;
+    try {
+      state = await this.options.loadServerState(exerciseId);
+    } catch {
+      this.setError(
+        exerciseId,
+        entry,
+        "No pudimos confirmar si se guardó. Tus cambios siguen guardados localmente.",
+        originalError.category,
+      );
+      return "error";
+    }
+
+    this.options.onServerState?.(exerciseId, state);
+    if (state.status !== "active") {
+      this.setError(
+        exerciseId,
+        entry,
+        unavailableMessage(state.status),
+        state.status,
+      );
+      return "error";
+    }
+
+    if (this.options.equals(state.payload, savedPayload)) {
+      this.confirmSaved(
+        exerciseId,
+        entry,
+        savedRevision,
+        state.payload,
+        state.updatedAt,
+      );
+      return "success";
+    }
+
+    if (this.options.equals(state.payload, entry.serverPayload)) {
+      entry.serverPayload = state.payload;
+      entry.serverVersion = state.updatedAt;
+      this.setError(
+        exerciseId,
+        entry,
+        "El guardado no quedó confirmado. Tus cambios siguen guardados localmente.",
+        originalError.category,
+      );
+      return "error";
+    }
+
+    this.setError(
+      exerciseId,
+      entry,
+      "Este ejercicio cambió en otra pestaña. Tus cambios siguen guardados localmente.",
+      "conflict",
+    );
+    return "error";
+  }
+
   private async retryConflict(
     exerciseId: string,
     entry: AutosaveEntry<Payload>,
@@ -506,8 +569,15 @@ export class ExerciseAutosaveQueue<Payload> {
       } catch (error) {
         const details = errorDetails(error);
         if (details.category !== "conflict") {
-          this.setError(exerciseId, entry, details.message, details.category);
-          return false;
+          const outcome = await this.reconcileAmbiguousSave(
+            exerciseId,
+            entry,
+            savedRevision,
+            savedPayload,
+            details,
+          );
+          if (outcome === "error") return false;
+          continue;
         }
 
         const outcome = await this.reconcileConflict(

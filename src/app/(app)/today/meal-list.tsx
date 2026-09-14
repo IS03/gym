@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui/react/dialog";
 import { ChevronRight, MoreHorizontal, Trash2, Utensils } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
@@ -52,16 +52,18 @@ function formatMealMacros(meal: TodayMeal) {
 function MealEditorForm({ meal, date, onSaved, onRequestDelete }: { meal: TodayMeal; date: string; onSaved: () => void; onRequestDelete: (meal: TodayMeal) => void }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (savingRef.current) return;
     const form = event.currentTarget;
     if (!form.checkValidity()) {
       form.reportValidity();
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -75,6 +77,7 @@ function MealEditorForm({ meal, date, onSaved, onRequestDelete }: { meal: TodayM
     } catch {
       setError("No pudimos guardar los cambios. Intentá nuevamente.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }

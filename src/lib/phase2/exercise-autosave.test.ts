@@ -143,7 +143,13 @@ describe("ExerciseAutosaveQueue", () => {
       .fn()
       .mockRejectedValueOnce(new ExerciseAutosaveError("transient", "Sin conexión"))
       .mockResolvedValueOnce({ updatedAt: "v2" });
-    const autosave = queue(save);
+    const autosave = queue(save, {
+      loadServerState: async () => ({
+        status: "active",
+        payload: { weight: 25 },
+        updatedAt: "v1",
+      }),
+    });
     autosave.register({
       exerciseId: "curl",
       serverVersion: "v1",
@@ -158,6 +164,7 @@ describe("ExerciseAutosaveQueue", () => {
       payload: { weight: 30 },
       expectedUpdatedAt: "v1",
     });
+    expect(save).toHaveBeenCalledTimes(2);
   });
 
   it("rebases a version-only conflict once instead of repeating the stale version", async () => {
@@ -213,7 +220,7 @@ describe("ExerciseAutosaveQueue", () => {
 
   it("recognizes a committed save whose response was lost", async () => {
     const save = vi.fn().mockRejectedValueOnce(
-      new ExerciseAutosaveError("conflict", "Respuesta perdida"),
+      new ExerciseAutosaveError("transient", "Respuesta perdida"),
     );
     const loadServerState = vi.fn(async () => ({
       status: "active" as const,
@@ -232,6 +239,73 @@ describe("ExerciseAutosaveQueue", () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the draft without retrying when the ambiguous save was not applied", async () => {
+    const save = vi.fn().mockRejectedValueOnce(
+      new ExerciseAutosaveError("transient", "Respuesta perdida"),
+    );
+    const loadServerState = vi.fn(async () => ({
+      status: "active" as const,
+      payload: { weight: 25 },
+      updatedAt: "v1",
+    }));
+    const autosave = queue(save, { loadServerState });
+    autosave.register({
+      exerciseId: "curl",
+      serverVersion: "v1",
+      serverPayload: { weight: 25 },
+    });
+    autosave.change("curl", { weight: 30 }, { immediate: true });
+
+    await expect(autosave.flush("curl")).resolves.toBe(false);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(autosave.getErrorCategory("curl")).toBe("transient");
+  });
+
+  it("turns a different read-back payload into a conflict without overwriting it", async () => {
+    const save = vi.fn().mockRejectedValueOnce(
+      new ExerciseAutosaveError("transient", "Respuesta perdida"),
+    );
+    const loadServerState = vi.fn(async () => ({
+      status: "active" as const,
+      payload: { weight: 35 },
+      updatedAt: "v2",
+    }));
+    const autosave = queue(save, { loadServerState });
+    autosave.register({
+      exerciseId: "curl",
+      serverVersion: "v1",
+      serverPayload: { weight: 25 },
+    });
+    autosave.change("curl", { weight: 30 }, { immediate: true });
+
+    await expect(autosave.flush("curl")).resolves.toBe(false);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(autosave.getErrorCategory("curl")).toBe("conflict");
+  });
+
+  it("keeps an unknown outcome pending when read-back also fails", async () => {
+    const save = vi.fn().mockRejectedValueOnce(
+      new ExerciseAutosaveError("timeout", "Respuesta perdida"),
+    );
+    const loadServerState = vi.fn().mockRejectedValueOnce(new Error("Offline"));
+    const onStateChange = vi.fn();
+    const autosave = queue(save, { loadServerState, onStateChange });
+    autosave.register({
+      exerciseId: "curl",
+      serverVersion: "v1",
+      serverPayload: { weight: 25 },
+    });
+    autosave.change("curl", { weight: 30 }, { immediate: true });
+
+    await expect(autosave.flush("curl")).resolves.toBe(false);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(onStateChange).toHaveBeenLastCalledWith("curl", {
+      phase: "error",
+      error: "No pudimos confirmar si se guardó. Tus cambios siguen guardados localmente.",
+      errorCategory: "timeout",
+    });
+  });
+
   it("leaves a lock timeout recoverable", async () => {
     const save = vi
       .fn()
@@ -239,7 +313,13 @@ describe("ExerciseAutosaveQueue", () => {
         new ExerciseAutosaveError("timeout", "El guardado demoró demasiado."),
       )
       .mockResolvedValueOnce({ updatedAt: "v2" });
-    const autosave = queue(save);
+    const autosave = queue(save, {
+      loadServerState: async () => ({
+        status: "active",
+        payload: { weight: 20 },
+        updatedAt: "v1",
+      }),
+    });
     autosave.register({ exerciseId: "remo", serverVersion: "v1", serverPayload: { weight: 20 } });
     autosave.change("remo", { weight: 25 }, { immediate: true });
 
@@ -253,7 +333,13 @@ describe("ExerciseAutosaveQueue", () => {
       .fn()
       .mockRejectedValueOnce(new ExerciseAutosaveError("transient", "Offline"))
       .mockResolvedValueOnce({ updatedAt: "v2" });
-    const autosave = queue(save);
+    const autosave = queue(save, {
+      loadServerState: async () => ({
+        status: "active",
+        payload: { weight: 25 },
+        updatedAt: "v1",
+      }),
+    });
     autosave.register({ exerciseId: "curl", serverVersion: "v1", serverPayload: { weight: 25 } });
     autosave.change("curl", { weight: 30 }, { immediate: true });
     await expect(autosave.flushAll(["curl"])).resolves.toEqual(["curl"]);

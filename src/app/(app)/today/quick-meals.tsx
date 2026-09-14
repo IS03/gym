@@ -164,6 +164,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
   const [tab, setTab] = useState<QuickAddTab>(() => defaultQuickAddTab(initialSavedMealData.length, suggestedMealData.length));
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const pendingRef = useRef(false);
+  const mutationKeysRef = useRef(new Map<string, string>());
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [successKey, setSuccessKey] = useState<string | null>(null);
   const [successAnnouncement, setSuccessAnnouncement] = useState("");
@@ -200,14 +201,23 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
     }, 900);
   }
 
-  async function run(key: string, task: () => Promise<{ ok: boolean; error?: string }>, success?: string) {
+  function mutationKey(key: string) {
+    const existing = mutationKeysRef.current.get(key);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    mutationKeysRef.current.set(key, created);
+    return created;
+  }
+
+  async function run(key: string, task: (idempotencyKey: string) => Promise<{ ok: boolean; error?: string }>, success?: string) {
     if (pendingRef.current) return false;
     pendingRef.current = true;
     clearLocalSuccess();
     setPendingKey(key); setError(null); setNotice(null);
     try {
-      const result = await task();
+      const result = await task(mutationKey(key));
       if (!result.ok) { setError(result.error ?? "No pudimos completar la acción."); return false; }
+      mutationKeysRef.current.delete(key);
       if (success) setNotice(success);
       router.refresh(); return true;
     } catch { setError("No pudimos completar la acción. Intentá nuevamente."); return false; }
@@ -216,13 +226,13 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
 
   async function addSaved(meal: SavedMealSummary) {
     const key = `saved-add:${meal.id}`;
-    const added = await run(key, () => quickAddSavedMealAction({ savedMealId: meal.id, date }));
+    const added = await run(key, (idempotencyKey) => quickAddSavedMealAction({ savedMealId: meal.id, date, idempotencyKey }));
     if (added) showLocalSuccess(key, meal.name);
   }
 
   async function addSuggested(meal: QuickMealCandidate) {
     const key = `suggested-add:${meal.sourceMealId}`;
-    const added = await run(key, () => quickAddMealAction(meal.sourceMealId));
+    const added = await run(key, (idempotencyKey) => quickAddMealAction(meal.sourceMealId, idempotencyKey));
     if (added) showLocalSuccess(key, meal.label);
   }
 
@@ -253,7 +263,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
 
   async function addAdjusted() {
     if (!adjustMeal) return;
-    const ok = await run(`adjust-add:${adjustMeal.id}`, () => addAdjustedSavedMealAction({ savedMealId: adjustMeal.id, date, items: adjustMeal.items.map((item) => ({ itemId: item.id, quantity: quantities[item.id] ?? "" })) }), "Agregada con ajustes.");
+    const ok = await run(`adjust-add:${adjustMeal.id}`, (idempotencyKey) => addAdjustedSavedMealAction({ savedMealId: adjustMeal.id, date, items: adjustMeal.items.map((item) => ({ itemId: item.id, quantity: quantities[item.id] ?? "" })), idempotencyKey }), "Agregada con ajustes.");
     if (ok) setAdjustOpen(false);
   }
 
@@ -304,7 +314,7 @@ export function QuickAddMeals({ date, suggestedMeals, initialSavedMeals, embedde
     </div>
   );
 
-  const adjustmentDialog = <ResponsiveDialog open={adjustOpen} onOpenChange={(open) => { if (!pendingRef.current) setAdjustOpen(open); }} title={adjustMeal?.name ?? "Ajustar comida"} description="Cambiá cantidades sólo para esta vez." closeLabel="Cerrar ajuste">{adjustMeal ? <AdjustSavedMeal meal={adjustMeal} pending={pendingKey === `adjust-add:${adjustMeal.id}`} error={error} quantities={quantities} onQuantityChange={(itemId, value) => setQuantities((current) => ({ ...current, [itemId]: value }))} onAdd={() => void addAdjusted()} /> : null}</ResponsiveDialog>;
+  const adjustmentDialog = <ResponsiveDialog open={adjustOpen} onOpenChange={(open) => { if (!pendingRef.current) setAdjustOpen(open); }} title={adjustMeal?.name ?? "Ajustar comida"} description="Cambiá cantidades sólo para esta vez." closeLabel="Cerrar ajuste">{adjustMeal ? <AdjustSavedMeal meal={adjustMeal} pending={pendingKey === `adjust-add:${adjustMeal.id}`} error={error} quantities={quantities} onQuantityChange={(itemId, value) => { mutationKeysRef.current.delete(`adjust-add:${adjustMeal.id}`); setQuantities((current) => ({ ...current, [itemId]: value })); }} onAdd={() => void addAdjusted()} /> : null}</ResponsiveDialog>;
 
   if (embedded) return <>{quickContent}{adjustmentDialog}</>;
 

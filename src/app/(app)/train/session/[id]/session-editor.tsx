@@ -45,6 +45,7 @@ import {
   cancelWorkoutSessionAction,
   finishWorkoutSessionAction,
   getWorkoutExerciseSyncStateAction,
+  getWorkoutSessionCompletionStateAction,
   removeSessionExerciseAction,
   saveWorkoutExerciseAction,
 } from "../../actions";
@@ -68,6 +69,7 @@ import {
   ExerciseAutosaveError,
   ExerciseAutosaveQueue,
 } from "@/lib/phase2/exercise-autosave";
+import { resolveWorkoutFinishOutcome } from "@/lib/phase2/finish-reliability";
 import type { ExerciseAutosaveErrorCategory } from "@/lib/phase2/exercise-autosave";
 import type {
   SessionMetadataInput,
@@ -506,6 +508,7 @@ export function SessionEditor({
     beforeTop: number;
   } | null>(null);
   const editingFencedRef = useRef(false);
+  const finishInFlightRef = useRef(false);
   const removingExerciseIdsRef = useRef(new Set<string>());
   const serverPayloadsRef = useRef(initialPayloads);
   const serverVersionsRef = useRef(initialVersions);
@@ -1038,10 +1041,12 @@ export function SessionEditor({
   }
 
   async function finishSession() {
+    if (finishInFlightRef.current) return;
     if (stats.completedSets === 0) {
       setGlobalError("Marcá al menos una serie antes de finalizar.");
       return;
     }
+    finishInFlightRef.current = true;
     editingFencedRef.current = true;
     setGlobalPending(true);
     setFinishStage("saving");
@@ -1056,6 +1061,7 @@ export function SessionEditor({
       );
       setGlobalPending(false);
       setFinishStage(null);
+      finishInFlightRef.current = false;
       editingFencedRef.current = false;
       autosaveRef.current?.releaseFence();
       const sessionUnavailable = failedExerciseIds.some((exerciseId) => {
@@ -1072,21 +1078,44 @@ export function SessionEditor({
     }
 
     setFinishStage("finishing");
-    const result = await finishWorkoutSessionAction({
-      sessionId: detail.session.id,
-      metadata,
-    });
+    let actionConfirmed = false;
+    let actionError: string | null = null;
+    try {
+      const result = await finishWorkoutSessionAction({
+        sessionId: detail.session.id,
+        metadata,
+      });
+      actionConfirmed = result.ok;
+      if (!result.ok) actionError = result.error;
+    } catch {
+      actionError = "No recibimos la confirmación de la finalización.";
+    }
+
+    let verification: "completed" | "in_progress" | "unknown" = "unknown";
+    if (!actionConfirmed) {
+      try {
+        const result = await getWorkoutSessionCompletionStateAction({
+          sessionId: detail.session.id,
+        });
+        if (result.ok && (result.data === "completed" || result.data === "in_progress")) {
+          verification = result.data;
+        }
+      } catch {
+        verification = "unknown";
+      }
+    }
+    const outcome = resolveWorkoutFinishOutcome(actionConfirmed, verification);
     setGlobalPending(false);
-    if (!result.ok) {
+    if (outcome.status !== "confirmed_success") {
       setFinishStage(null);
+      finishInFlightRef.current = false;
       editingFencedRef.current = false;
       autosaveRef.current?.releaseFence();
-      if (result.error.toLocaleLowerCase("es").includes("ya finaliz")) {
-        setGlobalError("La sesión ya fue finalizada en otra pestaña. Actualizando…");
-        router.refresh();
-      } else {
-        setGlobalError(result.error);
-      }
+      setGlobalError(
+        outcome.status === "confirmed_failure"
+          ? actionError ?? "La finalización no se guardó. Podés volver a intentarlo."
+          : "No pudimos confirmar si el entrenamiento se finalizó. Comprobá el estado antes de volver a intentarlo.",
+      );
       return;
     }
     try {
