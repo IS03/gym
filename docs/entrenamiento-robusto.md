@@ -1,5 +1,7 @@
 # Reconstrucción robusta de entrenamiento
 
+> **Documento histórico.** Este archivo conserva el contexto de la reconstrucción original del sistema de entrenamiento y puede describir flujos o UI que ya cambiaron. La referencia técnica vigente es [`architecture/training-system.md`](./architecture/training-system.md). Ante cualquier contradicción, usar el código/tests actuales y el documento canónico.
+
 ## Objetivo
 
 Reemplaza el registro resumido `series × reps × peso` por un modelo que conserva cada
