@@ -19,23 +19,48 @@ export default async function HomePage() {
   const [profile, todayData, activeSession, training, workoutStartRoutines] =
     await Promise.all([
       measurePerformance(
-        { route: "/home", operation: "home.profile" },
+        {
+          route: "/home",
+          operation: "home.profile",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getMyProfile(auth),
       ),
       measurePerformance(
-        { route: "/home", operation: "home.nutrition" },
+        {
+          route: "/home",
+          operation: "home.nutrition",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getNutritionDaySummary(today, auth),
       ),
       measurePerformance(
-        { route: "/home", operation: "home.active-session" },
+        {
+          route: "/home",
+          operation: "home.active-session",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getHomeActiveTrainingSnapshot(auth),
       ),
       measurePerformance(
-        { route: "/home", operation: "home.training" },
+        {
+          route: "/home",
+          operation: "home.training",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getHomeTrainingSnapshot(today, auth),
       ),
       measurePerformance(
-        { route: "/home", operation: "home.routines" },
+        {
+          route: "/home",
+          operation: "home.routines",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => listWorkoutStartRoutines(auth),
       ),
     ]);

@@ -1,9 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  classifyRequestKind,
   logPerformance,
-  performanceErrorCategory,
+  performanceErrorMetadata,
+  requestPerformanceContext,
 } from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
 
@@ -77,18 +77,22 @@ export async function updateSession(request: NextRequest) {
   // Debe ser la primera operación luego de crear el cliente: refresca una
   // sesión válida y copia las cookies resultantes al request y a la response.
   const authStartedAt = performance.now();
-  const requestKind = classifyRequestKind(request.headers);
+  const requestPerformance = requestPerformanceContext(request.headers);
   let claimsResult: Awaited<ReturnType<typeof supabase.auth.getClaims>>;
   try {
     claimsResult = await supabase.auth.getClaims();
   } catch (error) {
+    const status = isInvalidAuthSessionError(error)
+      ? "invalid_session"
+      : "error";
     logPerformance({
       route: request.nextUrl.pathname,
       operation: "proxy-auth",
       durationMs: performance.now() - authStartedAt,
-      status: "error",
-      requestKind,
-      errorCategory: performanceErrorCategory(error),
+      status,
+      layer: "auth",
+      ...requestPerformance,
+      ...performanceErrorMetadata(error, { layer: "auth", status }),
     });
     throw error;
   }
@@ -97,14 +101,15 @@ export async function updateSession(request: NextRequest) {
     route: request.nextUrl.pathname,
     operation: "proxy-auth",
     durationMs: performance.now() - authStartedAt,
-    requestKind,
+    layer: "auth",
+    ...requestPerformance,
     status: claimsData?.claims?.sub
       ? "authenticated"
       : claimsError && isInvalidAuthSessionError(claimsError)
         ? "invalid_session"
         : "unauthenticated",
     ...(claimsError && !isInvalidAuthSessionError(claimsError)
-      ? { errorCategory: performanceErrorCategory(claimsError) }
+      ? performanceErrorMetadata(claimsError, { layer: "auth" })
       : {}),
   });
 

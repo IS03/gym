@@ -47,7 +47,7 @@ export async function getOrCreateDayLog(
   });
 
   if (error) {
-    throw new Error(`RPC get_or_create_day_log: ${error.message}`);
+    throw new Error(`RPC get_or_create_day_log: ${error.message}`, { cause: error });
   }
 
   return data as DayLog;

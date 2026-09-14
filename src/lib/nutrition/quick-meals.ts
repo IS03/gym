@@ -30,7 +30,9 @@ export async function getQuickMealCandidates(
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (error) throw new Error(`Leer comidas rápidas: ${error.message}`);
+  if (error) {
+    throw new Error(`Leer comidas rápidas: ${error.message}`, { cause: error });
+  }
 
   const facts: QuickMealFact[] = (data ?? []).flatMap((row) => {
     const dayLog = Array.isArray(row.day_logs) ? row.day_logs[0] : row.day_logs;

@@ -18,6 +18,7 @@ import {
 import { todayInCordoba } from "@/lib/phase2/training-robust";
 import { formatSessionDate } from "@/lib/phase2/session-history";
 import { toWorkoutStartActiveSession } from "@/lib/phase2/workout-start";
+import { measurePerformance } from "@/lib/request-performance";
 import { requireAuthenticatedRequestContext } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,15 @@ export default async function TrainPage() {
   const auth = await requireAuthenticatedRequestContext();
   const [inProgress, workoutStartRoutines, trainedDays] = await Promise.all([
     getInProgressSessionForUser(auth),
-    listWorkoutStartRoutines(auth),
+    measurePerformance(
+      {
+        route: "/train",
+        operation: "train.routines",
+        layer: "database",
+        ...auth.requestPerformance,
+      },
+      () => listWorkoutStartRoutines(auth),
+    ),
     listTrainingDaysInMonth({ month }, auth),
   ]);
   const activeSession = inProgress ? toWorkoutStartActiveSession(inProgress) : null;

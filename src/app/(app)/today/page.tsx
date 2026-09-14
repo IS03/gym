@@ -49,23 +49,48 @@ export default async function TodayPage() {
   const [{ dayLog, meals, context }, metrics, quickMeals, foods, savedMeals] =
     await Promise.all([
       measurePerformance(
-        { route: "/today", operation: "today.nutrition" },
+        {
+          route: "/today",
+          operation: "today.nutrition",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getNutritionDay(today, undefined, auth),
       ),
       measurePerformance(
-        { route: "/today", operation: "today.metrics" },
+        {
+          route: "/today",
+          operation: "today.metrics",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getActiveDailyMetrics(today, auth),
       ),
       measurePerformance(
-        { route: "/today", operation: "today.quick-meals" },
+        {
+          route: "/today",
+          operation: "today.quick-meals",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => getQuickMealCandidates(today, auth),
       ),
       measurePerformance(
-        { route: "/today", operation: "today.foods" },
+        {
+          route: "/today",
+          operation: "today.foods",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => listActiveFoods(auth),
       ),
       measurePerformance(
-        { route: "/today", operation: "today.saved-meals" },
+        {
+          route: "/today",
+          operation: "today.saved-meals",
+          layer: "database",
+          ...auth.requestPerformance,
+        },
         () => listActiveSavedMeals(auth),
       ),
     ]);
