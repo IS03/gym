@@ -52,7 +52,15 @@ flujo de entrenamiento, fechas e invariantes entre estado actual e historial.
 
 ### [`architecture/training-system.md`](./architecture/training-system.md)
 
-Describe el modelo de rutinas, sesiones, series, snapshots, autosave, concurrencia, finalización, historial y reportes de entrenamiento.
+Referencia canónica de la lógica operativa de Entrenamiento: biblioteca, rutinas,
+sesión activa, series, snapshots, autosave, progresión, finalización, historial y
+corrección.
+
+### [`architecture/nutrition-system.md`](./architecture/nutrition-system.md)
+
+Referencia canónica de la lógica operativa de Nutrición: día nutricional,
+comidas, Foods, comidas habituales, Plan V2, gasto energético, snapshots,
+overrides, historial, importación e integración externa.
 
 ## Desarrollo
 
@@ -72,6 +80,8 @@ y las comidas canónicas de OWNLEVEL.
 ### [`history/technical-decisions.md`](./history/technical-decisions.md)
 
 Resumen de las decisiones que surgieron de los issues cerrados y de cómo fueron evolucionando.
+
+La especificación raíz [`MIGRAR_HISTÓRICOS_E_IMPLEMENTAR_INFONUTRI.md`](./MIGRAR_HISTÓRICOS_E_IMPLEMENTAR_INFONUTRI.md) conserva el contexto de la migración inicial de nutrición y no reemplaza a `architecture/nutrition-system.md` como contrato vigente.
 
 ## Archivo
 
