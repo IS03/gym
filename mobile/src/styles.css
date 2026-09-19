@@ -168,3 +168,36 @@ h1 {
 .capability-list span:first-child {
   color: #c9c5d0;
 }
+
+.haptics-qa {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem;
+  text-align: left;
+  background: rgb(0 0 0 / 18%);
+  border-radius: 0.9rem;
+}
+
+.haptics-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.qa-action {
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.35rem;
+  color: #f8f7fa;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 0.7rem;
+  cursor: pointer;
+}
+
+.qa-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+}

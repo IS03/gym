@@ -1,6 +1,10 @@
 import { App } from "@capacitor/app";
 
 import { createCapacitorNativeInfo } from "./capacitor-adapter";
+import {
+  createCapacitorHapticsAdapter,
+  type NativeHapticsAdapter,
+} from "./haptics-adapter";
 import { isCapacitorRuntime } from "./runtime";
 import {
   type NativeCapabilities,
@@ -13,12 +17,23 @@ export type NativeBridgeDependencies = {
   isCapacitorRuntime: () => boolean;
   readCapacitorInfo: () => Promise<NativeInfo>;
   readWebInfo: () => NativeInfo;
+  haptics: NativeHapticsAdapter;
 };
+
+const capacitorHaptics = createCapacitorHapticsAdapter();
 
 const defaultDependencies: NativeBridgeDependencies = {
   isCapacitorRuntime,
-  readCapacitorInfo: () => createCapacitorNativeInfo(() => App.getInfo()),
+  readCapacitorInfo: () =>
+    createCapacitorNativeInfo(() => App.getInfo(), {
+      haptics: capacitorHaptics.isAvailable() ? "available" : "unavailable",
+      notifications: "unavailable",
+      health: "unavailable",
+      camera: "unavailable",
+      photos: "unavailable",
+    }),
   readWebInfo: () => createWebNativeInfo(readWebRuntimeEnvironment()),
+  haptics: capacitorHaptics,
 };
 
 export function createNativeCapabilities(
@@ -43,8 +58,17 @@ export function createNativeCapabilities(
       : "unavailable";
   }
 
-  async function noop(): Promise<void> {
-    // Capability absence is a supported fallback, not a product error.
+  async function invokeHaptics(
+    operation: keyof Pick<
+      NativeHapticsAdapter,
+      "selection" | "success" | "warning"
+    >,
+  ): Promise<void> {
+    if ((await capability("haptics")) !== "available") {
+      return;
+    }
+
+    await dependencies.haptics[operation]();
   }
 
   return {
@@ -52,9 +76,9 @@ export function createNativeCapabilities(
     capability,
     haptics: {
       available: async () => (await capability("haptics")) === "available",
-      selection: noop,
-      success: noop,
-      warning: noop,
+      selection: () => invokeHaptics("selection"),
+      success: () => invokeHaptics("success"),
+      warning: () => invokeHaptics("warning"),
     },
   };
 }
