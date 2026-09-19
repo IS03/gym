@@ -186,6 +186,10 @@ No existe en el producto vigente un sistema propio de:
 - reset de contraseña;
 - cambio de contraseña.
 
+En Production, el provider Google está habilitado y los providers Email y
+Phone están deshabilitados. Por eso el warning de Leaked Password Protection
+no es aplicable mientras OWNLEVEL conserve esta arquitectura OAuth-only.
+
 El punto de entrada visual es `/login`.
 
 Flujo:
