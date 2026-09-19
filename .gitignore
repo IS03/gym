@@ -28,6 +28,7 @@
 
 # production
 /build
+/mobile-dist/
 
 # misc
 .DS_Store
