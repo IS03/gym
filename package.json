@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "mobile:dev": "vite --config mobile/vite.config.ts",
+    "mobile:test": "vitest run --config mobile/vite.config.ts src/auth",
     "mobile:typecheck": "tsc --noEmit --project mobile/tsconfig.json",
     "mobile:build": "npm run mobile:typecheck && vite build --config mobile/vite.config.ts",
     "mobile:sync": "npm run mobile:build && cap sync ios",
@@ -17,7 +18,10 @@
     "nutrition:apply": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/nutrition-import/apply-cli.ts"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "^8.0.0",
     "@base-ui/react": "^1.4.1",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
     "@supabase/ssr": "^0.10.2",
