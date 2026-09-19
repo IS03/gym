@@ -10,6 +10,7 @@ import {
 export function MobileApp() {
   const { retry, signIn, signOut, state } = useMobileAuth();
   const [logoutPending, setLogoutPending] = useState(false);
+  const [hapticPending, setHapticPending] = useState<string | null>(null);
   const [nativeInfo, setNativeInfo] = useState<NativeInfo | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,21 @@ export function MobileApp() {
       await signOut();
     } finally {
       setLogoutPending(false);
+    }
+  }
+
+  async function handleHaptic(
+    name: "selection" | "success" | "warning",
+  ) {
+    if (hapticPending) {
+      return;
+    }
+
+    setHapticPending(name);
+    try {
+      await native.haptics[name]();
+    } finally {
+      setHapticPending(null);
     }
   }
 
@@ -125,6 +141,42 @@ export function MobileApp() {
                     </li>
                   ))}
                 </ul>
+              </section>
+            ) : null}
+            {nativeInfo?.capabilities.haptics === "available" ? (
+              <section
+                className="haptics-qa"
+                aria-labelledby="haptics-qa-title"
+              >
+                <p className="diagnostics-title" id="haptics-qa-title">
+                  Haptics QA
+                </p>
+                <div className="haptics-actions">
+                  <button
+                    className="qa-action"
+                    disabled={hapticPending !== null}
+                    onClick={() => void handleHaptic("selection")}
+                    type="button"
+                  >
+                    Selección
+                  </button>
+                  <button
+                    className="qa-action"
+                    disabled={hapticPending !== null}
+                    onClick={() => void handleHaptic("success")}
+                    type="button"
+                  >
+                    Éxito
+                  </button>
+                  <button
+                    className="qa-action"
+                    disabled={hapticPending !== null}
+                    onClick={() => void handleHaptic("warning")}
+                    type="button"
+                  >
+                    Advertencia
+                  </button>
+                </div>
               </section>
             ) : null}
             <button

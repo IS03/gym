@@ -1,6 +1,6 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** shell iOS, Auth nativo y Capability Bridge implementados hasta Stage 1 / M4
+> **Estado:** Stage 1 / M5 implementado; cierre sujeto a QA físico de Haptics
 >
 > **Última revisión:** 2026-09-19
 
@@ -14,7 +14,7 @@ OWNLEVEL mantiene una aplicación y varias superficies:
 
 La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownlevel.fit`. El runtime productivo de Capacitor siempre parte del bundle local definido por `webDir: "mobile-dist"`.
 
-M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. Todavía no contiene datos de producto, Mobile API ni plugins nativos de producto.
+M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. El cliente todavía no contiene datos de producto ni Mobile API.
 
 ## Estructura
 
@@ -55,7 +55,7 @@ Los componentes y servicios de producto consultan la frontera OWNLEVEL exportada
 - `native.info()`: snapshot serializable y sin datos privados;
 - `native.capability(name)`: estado de una capability conocida o futura; una desconocida devuelve `unavailable`;
 - `native.haptics.available()`: disponibilidad funcional;
-- `native.haptics.selection()`, `success()` y `warning()`: noops seguros en M4, preparados para recibir la implementación real en M5.
+- `native.haptics.selection()`, `success()` y `warning()`: operaciones semánticas implementadas por el adapter nativo y noops seguros cuando la capability no está disponible.
 
 `NativeInfo` distingue:
 
@@ -68,11 +68,23 @@ Los componentes y servicios de producto consultan la frontera OWNLEVEL exportada
 | `bridgeVersion` | `1` | Versión del contrato bundle React ↔ bridge nativo |
 | `capabilities` | Estado individual por capability | Fuente de verdad para habilitar comportamiento |
 
-Los estados posibles son `available`, `unavailable`, `permission_required` y `denied`. `platform: "ios"` no implica disponibilidad. En M4 `haptics`, `notifications`, `health`, `camera` y `photos` son `unavailable` porque todavía no existe una implementación funcional para ellas.
+Los estados posibles son `available`, `unavailable`, `permission_required` y `denied`. `platform: "ios"` no implica disponibilidad. En M5, `haptics` es `available` únicamente cuando el runtime es Capacitor iOS y el plugin oficial está registrado. `notifications`, `health`, `camera` y `photos` continúan `unavailable`.
 
 `bridgeVersion` sólo aumenta cuando cambia el contrato entre el bundle React y las capacidades nativas. No cambia por UI, copy, bugfix web, métricas, backend ni migrations. `appVersion` y `buildNumber` son diagnósticos; el producto nunca debe inferir una capability comparando versiones.
 
 La ausencia de una capability es un fallback admitido: la función principal continúa y el efecto nativo se omite. Un bridge o cliente viejo tampoco debe romper por un nombre desconocido.
+
+## Haptics
+
+M5 integra el plugin oficial `@capacitor/haptics` exclusivamente detrás del Native Capability Bridge. Componentes y lógica de producto no importan el plugin directamente.
+
+| Operación OWNLEVEL | Implementación nativa |
+| --- | --- |
+| `native.haptics.selection()` | ciclo `selectionStart` → `selectionChanged` → `selectionEnd` |
+| `native.haptics.success()` | `notification` con `NotificationType.Success` |
+| `native.haptics.warning()` | `notification` con `NotificationType.Warning` |
+
+La disponibilidad combina runtime Capacitor iOS y registro efectivo del plugin mediante `Capacitor.isPluginAvailable("Haptics")`. En Web/PWA, ante plugin ausente o si iOS rechaza el feedback, las operaciones terminan como noops: el feedback háptico es complementario y nunca convierte una acción de producto en error. Esta implementación completa una capability ya declarada y mantiene `bridgeVersion = 1`.
 
 ## Compatibilidad y versionado
 
@@ -138,7 +150,7 @@ npm run mobile:open:ios
 ```
 
 - `mobile:dev` sirve únicamente la superficie React temporal en el navegador.
-- `mobile:test` ejecuta únicamente los tests del contrato Auth nativo.
+- `mobile:test` ejecuta únicamente los tests focalizados de Auth y del Native Capability Bridge.
 - `mobile:build` valida su TypeScript y genera `mobile-dist/`. Requiere en el entorno raíz los mismos valores públicos de Supabase que usa Next.js.
 - `mobile:sync` vuelve a compilar y copia el bundle al proyecto iOS, además de sincronizar dependencias nativas.
 - `mobile:open:ios` abre el proyecto generado en Xcode y por eso sólo funciona en macOS con Xcode instalado.
@@ -155,13 +167,17 @@ El proyecto generado conserva el deployment target oficial de Capacitor 8: iOS 1
 6. seleccionar el dispositivo y pulsar **Run**;
 7. comprobar el login Google o la restauración de la sesión M3;
 8. verificar el diagnóstico temporal: platform `ios`, runtime `capacitor`, app version, build y bridge `1`;
-9. comprobar que las cinco capabilities aparecen `unavailable` y que la app sigue operativa;
-10. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
+9. comprobar `haptics: available` y que `notifications`, `health`, `camera` y `photos` permanecen `unavailable`;
+10. probar los botones temporales **Selección**, **Éxito** y **Advertencia** y confirmar feedback real sin errores;
+11. enviar la app a background, volver y comprobar que sesión y Haptics siguen operativos;
+12. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
 
 Un Apple ID con Personal Team permite la prueba local gratuita. TestFlight y distribución requieren Apple Developer Program y quedan fuera de M2.
 
-## Límites actuales y próximos pasos
+## Cierre de Stage 1
 
-- **M5:** Haptics y QA de dispositivo.
+La foundation ya demuestra bundle React local, proyecto iOS reproducible, identidad Supabase compartida, sesión segura, deep links, contrato de capabilities/versiones y el recorrido React → bridge OWNLEVEL → plugin oficial de Haptics. La ejecución háptica real sigue pendiente de QA físico de M5.
 
-M5 reemplazará únicamente el noop de Haptics por el plugin real y cambiará su estado a `available`; no debe repartir imports de Capacitor por el producto. Hasta completar las siguientes etapas, el shell autentica una cuenta real de OWNLEVEL pero no consulta datos de producto y no representa una alternativa funcional a la Web/PWA.
+El criterio “el mismo usuario accede a los mismos datos desde Web/PWA/iOS” todavía no está demostrado extremo a extremo: Auth confirma la misma identidad y Supabase es la fuente de verdad definida, pero el shell iOS no consulta datos de producto. Esa comprobación es un gate real para la primera superficie móvil con Mobile API, no una razón para introducir una pantalla o endpoint artificial en M5.
+
+Tras aprobar el QA físico de Haptics, Stage 1 puede cerrarse como foundation nativa. La paridad observable de datos queda explícitamente pendiente para la primera subfase de producto móvil.

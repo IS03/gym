@@ -23,6 +23,7 @@
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.5.2",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
