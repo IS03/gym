@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ProductDataSync } from "./api/product-data-sync";
 import { useMobileAuth } from "./auth/use-mobile-auth";
 import { native } from "./native/bridge";
 import {
@@ -179,6 +180,7 @@ export function MobileApp() {
                 </div>
               </section>
             ) : null}
+            {nativeInfo ? <ProductDataSync /> : null}
             <button
               className="secondary-action"
               disabled={logoutPending}
