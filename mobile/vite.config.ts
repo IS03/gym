@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => {
       __OWNLEVEL_SUPABASE_ANON_KEY__: JSON.stringify(
         env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
       ),
+      __OWNLEVEL_API_BASE_URL__: JSON.stringify(
+        env.NEXT_PUBLIC_OWNLEVEL_API_BASE_URL ?? "https://www.ownlevel.fit",
+      ),
     },
     build: {
       outDir: fileURLToPath(new URL("../mobile-dist", import.meta.url)),

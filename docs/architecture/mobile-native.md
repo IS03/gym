@@ -1,6 +1,6 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** Stage 1 / M5 implementado; cierre sujeto a QA físico de Haptics
+> **Estado:** Stage 1 / M6 implementado; cierre sujeto a QA físico de paridad de datos
 >
 > **Última revisión:** 2026-09-19
 
@@ -14,7 +14,7 @@ OWNLEVEL mantiene una aplicación y varias superficies:
 
 La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownlevel.fit`. El runtime productivo de Capacitor siempre parte del bundle local definido por `webDir: "mobile-dist"`.
 
-M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. El cliente todavía no contiene datos de producto ni Mobile API.
+M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. M6 agrega la primera lectura real de producto mediante una Mobile API versionada y read-only.
 
 ## Estructura
 
@@ -88,14 +88,14 @@ La disponibilidad combina runtime Capacitor iOS y registro efectivo del plugin m
 
 ## Compatibilidad y versionado
 
-La futura Mobile API vivirá bajo `/api/mobile/v1/*`. M4 no crea endpoints ni envía metadata a Supabase Auth. El helper puro `createMobileClientHeaders()` deja definido el futuro contrato HTTP:
+La Mobile API vive bajo `/api/mobile/v1/*`. M6 activa el contrato HTTP preparado por `createMobileClientHeaders()` en el primer cliente real:
 
 - `X-OWNLEVEL-App-Version`, si existe;
 - `X-OWNLEVEL-Build`, si existe;
 - `X-OWNLEVEL-Bridge-Version`;
 - `X-OWNLEVEL-Platform`.
 
-Cuando exista un cliente HTTP móvil, él será el único responsable de aplicar esos headers a la Mobile API; no serán headers globales ni se enviarán a Supabase directamente.
+El cliente HTTP móvil es el único responsable de aplicar esos headers a la Mobile API; no son headers globales, no se envían a Supabase directamente y no autorizan la request. La autorización usa un Bearer separado.
 
 El estado futuro de soporte se expresa como `supported`, `update_recommended` o `update_required`. La decisión vendrá de un contrato versionado del backend, no de una tabla o endpoint anticipado en M4. `update_recommended` permitirá continuar; `update_required` deberá mostrar una pantalla explícita de actualización y nunca degradarse a un error genérico.
 
@@ -107,6 +107,36 @@ Para una app instalada vieja y un backend nuevo, los cambios de DB/API siguen la
 4. **CONTRACT:** retirar sólo cuando ninguna build soportada dependa de él.
 
 No se eliminan campos, DTOs, endpoints, RPCs ni significados que una build todavía soportada pueda utilizar.
+
+## Mobile API v1 y prueba de datos
+
+El primer endpoint real es:
+
+```text
+GET /api/mobile/v1/daily-metrics
+```
+
+El bundle local obtiene el access token de la sesión Supabase M3 sólo al iniciar la lectura y envía `Authorization: Bearer <token>` a Vercel. El servidor crea un cliente Supabase aislado con la key pública, valida el token con Auth y ejecuta las consultas con ese mismo Bearer. No acepta `userId`, no usa `service_role` y las políticas RLS de `user_metrics` y `daily_metric_values` limitan las filas a `auth.uid()`.
+
+La fecha primaria es `todayInCordoba()`. Si hoy no tiene valores, el endpoint devuelve el último día con métricas registrado hasta hoy; si no existe ninguno devuelve la fecha de hoy con `metrics: []`. La respuesta expone un DTO explícito, no filas Supabase:
+
+```ts
+type MobileDailyMetricsResponse = {
+  date: string;
+  metrics: Array<{
+    id: string;
+    key: string | null;
+    label: string;
+    unit: string | null;
+    valueType: "integer" | "decimal" | "duration";
+    value: number;
+  }>;
+};
+```
+
+Sólo aparecen métricas con un valor real. Una métrica ausente no se convierte en cero; un cero almacenado sí se conserva. `200` con lista vacía significa que la lectura fue válida y no hay valores. `503 DATA_UNAVAILABLE` significa que Auth o datos no pudieron comprobarse por infraestructura, mientras `401 UNAUTHORIZED` representa un Bearer rechazado. Ninguno de esos errores se convierte en datos vacíos.
+
+El endpoint admite CORS exclusivamente para el origen local esperado de Capacitor iOS (`capacitor://localhost`). `NEXT_PUBLIC_OWNLEVEL_API_BASE_URL` permite cambiar el backend para desarrollo; si no se define, el bundle usa el origen canónico `https://www.ownlevel.fit`. Esto no configura `server.url`: React continúa empaquetado localmente y sólo las requests viajan a Vercel.
 
 ## Matriz de actualización
 
@@ -150,7 +180,7 @@ npm run mobile:open:ios
 ```
 
 - `mobile:dev` sirve únicamente la superficie React temporal en el navegador.
-- `mobile:test` ejecuta únicamente los tests focalizados de Auth y del Native Capability Bridge.
+- `mobile:test` ejecuta únicamente los tests focalizados del cliente Mobile API, Auth y Native Capability Bridge.
 - `mobile:build` valida su TypeScript y genera `mobile-dist/`. Requiere en el entorno raíz los mismos valores públicos de Supabase que usa Next.js.
 - `mobile:sync` vuelve a compilar y copia el bundle al proyecto iOS, además de sincronizar dependencias nativas.
 - `mobile:open:ios` abre el proyecto generado en Xcode y por eso sólo funciona en macOS con Xcode instalado.
@@ -169,15 +199,16 @@ El proyecto generado conserva el deployment target oficial de Capacitor 8: iOS 1
 8. verificar el diagnóstico temporal: platform `ios`, runtime `capacitor`, app version, build y bridge `1`;
 9. comprobar `haptics: available` y que `notifications`, `health`, `camera` y `photos` permanecen `unavailable`;
 10. probar los botones temporales **Selección**, **Éxito** y **Advertencia** y confirmar feedback real sin errores;
-11. enviar la app a background, volver y comprobar que sesión y Haptics siguen operativos;
-12. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
+11. comparar fecha, etiqueta y valor de una métrica real con Web/PWA; cambiarla en Web/PWA y pulsar **Actualizar** en iOS para verificar el nuevo valor;
+12. enviar la app a background, volver y comprobar que sesión, Haptics y la actualización de datos siguen operativos;
+13. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
 
 Un Apple ID con Personal Team permite la prueba local gratuita. TestFlight y distribución requieren Apple Developer Program y quedan fuera de M2.
 
 ## Cierre de Stage 1
 
-La foundation ya demuestra bundle React local, proyecto iOS reproducible, identidad Supabase compartida, sesión segura, deep links, contrato de capabilities/versiones y el recorrido React → bridge OWNLEVEL → plugin oficial de Haptics. La ejecución háptica real sigue pendiente de QA físico de M5.
+La foundation ya demuestra bundle React local, proyecto iOS reproducible, identidad Supabase compartida, sesión segura, deep links, contrato de capabilities/versiones y el recorrido React → bridge OWNLEVEL → plugin oficial de Haptics. M6 suma el recorrido access token nativo → Mobile API v1 → RLS → datos canónicos → DTO → shell iOS.
 
-El criterio “el mismo usuario accede a los mismos datos desde Web/PWA/iOS” todavía no está demostrado extremo a extremo: Auth confirma la misma identidad y Supabase es la fuente de verdad definida, pero el shell iOS no consulta datos de producto. Esa comprobación es un gate real para la primera superficie móvil con Mobile API, no una razón para introducir una pantalla o endpoint artificial en M5.
+El cierre requiere comparar físicamente una fecha, etiqueta y valor real de métricas en Web/PWA contra el resultado del shell iOS, y repetir después de actualizar el valor desde Web/PWA y pulsar **Actualizar** en iOS. No se marca paridad antes de esa evidencia.
 
-Tras aprobar el QA físico de Haptics, Stage 1 puede cerrarse como foundation nativa. La paridad observable de datos queda explícitamente pendiente para la primera subfase de producto móvil.
+Una vez aprobado ese MATCH, Stage 1 queda cerrable: la prueba es deliberadamente read-only y no implica que exista todavía una pantalla móvil de producto ni paridad funcional completa.
