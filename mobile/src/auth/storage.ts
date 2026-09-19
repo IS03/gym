@@ -3,8 +3,9 @@ import {
   SecureStorage,
   type SecureStoragePlugin,
 } from "@aparajita/capacitor-secure-storage";
-import { Capacitor } from "@capacitor/core";
 import type { SupportedStorage } from "@supabase/supabase-js";
+
+import { isCapacitorRuntime } from "../native/runtime";
 
 const AUTH_KEY_PREFIX = "ownlevel-auth_";
 
@@ -64,7 +65,7 @@ export function createNativeAuthStorage(
 
 export function getMobileAuthStorage(): MobileAuthStorage {
   if (!mobileAuthStorage) {
-    mobileAuthStorage = Capacitor.isNativePlatform()
+    mobileAuthStorage = isCapacitorRuntime()
       ? createNativeAuthStorage()
       : createMemoryAuthStorage();
   }

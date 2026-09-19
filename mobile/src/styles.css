@@ -105,3 +105,66 @@ h1 {
   color: #9892a3;
   font-size: 0.8rem;
 }
+
+.foundation-diagnostics {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem;
+  text-align: left;
+  background: rgb(0 0 0 / 18%);
+  border-radius: 0.9rem;
+}
+
+.diagnostics-title {
+  margin: 0 0 0.75rem;
+  color: #9892a3;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.diagnostics-grid div {
+  min-width: 0;
+}
+
+.diagnostics-grid dt {
+  color: #9892a3;
+  font-size: 0.65rem;
+}
+
+.diagnostics-grid dd {
+  overflow: hidden;
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capability-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.8rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+  list-style: none;
+}
+
+.capability-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #9892a3;
+  font-size: 0.7rem;
+}
+
+.capability-list span:first-child {
+  color: #c9c5d0;
+}

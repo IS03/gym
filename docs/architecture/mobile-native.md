@@ -1,6 +1,6 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** shell iOS y autenticación nativa implementados hasta Stage 1 / M3
+> **Estado:** shell iOS, Auth nativo y Capability Bridge implementados hasta Stage 1 / M4
 >
 > **Última revisión:** 2026-09-19
 
@@ -14,7 +14,7 @@ OWNLEVEL mantiene una aplicación y varias superficies:
 
 La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownlevel.fit`. El runtime productivo de Capacitor siempre parte del bundle local definido por `webDir: "mobile-dist"`.
 
-M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. Todavía no contiene datos de producto, Mobile API, capability bridge ni plugins nativos de producto.
+M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. Todavía no contiene datos de producto, Mobile API ni plugins nativos de producto.
 
 ## Estructura
 
@@ -22,6 +22,7 @@ M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de 
 | --- | --- |
 | `mobile/` | Entry point React client-only, estilos y configuración de Vite/TypeScript |
 | `mobile/src/auth/` | Cliente Supabase móvil, máquina de estados, validación del callback y adapter de almacenamiento seguro |
+| `mobile/src/native/` | Contrato OWNLEVEL para runtime, versiones, capabilities y fallbacks |
 | `mobile-dist/` | Build generado y no versionado que consume Capacitor |
 | `capacitor.config.ts` | Identidad de la app y `webDir`; no contiene runtime remoto |
 | `ios/` | Proyecto iOS oficial, versionado y administrado por Capacitor/Xcode |
@@ -46,6 +47,68 @@ El cliente móvil reutiliza `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_A
 La sesión se restaura antes de mostrar login. El refresh automático se activa en foreground y se detiene en background mediante el lifecycle de Capacitor. Los estados son `booting`, `signed_out`, `signing_in`, `authenticated` y `auth_unavailable`: un timeout o fallo de red conserva las credenciales y no se interpreta como logout. Sólo un logout explícito o una sesión inválida confirmada pasa a `signed_out`.
 
 El botón de logout usa `scope: "local"`; elimina la sesión de este cliente sin cerrar las sesiones Safari/PWA del mismo usuario.
+
+## Native Capability Bridge
+
+Los componentes y servicios de producto consultan la frontera OWNLEVEL exportada como `native`; no importan Capacitor ni plugins concretos. El contrato base es independiente de React y expone:
+
+- `native.info()`: snapshot serializable y sin datos privados;
+- `native.capability(name)`: estado de una capability conocida o futura; una desconocida devuelve `unavailable`;
+- `native.haptics.available()`: disponibilidad funcional;
+- `native.haptics.selection()`, `success()` y `warning()`: noops seguros en M4, preparados para recibir la implementación real en M5.
+
+`NativeInfo` distingue:
+
+| Campo | Valores / fuente | Uso |
+| --- | --- | --- |
+| `platform` | `web`, `pwa`, `ios` | Superficie real; PWA usa display mode estándar y no user agent |
+| `runtime` | `browser`, `capacitor` | Distingue Safari/PWA de la app instalada |
+| `appVersion` | `App.getInfo().version` en iOS; `null` en web | Versión de aplicación para diagnóstico y gates globales |
+| `buildNumber` | `App.getInfo().build` en iOS; `null` en web | Build nativa concreta |
+| `bridgeVersion` | `1` | Versión del contrato bundle React ↔ bridge nativo |
+| `capabilities` | Estado individual por capability | Fuente de verdad para habilitar comportamiento |
+
+Los estados posibles son `available`, `unavailable`, `permission_required` y `denied`. `platform: "ios"` no implica disponibilidad. En M4 `haptics`, `notifications`, `health`, `camera` y `photos` son `unavailable` porque todavía no existe una implementación funcional para ellas.
+
+`bridgeVersion` sólo aumenta cuando cambia el contrato entre el bundle React y las capacidades nativas. No cambia por UI, copy, bugfix web, métricas, backend ni migrations. `appVersion` y `buildNumber` son diagnósticos; el producto nunca debe inferir una capability comparando versiones.
+
+La ausencia de una capability es un fallback admitido: la función principal continúa y el efecto nativo se omite. Un bridge o cliente viejo tampoco debe romper por un nombre desconocido.
+
+## Compatibilidad y versionado
+
+La futura Mobile API vivirá bajo `/api/mobile/v1/*`. M4 no crea endpoints ni envía metadata a Supabase Auth. El helper puro `createMobileClientHeaders()` deja definido el futuro contrato HTTP:
+
+- `X-OWNLEVEL-App-Version`, si existe;
+- `X-OWNLEVEL-Build`, si existe;
+- `X-OWNLEVEL-Bridge-Version`;
+- `X-OWNLEVEL-Platform`.
+
+Cuando exista un cliente HTTP móvil, él será el único responsable de aplicar esos headers a la Mobile API; no serán headers globales ni se enviarán a Supabase directamente.
+
+El estado futuro de soporte se expresa como `supported`, `update_recommended` o `update_required`. La decisión vendrá de un contrato versionado del backend, no de una tabla o endpoint anticipado en M4. `update_recommended` permitirá continuar; `update_required` deberá mostrar una pantalla explícita de actualización y nunca degradarse a un error genérico.
+
+Para una app instalada vieja y un backend nuevo, los cambios de DB/API siguen la secuencia permanente:
+
+1. **EXPAND:** agregar contratos opcionales o compatibles;
+2. **CLIENTS ADOPT:** publicar y permitir adopción de builds nuevas;
+3. **OBSERVE:** comprobar que las builds soportadas dejaron el contrato anterior;
+4. **CONTRACT:** retirar sólo cuando ninguna build soportada dependa de él.
+
+No se eliminan campos, DTOs, endpoints, RPCs ni significados que una build todavía soportada pueda utilizar.
+
+## Matriz de actualización
+
+| Cambio | Publicación | ¿Nueva build iOS? |
+| --- | --- | --- |
+| UI web, RSC o Server Actions web | Vercel | No |
+| Backend compatible / Mobile API compatible | Vercel | No |
+| DB aditiva y compatible | Supabase | No |
+| Bundle React local de iOS | Xcode / distribución iOS | Sí, con el modelo actual |
+| Plugin nativo | Xcode / distribución iOS | Sí |
+| Permiso o entitlement | Xcode / distribución iOS | Sí |
+| Swift o configuración nativa | Xcode / distribución iOS | Sí |
+
+M4 no agrega live updates ni Appflow.
 
 ## Deep links y configuración manual
 
@@ -90,15 +153,15 @@ El proyecto generado conserva el deployment target oficial de Capacitor 8: iOS 1
 4. en Xcode, seleccionar el target **App**, elegir un Team de firma y conectar el iPhone;
 5. activar Developer Mode en el iPhone si iOS lo solicita;
 6. seleccionar el dispositivo y pulsar **Run**;
-7. comprobar el login Google, el retorno a OWNLEVEL y el estado `Sesión activa`;
-8. cerrar y reabrir la app para verificar la restauración desde Keychain;
-9. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
+7. comprobar el login Google o la restauración de la sesión M3;
+8. verificar el diagnóstico temporal: platform `ios`, runtime `capacitor`, app version, build y bridge `1`;
+9. comprobar que las cinco capabilities aparecen `unavailable` y que la app sigue operativa;
+10. cerrar sesión y comprobar que Safari/PWA conserva su propia sesión.
 
 Un Apple ID con Personal Team permite la prueba local gratuita. TestFlight y distribución requieren Apple Developer Program y quedan fuera de M2.
 
 ## Límites actuales y próximos pasos
 
-- **M4:** capability bridge y contrato de versionado.
 - **M5:** Haptics y QA de dispositivo.
 
-Hasta completar esas etapas, el shell autentica una cuenta real de OWNLEVEL pero no consulta datos de producto y no representa una alternativa funcional a la Web/PWA.
+M5 reemplazará únicamente el noop de Haptics por el plugin real y cambiará su estado a `available`; no debe repartir imports de Capacitor por el producto. Hasta completar las siguientes etapas, el shell autentica una cuenta real de OWNLEVEL pero no consulta datos de producto y no representa una alternativa funcional a la Web/PWA.

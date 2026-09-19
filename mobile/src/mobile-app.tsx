@@ -1,10 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useMobileAuth } from "./auth/use-mobile-auth";
+import { native } from "./native/bridge";
+import {
+  NATIVE_CAPABILITY_NAMES,
+  type NativeInfo,
+} from "./native/types";
 
 export function MobileApp() {
-  const { isNative, retry, signIn, signOut, state } = useMobileAuth();
+  const { retry, signIn, signOut, state } = useMobileAuth();
   const [logoutPending, setLogoutPending] = useState(false);
+  const [nativeInfo, setNativeInfo] = useState<NativeInfo | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    void native.info().then((info) => {
+      if (active) {
+        setNativeInfo(info);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleLogout() {
     if (logoutPending) {
@@ -39,13 +59,13 @@ export function MobileApp() {
             <p className="status">{state.notice ?? "Ingresá a tu cuenta."}</p>
             <button
               className="primary-action"
-              disabled={!isNative}
+              disabled={nativeInfo?.runtime !== "capacitor"}
               onClick={() => void signIn()}
               type="button"
             >
               Continuar con Google
             </button>
-            {!isNative ? (
+            {nativeInfo?.runtime === "browser" ? (
               <p className="runtime-note">El acceso nativo se prueba en iOS.</p>
             ) : null}
           </>
@@ -69,6 +89,44 @@ export function MobileApp() {
             <p className="status">
               {state.identity.displayName ?? state.identity.email ?? "Cuenta OWNLEVEL"}
             </p>
+            {nativeInfo ? (
+              <section
+                className="foundation-diagnostics"
+                aria-label="Diagnóstico de la foundation nativa"
+              >
+                <p className="diagnostics-title">Foundation diagnostics</p>
+                <dl className="diagnostics-grid">
+                  <div>
+                    <dt>Platform</dt>
+                    <dd>{nativeInfo.platform}</dd>
+                  </div>
+                  <div>
+                    <dt>Runtime</dt>
+                    <dd>{nativeInfo.runtime}</dd>
+                  </div>
+                  <div>
+                    <dt>App</dt>
+                    <dd>{nativeInfo.appVersion ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Build</dt>
+                    <dd>{nativeInfo.buildNumber ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Bridge</dt>
+                    <dd>{nativeInfo.bridgeVersion}</dd>
+                  </div>
+                </dl>
+                <ul className="capability-list">
+                  {NATIVE_CAPABILITY_NAMES.map((capability) => (
+                    <li key={capability}>
+                      <span>{capability}</span>
+                      <span>{nativeInfo.capabilities[capability]}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
             <button
               className="secondary-action"
               disabled={logoutPending}

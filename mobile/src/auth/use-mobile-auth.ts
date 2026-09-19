@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 
+import { isCapacitorRuntime } from "../native/runtime";
 import { OAuthCallbackGate, parseNativeAuthCallback } from "./callback";
 import {
   clearMobileSupabaseSession,
@@ -271,7 +272,7 @@ export function useMobileAuth() {
   }, [confirmStoredSession, handleCallback]);
 
   const signIn = useCallback(async () => {
-    if (signInPendingRef.current || !Capacitor.isNativePlatform()) {
+    if (signInPendingRef.current || !isCapacitorRuntime()) {
       return;
     }
 
@@ -344,7 +345,6 @@ export function useMobileAuth() {
   }, []);
 
   return {
-    isNative: Capacitor.isNativePlatform(),
     retry,
     signIn,
     signOut,
