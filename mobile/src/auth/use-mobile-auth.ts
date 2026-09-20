@@ -108,16 +108,16 @@ export function useMobileAuth() {
   }, [markInvalidSession]);
 
   const handleCallback = useCallback(
-    async (rawUrl: string, client: SupabaseClient) => {
+    async (rawUrl: string, client: SupabaseClient): Promise<boolean> => {
       const callback = parseNativeAuthCallback(rawUrl);
       if (!callback) {
-        return;
+        return false;
       }
 
       if (callback.kind === "invalid") {
         await closeAuthBrowser();
         dispatch({ type: "transient_failure" });
-        return;
+        return true;
       }
 
       if (callback.kind === "oauth_error") {
@@ -129,7 +129,7 @@ export function useMobileAuth() {
               ? "Inicio de sesión cancelado."
               : "No pudimos iniciar sesión.",
         });
-        return;
+        return true;
       }
 
       if (
@@ -137,7 +137,7 @@ export function useMobileAuth() {
         !callbackGateRef.current.claim(callback.code)
       ) {
         await closeAuthBrowser();
-        return;
+        return true;
       }
 
       dispatch({ type: "sign_in_started" });
@@ -150,7 +150,7 @@ export function useMobileAuth() {
       } catch {
         await closeAuthBrowser();
         dispatch({ type: "transient_failure" });
-        return;
+        return true;
       }
 
       await closeAuthBrowser();
@@ -162,18 +162,19 @@ export function useMobileAuth() {
         } else {
           dispatch({ type: "transient_failure" });
         }
-        return;
+        return true;
       }
 
       if (!data.session) {
         dispatch({ type: "transient_failure" });
-        return;
+        return true;
       }
 
       dispatch({
         type: "session_confirmed",
         identity: identityFromUser(data.session.user),
       });
+      return true;
     },
     [markInvalidSession],
   );
@@ -248,9 +249,10 @@ export function useMobileAuth() {
       }
 
       const launch = await App.getLaunchUrl();
-      if (launch?.url) {
-        await handleCallback(launch.url, client);
-      } else {
+      const handledAuthCallback = launch?.url
+        ? await handleCallback(launch.url, client)
+        : false;
+      if (!handledAuthCallback) {
         await confirmStoredSession(client);
       }
     }
