@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "mobile:dev": "vite --config mobile/vite.config.ts",
-    "mobile:test": "vitest run --config mobile/vite.config.ts src/api src/app src/auth src/navigation src/native",
+    "mobile:test": "vitest run --config mobile/vite.config.ts src/api src/app src/auth src/navigation src/native src/screens",
     "mobile:typecheck": "tsc --noEmit --project mobile/tsconfig.json",
     "mobile:build": "npm run mobile:typecheck && vite build --config mobile/vite.config.ts",
     "mobile:sync": "npm run mobile:build && cap sync ios",

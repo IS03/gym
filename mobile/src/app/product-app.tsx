@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ArrowLeft, Settings } from "lucide-react";
 import {
   HashRouter,
@@ -15,10 +15,12 @@ import {
   settingsReturnPath,
   tabPathForContext,
   type ProductNavigationState,
+  type ProductTabPath,
 } from "../navigation/routes";
 import { useProductDeepLinks } from "../navigation/use-product-deep-links";
 import type { NativeInfo } from "../native/types";
 import { DiagnosticsScreen } from "../screens/diagnostics-screen";
+import { HomeScreen } from "../screens/home-screen";
 import {
   PlaceholderScreen,
   SettingsScreen,
@@ -27,10 +29,16 @@ import {
 type ProductAppProps = {
   identity: AuthIdentity;
   nativeInfo: NativeInfo | null;
+  onAuthRejected: () => Promise<void>;
   onSignOut: () => Promise<void>;
 };
 
-function ProductRouter({ identity, nativeInfo, onSignOut }: ProductAppProps) {
+function ProductRouter({
+  identity,
+  nativeInfo,
+  onAuthRejected,
+  onSignOut,
+}: ProductAppProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [logoutPending, setLogoutPending] = useState(false);
@@ -39,6 +47,13 @@ function ProductRouter({ identity, nativeInfo, onSignOut }: ProductAppProps) {
   const nested = isSettings || isDiagnostics;
   const navigationState = location.state as ProductNavigationState | null;
   const returnTo = settingsReturnPath(navigationState);
+
+  const navigateToTab = useCallback(
+    (path: ProductTabPath) => {
+      navigate(path, { replace: true });
+    },
+    [navigate],
+  );
 
   useProductDeepLinks();
 
@@ -102,9 +117,10 @@ function ProductRouter({ identity, nativeInfo, onSignOut }: ProductAppProps) {
           <Route
             path="/home"
             element={
-              <PlaceholderScreen
-                title="Inicio"
-                description="Tu resumen diario de OWNLEVEL aparecerá acá."
+              <HomeScreen
+                fallbackDisplayName={identity.displayName}
+                onNavigate={navigateToTab}
+                onUnauthorized={onAuthRejected}
               />
             }
           />

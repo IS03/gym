@@ -17,12 +17,17 @@ export type MobileDailyMetricsResult =
   | { status: "unauthorized" }
   | { status: "unavailable" };
 
-type MobileApiClientDependencies = {
+export type MobileApiClientDependencies = {
   baseUrl: string;
   fetchImplementation: typeof fetch;
   getAccessToken: () => Promise<string | null>;
   getVersionHeaders: () => Promise<MobileClientHeaders>;
 };
+
+export type MobileApiJsonResult =
+  | { status: "ok"; data: unknown }
+  | { status: "unauthorized" }
+  | { status: "unavailable" };
 
 const VALUE_TYPES = new Set<MobileMetricValueType>([
   "integer",
@@ -83,7 +88,7 @@ export function parseMobileDailyMetricsResponse(
   };
 }
 
-const defaultDependencies: MobileApiClientDependencies = {
+export const defaultMobileApiDependencies: MobileApiClientDependencies = {
   baseUrl: mobileApiBaseUrl(),
   fetchImplementation: globalThis.fetch.bind(globalThis),
   getAccessToken: async () => {
@@ -94,9 +99,10 @@ const defaultDependencies: MobileApiClientDependencies = {
   getVersionHeaders: async () => createMobileClientHeaders(await native.info()),
 };
 
-export async function fetchMobileDailyMetrics(
-  dependencies: MobileApiClientDependencies = defaultDependencies,
-): Promise<MobileDailyMetricsResult> {
+export async function fetchMobileApiJson(
+  path: string,
+  dependencies: MobileApiClientDependencies = defaultMobileApiDependencies,
+): Promise<MobileApiJsonResult> {
   try {
     const accessToken = await dependencies.getAccessToken();
     if (!accessToken) {
@@ -104,7 +110,7 @@ export async function fetchMobileDailyMetrics(
     }
 
     const response = await dependencies.fetchImplementation(
-      `${dependencies.baseUrl}${MOBILE_DAILY_METRICS_API_PATH}`,
+      `${dependencies.baseUrl}${path}`,
       {
         method: "GET",
         cache: "no-store",
@@ -123,9 +129,21 @@ export async function fetchMobileDailyMetrics(
       return { status: "unavailable" };
     }
 
-    const data = parseMobileDailyMetricsResponse(await response.json());
-    return data ? { status: "ok", data } : { status: "unavailable" };
+    return { status: "ok", data: await response.json() };
   } catch {
     return { status: "unavailable" };
   }
+}
+
+export async function fetchMobileDailyMetrics(
+  dependencies: MobileApiClientDependencies = defaultMobileApiDependencies,
+): Promise<MobileDailyMetricsResult> {
+  const result = await fetchMobileApiJson(
+    MOBILE_DAILY_METRICS_API_PATH,
+    dependencies,
+  );
+  if (result.status !== "ok") return result;
+
+  const data = parseMobileDailyMetricsResponse(result.data);
+  return data ? { status: "ok", data } : { status: "unavailable" };
 }

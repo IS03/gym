@@ -1,6 +1,6 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** Stage 1 cerrado; Stage 1.5 / P1 implementado, sujeto a QA físico
+> **Estado:** Stage 1 cerrado; Stage 1.5 / P2 implementado, sujeto a QA físico
 >
 > **Última revisión:** 2026-09-20
 
@@ -16,7 +16,7 @@ La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownleve
 
 M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. M6 agrega la primera lectura real de producto mediante una Mobile API versionada y read-only.
 
-Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell autenticado definitivo, navegación propia y entradas estables para Inicio, Entrenar, Nutrición, Progreso y Ajustes; las superficies de dominio todavía son placeholders explícitos y no simulan datos.
+Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell autenticado definitivo, navegación propia y entradas estables para Inicio, Entrenar, Nutrición, Progreso y Ajustes. P2 reemplaza el placeholder de Inicio por la primera superficie diaria real; los otros dominios continúan como placeholders explícitos y no simulan datos.
 
 ## Estructura
 
@@ -49,7 +49,7 @@ Una sesión confirmada monta el shell OWNLEVEL y abre **Inicio**. La navegación
 
 El bundle local usa React Router en modo hash. Las rutas siguen siendo `/home`, `/train`, etc., pero se almacenan después de `#`, por lo que nunca se envían al servidor local de Capacitor ni requieren fallback HTTP. Un destino desconocido vuelve de forma segura a Inicio. Cada superficie controla su propio scroll dentro del viewport, mientras header y navegación quedan estables y respetan safe areas.
 
-Las herramientas de Stage 1 —runtime/versiones/capabilities, Haptics QA y la prueba M6— permanecen accesibles desde **Ajustes → Developer / Diagnostics**, pero dejaron de ser la pantalla principal.
+Las herramientas de Stage 1 —runtime/versiones/capabilities, Haptics QA y la prueba M6— permanecen accesibles desde **Ajustes → Developer / Diagnostics**, pero dejaron de ser la pantalla principal. Inicio consume la Mobile API y navega exclusivamente a los tabs existentes; no crea rutas hacia superficies todavía inexistentes.
 
 ## Autenticación nativa
 
@@ -159,6 +159,20 @@ type MobileDailyMetricsResponse = {
 Sólo aparecen métricas con un valor real. Una métrica ausente no se convierte en cero; un cero almacenado sí se conserva. `200` con lista vacía significa que la lectura fue válida y no hay valores. `503 DATA_UNAVAILABLE` significa que Auth o datos no pudieron comprobarse por infraestructura, mientras `401 UNAUTHORIZED` representa un Bearer rechazado. Ninguno de esos errores se convierte en datos vacíos.
 
 El endpoint admite CORS exclusivamente para el origen local esperado de Capacitor iOS (`capacitor://localhost`). `NEXT_PUBLIC_OWNLEVEL_API_BASE_URL` permite cambiar el backend para desarrollo; si no se define, el bundle usa el origen canónico `https://www.ownlevel.fit`. Esto no configura `server.url`: React continúa empaquetado localmente y sólo las requests viajan a Vercel.
+
+## Home nativa
+
+P2 agrega una segunda lectura versionada:
+
+```text
+GET /api/mobile/v1/home
+```
+
+El endpoint reutiliza la autenticación Bearer, el cliente Supabase y los headers de versión de M6. Después de validar el access token, deriva el usuario server-side y ejecuta en paralelo los mismos read models canónicos que Home Web/PWA usa para perfil, Nutrición, sesión activa y entrenamiento semanal. No acepta `userId`, no usa `service_role` y no cambia tablas, RPCs ni policies.
+
+La respuesta es un DTO explícito con fecha lógica de Córdoba. Perfil, Nutrición, sesión activa y semana conservan estados `ok` / `unavailable` independientes. Por eso una caída de Nutrición no oculta Entrenamiento, `activeSession: null` significa ausencia confirmada y una semana sin sesiones sigue siendo distinta de una lectura fallida. Si ninguna fuente de producto puede resolverse, el endpoint responde `503`; un Bearer rechazado conserva `401`.
+
+Inicio carga al montarse, admite actualización manual y vuelve a consultar al regresar a foreground. Un `401` solicita a la máquina Auth M3 que verifique la sesión; un timeout o fallo de red sólo muestra indisponibilidad y nunca limpia Keychain. No hay polling, realtime ni cache de datos privada.
 
 ## Matriz de actualización
 

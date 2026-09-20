@@ -32,6 +32,7 @@ export function MobileApp() {
       <ProductApp
         identity={state.identity}
         nativeInfo={nativeInfo}
+        onAuthRejected={retry}
         onSignOut={signOut}
       />
     );

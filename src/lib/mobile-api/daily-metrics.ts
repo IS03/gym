@@ -4,6 +4,13 @@ import type {
   MobileDailyMetricsResponse,
   MobileMetricValueType,
 } from "./contracts";
+import {
+  handleMobileAuthenticatedRequest,
+  isRejectedMobileAccessToken,
+  MobileApiUnauthorizedError,
+} from "./auth";
+
+export { isRejectedMobileAccessToken, MobileApiUnauthorizedError } from "./auth";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -36,45 +43,6 @@ export type MobileAuthenticatedContext = {
   userId: string;
   repository: MobileDailyMetricsRepository;
 };
-
-export class MobileApiUnauthorizedError extends Error {
-  readonly httpStatus = 401;
-
-  constructor() {
-    super("Unauthorized");
-    this.name = "MobileApiUnauthorizedError";
-  }
-}
-
-export function isRejectedMobileAccessToken(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const record = error as { code?: unknown; status?: unknown };
-  const code = typeof record.code === "string"
-    ? record.code.toLowerCase()
-    : "";
-  return (
-    Number(record.status) === 401 ||
-    code === "bad_jwt" ||
-    code === "invalid_jwt" ||
-    code === "user_not_found"
-  );
-}
-
-function bearerToken(authorization: string | null): string {
-  if (!authorization || authorization.length > 8_192) {
-    throw new MobileApiUnauthorizedError();
-  }
-
-  const match = /^Bearer ([^\s]+)$/i.exec(authorization);
-  if (!match?.[1]) {
-    throw new MobileApiUnauthorizedError();
-  }
-
-  return match[1];
-}
 
 function metricValue(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -164,14 +132,5 @@ export async function handleMobileDailyMetricsRequest(
     ) => Promise<MobileDailyMetricsResponse>;
   },
 ): Promise<MobileDailyMetricsHandlerResult> {
-  try {
-    const accessToken = bearerToken(authorization);
-    const context = await dependencies.authenticate(accessToken);
-    return { status: 200, body: await dependencies.read(context) };
-  } catch (error) {
-    if (error instanceof MobileApiUnauthorizedError) {
-      return { status: 401, body: { error: "UNAUTHORIZED" } };
-    }
-    return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
-  }
+  return handleMobileAuthenticatedRequest(authorization, dependencies);
 }
