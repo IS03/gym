@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  handleMobileDailyMetricsRequest,
-  readMobileDailyMetrics,
-} from "@/lib/mobile-api/daily-metrics";
+import { handleMobileHomeRequest } from "@/lib/mobile-api/home";
+import { readMobileHome } from "@/lib/mobile-api/home-server";
 import { mobileApiResponseHeaders } from "@/lib/mobile-api/http";
 import { authenticateMobileAccessToken } from "@/lib/mobile-api/supabase";
 import { todayInCordoba } from "@/lib/phase2/cordoba-date";
@@ -22,19 +20,19 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const { vercelId } = requestPerformanceContext(request.headers);
-  const performanceContext = {
-    route: "/api/mobile/v1/daily-metrics",
-    ...(vercelId ? { vercelId } : {}),
+  const requestPerformance = requestPerformanceContext(request.headers);
+  const performanceBase = {
+    route: "/api/mobile/v1/home",
+    ...requestPerformance,
   };
-  const result = await handleMobileDailyMetricsRequest(
+  const result = await handleMobileHomeRequest(
     request.headers.get("authorization"),
     {
       authenticate: (accessToken) =>
         measurePerformance(
           {
-            ...performanceContext,
-            operation: "mobile.daily_metrics.auth",
+            ...performanceBase,
+            operation: "mobile.home.auth",
             layer: "auth",
           },
           () => authenticateMobileAccessToken(accessToken),
@@ -42,16 +40,11 @@ export async function GET(request: NextRequest) {
       read: (context) =>
         measurePerformance(
           {
-            ...performanceContext,
-            operation: "mobile.daily_metrics.read",
-            layer: "database",
+            ...performanceBase,
+            operation: "mobile.home.read",
+            layer: "application",
           },
-          () =>
-            readMobileDailyMetrics(
-              context.repository,
-              context.userId,
-              todayInCordoba(),
-            ),
+          () => readMobileHome(todayInCordoba(), context, requestPerformance),
         ),
     },
   );

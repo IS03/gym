@@ -6,6 +6,8 @@ import { createResilientSupabaseFetch } from "@/lib/supabase/resilient-fetch";
 import {
   isRejectedMobileAccessToken,
   MobileApiUnauthorizedError,
+} from "./auth";
+import {
   type MobileAuthenticatedContext,
   type MobileDailyMetricsRepository,
   type MobileMetricDefinitionRow,
@@ -102,9 +104,13 @@ function repositoryFor(supabase: SupabaseClient): MobileDailyMetricsRepository {
   };
 }
 
+export type MobileSupabaseAuthenticatedContext = MobileAuthenticatedContext & {
+  supabase: SupabaseClient;
+};
+
 export async function authenticateMobileAccessToken(
   accessToken: string,
-): Promise<MobileAuthenticatedContext> {
+): Promise<MobileSupabaseAuthenticatedContext> {
   const supabase = createMobileRequestClient(accessToken);
   const { data, error } = await supabase.auth.getUser(accessToken);
 
@@ -119,6 +125,7 @@ export async function authenticateMobileAccessToken(
   }
 
   return {
+    supabase,
     userId: data.user.id,
     repository: repositoryFor(supabase),
   };
