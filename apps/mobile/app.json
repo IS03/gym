@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "OWNLEVEL Dev",
+    "slug": "ownlevel-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/ownlevel-app-icon.png",
+    "scheme": "ownlevel-dev",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "fit.ownlevel.app.dev",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "fit.ownlevel.app.dev",
+      "adaptiveIcon": {
+        "backgroundColor": "#15121D",
+        "foregroundImage": "./assets/images/ownlevel-app-icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/ownlevel-app-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/ownlevel-app-icon.png",
+          "imageWidth": 112,
+          "resizeMode": "contain",
+          "backgroundColor": "#F8F7FB",
+          "dark": {
+            "image": "./assets/images/ownlevel-app-icon.png",
+            "backgroundColor": "#0D0B12"
+          }
+        }
+      ]
+    ]
+  }
+}
