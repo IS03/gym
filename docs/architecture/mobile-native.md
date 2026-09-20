@@ -1,6 +1,6 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** Stage 1 cerrado; Stage 1.5 / P2 implementado, sujeto a QA físico
+> **Estado:** Stage 1 cerrado; Stage 1.5 / P3 implementado, sujeto a QA físico
 >
 > **Última revisión:** 2026-09-20
 
@@ -16,7 +16,7 @@ La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownleve
 
 M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. M6 agrega la primera lectura real de producto mediante una Mobile API versionada y read-only.
 
-Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell autenticado definitivo, navegación propia y entradas estables para Inicio, Entrenar, Nutrición, Progreso y Ajustes. P2 reemplaza el placeholder de Inicio por la primera superficie diaria real; los otros dominios continúan como placeholders explícitos y no simulan datos.
+Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell autenticado definitivo, navegación propia y entradas estables para Inicio, Entrenar, Nutrición, Progreso y Ajustes. P2 reemplaza el placeholder de Inicio por la primera superficie diaria real. P3 convierte Nutrición en la primera superficie móvil con lectura y escrituras reales; Entrenar y Progreso continúan como placeholders explícitos y no simulan datos.
 
 ## Estructura
 
@@ -26,7 +26,7 @@ Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell
 | `mobile/src/auth/` | Cliente Supabase móvil, máquina de estados, validación del callback y adapter de almacenamiento seguro |
 | `mobile/src/app/` | Auth gate y composición del shell autenticado |
 | `mobile/src/navigation/` | Rutas, bottom navigation y frontera de deep links de producto |
-| `mobile/src/screens/` | Superficies móviles; en P1, placeholders de producto, Ajustes y Diagnostics |
+| `mobile/src/screens/` | Superficies móviles de producto, formularios, estados resilientes, Ajustes y Diagnostics |
 | `mobile/src/native/` | Contrato OWNLEVEL para runtime, versiones, capabilities y fallbacks |
 | `mobile-dist/` | Build generado y no versionado que consume Capacitor |
 | `capacitor.config.ts` | Identidad de la app y `webDir`; no contiene runtime remoto |
@@ -173,6 +173,30 @@ El endpoint reutiliza la autenticación Bearer, el cliente Supabase y los header
 La respuesta es un DTO explícito con fecha lógica de Córdoba. Perfil, Nutrición, sesión activa y semana conservan estados `ok` / `unavailable` independientes. Por eso una caída de Nutrición no oculta Entrenamiento, `activeSession: null` significa ausencia confirmada y una semana sin sesiones sigue siendo distinta de una lectura fallida. Si ninguna fuente de producto puede resolverse, el endpoint responde `503`; un Bearer rechazado conserva `401`.
 
 Inicio carga al montarse, admite actualización manual y vuelve a consultar al regresar a foreground. Un `401` solicita a la máquina Auth M3 que verifique la sesión; un timeout o fallo de red sólo muestra indisponibilidad y nunca limpia Keychain. No hay polling, realtime ni cache de datos privada.
+
+## Nutrición nativa
+
+P3 reemplaza el placeholder `/today` por la primera superficie móvil diaria con CRUD real. La fecha sigue siendo responsabilidad del backend mediante `todayInCordoba()`; el cliente no calcula ni envía una fecha ni un propietario.
+
+La lectura usa:
+
+```text
+GET /api/mobile/v1/nutrition/today
+```
+
+El DTO contiene únicamente el resumen nutricional canónico y las comidas activas del día. `summary` y `meals` tienen estados `ok` / `unavailable` independientes: una lista vacía confirmada se representa como `meals: { status: "ok", data: [] }`, mientras un error de lectura nunca se convierte en vacío. Calorías y macros agregados conservan los ceros reales del `day_log`; macros ausentes en una comida individual conservan `null`.
+
+Las escrituras usan rutas explícitas:
+
+```text
+POST   /api/mobile/v1/nutrition/meals
+PATCH  /api/mobile/v1/nutrition/meals/:id
+DELETE /api/mobile/v1/nutrition/meals/:id
+```
+
+Todas validan el Bearer de M3, derivan el usuario server-side y ejecutan el dominio canónico `createMeal`, `updateMeal` y `softDeleteMeal` bajo RLS. No aceptan `userId`, no usan `service_role` y no cambian schema o policies. Create reutiliza la `idempotency_key` introducida en Reliability R3; una misma operación conserva su key ante un outcome ambiguo y no se reintenta automáticamente. Update y delete filtran por `user_id`, y una fila ajena, inexistente o ya eliminada devuelve el mismo `404 NOT_FOUND` acotado.
+
+El formulario usa los parsers de decimales localizados del dominio: macros aceptan coma o punto y calorías siguen siendo enteras positivas. Los snapshots del `day_log` y la semántica histórica no se reconstruyen en mobile. Después de una escritura confirmada se releen resumen y comidas; volver a Inicio remonta la superficie Home y obtiene sus totales actuales. La pantalla también refresca manualmente y al regresar a foreground, sin polling ni caché privada.
 
 ## Matriz de actualización
 

@@ -1,3 +1,5 @@
+import { MobileApiValidationError } from "./auth";
+
 const MOBILE_ORIGIN = "capacitor://localhost";
 const MOBILE_ALLOWED_HEADERS = [
   "Authorization",
@@ -16,10 +18,18 @@ export function mobileApiResponseHeaders(request: Request): HeadersInit {
     ...(origin === MOBILE_ORIGIN
       ? {
           "Access-Control-Allow-Origin": MOBILE_ORIGIN,
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": MOBILE_ALLOWED_HEADERS,
           "Access-Control-Max-Age": "600",
         }
       : {}),
   };
+}
+
+export async function readMobileJson(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new MobileApiValidationError("El contenido enviado no es válido.");
+  }
 }

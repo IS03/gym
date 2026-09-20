@@ -29,6 +29,13 @@ export type MobileApiJsonResult =
   | { status: "unauthorized" }
   | { status: "unavailable" };
 
+export type MobileApiMutationResult =
+  | { status: "ok"; data: unknown }
+  | { status: "validation"; message: string }
+  | { status: "not_found"; message: string }
+  | { status: "unauthorized" }
+  | { status: "unavailable" };
+
 const VALUE_TYPES = new Set<MobileMetricValueType>([
   "integer",
   "decimal",
@@ -99,10 +106,11 @@ export const defaultMobileApiDependencies: MobileApiClientDependencies = {
   getVersionHeaders: async () => createMobileClientHeaders(await native.info()),
 };
 
-export async function fetchMobileApiJson(
+export async function requestMobileApiJson(
   path: string,
+  init: Pick<RequestInit, "body" | "method">,
   dependencies: MobileApiClientDependencies = defaultMobileApiDependencies,
-): Promise<MobileApiJsonResult> {
+): Promise<MobileApiMutationResult> {
   try {
     const accessToken = await dependencies.getAccessToken();
     if (!accessToken) {
@@ -112,11 +120,15 @@ export async function fetchMobileApiJson(
     const response = await dependencies.fetchImplementation(
       `${dependencies.baseUrl}${path}`,
       {
-        method: "GET",
+        method: init.method,
+        ...(init.body === undefined ? {} : { body: init.body }),
         cache: "no-store",
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${accessToken}`,
+          ...(init.body === undefined
+            ? {}
+            : { "Content-Type": "application/json" }),
           ...(await dependencies.getVersionHeaders()),
         },
       },
@@ -125,14 +137,55 @@ export async function fetchMobileApiJson(
     if (response.status === 401) {
       return { status: "unauthorized" };
     }
+    const responseBody = await response.json().catch(() => null);
+    if (
+      response.status === 400 &&
+      isRecord(responseBody) &&
+      responseBody.error === "VALIDATION_ERROR"
+    ) {
+      return {
+        status: "validation",
+        message:
+          typeof responseBody.message === "string"
+            ? responseBody.message
+            : "Revisá los datos ingresados.",
+      };
+    }
+    if (
+      response.status === 404 &&
+      isRecord(responseBody) &&
+      responseBody.error === "NOT_FOUND"
+    ) {
+      return {
+        status: "not_found",
+        message:
+          typeof responseBody.message === "string"
+            ? responseBody.message
+            : "El registro ya no está disponible.",
+      };
+    }
     if (!response.ok) {
       return { status: "unavailable" };
     }
 
-    return { status: "ok", data: await response.json() };
+    return { status: "ok", data: responseBody };
   } catch {
     return { status: "unavailable" };
   }
+}
+
+export async function fetchMobileApiJson(
+  path: string,
+  dependencies: MobileApiClientDependencies = defaultMobileApiDependencies,
+): Promise<MobileApiJsonResult> {
+  const result = await requestMobileApiJson(
+    path,
+    { method: "GET" },
+    dependencies,
+  );
+  return result.status === "validation" || result.status === "not_found"
+    ? { status: "unavailable" }
+    : result;
 }
 
 export async function fetchMobileDailyMetrics(

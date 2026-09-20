@@ -1,6 +1,14 @@
 export const MOBILE_DAILY_METRICS_API_PATH =
   "/api/mobile/v1/daily-metrics" as const;
 export const MOBILE_HOME_API_PATH = "/api/mobile/v1/home" as const;
+export const MOBILE_NUTRITION_TODAY_API_PATH =
+  "/api/mobile/v1/nutrition/today" as const;
+export const MOBILE_NUTRITION_MEALS_API_PATH =
+  "/api/mobile/v1/nutrition/meals" as const;
+
+export function mobileNutritionMealApiPath(id: string) {
+  return `${MOBILE_NUTRITION_MEALS_API_PATH}/${encodeURIComponent(id)}` as const;
+}
 
 export type MobileReadResult<T> =
   | { status: "ok"; data: T }
@@ -66,6 +74,55 @@ export type MobileHomeResponse = {
   };
 };
 
+export type MobileNutritionSummaryDto = {
+  calories: number;
+  calorieTarget: number | null;
+  proteinG: number;
+  proteinTargetG: number | null;
+  carbsG: number;
+  fatG: number;
+  mealCount: number;
+  waterL: number | null;
+  waterTargetL: number | null;
+  energyBalanceKcal: number | null;
+};
+
+export type MobileMealDto = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  consumedAt: string;
+  updatedAt: string;
+};
+
+export type MobileNutritionTodayResponse = {
+  date: string;
+  summary: MobileReadResult<MobileNutritionSummaryDto>;
+  meals: MobileReadResult<MobileMealDto[]>;
+};
+
+export type MobileMealMutationPayload = {
+  title: string;
+  description: string;
+  calories: string;
+  proteinG: string;
+  carbsG: string;
+  fatG: string;
+  idempotencyKey?: string;
+};
+
+export type MobileMealMutationResponse = {
+  meal: MobileMealDto;
+};
+
+export type MobileMealDeleteResponse = {
+  deleted: true;
+};
+
 export type MobileMetricValueType = "integer" | "decimal" | "duration";
 
 export type MobileDailyMetricDto = {
@@ -82,8 +139,13 @@ export type MobileDailyMetricsResponse = {
   metrics: MobileDailyMetricDto[];
 };
 
-export type MobileApiErrorCode = "UNAUTHORIZED" | "DATA_UNAVAILABLE";
+export type MobileApiErrorCode =
+  | "UNAUTHORIZED"
+  | "VALIDATION_ERROR"
+  | "NOT_FOUND"
+  | "DATA_UNAVAILABLE";
 
 export type MobileApiErrorResponse = {
   error: MobileApiErrorCode;
+  message?: string;
 };

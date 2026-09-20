@@ -21,6 +21,7 @@ import { useProductDeepLinks } from "../navigation/use-product-deep-links";
 import type { NativeInfo } from "../native/types";
 import { DiagnosticsScreen } from "../screens/diagnostics-screen";
 import { HomeScreen } from "../screens/home-screen";
+import { NutritionTodayScreen } from "../screens/nutrition-today-screen";
 import {
   PlaceholderScreen,
   SettingsScreen,
@@ -135,12 +136,7 @@ function ProductRouter({
           />
           <Route
             path="/today"
-            element={
-              <PlaceholderScreen
-                title="Nutrición"
-                description="Tus comidas y objetivos del día aparecerán acá."
-              />
-            }
+            element={<NutritionTodayScreen onUnauthorized={onAuthRejected} />}
           />
           <Route
             path="/progress"

@@ -95,7 +95,7 @@ function contextFromSnapshot(dayLog: DayLog): NutritionContext {
   };
 }
 
-async function listActiveMeals(
+export async function listActiveMealsForDayLog(
   dayLogId: string,
   context: AuthenticatedRequestContext,
 ): Promise<MealEntry[]> {
@@ -111,9 +111,9 @@ async function listActiveMeals(
   return (data ?? []) as MealEntry[];
 }
 
-/** Home sólo necesita los agregados del día y la cantidad de comidas. */
-export async function getNutritionDaySummary(
+export async function getNutritionDaySummaryForLog(
   date: string,
+  dayLog: DayLog,
   context: AuthenticatedRequestContext,
 ): Promise<{
   date: string;
@@ -122,7 +122,6 @@ export async function getNutritionDaySummary(
   context: NutritionContext;
 }> {
   assertIsoDate(date);
-  const dayLog = await getOrCreateDayLog(date, context);
   const { count, error } = await context.supabase
     .from("meal_entries")
     .select("id", { count: "exact", head: true })
@@ -136,6 +135,21 @@ export async function getNutritionDaySummary(
     mealCount: count ?? 0,
     context: contextFromSnapshot(dayLog),
   };
+}
+
+/** Home sólo necesita los agregados del día y la cantidad de comidas. */
+export async function getNutritionDaySummary(
+  date: string,
+  context: AuthenticatedRequestContext,
+): Promise<{
+  date: string;
+  dayLog: DayLog;
+  mealCount: number;
+  context: NutritionContext;
+}> {
+  assertIsoDate(date);
+  const dayLog = await getOrCreateDayLog(date, context);
+  return getNutritionDaySummaryForLog(date, dayLog, context);
 }
 
 export async function getNutritionDay(
@@ -180,7 +194,7 @@ export async function getNutritionDay(
   return {
     date,
     dayLog,
-    meals: await listActiveMeals(dayLog.id, auth),
+    meals: await listActiveMealsForDayLog(dayLog.id, auth),
     context: contextFromSnapshot(dayLog),
   };
 }
