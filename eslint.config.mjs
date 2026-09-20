@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Expo has its own ESLint config and dependency tree.
+    "apps/mobile/**",
     // PWA generado por @ducanh2912/next-pwa en build
     "public/sw.js",
     "public/workbox-*.js",
