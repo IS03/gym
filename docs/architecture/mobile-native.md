@@ -1,8 +1,8 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** Stage 1 / M6 implementado; cierre sujeto a QA físico de paridad de datos
+> **Estado:** Stage 1 cerrado; Stage 1.5 / P1 implementado, sujeto a QA físico
 >
-> **Última revisión:** 2026-09-19
+> **Última revisión:** 2026-09-20
 
 ## Arquitectura vigente
 
@@ -16,18 +16,40 @@ La aplicación iOS no usa `server.url` ni `allowNavigation` para cargar `ownleve
 
 M3 agrega Google OAuth con PKCE, retorno por deep link y persistencia segura de sesión. M4 agrega la frontera propia de capacidades y versiones. M5 incorpora Haptics como primera capability nativa real. M6 agrega la primera lectura real de producto mediante una Mobile API versionada y read-only.
 
+Stage 1.5 convierte esa foundation en el cliente de producto. P1 agrega el shell autenticado definitivo, navegación propia y entradas estables para Inicio, Entrenar, Nutrición, Progreso y Ajustes; las superficies de dominio todavía son placeholders explícitos y no simulan datos.
+
 ## Estructura
 
 | Ruta | Responsabilidad |
 | --- | --- |
 | `mobile/` | Entry point React client-only, estilos y configuración de Vite/TypeScript |
 | `mobile/src/auth/` | Cliente Supabase móvil, máquina de estados, validación del callback y adapter de almacenamiento seguro |
+| `mobile/src/app/` | Auth gate y composición del shell autenticado |
+| `mobile/src/navigation/` | Rutas, bottom navigation y frontera de deep links de producto |
+| `mobile/src/screens/` | Superficies móviles; en P1, placeholders de producto, Ajustes y Diagnostics |
 | `mobile/src/native/` | Contrato OWNLEVEL para runtime, versiones, capabilities y fallbacks |
 | `mobile-dist/` | Build generado y no versionado que consume Capacitor |
 | `capacitor.config.ts` | Identidad de la app y `webDir`; no contiene runtime remoto |
 | `ios/` | Proyecto iOS oficial, versionado y administrado por Capacitor/Xcode |
 
 El bundle móvil es deliberadamente independiente de `src/app`: no intenta exportar Next.js ni ejecutar RSC o Server Actions dentro del dispositivo.
+
+## Shell y navegación de producto
+
+Una sesión confirmada monta el shell OWNLEVEL y abre **Inicio**. La navegación principal conserva los mismos cuatro destinos de Web/PWA:
+
+| Destino | Ruta interna |
+| --- | --- |
+| Inicio | `/home` |
+| Entrenar | `/train` |
+| Nutrición | `/today` |
+| Progreso | `/progress` |
+
+**Ajustes** vive en `/settings` y se abre desde el header; no es un quinto tab. Entrar a Ajustes conserva el tab de origen y el back explícito vuelve a ese contexto. Cambiar de tab reemplaza la entrada actual en vez de construir una pila indefinida.
+
+El bundle local usa React Router en modo hash. Las rutas siguen siendo `/home`, `/train`, etc., pero se almacenan después de `#`, por lo que nunca se envían al servidor local de Capacitor ni requieren fallback HTTP. Un destino desconocido vuelve de forma segura a Inicio. Cada superficie controla su propio scroll dentro del viewport, mientras header y navegación quedan estables y respetan safe areas.
+
+Las herramientas de Stage 1 —runtime/versiones/capabilities, Haptics QA y la prueba M6— permanecen accesibles desde **Ajustes → Developer / Diagnostics**, pero dejaron de ser la pantalla principal.
 
 ## Autenticación nativa
 
@@ -160,6 +182,8 @@ El callback de desarrollo registrado en iOS y requerido en Supabase es:
 ownlevel://auth/callback
 ```
 
+P1 separa esa frontera de Auth de los deep links de producto. El parser de producto sólo acepta destinos conocidos con host `app`, por ejemplo `ownlevel://app/train`; nunca consume `ownlevel://auth/callback`. El listener traduce un destino válido a una ruta interna y también contempla cold start. Estos links de producto son foundation para etapas futuras: P1 no registra notificaciones ni cambia el scheme de Auth.
+
 Antes del QA físico, agregarlo en **Supabase Dashboard → proyecto gym → Authentication → URL Configuration → Redirect URLs → Add URL**. No cambiar el Site URL ni eliminar el callback web existente.
 
 El custom scheme permite desarrollo con Personal Team, pero no es el contrato final de distribución. El callback de producción previsto es `https://ownlevel.fit/auth/native/callback` mediante Universal Links. Associated Domains, el archivo AASA y la allowlist de ese callback quedan gated hasta preparar distribución con Apple Developer Program; no se agregaron entitlements incompletos en M3.
@@ -209,6 +233,6 @@ Un Apple ID con Personal Team permite la prueba local gratuita. TestFlight y dis
 
 La foundation ya demuestra bundle React local, proyecto iOS reproducible, identidad Supabase compartida, sesión segura, deep links, contrato de capabilities/versiones y el recorrido React → bridge OWNLEVEL → plugin oficial de Haptics. M6 suma el recorrido access token nativo → Mobile API v1 → RLS → datos canónicos → DTO → shell iOS.
 
-El cierre requiere comparar físicamente una fecha, etiqueta y valor real de métricas en Web/PWA contra el resultado del shell iOS, y repetir después de actualizar el valor desde Web/PWA y pulsar **Actualizar** en iOS. No se marca paridad antes de esa evidencia.
+El QA físico de M6 confirmó la misma fecha, métrica y valor en Web/PWA e iOS, incluida la actualización explícita desde Web/PWA. Con esa evidencia, Stage 1 está cerrado. La prueba continúa siendo deliberadamente read-only y no implica paridad funcional completa de las superficies de producto.
 
-Una vez aprobado ese MATCH, Stage 1 queda cerrable: la prueba es deliberadamente read-only y no implica que exista todavía una pantalla móvil de producto ni paridad funcional completa.
+Stage 1.5 comienza con P1: el shell de producto y su navegación están implementados, mientras el contenido real de cada dominio se incorporará de forma progresiva después de su QA físico.

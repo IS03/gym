@@ -17,6 +17,7 @@ describe("native auth callback", () => {
     expect(
       parseNativeAuthCallback("ownlevel://auth/other?code=pkce-code"),
     ).toBeNull();
+    expect(parseNativeAuthCallback("ownlevel://app/train")).toBeNull();
   });
 
   it("rejects malformed expected callbacks without retaining sensitive fields", () => {
