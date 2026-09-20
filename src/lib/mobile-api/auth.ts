@@ -9,6 +9,24 @@ export class MobileApiUnauthorizedError extends Error {
   }
 }
 
+export class MobileApiValidationError extends Error {
+  readonly httpStatus = 400;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "MobileApiValidationError";
+  }
+}
+
+export class MobileApiNotFoundError extends Error {
+  readonly httpStatus = 404;
+
+  constructor(message = "El recurso ya no está disponible.") {
+    super(message);
+    this.name = "MobileApiNotFoundError";
+  }
+}
+
 export function isRejectedMobileAccessToken(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -57,6 +75,45 @@ export async function handleMobileAuthenticatedRequest<TContext, TBody>(
   } catch (error) {
     if (error instanceof MobileApiUnauthorizedError) {
       return { status: 401, body: { error: "UNAUTHORIZED" } };
+    }
+    return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
+  }
+}
+
+export type MobileMutationHandlerResult<T> =
+  | { status: 200 | 201; body: T }
+  | { status: 400 | 401 | 404 | 503; body: MobileApiErrorResponse };
+
+export async function handleMobileMutationRequest<TContext, TBody>(
+  authorization: string | null,
+  dependencies: {
+    authenticate: (accessToken: string) => Promise<TContext>;
+    mutate: (context: TContext) => Promise<TBody>;
+    successStatus?: 200 | 201;
+  },
+): Promise<MobileMutationHandlerResult<TBody>> {
+  try {
+    const accessToken = mobileBearerToken(authorization);
+    const context = await dependencies.authenticate(accessToken);
+    return {
+      status: dependencies.successStatus ?? 200,
+      body: await dependencies.mutate(context),
+    };
+  } catch (error) {
+    if (error instanceof MobileApiUnauthorizedError) {
+      return { status: 401, body: { error: "UNAUTHORIZED" } };
+    }
+    if (error instanceof MobileApiValidationError) {
+      return {
+        status: 400,
+        body: { error: "VALIDATION_ERROR", message: error.message },
+      };
+    }
+    if (error instanceof MobileApiNotFoundError) {
+      return {
+        status: 404,
+        body: { error: "NOT_FOUND", message: error.message },
+      };
     }
     return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
   }

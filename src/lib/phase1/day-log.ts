@@ -249,6 +249,13 @@ export type UpdateMealInput = {
   final_fat_g?: number | null;
 };
 
+export class MealNotFoundError extends Error {
+  constructor() {
+    super("La comida no existe o ya no está disponible.");
+    this.name = "MealNotFoundError";
+  }
+}
+
 export async function updateMeal(
   input: UpdateMealInput,
   context?: AuthenticatedRequestContext,
@@ -280,23 +287,31 @@ export async function updateMeal(
     .eq("id", input.id)
     .eq("user_id", userId)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error) throw new Error(`Editar meal_entries: ${error.message}`);
+  if (!data) throw new MealNotFoundError();
   return data as MealEntry;
 }
 
-export async function softDeleteMeal(id: string): Promise<void> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+export async function softDeleteMeal(
+  id: string,
+  context?: AuthenticatedRequestContext,
+): Promise<void> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("meal_entries")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) throw new Error(`Soft delete meal_entries: ${error.message}`);
+  if (!data) throw new MealNotFoundError();
 }
 
 export async function listRecentDays(limit = 14): Promise<DayLog[]> {
