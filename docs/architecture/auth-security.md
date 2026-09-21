@@ -2,11 +2,12 @@
 
 Documento técnico canónico de autenticación, autorización y protección de datos de OWNLEVEL.
 
-> **Alcance:** login web, sesión, OAuth, proxy, clientes Supabase, RLS, ownership, credenciales server-only, API privada de integraciones, hardening HTTP/PWA y reglas para extender el sistema sin debilitar sus límites de confianza.
+> **Alcance:** login Web y Expo nativo, sesión, OAuth, proxy, clientes Supabase, RLS, ownership, credenciales server-only, API privada de integraciones, hardening HTTP/PWA y reglas para extender el sistema sin debilitar sus límites de confianza.
 >
 > **Estado:** contrato vigente basado en `main` al 14 de septiembre de 2026.
 >
 > Para arquitectura global consultar [`../ownlevel-architecture.md`](../ownlevel-architecture.md). Para la integración ChatGPT a nivel funcional consultar [`../integrations/chatgpt-nutrition.md`](../integrations/chatgpt-nutrition.md).
+> Para el contrato Auth del cliente Expo consultar [`../mobile/native-auth.md`](../mobile/native-auth.md). El documento [`mobile-native.md`](mobile-native.md) conserva únicamente el cliente Capacitor legacy.
 
 ## Fuente de verdad
 

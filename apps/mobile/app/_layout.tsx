@@ -5,6 +5,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect, useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { MobileAuthProvider, useMobileAuth } from '@/auth';
 import { OwnlevelThemeProvider, useOwnlevelTheme } from '@/design-system';
 import { useStackScreenOptions } from '@/navigation/use-stack-screen-options';
 
@@ -13,6 +14,7 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 function RootNavigator() {
+  const { session, state } = useMobileAuth();
   const { colors, isDark } = useOwnlevelTheme();
   const screenOptions = useStackScreenOptions();
   const navigationTheme = useMemo(
@@ -37,18 +39,26 @@ function RootNavigator() {
   }, [colors.background]);
 
   useEffect(() => {
-    void SplashScreen.hideAsync().catch(() => {
-      // The splash may already be hidden during fast refresh.
-    });
-  }, []);
+    if (state.status !== 'BOOTSTRAPPING') {
+      void SplashScreen.hideAsync().catch(() => {
+        // The splash may already be hidden during fast refresh.
+      });
+    }
+  }, [state.status]);
 
   return (
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={screenOptions}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="auth" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={Boolean(session)}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
+        </Stack.Protected>
       </Stack>
     </NavigationThemeProvider>
   );
@@ -58,7 +68,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <OwnlevelThemeProvider>
-        <RootNavigator />
+        <MobileAuthProvider>
+          <RootNavigator />
+        </MobileAuthProvider>
       </OwnlevelThemeProvider>
     </SafeAreaProvider>
   );

@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
+import { useState } from 'react';
 import { Platform } from 'react-native';
 
+import { useMobileAuth } from '@/auth';
 import {
   AppText,
   Button,
@@ -20,7 +22,19 @@ const themeOptions: { label: string; value: ThemeMode }[] = [
 ];
 
 export default function SettingsScreen() {
-  const { mode, resolvedMode, setMode } = useOwnlevelTheme();
+  const { colors, mode, resolvedMode, setMode } = useOwnlevelTheme();
+  const { session, signOut, state } = useMobileAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+    await signOut();
+    setIsSigningOut(false);
+  }
 
   return (
     <ScrollScreen>
@@ -47,6 +61,25 @@ export default function SettingsScreen() {
         <AppText>OWNLEVEL Dev {Constants.expoConfig?.version ?? '0.1.0'}</AppText>
         <AppText muted variant="caption">
           {Platform.OS} · Expo SDK {Constants.expoConfig?.sdkVersion ?? '57'}
+        </AppText>
+      </Surface>
+      <Separator />
+      <Surface>
+        <Heading level={2}>Cuenta</Heading>
+        <AppText>{session?.user.email ?? 'Cuenta Google conectada'}</AppText>
+        {state.status === 'TRANSIENT_ERROR' && state.session ? (
+          <AppText accessibilityRole="alert" style={{ color: colors.warning }}>
+            No pudimos verificar la sesión en este momento. La sesión local se conservó.
+          </AppText>
+        ) : null}
+        <Button
+          disabled={isSigningOut}
+          label={isSigningOut ? 'Cerrando sesión…' : 'Cerrar sesión en este dispositivo'}
+          onPress={() => void handleSignOut()}
+          variant="secondary"
+        />
+        <AppText muted variant="caption">
+          Esto no cierra tu sesión en Safari ni en OWNLEVEL Web/PWA.
         </AppText>
       </Surface>
     </ScrollScreen>
