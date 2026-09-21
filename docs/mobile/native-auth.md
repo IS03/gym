@@ -1,6 +1,6 @@
 # OWNLEVEL Mobile — Native Auth
 
-> **Estado:** M1.2 implementado técnicamente; QA físico iPhone pendiente.
+> **Estado:** M1.2 cerrado y aprobado en QA físico iPhone.
 >
 > **Cliente:** React Native + Expo SDK 57 en `apps/mobile/`.
 
@@ -13,7 +13,7 @@ Mobile y Web/PWA autentican contra el mismo proyecto Supabase, pero son clientes
 | Web/PWA | cookies + SSR | callback HTTPS Web existente | sesión Web |
 | Expo development | SecureStore + Supabase JS | `ownlevel-dev://auth/callback` | `scope: "local"` |
 
-Mobile no lee cookies OWNLEVEL, no usa el callback Web y no contiene una clave `service_role`. El bearer de esta sesión se usará recién en la futura Mobile API.
+Mobile no lee cookies OWNLEVEL, no usa el callback Web y no contiene una clave `service_role`. M1.3 consume el bearer justo a tiempo mediante la frontera documentada en [`mobile-api-runtime.md`](mobile-api-runtime.md).
 
 ## Configuración pública
 
@@ -82,4 +82,4 @@ Validar login Google, retorno warm y cold, force-close/restore, background/foreg
 
 - Sign in with Apple no pertenece a M1.2; debe resolverse antes de distribución si aplica App Store Review Guideline 4.8.
 - QA físico Android está diferido.
-- Mobile API y datos de producto no forman parte de esta etapa.
+- La integración Mobile API pertenece a M1.3 y conserva la semántica Auth de esta etapa.

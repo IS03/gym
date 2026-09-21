@@ -4,8 +4,10 @@ import type { Mock } from 'jest-mock';
 
 import { OAuthCallbackGate } from './callback';
 import {
+  getNativeApiAccessToken,
   performLocalLogout,
   processNativeAuthCallback,
+  revalidateNativeSessionAfterUnauthorized,
   restoreNativeSession,
   syncAuthRefreshWithAppState,
 } from './service';
@@ -26,6 +28,7 @@ type AuthMock = {
   exchangeCodeForSession: AsyncAuthMock;
   getSession: AsyncAuthMock;
   getUser: AsyncAuthMock;
+  refreshSession: AsyncAuthMock;
   signOut: AsyncAuthMock;
   startAutoRefresh: AsyncAuthMock;
   stopAutoRefresh: AsyncAuthMock;
@@ -40,6 +43,7 @@ function makeClient(overrides: Partial<AuthMock> = {}) {
     exchangeCodeForSession: asyncMock({ data: { session }, error: null }),
     getSession: asyncMock({ data: { session }, error: null }),
     getUser: asyncMock({ data: { user }, error: null }),
+    refreshSession: asyncMock({ data: { session }, error: null }),
     signOut: asyncMock({ error: null }),
     startAutoRefresh: asyncMock(undefined),
     stopAutoRefresh: asyncMock(undefined),
@@ -99,6 +103,81 @@ describe('native session bootstrap', () => {
     });
 
     await expect(restoreNativeSession(client)).resolves.toEqual({ type: 'SESSION_INVALID' });
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+});
+
+describe('Mobile API Auth boundary', () => {
+  it('reads the access token just in time from the Supabase session', async () => {
+    const { client } = makeClient();
+
+    await expect(getNativeApiAccessToken(client)).resolves.toEqual({
+      status: 'ok',
+      accessToken: session.access_token,
+    });
+  });
+
+  it('recognizes a token already renewed by the Auth listener', async () => {
+    const renewedSession = { ...session, access_token: 'renewed-token' };
+    const { client, auth } = makeClient({
+      getSession: asyncMock({ data: { session: renewedSession }, error: null }),
+    });
+
+    await expect(
+      revalidateNativeSessionAfterUnauthorized(client, session.access_token),
+    ).resolves.toMatchObject({
+      status: 'renewed',
+      accessToken: 'renewed-token',
+    });
+    expect(auth.refreshSession).not.toHaveBeenCalled();
+  });
+
+  it('refreshes once after a rejected current token', async () => {
+    const renewedSession = { ...session, access_token: 'renewed-token' };
+    const { client, auth } = makeClient({
+      refreshSession: asyncMock({
+        data: { session: renewedSession },
+        error: null,
+      }),
+    });
+
+    await expect(
+      revalidateNativeSessionAfterUnauthorized(client, session.access_token),
+    ).resolves.toMatchObject({
+      status: 'renewed',
+      accessToken: 'renewed-token',
+    });
+    expect(auth.refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear the local session after a transient refresh failure', async () => {
+    const { client, auth } = makeClient({
+      refreshSession: asyncMock({
+        data: { session: null },
+        error: new Error('network unavailable'),
+      }),
+    });
+
+    await expect(
+      revalidateNativeSessionAfterUnauthorized(client, session.access_token),
+    ).resolves.toMatchObject({ status: 'unavailable', session });
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('clears only local Auth after Supabase confirms invalidity', async () => {
+    const { client, auth } = makeClient({
+      refreshSession: asyncMock({
+        data: { session: null },
+        error: {
+          name: 'AuthSessionMissingError',
+          message: 'Auth session missing',
+        },
+      }),
+    });
+
+    await expect(
+      revalidateNativeSessionAfterUnauthorized(client, session.access_token),
+    ).resolves.toEqual({ status: 'invalid' });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
 });

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform } from 'react-native';
 
@@ -22,6 +23,7 @@ const themeOptions: { label: string; value: ThemeMode }[] = [
 ];
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { colors, mode, resolvedMode, setMode } = useOwnlevelTheme();
   const { session, signOut, state } = useMobileAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -62,6 +64,13 @@ export default function SettingsScreen() {
         <AppText muted variant="caption">
           {Platform.OS} · Expo SDK {Constants.expoConfig?.sdkVersion ?? '57'}
         </AppText>
+        {__DEV__ ? (
+          <Button
+            label="API Diagnostics"
+            onPress={() => router.push('/settings/diagnostics')}
+            variant="secondary"
+          />
+        ) : null}
       </Surface>
       <Separator />
       <Surface>

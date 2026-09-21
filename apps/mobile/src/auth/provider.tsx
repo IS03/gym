@@ -18,10 +18,14 @@ import { getMobileSupabaseClient } from './client';
 import { NATIVE_AUTH_CALLBACK_URL } from './constants';
 import { authMessages } from './errors';
 import {
+  getNativeApiAccessToken,
   performLocalLogout,
   processNativeAuthCallback,
+  revalidateNativeSessionAfterUnauthorized,
   restoreNativeSession,
   syncAuthRefreshWithAppState,
+  type MobileApiAccessTokenResult,
+  type MobileApiSessionRevalidationResult,
 } from './service';
 import {
   authenticatedSession,
@@ -32,7 +36,11 @@ import {
 } from './state';
 
 type MobileAuthContextValue = {
+  getAccessTokenForApi: () => Promise<MobileApiAccessTokenResult>;
   handleCallbackUrl: (url: string) => Promise<boolean>;
+  revalidateApiSession: (
+    rejectedAccessToken: string,
+  ) => Promise<MobileApiSessionRevalidationResult>;
   retry: () => Promise<void>;
   session: Session | null;
   signInWithGoogle: () => Promise<void>;
@@ -182,6 +190,49 @@ export function MobileAuthProvider({ children }: PropsWithChildren) {
     await restore(client);
   }, [dispatchIfMounted, restore]);
 
+  const getAccessTokenForApi = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) {
+      return { status: 'unavailable', session: null } as const;
+    }
+
+    const result = await getNativeApiAccessToken(client);
+    if (result.status === 'auth_required') {
+      dispatchIfMounted({ type: 'SESSION_INVALID' });
+    } else if (result.status === 'unavailable') {
+      dispatchIfMounted({
+        type: 'TRANSIENT_FAILURE',
+        message: authMessages.restoreFailed,
+        session: result.session,
+      });
+    }
+    return result;
+  }, [dispatchIfMounted]);
+
+  const revalidateApiSession = useCallback(async (rejectedAccessToken: string) => {
+    const client = clientRef.current;
+    if (!client) {
+      return { status: 'unavailable', session: null } as const;
+    }
+
+    const result = await revalidateNativeSessionAfterUnauthorized(
+      client,
+      rejectedAccessToken,
+    );
+    if (result.status === 'invalid') {
+      dispatchIfMounted({ type: 'SESSION_INVALID' });
+    } else if (result.status === 'unavailable') {
+      dispatchIfMounted({
+        type: 'TRANSIENT_FAILURE',
+        message: authMessages.restoreFailed,
+        session: result.session,
+      });
+    } else {
+      dispatchIfMounted({ type: 'SESSION_CONFIRMED', session: result.session });
+    }
+    return result;
+  }, [dispatchIfMounted]);
+
   const signInWithGoogle = useCallback(async () => {
     const client = clientRef.current;
     if (!client || signInPendingRef.current) {
@@ -240,14 +291,16 @@ export function MobileAuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<MobileAuthContextValue>(
     () => ({
+      getAccessTokenForApi,
       handleCallbackUrl,
+      revalidateApiSession,
       retry,
       session: authenticatedSession(state),
       signInWithGoogle,
       signOut,
       state,
     }),
-    [handleCallbackUrl, retry, signInWithGoogle, signOut, state],
+    [getAccessTokenForApi, handleCallbackUrl, revalidateApiSession, retry, signInWithGoogle, signOut, state],
   );
 
   return <MobileAuthContext.Provider value={value}>{children}</MobileAuthContext.Provider>;
