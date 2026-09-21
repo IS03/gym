@@ -15,7 +15,7 @@ export default function HomeScreen() {
         <AppText>El cliente React Native + Expo definitivo está listo para validación técnica.</AppText>
         <Separator />
         <AppText muted variant="caption">
-          Sin Auth, Mobile API ni datos reales en M1.1.
+          Sesión nativa protegida. Mobile API y datos reales llegan en los próximos milestones.
         </AppText>
       </Surface>
       <Row>

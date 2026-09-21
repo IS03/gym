@@ -45,7 +45,9 @@
             "enableSceneSupport": true
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }

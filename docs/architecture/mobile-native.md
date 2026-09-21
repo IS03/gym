@@ -1,6 +1,10 @@
 # OWNLEVEL — Mobile native
 
-> **Estado:** Stage 1 cerrado; Stage 1.5 / P3 implementado, sujeto a QA físico
+> **LEGACY — Capacitor:** este documento conserva la arquitectura del prototipo técnico congelado en `mobile/` + `ios/`. No describe el cliente definitivo.
+>
+> El cliente vigente para desarrollo Mobile es React Native + Expo en `apps/mobile/`. Su foundation está en [`../mobile/expo-foundation.md`](../mobile/expo-foundation.md) y su Auth nativa en [`../mobile/native-auth.md`](../mobile/native-auth.md).
+>
+> **Estado histórico:** Stage 1 cerrado; Stage 1.5 / P3 implementado, sujeto a QA físico
 >
 > **Última revisión:** 2026-09-20
 
