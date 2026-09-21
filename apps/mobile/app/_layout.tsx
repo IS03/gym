@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MobileAuthProvider, useMobileAuth } from '@/auth';
+import { MobileApiProvider } from '@/api';
 import { OwnlevelThemeProvider, useOwnlevelTheme } from '@/design-system';
 import { useStackScreenOptions } from '@/navigation/use-stack-screen-options';
 
@@ -69,7 +70,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <OwnlevelThemeProvider>
         <MobileAuthProvider>
-          <RootNavigator />
+          <MobileApiProvider>
+            <RootNavigator />
+          </MobileApiProvider>
         </MobileAuthProvider>
       </OwnlevelThemeProvider>
     </SafeAreaProvider>

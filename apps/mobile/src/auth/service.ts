@@ -38,6 +38,105 @@ async function invalidateLocalSession(client: SupabaseClient): Promise<void> {
   }
 }
 
+export type MobileApiAccessTokenResult =
+  | { status: 'ok'; accessToken: string }
+  | { status: 'auth_required' }
+  | { status: 'unavailable'; session: Session | null };
+
+export async function getNativeApiAccessToken(
+  client: SupabaseClient,
+  timeoutMs = AUTH_OPERATION_TIMEOUT_MS,
+): Promise<MobileApiAccessTokenResult> {
+  try {
+    const { data, error } = await withTimeout(client.auth.getSession(), timeoutMs);
+    const session = data.session;
+
+    if (error) {
+      if (isConfirmedInvalidSession(error)) {
+        await invalidateLocalSession(client);
+        return { status: 'auth_required' };
+      }
+      return { status: 'unavailable', session };
+    }
+
+    return session?.access_token
+      ? { status: 'ok', accessToken: session.access_token }
+      : { status: 'auth_required' };
+  } catch {
+    return { status: 'unavailable', session: null };
+  }
+}
+
+export type MobileApiSessionRevalidationResult =
+  | { status: 'renewed'; accessToken: string; session: Session }
+  | { status: 'valid'; session: Session }
+  | { status: 'invalid' }
+  | { status: 'unavailable'; session: Session | null };
+
+export async function revalidateNativeSessionAfterUnauthorized(
+  client: SupabaseClient,
+  rejectedAccessToken: string,
+  timeoutMs = AUTH_OPERATION_TIMEOUT_MS,
+): Promise<MobileApiSessionRevalidationResult> {
+  let localSession: Session | null = null;
+
+  try {
+    const { data, error } = await withTimeout(client.auth.getSession(), timeoutMs);
+    localSession = data.session;
+
+    if (error) {
+      if (isConfirmedInvalidSession(error)) {
+        await invalidateLocalSession(client);
+        return { status: 'invalid' };
+      }
+      return { status: 'unavailable', session: localSession };
+    }
+  } catch {
+    return { status: 'unavailable', session: localSession };
+  }
+
+  if (!localSession?.access_token) {
+    await invalidateLocalSession(client);
+    return { status: 'invalid' };
+  }
+
+  if (localSession.access_token !== rejectedAccessToken) {
+    return {
+      status: 'renewed',
+      accessToken: localSession.access_token,
+      session: localSession,
+    };
+  }
+
+  try {
+    const { data, error } = await withTimeout(client.auth.refreshSession(), timeoutMs);
+    const refreshedSession = data.session;
+
+    if (error) {
+      if (isConfirmedInvalidSession(error)) {
+        await invalidateLocalSession(client);
+        return { status: 'invalid' };
+      }
+      return { status: 'unavailable', session: localSession };
+    }
+
+    if (!refreshedSession?.access_token) {
+      await invalidateLocalSession(client);
+      return { status: 'invalid' };
+    }
+
+    return refreshedSession.access_token !== rejectedAccessToken
+      ? {
+          status: 'renewed',
+          accessToken: refreshedSession.access_token,
+          session: refreshedSession,
+        }
+      : { status: 'valid', session: refreshedSession };
+  } catch {
+    return { status: 'unavailable', session: localSession };
+  }
+}
+
 export async function restoreNativeSession(
   client: SupabaseClient,
   timeoutMs = AUTH_OPERATION_TIMEOUT_MS,
