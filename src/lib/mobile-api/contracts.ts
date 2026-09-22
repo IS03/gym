@@ -47,7 +47,29 @@ export type MobileHomeWeekDto = {
   sessions: number;
   sets: number;
   minutes: number;
+  // M2 fields are emitted by the current server. Optional typing keeps
+  // installed/legacy v1 clients source-compatible with this additive DTO.
+  routines?: Record<string, number>;
+  muscleGroups?: Record<string, number>;
   trainingDays: string[];
+};
+
+export type MobileRoutineColorKey =
+  | "violet"
+  | "indigo"
+  | "blue"
+  | "cyan"
+  | "green"
+  | "yellow"
+  | "orange"
+  | "rose";
+
+export type MobileHomeWorkoutStartRoutineDto = {
+  id: string;
+  name: string;
+  color: MobileRoutineColorKey | null;
+  exerciseCount: number;
+  setCount: number;
 };
 
 export type MobileHomeTodaySessionDto = {
@@ -67,6 +89,8 @@ export type MobileHomeResponse = {
   nutrition: MobileReadResult<MobileHomeNutritionDto>;
   training: {
     activeSession: MobileReadResult<MobileHomeActiveSessionDto | null>;
+    // Emitted by the current server; optional for additive v1 compatibility.
+    workoutStartRoutines?: MobileReadResult<MobileHomeWorkoutStartRoutineDto[]>;
     week: MobileReadResult<{
       summary: MobileHomeWeekDto;
       todaySessions: MobileHomeTodaySessionDto[];

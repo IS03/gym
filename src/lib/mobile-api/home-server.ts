@@ -2,6 +2,7 @@ import "server-only";
 
 import { getNutritionDaySummary } from "@/lib/nutrition/day";
 import { getMyProfile } from "@/lib/phase1/profile";
+import { listWorkoutStartRoutines } from "@/lib/phase2/training";
 import {
   getHomeActiveTrainingSnapshot,
   getHomeTrainingSnapshot,
@@ -28,29 +29,35 @@ export async function readMobileHome(
     ...requestPerformance,
   };
 
-  const [profile, nutrition, activeSession, training] = await Promise.all([
-    resilientRead(
-      { ...performanceBase, operation: "mobile.home.profile" },
-      () => getMyProfile(auth),
-    ),
-    resilientRead(
-      { ...performanceBase, operation: "mobile.home.nutrition" },
-      () => getNutritionDaySummary(date, auth),
-    ),
-    resilientRead(
-      { ...performanceBase, operation: "mobile.home.active-session" },
-      () => getHomeActiveTrainingSnapshot(auth),
-    ),
-    resilientRead(
-      { ...performanceBase, operation: "mobile.home.training" },
-      () => getHomeTrainingSnapshot(date, auth),
-    ),
-  ]);
+  const [profile, nutrition, activeSession, training, workoutStartRoutines] =
+    await Promise.all([
+      resilientRead(
+        { ...performanceBase, operation: "mobile.home.profile" },
+        () => getMyProfile(auth),
+      ),
+      resilientRead(
+        { ...performanceBase, operation: "mobile.home.nutrition" },
+        () => getNutritionDaySummary(date, auth),
+      ),
+      resilientRead(
+        { ...performanceBase, operation: "mobile.home.active-session" },
+        () => getHomeActiveTrainingSnapshot(auth),
+      ),
+      resilientRead(
+        { ...performanceBase, operation: "mobile.home.training" },
+        () => getHomeTrainingSnapshot(date, auth),
+      ),
+      resilientRead(
+        { ...performanceBase, operation: "mobile.home.routines" },
+        () => listWorkoutStartRoutines(auth),
+      ),
+    ]);
 
   return buildMobileHomeResponse(date, {
     profile,
     nutrition,
     activeSession,
     training,
+    workoutStartRoutines,
   });
 }
