@@ -4,6 +4,7 @@ import type {
   CompletedSessionSummary,
   WeeklyTrainingSummary,
 } from "@/lib/phase2/types";
+import type { WorkoutStartRoutine } from "@/lib/phase2/workout-start";
 import type { ReadResult } from "@/lib/resilient-read";
 import { handleMobileAuthenticatedRequest } from "./auth";
 import type {
@@ -38,6 +39,7 @@ export type MobileHomeSources = {
   profile: ReadResult<Profile | null>;
   nutrition: ReadResult<MobileHomeNutritionSource>;
   activeSession: ReadResult<HomeActiveSessionSummary | null>;
+  workoutStartRoutines: ReadResult<WorkoutStartRoutine[]>;
   training: ReadResult<MobileHomeTrainingSource>;
 };
 
@@ -64,6 +66,7 @@ export function buildMobileHomeResponse(
   const allProductSourcesUnavailable =
     sources.nutrition.status === "unavailable" &&
     sources.activeSession.status === "unavailable" &&
+    sources.workoutStartRoutines.status === "unavailable" &&
     sources.training.status === "unavailable";
 
   if (allProductSourcesUnavailable) {
@@ -101,6 +104,17 @@ export function buildMobileHomeResponse(
             }
           : null,
       ),
+      workoutStartRoutines: mapReadResult(
+        sources.workoutStartRoutines,
+        (routines) =>
+          routines.map((routine) => ({
+            id: routine.id,
+            name: routine.name,
+            color: routine.color,
+            exerciseCount: routine.exerciseCount,
+            setCount: routine.setCount,
+          })),
+      ),
       week: mapReadResult(sources.training, ({ currentWeek, todaySessions }) => ({
         summary: {
           weekStart: currentWeek.weekStart,
@@ -108,6 +122,8 @@ export function buildMobileHomeResponse(
           sessions: currentWeek.sessions,
           sets: currentWeek.sets,
           minutes: currentWeek.minutes,
+          routines: currentWeek.routines,
+          muscleGroups: currentWeek.muscleGroups,
           trainingDays: currentWeek.trainingDays,
         },
         todaySessions: todaySessions.map((session) => ({

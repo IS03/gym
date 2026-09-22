@@ -34,6 +34,18 @@ function sources(
       },
     },
     activeSession: { status: "ok", data: null },
+    workoutStartRoutines: {
+      status: "ok",
+      data: [
+        {
+          id: "routine-push",
+          name: "Push",
+          color: "violet",
+          exerciseCount: 6,
+          setCount: 18,
+        },
+      ],
+    },
     training: {
       status: "ok",
       data: {
@@ -98,6 +110,157 @@ describe("Mobile API v1 Home", () => {
     expect(result.training.activeSession).toEqual({
       status: "ok",
       data: null,
+    });
+  });
+
+  it("maps weekly routines, muscle groups, and workout-start routines additively", () => {
+    const result = buildMobileHomeResponse(date, sources());
+
+    expect(result.training.week).toEqual({
+      status: "ok",
+      data: expect.objectContaining({
+        summary: expect.objectContaining({
+          routines: { Push: 2, Pull: 1 },
+          muscleGroups: { Pecho: 18 },
+        }),
+      }),
+    });
+    expect(result.training.workoutStartRoutines).toEqual({
+      status: "ok",
+      data: [
+        {
+          id: "routine-push",
+          name: "Push",
+          color: "violet",
+          exerciseCount: 6,
+          setCount: 18,
+        },
+      ],
+    });
+  });
+
+  it("keeps workout-start routines unavailable independently", () => {
+    const result = buildMobileHomeResponse(
+      date,
+      sources({ workoutStartRoutines: { status: "unavailable" } }),
+    );
+
+    expect(result.training.workoutStartRoutines).toEqual({
+      status: "unavailable",
+    });
+    expect(result.training.week.status).toBe("ok");
+    expect(result.nutrition.status).toBe("ok");
+  });
+
+  it("keeps confirmed empty additions distinct from unavailable", () => {
+    const baseSources = sources();
+    if (baseSources.training.status !== "ok") {
+      throw new Error("Expected an available training fixture");
+    }
+
+    const result = buildMobileHomeResponse(
+      date,
+      sources({
+        workoutStartRoutines: { status: "ok", data: [] },
+        training: {
+          status: "ok",
+          data: {
+            ...baseSources.training.data,
+            currentWeek: {
+              ...baseSources.training.data.currentWeek,
+              routines: {},
+              muscleGroups: {},
+            },
+          },
+        },
+      }),
+    );
+
+    expect(result.training.workoutStartRoutines).toEqual({
+      status: "ok",
+      data: [],
+    });
+    expect(result.training.week).toEqual({
+      status: "ok",
+      data: expect.objectContaining({
+        summary: expect.objectContaining({
+          routines: {},
+          muscleGroups: {},
+        }),
+      }),
+    });
+  });
+
+  it("preserves the legacy Home projection while clients ignore additions", () => {
+    const result = buildMobileHomeResponse(date, sources());
+    if (result.training.week.status !== "ok") {
+      throw new Error("Expected an available weekly fixture");
+    }
+
+    const summary = result.training.week.data.summary;
+    const legacyProjection = {
+      date: result.date,
+      profile: result.profile,
+      nutrition: result.nutrition,
+      training: {
+        activeSession: result.training.activeSession,
+        week: {
+          status: "ok" as const,
+          data: {
+            summary: {
+              weekStart: summary.weekStart,
+              weekEnd: summary.weekEnd,
+              sessions: summary.sessions,
+              sets: summary.sets,
+              minutes: summary.minutes,
+              trainingDays: summary.trainingDays,
+            },
+            todaySessions: result.training.week.data.todaySessions,
+          },
+        },
+      },
+    };
+
+    expect(legacyProjection).toEqual({
+      date,
+      profile: {
+        status: "ok",
+        data: { displayName: "Ignacio Senestrari" },
+      },
+      nutrition: {
+        status: "ok",
+        data: {
+          calories: 2_000,
+          calorieTarget: 2_200,
+          proteinG: 135,
+          proteinTargetG: 140,
+          mealCount: 4,
+          waterL: 2.5,
+          waterTargetL: 3,
+          energyBalanceKcal: -180,
+        },
+      },
+      training: {
+        activeSession: { status: "ok", data: null },
+        week: {
+          status: "ok",
+          data: {
+            summary: {
+              weekStart: "2026-09-14",
+              weekEnd: "2026-09-20",
+              sessions: 3,
+              sets: 54,
+              minutes: 225,
+              trainingDays: [
+                "2026-09-15",
+                "2026-09-17",
+                "2026-09-19",
+              ],
+            },
+            todaySessions: [],
+          },
+        },
+      },
     });
   });
 
@@ -210,6 +373,7 @@ describe("Mobile API v1 Home", () => {
           sources({
             nutrition: { status: "unavailable" },
             activeSession: { status: "unavailable" },
+            workoutStartRoutines: { status: "unavailable" },
             training: { status: "unavailable" },
           }),
         ),
