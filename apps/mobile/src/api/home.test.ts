@@ -20,6 +20,18 @@ const home: MobileHomeResponse = {
   },
   training: {
     activeSession: { status: 'ok', data: null },
+    workoutStartRoutines: {
+      status: 'ok',
+      data: [
+        {
+          id: 'routine-push',
+          name: 'Push',
+          color: 'violet',
+          exerciseCount: 6,
+          setCount: 18,
+        },
+      ],
+    },
     week: {
       status: 'ok',
       data: {
@@ -29,6 +41,8 @@ const home: MobileHomeResponse = {
           sessions: 0,
           sets: 0,
           minutes: 0,
+          routines: {},
+          muscleGroups: {},
           trainingDays: [],
         },
         todaySessions: [],
@@ -49,6 +63,50 @@ describe('Mobile Home runtime parser', () => {
         nutrition: { status: 'unavailable' },
       }),
     ).toEqual({ ...home, nutrition: { status: 'unavailable' } });
+  });
+
+  it('parses weekly routines, muscles, and workout-start routines', () => {
+    const expanded = {
+      ...home,
+      training: {
+        ...home.training,
+        week: {
+          status: 'ok' as const,
+          data: {
+            ...(home.training.week.status === 'ok'
+              ? home.training.week.data
+              : { summary: {}, todaySessions: [] }),
+            summary: {
+              ...(home.training.week.status === 'ok'
+                ? home.training.week.data.summary
+                : {}),
+              routines: { Push: 2, Pull: 1 },
+              muscleGroups: { Pecho: 18, Tríceps: 12 },
+            },
+          },
+        },
+      },
+    };
+
+    expect(parseMobileHomeResponse(expanded)).toEqual(expanded);
+  });
+
+  it('preserves workout-start routines unavailable independently', () => {
+    expect(
+      parseMobileHomeResponse({
+        ...home,
+        training: {
+          ...home.training,
+          workoutStartRoutines: { status: 'unavailable' },
+        },
+      }),
+    ).toEqual({
+      ...home,
+      training: {
+        ...home.training,
+        workoutStartRoutines: { status: 'unavailable' },
+      },
+    });
   });
 
   it('rejects missing or corrupted values rather than inventing zero', () => {

@@ -104,7 +104,9 @@ No registra headers, bearer, sesión, response body, payload de writes, OAuth co
 
 Settings muestra `API Diagnostics` sólo en development. La pantalla ejecuta `GET /api/mobile/v1/home` y presenta host, environment, plataforma, Auth yes/no, state, outcome, HTTP status, duración y fecha contractual. No muestra el payload ni datos privados. Incluye Refresh manual y refresh al volver a foreground.
 
-Esta superficie se elimina cuando M2 conecte Home real.
+M2 conecta Home real y conserva esta superficie temporal para aislar problemas del runtime HTTP. Sólo consulta el endpoint cuando el usuario abre Diagnostics; no duplica la lectura mientras Home está visible. Su retiro queda para un PR posterior cuando deje de aportar a QA.
+
+La integración de producto, expansión aditiva del contrato y deuda de paridad están documentadas en [Real Native Home](./real-home.md).
 
 ## QA físico iPhone
 
