@@ -2,7 +2,12 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
 import type { ReactNode } from 'react';
 
-import { Button, EmptyState, UnavailableState } from './primitives';
+import {
+  Button,
+  EmptyState,
+  ProgressBar,
+  UnavailableState,
+} from './primitives';
 import { OwnlevelThemeProvider } from './theme';
 
 function renderWithTheme(node: ReactNode) {
@@ -29,5 +34,16 @@ describe('design-system primitives', () => {
 
     expect(view.getByText('Sin datos')).toBeTruthy();
     expect(view.getByText('No disponible')).toBeTruthy();
+  });
+
+  it('exposes progress without relying only on color', () => {
+    const view = renderWithTheme(
+      <ProgressBar accessibilityLabel="Progreso: 40%" value={40} />,
+    );
+
+    expect(view.getByRole('progressbar', { name: 'Progreso: 40%' })).toHaveProp(
+      'accessibilityValue',
+      { max: 100, min: 0, now: 40 },
+    );
   });
 });

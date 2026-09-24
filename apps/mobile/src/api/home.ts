@@ -7,6 +7,35 @@ export type MobileReadResult<T> =
   | { status: 'ok'; data: T }
   | { status: 'unavailable' };
 
+export type MobileRoutineColorKey =
+  | 'violet'
+  | 'indigo'
+  | 'blue'
+  | 'cyan'
+  | 'green'
+  | 'yellow'
+  | 'orange'
+  | 'rose';
+
+export type MobileHomeWorkoutStartRoutine = {
+  id: string;
+  name: string;
+  color: MobileRoutineColorKey | null;
+  exerciseCount: number;
+  setCount: number;
+};
+
+export type MobileHomeTodaySession = {
+  id: string;
+  name: string;
+  startedAt: string;
+  endedAt: string;
+  durationMilliseconds: number | null;
+  exercisesCompleted: number;
+  completedSets: number;
+  status: 'completed';
+};
+
 export type MobileHomeResponse = {
   date: string;
   profile: MobileReadResult<{ displayName: string | null }>;
@@ -32,6 +61,7 @@ export type MobileHomeResponse = {
       totalSets: number;
       progressPercent: number;
     } | null>;
+    workoutStartRoutines: MobileReadResult<MobileHomeWorkoutStartRoutine[]>;
     week: MobileReadResult<{
       summary: {
         weekStart: string;
@@ -39,21 +69,25 @@ export type MobileHomeResponse = {
         sessions: number;
         sets: number;
         minutes: number;
+        routines: Record<string, number>;
+        muscleGroups: Record<string, number>;
         trainingDays: string[];
       };
-      todaySessions: {
-        id: string;
-        name: string;
-        startedAt: string;
-        endedAt: string;
-        durationMilliseconds: number | null;
-        exercisesCompleted: number;
-        completedSets: number;
-        status: 'completed';
-      }[];
+      todaySessions: MobileHomeTodaySession[];
     }>;
   };
 };
+
+const ROUTINE_COLORS = new Set<MobileRoutineColorKey>([
+  'violet',
+  'indigo',
+  'blue',
+  'cyan',
+  'green',
+  'yellow',
+  'orange',
+  'rose',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -81,6 +115,17 @@ function isNullableFiniteNumber(value: unknown): value is number | null {
 
 function isCount(value: unknown): value is number {
   return Number.isInteger(value) && isNonNegativeNumber(value);
+}
+
+function parseCountRecord(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const entries = Object.entries(value);
+  if (entries.some(([key, count]) => !key.trim() || !isCount(count))) {
+    return undefined;
+  }
+  return Object.fromEntries(entries) as Record<string, number>;
 }
 
 function parseReadResult<T>(
@@ -172,6 +217,10 @@ function parseActiveSession(value: unknown) {
 }
 
 function parseWeekSummary(value: unknown) {
+  const routines = isRecord(value) ? parseCountRecord(value.routines) : undefined;
+  const muscleGroups = isRecord(value)
+    ? parseCountRecord(value.muscleGroups)
+    : undefined;
   if (
     !isRecord(value) ||
     !isIsoDate(value.weekStart) ||
@@ -179,6 +228,8 @@ function parseWeekSummary(value: unknown) {
     !isCount(value.sessions) ||
     !isCount(value.sets) ||
     !isNonNegativeNumber(value.minutes) ||
+    !routines ||
+    !muscleGroups ||
     !Array.isArray(value.trainingDays) ||
     !value.trainingDays.every(isIsoDate)
   ) {
@@ -191,8 +242,43 @@ function parseWeekSummary(value: unknown) {
     sessions: value.sessions,
     sets: value.sets,
     minutes: value.minutes,
+    routines,
+    muscleGroups,
     trainingDays: [...value.trainingDays],
   };
+}
+
+function parseWorkoutStartRoutine(value: unknown): MobileHomeWorkoutStartRoutine | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.name !== 'string' ||
+    !(value.color === null || ROUTINE_COLORS.has(value.color as MobileRoutineColorKey)) ||
+    !isCount(value.exerciseCount) ||
+    !isCount(value.setCount)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    color: value.color as MobileRoutineColorKey | null,
+    exerciseCount: value.exerciseCount,
+    setCount: value.setCount,
+  };
+}
+
+function parseWorkoutStartRoutines(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const routines = value.map(parseWorkoutStartRoutine);
+  return routines.some((routine) => routine === null)
+    ? undefined
+    : routines.filter(
+        (routine): routine is MobileHomeWorkoutStartRoutine => routine !== null,
+      );
 }
 
 function parseTodaySession(value: unknown) {
@@ -254,9 +340,13 @@ export function parseMobileHomeResponse(value: unknown): MobileHomeResponse | nu
     value.training.activeSession,
     parseActiveSession,
   );
+  const workoutStartRoutines = parseReadResult(
+    value.training.workoutStartRoutines,
+    parseWorkoutStartRoutines,
+  );
   const week = parseReadResult(value.training.week, parseWeek);
 
-  if (!profile || !nutrition || !activeSession || !week) {
+  if (!profile || !nutrition || !activeSession || !workoutStartRoutines || !week) {
     return null;
   }
 
@@ -264,7 +354,7 @@ export function parseMobileHomeResponse(value: unknown): MobileHomeResponse | nu
     date: value.date,
     profile,
     nutrition,
-    training: { activeSession, week },
+    training: { activeSession, workoutStartRoutines, week },
   };
 }
 
