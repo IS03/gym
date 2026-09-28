@@ -174,4 +174,24 @@ describe('Training resource screen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/routines');
     expect(view.queryByText(/Rutinas estará disponible/)).toBeNull();
   });
+
+  it('navigates Ejercicios to the native library screen', () => {
+    const data = fixture();
+    mockUseApiResource.mockReturnValue({
+      refresh: mockRefresh,
+      state: {
+        status: 'ready',
+        current: { confirmedAt: 1, data },
+        refreshing: false,
+        trigger: 'initial',
+        result: okResult(data),
+      },
+    });
+    const view = renderScreen();
+
+    fireEvent.press(view.getByRole('button', { name: 'Abrir Ejercicios' }));
+
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/exercises');
+    expect(view.queryByText(/Ejercicios estará disponible/)).toBeNull();
+  });
 });

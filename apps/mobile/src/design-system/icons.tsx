@@ -9,6 +9,7 @@ export type AppIconName =
   | 'clock'
   | 'dumbbell'
   | 'flame'
+  | 'filter'
   | 'nutrition'
   | 'profile'
   | 'progress'
@@ -33,6 +34,7 @@ const iconNames: Record<
   clock: { ios: 'clock.fill', android: 'schedule' },
   dumbbell: { ios: 'dumbbell.fill', android: 'fitness_center' },
   flame: { ios: 'flame.fill', android: 'local_fire_department' },
+  filter: { ios: 'line.3.horizontal.decrease', android: 'filter_list' },
   nutrition: { ios: 'fork.knife', android: 'restaurant' },
   profile: { ios: 'person.fill', android: 'person' },
   progress: { ios: 'chart.line.uptrend.xyaxis', android: 'show_chart' },
