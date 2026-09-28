@@ -21,9 +21,8 @@ import {
   type TrainingDeferredAction,
 } from './training-dashboard';
 
-const DEFERRED_MESSAGES: Record<Exclude<TrainingDeferredAction, 'routines'>, string> = {
+const DEFERRED_MESSAGES: Record<Exclude<TrainingDeferredAction, 'routines' | 'exercises'>, string> = {
   continueSession: 'Continuar entrenamiento estará disponible en M3.3.',
-  exercises: 'Ejercicios estará disponible en M3.1D.',
   history: 'Historial estará disponible en M3.4.',
   newSession: 'Nueva sesión estará disponible en M3.2.',
 };
@@ -128,6 +127,10 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
     haptics.selection();
     if (action === 'routines') {
       router.push('/(tabs)/train/routines');
+      return;
+    }
+    if (action === 'exercises') {
+      router.push('/(tabs)/train/exercises');
       return;
     }
     const message = DEFERRED_MESSAGES[action];

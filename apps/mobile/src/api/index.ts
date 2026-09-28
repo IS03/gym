@@ -7,6 +7,14 @@ export {
 export { MobileApiProvider, useMobileApi } from './provider';
 export { useApiResource } from './resource';
 export {
+  createMobileTrainingExercise,
+  fetchMobileTrainingExercises,
+  MOBILE_TRAINING_EXERCISES_API_PATH,
+  parseMobileTrainingExercisesResponse,
+  setMobileTrainingExerciseStatus,
+  updateMobileTrainingExercise,
+} from './exercises';
+export {
   createMobileTrainingRoutine,
   fetchMobileTrainingRoutines,
   importMobileTrainingInitialPlan,
