@@ -33,3 +33,13 @@ export async function readMobileJson(request: Request): Promise<unknown> {
     throw new MobileApiValidationError("El contenido enviado no es válido.");
   }
 }
+
+export async function readOptionalMobileJson(request: Request): Promise<unknown> {
+  const body = await request.text();
+  if (!body.trim()) return {};
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    throw new MobileApiValidationError("El contenido enviado no es válido.");
+  }
+}

@@ -45,6 +45,8 @@ type RetryLogger = Pick<Console, "info" | "warn">;
 
 type ResilientFetchOptions = {
   retryDelaysMs?: readonly number[];
+  /** Defaults to true for legacy Web behavior; Mobile mutation contexts set false. */
+  retryMutations?: boolean;
   sleep?: (delayMs: number) => Promise<void>;
   logger?: RetryLogger;
   requestTimeoutMs?: number;
@@ -82,14 +84,42 @@ async function isJwtIssuedAtFutureResponse(response: Response): Promise<boolean>
   }
 }
 
-function defaultRetryDelaysForMethod(method: string): readonly number[] {
+function defaultRetryDelaysForMethod(
+  method: string,
+  retryMutations: boolean,
+): readonly number[] {
   return method === "GET" || method === "HEAD"
     ? JWT_CLOCK_SKEW_READ_RETRY_DELAYS_MS
-    : JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS;
+    : retryMutations
+      ? JWT_CLOCK_SKEW_MUTATION_RETRY_DELAYS_MS
+      : [];
 }
 
 function isSafeDataApiRead(request: Request, pathname: string | null) {
   return Boolean(pathname) && (request.method === "GET" || request.method === "HEAD");
+}
+
+function fetchAttempt(
+  fetchImplementation: typeof fetch,
+  request: Request,
+  signal: AbortSignal,
+): Promise<Response> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+
+  return new Promise<Response>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    Promise.resolve().then(() => fetchImplementation(request.clone())).then(
+      (response) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(response);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /**
@@ -97,7 +127,8 @@ function isSafeDataApiRead(request: Request, pathname: string | null) {
  * único retry corto de transporte sólo para GET/HEAD del Data API. El Request
  * base nunca se envía directamente: cada intento recibe un clone nuevo para
  * no reutilizar streams consumidos. Las mutaciones no reciben retries de
- * transporte y conservan exactamente el comportamiento previo.
+ * transporte. `retryMutations: false` también elimina el retry de clock-skew
+ * para contextos Mobile donde cada retry debe ser una decisión del caller.
  */
 export function createResilientSupabaseFetch(
   fetchImplementation: typeof fetch = globalThis.fetch.bind(globalThis),
@@ -108,92 +139,108 @@ export function createResilientSupabaseFetch(
 
   return async (input, init) => {
     const originalRequest = new Request(input, init);
-    const timeoutSignal = options.requestTimeoutMs
-      ? AbortSignal.timeout(options.requestTimeoutMs)
+    const timeoutController = options.requestTimeoutMs
+      ? new AbortController()
       : null;
-    const signal = timeoutSignal
-      ? AbortSignal.any([originalRequest.signal, timeoutSignal])
+    const timeoutId = timeoutController && options.requestTimeoutMs
+      ? setTimeout(
+          () => timeoutController.abort(
+            new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+          ),
+          options.requestTimeoutMs,
+        )
+      : null;
+    const signal = timeoutController
+      ? AbortSignal.any([originalRequest.signal, timeoutController.signal])
       : originalRequest.signal;
     const request = new Request(originalRequest, { signal });
     const pathname = dataApiPathname(request);
     const retryDelaysMs =
-      options.retryDelaysMs ?? defaultRetryDelaysForMethod(request.method);
+      options.retryDelaysMs
+      ?? defaultRetryDelaysForMethod(
+        request.method,
+        options.retryMutations ?? true,
+      );
     const transientReadRetryDelayMs =
       options.transientReadRetryDelayMs ?? TRANSIENT_READ_RETRY_DELAY_MS;
     let retryDelayTotalMs = 0;
     let transientReadRetried = false;
     let jwtAttempt = 1;
 
-    for (;;) {
-      let response: Response;
-      try {
-        response = await fetchImplementation(request.clone());
-      } catch (error) {
+    try {
+      for (;;) {
+        let response: Response;
+        try {
+          response = await fetchAttempt(fetchImplementation, request, signal);
+        } catch (error) {
+          if (
+            !transientReadRetried
+            && isSafeDataApiRead(request, pathname)
+            && !signal.aborted
+          ) {
+            transientReadRetried = true;
+            logger.warn("[supabase-read-retry] retry", {
+              pathname,
+              reason: "network",
+              delayMs: transientReadRetryDelayMs,
+            });
+            await sleep(transientReadRetryDelayMs);
+            signal.throwIfAborted();
+            continue;
+          }
+          throw error;
+        }
+
         if (
           !transientReadRetried
           && isSafeDataApiRead(request, pathname)
-          && !signal.aborted
+          && TRANSIENT_READ_RESPONSE_STATUSES.has(response.status)
         ) {
           transientReadRetried = true;
           logger.warn("[supabase-read-retry] retry", {
             pathname,
-            reason: "network",
+            reason: "http",
+            status: response.status,
             delayMs: transientReadRetryDelayMs,
           });
           await sleep(transientReadRetryDelayMs);
           signal.throwIfAborted();
           continue;
         }
-        throw error;
-      }
 
-      if (
-        !transientReadRetried
-        && isSafeDataApiRead(request, pathname)
-        && TRANSIENT_READ_RESPONSE_STATUSES.has(response.status)
-      ) {
-        transientReadRetried = true;
-        logger.warn("[supabase-read-retry] retry", {
+        if (!pathname || !(await isJwtIssuedAtFutureResponse(response))) {
+          if (transientReadRetried && response.ok) {
+            logger.info("[supabase-read-retry] recovered", {
+              pathname,
+              status: response.status,
+            });
+          }
+          if (jwtAttempt > 1 && response.ok) {
+            logger.info("[supabase-jwt-skew] recovered", {
+              attempt: jwtAttempt,
+              pathname,
+              retryDelayTotalMs,
+            });
+          }
+          return response;
+        }
+
+        const delayMs = retryDelaysMs[jwtAttempt - 1];
+        if (delayMs === undefined) return response;
+
+        retryDelayTotalMs += delayMs;
+        logger.warn("[supabase-jwt-skew] retry", {
+          attempt: jwtAttempt + 1,
           pathname,
-          reason: "http",
-          status: response.status,
-          delayMs: transientReadRetryDelayMs,
+          delayMs,
+          retryDelayTotalMs,
         });
-        await sleep(transientReadRetryDelayMs);
+        await sleep(delayMs);
         signal.throwIfAborted();
-        continue;
+        jwtAttempt += 1;
       }
-
-      if (!pathname || !(await isJwtIssuedAtFutureResponse(response))) {
-        if (transientReadRetried && response.ok) {
-          logger.info("[supabase-read-retry] recovered", {
-            pathname,
-            status: response.status,
-          });
-        }
-        if (jwtAttempt > 1 && response.ok) {
-          logger.info("[supabase-jwt-skew] recovered", {
-            attempt: jwtAttempt,
-            pathname,
-            retryDelayTotalMs,
-          });
-        }
-        return response;
-      }
-
-      const delayMs = retryDelaysMs[jwtAttempt - 1];
-      if (delayMs === undefined) return response;
-
-      retryDelayTotalMs += delayMs;
-      logger.warn("[supabase-jwt-skew] retry", {
-        attempt: jwtAttempt + 1,
-        pathname,
-        delayMs,
-        retryDelayTotalMs,
-      });
-      await sleep(delayMs);
-      signal.throwIfAborted();
-      jwtAttempt += 1;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   };
 }

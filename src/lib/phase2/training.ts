@@ -48,6 +48,13 @@ function asPostgrestError(err: unknown): { code?: string; message?: string } {
   };
 }
 
+export class TrainingResourceNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TrainingResourceNotFoundError";
+  }
+}
+
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
@@ -278,10 +285,10 @@ export async function createExercise(input: {
   descanso_min_sugerido_segundos: number | null;
   descanso_max_sugerido_segundos: number | null;
   notes?: string | null;
-}): Promise<Exercise> {
+}, context?: AuthenticatedRequestContext): Promise<Exercise> {
   assertNonEmpty(input.nombre, "Nombre");
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   const { data, error } = await supabase
     .from("exercises")
@@ -329,9 +336,9 @@ export async function updateExercise(input: {
   descanso_max_sugerido_segundos?: number | null;
   notes?: string | null;
   is_active?: boolean;
-}): Promise<Exercise> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+}, context?: AuthenticatedRequestContext): Promise<Exercise> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   const patch: Record<string, unknown> = {};
   if (input.nombre !== undefined) {
@@ -370,17 +377,26 @@ export async function updateExercise(input: {
     if (code === "23505") {
       throw new Error("Ya existe un ejercicio con ese nombre.");
     }
-    throw new Error(`Editar exercise: ${error.message}`);
+    if (code === "PGRST116") {
+      throw new TrainingResourceNotFoundError("Ejercicio no encontrado.");
+    }
+    throw new Error(`Editar exercise: ${error.message}`, { cause: error });
   }
   return data as Exercise;
 }
 
-export async function archiveExercise(id: string): Promise<void> {
-  await updateExercise({ id, is_active: false });
+export async function archiveExercise(
+  id: string,
+  context?: AuthenticatedRequestContext,
+): Promise<void> {
+  await updateExercise({ id, is_active: false }, context);
 }
 
-export async function restoreExercise(id: string): Promise<Exercise> {
-  return updateExercise({ id, is_active: true });
+export async function restoreExercise(
+  id: string,
+  context?: AuthenticatedRequestContext,
+): Promise<Exercise> {
+  return updateExercise({ id, is_active: true }, context);
 }
 
 export async function listRoutines(
@@ -413,10 +429,11 @@ type RoutineMembershipQueryRow = {
 
 export async function listExerciseRoutineMemberships(
   routineIds: string[],
+  context?: AuthenticatedRequestContext,
 ): Promise<Map<string, ExerciseRoutineMembership[]>> {
   if (routineIds.length === 0) return new Map();
-  const supabase = await createClient();
-  await getAuthedUserId();
+  const supabase = context?.supabase ?? await createClient();
+  if (!context) await getAuthedUserId();
   const { data, error } = await supabase
     .from("routine_exercises")
     .select("exercise_id, routine:routines(id, nombre, color)")
@@ -510,9 +527,9 @@ export async function updateRoutine(input: {
   nombre?: string;
   color?: RoutineColorKey | null;
   is_active?: boolean;
-}): Promise<Routine> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+}, context?: AuthenticatedRequestContext): Promise<Routine> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
 
   const patch: Record<string, unknown> = {};
   if (input.nombre !== undefined) {
@@ -535,14 +552,20 @@ export async function updateRoutine(input: {
     if (code === "23505") {
       throw new Error("Ya existe una rutina con ese nombre.");
     }
-    throw new Error(`Editar rutina: ${error.message}`);
+    if (code === "PGRST116") {
+      throw new TrainingResourceNotFoundError("Rutina no encontrada.");
+    }
+    throw new Error(`Editar rutina: ${error.message}`, { cause: error });
   }
   return data as Routine;
 }
 
 /** En la app, "eliminar" rutina = archivar (no hay DELETE en DB para `authenticated`). */
-export async function archiveRoutine(id: string): Promise<void> {
-  await updateRoutine({ id, is_active: false });
+export async function archiveRoutine(
+  id: string,
+  context?: AuthenticatedRequestContext,
+): Promise<void> {
+  await updateRoutine({ id, is_active: false }, context);
 }
 
 export async function listRoutineExercises(routineId: string): Promise<
@@ -677,9 +700,9 @@ export async function removeRoutineExercise(input: {
 export async function syncExerciseActiveRoutineMemberships(input: {
   exerciseId: string;
   routineIds: string[];
-}): Promise<void> {
-  const supabase = await createClient();
-  const userId = await getAuthedUserId();
+}, context?: AuthenticatedRequestContext): Promise<void> {
+  const supabase = context?.supabase ?? await createClient();
+  const userId = context?.userId ?? await getAuthedUserId();
   const requestedIds = [...new Set(input.routineIds.filter(Boolean))];
 
   const { data: activeRoutines, error: routineError } = await supabase

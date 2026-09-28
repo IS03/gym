@@ -106,8 +106,10 @@ function requireUuid(value: unknown, label: string): string {
   return value;
 }
 
-async function getAuthedContext(): Promise<AuthenticatedRequestContext> {
-  return requireAuthenticatedRequestContext();
+async function getAuthedContext(
+  context?: AuthenticatedRequestContext,
+): Promise<AuthenticatedRequestContext> {
+  return context ?? requireAuthenticatedRequestContext();
 }
 
 function throwRpcError(label: string, value: unknown): never {
@@ -194,11 +196,13 @@ function throwWorkoutSaveRpcError(value: unknown): never {
 
 export { todayInCordoba } from "./cordoba-date";
 
-export async function getInitialPlanStatus(): Promise<{
+export async function getInitialPlanStatus(
+  context?: AuthenticatedRequestContext,
+): Promise<{
   imported: boolean;
   routinesFound: number;
 }> {
-  const { supabase, userId } = await getAuthedContext();
+  const { supabase, userId } = await getAuthedContext(context);
   const keys = INITIAL_TRAINING_PLAN.routines.map((routine) => routine.source_key);
   const { data, error } = await supabase
     .from("routines")
@@ -214,11 +218,13 @@ export async function getInitialPlanStatus(): Promise<{
   return { imported: keys.every((key) => found.has(key)), routinesFound: found.size };
 }
 
-export async function importInitialTrainingPlan(): Promise<{
+export async function importInitialTrainingPlan(
+  context?: AuthenticatedRequestContext,
+): Promise<{
   routines: number;
   exercises: number;
 }> {
-  const { supabase } = await getAuthedContext();
+  const { supabase } = await getAuthedContext(context);
   const { data, error } = await supabase.rpc("import_training_plan", {
     p_plan: INITIAL_TRAINING_PLAN,
   });

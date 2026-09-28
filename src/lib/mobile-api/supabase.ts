@@ -25,7 +25,10 @@ function requiredPublicConfig() {
   return { url, publishableKey };
 }
 
-function createMobileRequestClient(accessToken: string): SupabaseClient {
+function createMobileRequestClient(
+  accessToken: string,
+  options: { retryMutations?: boolean } = {},
+): SupabaseClient {
   const { url, publishableKey } = requiredPublicConfig();
   return createClient(url, publishableKey, {
     auth: {
@@ -37,6 +40,7 @@ function createMobileRequestClient(accessToken: string): SupabaseClient {
       headers: { Authorization: `Bearer ${accessToken}` },
       fetch: createResilientSupabaseFetch(undefined, {
         requestTimeoutMs: MOBILE_API_REQUEST_TIMEOUT_MS,
+        retryMutations: options.retryMutations,
       }),
     },
   });
@@ -110,8 +114,9 @@ export type MobileSupabaseAuthenticatedContext = MobileAuthenticatedContext & {
 
 export async function authenticateMobileAccessToken(
   accessToken: string,
+  options: { retryMutations?: boolean } = {},
 ): Promise<MobileSupabaseAuthenticatedContext> {
-  const supabase = createMobileRequestClient(accessToken);
+  const supabase = createMobileRequestClient(accessToken, options);
   const { data, error } = await supabase.auth.getUser(accessToken);
 
   if (error) {
@@ -129,4 +134,11 @@ export async function authenticateMobileAccessToken(
     userId: data.user.id,
     repository: repositoryFor(supabase),
   };
+}
+
+/** Training mutations never retry automatically; callers own every retry. */
+export function authenticateMobileMutationAccessToken(
+  accessToken: string,
+): Promise<MobileSupabaseAuthenticatedContext> {
+  return authenticateMobileAccessToken(accessToken, { retryMutations: false });
 }

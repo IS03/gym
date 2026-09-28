@@ -121,7 +121,7 @@ export async function readMobileDailyMetrics(
 
 export type MobileDailyMetricsHandlerResult =
   | { status: 200; body: MobileDailyMetricsResponse }
-  | { status: 401 | 503; body: MobileApiErrorResponse };
+  | { status: 400 | 401 | 503; body: MobileApiErrorResponse };
 
 export async function handleMobileDailyMetricsRequest(
   authorization: string | null,
