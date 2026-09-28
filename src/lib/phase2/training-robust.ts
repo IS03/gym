@@ -247,11 +247,14 @@ type RawRoutineExercise = Omit<RoutineExerciseTemplate, "exercise" | "sets"> & {
   sets: RoutineExerciseSet[] | null;
 };
 
-export async function getRoutineTemplate(routineId: string): Promise<{
+export async function getRoutineTemplate(
+  routineId: string,
+  context?: AuthenticatedRequestContext,
+): Promise<{
   routine: Routine;
   exercises: RoutineExerciseTemplate[];
 }> {
-  const { supabase, userId } = await getAuthedContext();
+  const { supabase, userId } = await getAuthedContext(context);
   const [{ data: routine, error: routineError }, { data: items, error: itemsError }] =
     await Promise.all([
       supabase
@@ -329,17 +332,27 @@ export async function moveRoutineExerciseTarget(input: {
 export async function startWorkoutSession(input: {
   date: string;
   routineId: string | null;
-}): Promise<string> {
+}, context?: AuthenticatedRequestContext): Promise<string> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
     throw new Error("La fecha no es válida.");
   }
-  const dayLog = await getOrCreateDayLog(input.date);
-  const { supabase } = await getAuthedContext();
+  const auth = await getAuthedContext(context);
+  const dayLog = await getOrCreateDayLog(input.date, auth);
+  const { supabase } = auth;
   const { data, error } = await supabase.rpc("start_workout_session", {
     p_day_log_id: dayLog.id,
     p_routine_id: input.routineId,
   });
-  if (error) throwRpcError("Iniciar sesión", error);
+  if (error) {
+    const { message } = errorLike(error);
+    if (message?.includes("ACTIVE_SESSION_EXISTS")) {
+      throw new Error(
+        "Ya tenés una sesión de entrenamiento en curso. Continuá esa sesión o finalizala antes de iniciar otra.",
+        { cause: error },
+      );
+    }
+    throwRpcError("Iniciar sesión", error);
+  }
   return requireUuid(data, "Iniciar sesión");
 }
 

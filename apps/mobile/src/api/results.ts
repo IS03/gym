@@ -35,7 +35,17 @@ export type MobileApiReadResult<T> =
 
 export type MobileApiMutationResult<T> =
   | { status: 'ok'; data: T; meta: MobileApiResultMeta }
-  | { status: 'conflict'; code: 'IDEMPOTENCY_KEY_REUSED'; message: string; meta: MobileApiResultMeta }
+  | {
+      status: 'conflict';
+      code:
+        | 'IDEMPOTENCY_KEY_REUSED'
+        | 'ACTIVE_SESSION_EXISTS'
+        | 'ROUTINE_CHANGED'
+        | 'ROUTINE_TEMPLATE_CHANGED';
+      message: string;
+      data?: T;
+      meta: MobileApiResultMeta;
+    }
   | { status: 'validation'; message: string; meta: MobileApiResultMeta }
   | { status: 'not_found'; message: string; meta: MobileApiResultMeta }
   | { status: 'auth_required'; meta: MobileApiResultMeta }

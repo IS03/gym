@@ -33,8 +33,12 @@ import {
   patchMobileTrainingExercise,
   readMobileTraining,
   readMobileTrainingExercises,
+  readMobileTrainingRoutineDetail,
   readMobileTrainingRoutines,
+  replaceMobileTrainingRoutineTemplate,
   setMobileTrainingRoutineStatus,
+  startMobileTrainingSession,
+  updateMobileTrainingRoutineIdentity,
 } from "./training-server";
 import {
   handleMobileMutationRequest,
@@ -103,6 +107,18 @@ const exercisePayload = {
   suggestedRestMinSeconds: 90,
   suggestedRestMaxSeconds: 120,
   notes: null,
+};
+
+const routineDetail = {
+  routine: {
+    id: routineId,
+    name: "PUSH",
+    color: "violet",
+    isActive: true,
+    updatedAt: routineRow.updated_at,
+    templateVersion: 3,
+  },
+  items: [],
 };
 
 describe("Mobile Training server adapters", () => {
@@ -300,6 +316,40 @@ describe("Mobile Training server adapters", () => {
     ).rejects.toBeInstanceOf(MobileApiNotFoundError);
   });
 
+  it("maps a missing or foreign nested routine exercise to not found", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0002", message: "TRAINING_ROUTINE_EXERCISE_NOT_FOUND" },
+    });
+    await expect(
+      replaceMobileTrainingRoutineTemplate(
+        routineId,
+        {
+          expectedTemplateVersion: 3,
+          items: [{
+            routineExerciseId: "33333333-3333-4333-8333-333333333333",
+            exerciseId,
+            targets: {
+              nextAdjustment: "maintain",
+              nextAdjustmentNote: null,
+              restMinSeconds: 90,
+              restMaxSeconds: 120,
+              notes: null,
+              sets: [{
+                setNumber: 1,
+                targetReps: 8,
+                targetWeightKg: 80,
+                targetRir: 2,
+                notes: null,
+              }],
+            },
+          }],
+        },
+        context(rpc),
+      ),
+    ).rejects.toBeInstanceOf(MobileApiNotFoundError);
+  });
+
   it("maps an unexpected atomic membership failure to 503", async () => {
     const rpc = vi.fn().mockResolvedValue({
       data: null,
@@ -329,5 +379,117 @@ describe("Mobile Training server adapters", () => {
     expect(mocks.importInitialTrainingPlan).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
     );
+  });
+
+  it("reads an atomic routine detail and maps cross-user rows to 404", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: routineDetail, error: null });
+    await expect(readMobileTrainingRoutineDetail(routineId, context(rpc)))
+      .resolves.toEqual(routineDetail);
+    expect(rpc).toHaveBeenCalledWith("mobile_training_routine_detail", {
+      p_routine_id: routineId,
+    });
+
+    const missingRpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "P0002", message: "TRAINING_ROUTINE_NOT_FOUND" },
+    });
+    await expect(readMobileTrainingRoutineDetail(routineId, context(missingRpc)))
+      .rejects.toBeInstanceOf(MobileApiNotFoundError);
+  });
+
+  it("uses identity and template CAS RPCs without forwarding a user id", async () => {
+    const identityRpc = vi.fn().mockResolvedValue({
+      data: { routine: routineDetail.routine },
+      error: null,
+    });
+    await updateMobileTrainingRoutineIdentity(
+      routineId,
+      {
+        name: "Push",
+        color: "violet",
+        expectedUpdatedAt: routineRow.updated_at,
+      },
+      context(identityRpc),
+    );
+    expect(identityRpc).toHaveBeenCalledWith(
+      "mobile_update_training_routine_identity",
+      expect.not.objectContaining({ userId: expect.anything() }),
+    );
+
+    const templateRpc = vi.fn().mockResolvedValue({ data: routineDetail, error: null });
+    await replaceMobileTrainingRoutineTemplate(
+      routineId,
+      { expectedTemplateVersion: 3, items: [] },
+      context(templateRpc),
+    );
+    expect(templateRpc).toHaveBeenCalledWith(
+      "mobile_replace_training_routine_template",
+      {
+        p_routine_id: routineId,
+        p_expected_template_version: 3,
+        p_items: [],
+      },
+    );
+  });
+
+  it.each([
+    ["ROUTINE_CHANGED", "ROUTINE_CHANGED"],
+    ["ROUTINE_TEMPLATE_CHANGED", "ROUTINE_TEMPLATE_CHANGED"],
+  ] as const)("maps %s CAS conflicts to stable 409 codes", async (message, code) => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { code: "40001", message },
+    });
+    const operation = code === "ROUTINE_CHANGED"
+      ? updateMobileTrainingRoutineIdentity(
+          routineId,
+          { name: "Push", color: null, expectedUpdatedAt: routineRow.updated_at },
+          context(rpc),
+        )
+      : replaceMobileTrainingRoutineTemplate(
+          routineId,
+          { expectedTemplateVersion: 3, items: [] },
+          context(rpc),
+        );
+    await expect(operation).rejects.toMatchObject({ code });
+  });
+
+  it("returns the exact durable start or active response from the ledger", async () => {
+    const started = {
+      status: "started",
+      session: {
+        id: "44444444-4444-4444-8444-444444444444",
+        routineId,
+        name: "PUSH",
+        logDate: "2026-09-28",
+        startedAt: routineRow.updated_at,
+      },
+    };
+    const rpc = vi.fn().mockResolvedValue({
+      data: [{ response_status: 201, response_body: started, replayed: true }],
+      error: null,
+    });
+    await expect(startMobileTrainingSession(
+      { routineId, idempotencyKey: "session:start:1" },
+      context(rpc),
+    )).resolves.toEqual({ status: 201, body: started });
+    expect(rpc).toHaveBeenCalledWith("mobile_start_training_session", {
+      p_idempotency_key: "session:start:1",
+      p_routine_id: routineId,
+    });
+
+    const active = {
+      ...started,
+      status: "active",
+      code: "ACTIVE_SESSION_EXISTS",
+    };
+    rpc.mockResolvedValueOnce({
+      data: [{ response_status: 409, response_body: active, replayed: false }],
+      error: null,
+    });
+    await expect(startMobileTrainingSession(
+      { routineId, idempotencyKey: "session:start:2" },
+      context(rpc),
+    )).resolves.toEqual({ status: 409, body: active });
   });
 });

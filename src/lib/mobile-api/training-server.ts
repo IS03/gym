@@ -30,7 +30,10 @@ import type {
   MobileTrainingExerciseStatusResponse,
   MobileTrainingInitialPlanResponse,
   MobileTrainingRoutineCreateResponse,
+  MobileTrainingRoutineDetailResponse,
+  MobileTrainingRoutineIdentityResponse,
   MobileTrainingRoutineStatusResponse,
+  MobileTrainingSessionStartResponse,
 } from "./contracts";
 import type { MobileSupabaseAuthenticatedContext } from "./supabase";
 import {
@@ -41,7 +44,13 @@ import {
   parseMobileTrainingExercisePatch,
   parseMobileTrainingId,
   parseMobileTrainingRoutineCreate,
+  parseMobileTrainingRoutineDetailResponse,
+  parseMobileTrainingRoutineIdentity,
+  parseMobileTrainingRoutineIdentityResponse,
   parseMobileTrainingRoutineStatus,
+  parseMobileTrainingRoutineTemplate,
+  parseMobileTrainingSessionStart,
+  parseMobileTrainingSessionStartResponse,
 } from "./training";
 
 type RpcError = { code?: string; message?: string };
@@ -91,19 +100,45 @@ function throwTrainingMutationError(
   const message = direct.message ?? caused.message ?? "";
   if (
     code === "P0002"
-    && message.includes("TRAINING_EXERCISE_NOT_FOUND")
+    && (message.includes("TRAINING_EXERCISE_NOT_FOUND")
+      || message.includes("TRAINING_ROUTINE_NOT_FOUND")
+      || message.includes("TRAINING_ROUTINE_EXERCISE_NOT_FOUND"))
   ) {
-    throw new MobileApiNotFoundError("Ejercicio no encontrado.");
+    throw new MobileApiNotFoundError(
+      message.includes("ROUTINE_EXERCISE")
+        ? "Ejercicio de rutina no encontrado."
+        : message.includes("ROUTINE")
+        ? "Rutina no encontrada."
+        : "Ejercicio no encontrado.",
+    );
   }
   if (message.includes("IDEMPOTENCY_KEY_REUSED")) {
     throw new MobileApiConflictError(
       "La clave de idempotencia ya fue usada con otros datos.",
     );
   }
+  if (code === "40001" && message.includes("ROUTINE_TEMPLATE_CHANGED")) {
+    throw new MobileApiConflictError(
+      "La plantilla cambió en otro dispositivo. Recargá antes de guardar.",
+      "ROUTINE_TEMPLATE_CHANGED",
+    );
+  }
+  if (code === "40001" && message.includes("ROUTINE_CHANGED")) {
+    throw new MobileApiConflictError(
+      "La rutina cambió en otro dispositivo. Recargá antes de guardar.",
+      "ROUTINE_CHANGED",
+    );
+  }
   if (code === "23505") {
     throw new MobileApiValidationError(
       duplicateMessage ?? "Ya existe un recurso con ese nombre.",
     );
+  }
+  if (
+    message.includes("TRAINING_ROUTINE_TEMPLATE_CORRUPT") ||
+    message.includes("TRAINING_SESSION_START_FAILED")
+  ) {
+    throw value;
   }
   if (
     code === "22P02" ||
@@ -116,6 +151,14 @@ function throwTrainingMutationError(
     );
   }
   throw value;
+}
+
+function parseDatabaseResponse<T>(parser: (value: unknown) => T, value: unknown): T {
+  try {
+    return parser(value);
+  } catch (error) {
+    throw new Error("Invalid Mobile Training database response", { cause: error });
+  }
 }
 
 function parseIdempotentRpcRow(value: unknown): IdempotentRpcRow {
@@ -257,6 +300,90 @@ export async function createMobileTrainingRoutine(
     throw new Error("Invalid routine create body");
   }
   return result.response_body as MobileTrainingRoutineCreateResponse;
+}
+
+export async function readMobileTrainingRoutineDetail(
+  id: unknown,
+  context: MobileSupabaseAuthenticatedContext,
+): Promise<MobileTrainingRoutineDetailResponse> {
+  const routineId = parseMobileTrainingId(id, "La rutina");
+  const { data, error } = await context.supabase.rpc(
+    "mobile_training_routine_detail",
+    { p_routine_id: routineId },
+  );
+  if (error) throwTrainingMutationError(error);
+  return parseDatabaseResponse(parseMobileTrainingRoutineDetailResponse, data);
+}
+
+export async function updateMobileTrainingRoutineIdentity(
+  id: unknown,
+  payload: unknown,
+  context: MobileSupabaseAuthenticatedContext,
+): Promise<MobileTrainingRoutineIdentityResponse> {
+  const routineId = parseMobileTrainingId(id, "La rutina");
+  const input = parseMobileTrainingRoutineIdentity(payload);
+  const { data, error } = await context.supabase.rpc(
+    "mobile_update_training_routine_identity",
+    {
+      p_routine_id: routineId,
+      p_name: input.name,
+      p_color: input.color,
+      p_expected_updated_at: input.expectedUpdatedAt,
+    },
+  );
+  if (error) {
+    throwTrainingMutationError(error, "Ya existe una rutina con ese nombre.");
+  }
+  return parseDatabaseResponse(parseMobileTrainingRoutineIdentityResponse, data);
+}
+
+export async function replaceMobileTrainingRoutineTemplate(
+  id: unknown,
+  payload: unknown,
+  context: MobileSupabaseAuthenticatedContext,
+): Promise<MobileTrainingRoutineDetailResponse> {
+  const routineId = parseMobileTrainingId(id, "La rutina");
+  const input = parseMobileTrainingRoutineTemplate(payload);
+  const { data, error } = await context.supabase.rpc(
+    "mobile_replace_training_routine_template",
+    {
+      p_routine_id: routineId,
+      p_expected_template_version: input.expectedTemplateVersion,
+      p_items: input.items,
+    },
+  );
+  if (error) throwTrainingMutationError(error);
+  return parseDatabaseResponse(parseMobileTrainingRoutineDetailResponse, data);
+}
+
+export async function startMobileTrainingSession(
+  payload: unknown,
+  context: MobileSupabaseAuthenticatedContext,
+): Promise<{ status: 201 | 409; body: MobileTrainingSessionStartResponse }> {
+  const input = parseMobileTrainingSessionStart(payload);
+  const { data, error } = await context.supabase.rpc(
+    "mobile_start_training_session",
+    {
+      p_idempotency_key: input.idempotencyKey,
+      p_routine_id: input.routineId,
+    },
+  );
+  if (error) throwTrainingMutationError(error);
+  const result = parseIdempotentRpcRow(data);
+  if (result.response_status !== 201 && result.response_status !== 409) {
+    throw new Error("Invalid training session start status");
+  }
+  const body = parseDatabaseResponse(
+    parseMobileTrainingSessionStartResponse,
+    result.response_body,
+  );
+  if (
+    (result.response_status === 201 && body.status !== "started") ||
+    (result.response_status === 409 && body.status !== "active")
+  ) {
+    throw new Error("Mismatched training session start response");
+  }
+  return { status: result.response_status, body };
 }
 
 export async function setMobileTrainingRoutineStatus(

@@ -4,6 +4,10 @@ import type { ExerciseRoutineMembership } from "../phase2/exercise-insights";
 import { isRoutineColorKey } from "../phase2/routine-colors";
 import type { RoutineOverview } from "../phase2/routine-overview";
 import type { Exercise, Routine } from "../phase2/types";
+import {
+  assertAdjustment,
+  validateRoutineExercisePayload,
+} from "../phase2/training-validation";
 import { toWorkoutStartActiveSession } from "../phase2/workout-start";
 import type { ReadResult } from "../resilient-read";
 import { MobileApiValidationError } from "./auth";
@@ -16,8 +20,14 @@ import type {
   MobileTrainingExerciseStatusPayload,
   MobileTrainingResponse,
   MobileTrainingRoutineCreatePayload,
+  MobileTrainingRoutineDetailResponse,
+  MobileTrainingRoutineIdentityPayload,
+  MobileTrainingRoutineIdentityResponse,
+  MobileTrainingRoutineTemplatePayload,
   MobileTrainingRoutinesResponse,
   MobileTrainingRoutineStatusPayload,
+  MobileTrainingSessionStartPayload,
+  MobileTrainingSessionStartResponse,
 } from "./contracts";
 
 const UUID_PATTERN =
@@ -97,6 +107,40 @@ function requiredText(value: unknown, label: string): string {
     throw new MobileApiValidationError(`${label} es obligatorio.`);
   }
   return value.trim();
+}
+
+function nullableText(value: unknown, label: string): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") {
+    throw new MobileApiValidationError(`${label} no es válido.`);
+  }
+  return value;
+}
+
+function nullableNumber(value: unknown, label: string): number | null {
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new MobileApiValidationError(`${label} no es válido.`);
+  }
+  return value;
+}
+
+function requiredInteger(value: unknown, label: string, minimum = 0): number {
+  if (!Number.isSafeInteger(value) || (value as number) < minimum) {
+    throw new MobileApiValidationError(`${label} no es válido.`);
+  }
+  return value as number;
+}
+
+function requiredTimestamp(value: unknown, label: string): string {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) ||
+    !Number.isFinite(Date.parse(value))
+  ) {
+    throw new MobileApiValidationError(`${label} no es válido.`);
+  }
+  return value;
 }
 
 export function parseMobileTrainingMonth(value: unknown): `${number}-${number}` {
@@ -227,6 +271,327 @@ export function parseMobileTrainingRoutineStatus(
     throw new MobileApiValidationError("El estado de la rutina no es válido.");
   }
   return { isActive: input.isActive };
+}
+
+export function parseMobileTrainingRoutineIdentity(
+  value: unknown,
+): MobileTrainingRoutineIdentityPayload {
+  const input = strictObject(value, "La identidad de la rutina", [
+    "name",
+    "color",
+    "expectedUpdatedAt",
+  ]);
+  if (input.color !== null && !isRoutineColorKey(input.color)) {
+    throw new MobileApiValidationError("Elegí un color de rutina válido.");
+  }
+  return {
+    name: requiredText(input.name, "El nombre"),
+    color: input.color,
+    expectedUpdatedAt: requiredTimestamp(
+      input.expectedUpdatedAt,
+      "La versión de la rutina",
+    ),
+  };
+}
+
+export function parseMobileTrainingRoutineTemplate(
+  value: unknown,
+): MobileTrainingRoutineTemplatePayload {
+  const input = strictObject(value, "La plantilla", [
+    "expectedTemplateVersion",
+    "items",
+  ]);
+  const expectedTemplateVersion = requiredInteger(
+    input.expectedTemplateVersion,
+    "La versión de la plantilla",
+    1,
+  );
+  if (!Array.isArray(input.items) || input.items.length > 10_000) {
+    throw new MobileApiValidationError("La plantilla no es válida.");
+  }
+
+  const items = input.items.map((rawItem, itemIndex) => {
+    const item = strictObject(rawItem, `El ejercicio ${itemIndex + 1}`, [
+      "routineExerciseId",
+      "exerciseId",
+      "targets",
+    ]);
+    const routineExerciseId = item.routineExerciseId === null
+      ? null
+      : parseMobileTrainingId(item.routineExerciseId, "La relación de rutina");
+    const exerciseId = parseMobileTrainingId(item.exerciseId, "El ejercicio");
+    const targetInput = strictObject(item.targets, "Los objetivos", [
+      "nextAdjustment",
+      "nextAdjustmentNote",
+      "restMinSeconds",
+      "restMaxSeconds",
+      "notes",
+      "sets",
+    ]);
+    if (typeof targetInput.nextAdjustment !== "string") {
+      throw new MobileApiValidationError("El ajuste no es válido.");
+    }
+    try {
+      assertAdjustment(targetInput.nextAdjustment);
+    } catch (error) {
+      throw new MobileApiValidationError(
+        error instanceof Error ? error.message : "El ajuste no es válido.",
+      );
+    }
+    if (!Array.isArray(targetInput.sets)) {
+      throw new MobileApiValidationError("Las series no son válidas.");
+    }
+    const sets = targetInput.sets.map((rawSet, setIndex) => {
+      const set = strictObject(rawSet, `La serie ${setIndex + 1}`, [
+        "setNumber",
+        "targetReps",
+        "targetWeightKg",
+        "targetRir",
+        "notes",
+      ]);
+      return {
+        setNumber: requiredInteger(set.setNumber, "El número de serie", 1),
+        targetReps: nullableNumber(set.targetReps, "Las repeticiones"),
+        targetWeightKg: nullableNumber(set.targetWeightKg, "El peso"),
+        targetRir: nullableNumber(set.targetRir, "El RIR"),
+        notes: nullableText(set.notes, "Las notas de la serie"),
+      };
+    });
+    const targets = {
+      nextAdjustment: targetInput.nextAdjustment,
+      nextAdjustmentNote: nullableText(
+        targetInput.nextAdjustmentNote,
+        "La nota del ajuste",
+      ),
+      restMinSeconds: nullableNumber(
+        targetInput.restMinSeconds,
+        "El descanso mínimo",
+      ),
+      restMaxSeconds: nullableNumber(
+        targetInput.restMaxSeconds,
+        "El descanso máximo",
+      ),
+      notes: nullableText(targetInput.notes, "Las notas"),
+      sets,
+    };
+    try {
+      validateRoutineExercisePayload({
+        next_adjustment: targets.nextAdjustment,
+        rest_min_seconds: targets.restMinSeconds,
+        rest_max_seconds: targets.restMaxSeconds,
+        notes: targets.notes ?? "",
+        sets: targets.sets.map((set) => ({
+          set_number: set.setNumber,
+          target_reps: set.targetReps,
+          target_weight_kg: set.targetWeightKg,
+          target_rir: set.targetRir,
+          notes: set.notes,
+        })),
+      });
+    } catch (error) {
+      throw new MobileApiValidationError(
+        error instanceof Error ? error.message : "Los objetivos no son válidos.",
+      );
+    }
+    return { routineExerciseId, exerciseId, targets };
+  });
+
+  if (new Set(items.map((item) => item.exerciseId)).size !== items.length) {
+    throw new MobileApiValidationError(
+      "Un ejercicio no puede repetirse en la rutina.",
+    );
+  }
+  return { expectedTemplateVersion, items };
+}
+
+export function parseMobileTrainingSessionStart(
+  value: unknown,
+): MobileTrainingSessionStartPayload {
+  const input = strictObject(value, "El inicio de sesión", [
+    "routineId",
+    "idempotencyKey",
+  ]);
+  return {
+    routineId: input.routineId === null
+      ? null
+      : parseMobileTrainingId(input.routineId, "La rutina"),
+    idempotencyKey: parseMobileIdempotencyKey(input.idempotencyKey),
+  };
+}
+
+const MUSCLE_GROUPS = new Set([
+  "pecho",
+  "espalda",
+  "piernas",
+  "hombros",
+  "bíceps",
+  "tríceps",
+  "abdomen",
+  "cardio",
+]);
+
+export function parseMobileTrainingRoutineDetailResponse(
+  value: unknown,
+): MobileTrainingRoutineDetailResponse {
+  const root = strictObject(value, "La rutina recibida", ["routine", "items"]);
+  const routine = strictObject(root.routine, "La rutina recibida", [
+    "id",
+    "name",
+    "color",
+    "isActive",
+    "updatedAt",
+    "templateVersion",
+  ]);
+  if (routine.color !== null && !isRoutineColorKey(routine.color)) {
+    throw new Error("Invalid routine detail color");
+  }
+  if (typeof routine.isActive !== "boolean") {
+    throw new Error("Invalid routine detail status");
+  }
+  const templateVersion = requiredInteger(
+    routine.templateVersion,
+    "La versión de la plantilla",
+    1,
+  );
+  if (!Array.isArray(root.items)) {
+    throw new Error("Invalid routine detail items");
+  }
+
+  const rawItems = root.items.map((rawItem, index) => {
+    const item = strictObject(rawItem, "El ejercicio recibido", [
+      "routineExerciseId",
+      "exerciseOrder",
+      "exercise",
+      "updatedAt",
+      "targets",
+    ]);
+    const exercise = strictObject(item.exercise, "El ejercicio recibido", [
+      "id",
+      "name",
+      "muscleGroup",
+      "muscleGroupLabel",
+      "implement",
+      "weightMode",
+      "isActive",
+    ]);
+    if (
+      exercise.muscleGroup !== null &&
+      (typeof exercise.muscleGroup !== "string" ||
+        !MUSCLE_GROUPS.has(exercise.muscleGroup))
+    ) {
+      throw new Error("Invalid routine detail muscle group");
+    }
+    if (typeof exercise.isActive !== "boolean") {
+      throw new Error("Invalid routine detail exercise status");
+    }
+    return {
+      routineExerciseId: parseMobileTrainingId(
+        item.routineExerciseId,
+        "La relación de rutina",
+      ),
+      exerciseOrder: requiredInteger(
+        item.exerciseOrder,
+        "El orden del ejercicio",
+        1,
+      ),
+      exercise: {
+        id: parseMobileTrainingId(exercise.id, "El ejercicio"),
+        name: requiredText(exercise.name, "El nombre del ejercicio"),
+        muscleGroup: exercise.muscleGroup,
+        muscleGroupLabel: nullableText(
+          exercise.muscleGroupLabel,
+          "El músculo específico",
+        ),
+        implement: nullableText(exercise.implement, "El implemento"),
+        weightMode: nullableText(exercise.weightMode, "El registro de carga"),
+        isActive: exercise.isActive,
+      },
+      updatedAt: requiredTimestamp(item.updatedAt, "La versión del ejercicio"),
+      targets: item.targets,
+      index,
+    };
+  });
+
+  const parsedTemplate = parseMobileTrainingRoutineTemplate({
+    expectedTemplateVersion: templateVersion,
+    items: rawItems.map((item) => ({
+      routineExerciseId: item.routineExerciseId,
+      exerciseId: item.exercise.id,
+      targets: item.targets,
+    })),
+  });
+
+  return {
+    routine: {
+      id: parseMobileTrainingId(routine.id, "La rutina"),
+      name: requiredText(routine.name, "El nombre"),
+      color: routine.color,
+      isActive: routine.isActive,
+      updatedAt: requiredTimestamp(routine.updatedAt, "La versión de la rutina"),
+      templateVersion,
+    },
+    items: rawItems.map((item, index) => ({
+      routineExerciseId: item.routineExerciseId,
+      exerciseOrder: item.exerciseOrder,
+      exercise: item.exercise,
+      updatedAt: item.updatedAt,
+      targets: parsedTemplate.items[index]!.targets,
+    })),
+  } as MobileTrainingRoutineDetailResponse;
+}
+
+export function parseMobileTrainingRoutineIdentityResponse(
+  value: unknown,
+): MobileTrainingRoutineIdentityResponse {
+  const root = strictObject(value, "La rutina recibida", ["routine"]);
+  return {
+    routine: parseMobileTrainingRoutineDetailResponse({
+      routine: root.routine,
+      items: [],
+    }).routine,
+  };
+}
+
+export function parseMobileTrainingSessionStartResponse(
+  value: unknown,
+): MobileTrainingSessionStartResponse {
+  const root = objectValue(value, "La sesión recibida");
+  const status = root.status;
+  const allowed = status === "active"
+    ? ["status", "code", "session"]
+    : ["status", "session"];
+  const strict = strictObject(value, "La sesión recibida", allowed);
+  if (status !== "started" && status !== "active") {
+    throw new Error("Invalid training session status");
+  }
+  if (status === "active" && strict.code !== "ACTIVE_SESSION_EXISTS") {
+    throw new Error("Invalid active session conflict");
+  }
+  const session = strictObject(strict.session, "La sesión recibida", [
+    "id",
+    "routineId",
+    "name",
+    "logDate",
+    "startedAt",
+  ]);
+  if (
+    typeof session.logDate !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(session.logDate)
+  ) {
+    throw new Error("Invalid training session date");
+  }
+  const parsedSession = {
+    id: parseMobileTrainingId(session.id, "La sesión"),
+    routineId: session.routineId === null
+      ? null
+      : parseMobileTrainingId(session.routineId, "La rutina"),
+    name: requiredText(session.name, "El nombre de la sesión"),
+    logDate: session.logDate,
+    startedAt: requiredTimestamp(session.startedAt, "El inicio de la sesión"),
+  };
+  return status === "started"
+    ? { status, session: parsedSession }
+    : { status, code: "ACTIVE_SESSION_EXISTS", session: parsedSession };
 }
 
 export function parseMobileTrainingExerciseCreate(

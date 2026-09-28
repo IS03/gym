@@ -18,7 +18,7 @@ export function mobileApiResponseHeaders(request: Request): HeadersInit {
     ...(origin === MOBILE_ORIGIN
       ? {
           "Access-Control-Allow-Origin": MOBILE_ORIGIN,
-          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": MOBILE_ALLOWED_HEADERS,
           "Access-Control-Max-Age": "600",
         }

@@ -32,7 +32,11 @@ export class MobileApiConflictError extends Error {
 
   constructor(
     message: string,
-    public readonly code: "IDEMPOTENCY_KEY_REUSED" =
+    public readonly code:
+      | "IDEMPOTENCY_KEY_REUSED"
+      | "ACTIVE_SESSION_EXISTS"
+      | "ROUTINE_CHANGED"
+      | "ROUTINE_TEMPLATE_CHANGED" =
       "IDEMPOTENCY_KEY_REUSED",
   ) {
     super(message);
@@ -93,6 +97,103 @@ export async function handleMobileAuthenticatedRequest<TContext, TBody>(
       return {
         status: 400,
         body: { error: "VALIDATION_ERROR", message: error.message },
+      };
+    }
+    return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
+  }
+}
+
+export type MobileAuthenticatedResourceHandlerResult<T> =
+  | { status: 200; body: T }
+  | { status: 400 | 401 | 404 | 503; body: MobileApiErrorResponse };
+
+export async function handleMobileAuthenticatedResourceRequest<TContext, TBody>(
+  authorization: string | null,
+  dependencies: {
+    authenticate: (accessToken: string) => Promise<TContext>;
+    read: (context: TContext) => Promise<TBody>;
+  },
+): Promise<MobileAuthenticatedResourceHandlerResult<TBody>> {
+  try {
+    const accessToken = mobileBearerToken(authorization);
+    const context = await dependencies.authenticate(accessToken);
+    return { status: 200, body: await dependencies.read(context) };
+  } catch (error) {
+    if (error instanceof MobileApiUnauthorizedError) {
+      return { status: 401, body: { error: "UNAUTHORIZED" } };
+    }
+    if (error instanceof MobileApiValidationError) {
+      return {
+        status: 400,
+        body: { error: "VALIDATION_ERROR", message: error.message },
+      };
+    }
+    if (error instanceof MobileApiNotFoundError) {
+      return {
+        status: 404,
+        body: { error: "NOT_FOUND", message: error.message },
+      };
+    }
+    return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
+  }
+}
+
+export type MobileExplicitMutationHandlerResult<T> =
+  | { status: 200 | 201 | 409; body: T }
+  | {
+      status: 409;
+      body: {
+        status: "conflict";
+        code: "IDEMPOTENCY_KEY_REUSED";
+        message: string;
+      };
+    }
+  | { status: 400 | 401 | 404 | 409 | 503; body: MobileApiErrorResponse };
+
+/** Used when the successful domain contract itself can be a 409 response. */
+export async function handleMobileExplicitMutationRequest<TContext, TBody>(
+  authorization: string | null,
+  dependencies: {
+    authenticate: (accessToken: string) => Promise<TContext>;
+    mutate: (
+      context: TContext,
+    ) => Promise<{ status: 200 | 201 | 409; body: TBody }>;
+  },
+): Promise<MobileExplicitMutationHandlerResult<TBody>> {
+  try {
+    const accessToken = mobileBearerToken(authorization);
+    const context = await dependencies.authenticate(accessToken);
+    return await dependencies.mutate(context);
+  } catch (error) {
+    if (error instanceof MobileApiUnauthorizedError) {
+      return { status: 401, body: { error: "UNAUTHORIZED" } };
+    }
+    if (error instanceof MobileApiValidationError) {
+      return {
+        status: 400,
+        body: { error: "VALIDATION_ERROR", message: error.message },
+      };
+    }
+    if (error instanceof MobileApiNotFoundError) {
+      return {
+        status: 404,
+        body: { error: "NOT_FOUND", message: error.message },
+      };
+    }
+    if (error instanceof MobileApiConflictError) {
+      if (error.code === "IDEMPOTENCY_KEY_REUSED") {
+        return {
+          status: 409,
+          body: {
+            status: "conflict",
+            code: "IDEMPOTENCY_KEY_REUSED",
+            message: error.message,
+          },
+        };
+      }
+      return {
+        status: 409,
+        body: { error: error.code, message: error.message },
       };
     }
     return { status: 503, body: { error: "DATA_UNAVAILABLE" } };

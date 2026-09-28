@@ -12,6 +12,8 @@ export const MOBILE_TRAINING_INITIAL_PLAN_API_PATH =
   "/api/mobile/v1/training/routines/initial-plan" as const;
 export const MOBILE_TRAINING_EXERCISES_API_PATH =
   "/api/mobile/v1/training/exercises" as const;
+export const MOBILE_TRAINING_SESSIONS_API_PATH =
+  "/api/mobile/v1/training/sessions" as const;
 
 export function mobileNutritionMealApiPath(id: string) {
   return `${MOBILE_NUTRITION_MEALS_API_PATH}/${encodeURIComponent(id)}` as const;
@@ -19,6 +21,14 @@ export function mobileNutritionMealApiPath(id: string) {
 
 export function mobileTrainingRoutineApiPath(id: string) {
   return `${MOBILE_TRAINING_ROUTINES_API_PATH}/${encodeURIComponent(id)}` as const;
+}
+
+export function mobileTrainingRoutineIdentityApiPath(id: string) {
+  return `${mobileTrainingRoutineApiPath(id)}/identity` as const;
+}
+
+export function mobileTrainingRoutineTemplateApiPath(id: string) {
+  return `${mobileTrainingRoutineApiPath(id)}/template` as const;
 }
 
 export function mobileTrainingExerciseApiPath(id: string) {
@@ -172,6 +182,112 @@ export type MobileTrainingRoutineStatusResponse = {
   };
 };
 
+export type MobileTrainingAdjustment =
+  | "maintain"
+  | "increase_weight"
+  | "increase_reps"
+  | "custom";
+
+export type MobileTrainingRoutineSetDto = {
+  setNumber: number;
+  targetReps: number | null;
+  targetWeightKg: number | null;
+  targetRir: number | null;
+  notes: string | null;
+};
+
+export type MobileTrainingRoutineTargetsDto = {
+  nextAdjustment: MobileTrainingAdjustment;
+  nextAdjustmentNote: string | null;
+  restMinSeconds: number | null;
+  restMaxSeconds: number | null;
+  notes: string | null;
+  sets: MobileTrainingRoutineSetDto[];
+};
+
+export type MobileTrainingRoutineDetailResponse = {
+  routine: {
+    id: string;
+    name: string;
+    color: MobileRoutineColorKey | null;
+    isActive: boolean;
+    updatedAt: string;
+    templateVersion: number;
+  };
+  items: Array<{
+    routineExerciseId: string;
+    exerciseOrder: number;
+    exercise: {
+      id: string;
+      name: string;
+      muscleGroup: MobileTrainingMuscleGroup | null;
+      muscleGroupLabel: string | null;
+      implement: string | null;
+      weightMode: string | null;
+      isActive: boolean;
+    };
+    updatedAt: string;
+    targets: MobileTrainingRoutineTargetsDto;
+  }>;
+};
+
+export type MobileTrainingRoutineIdentityPayload = {
+  name: string;
+  color: MobileRoutineColorKey | null;
+  expectedUpdatedAt: string;
+};
+
+export type MobileTrainingRoutineIdentityResponse = {
+  routine: MobileTrainingRoutineDetailResponse["routine"];
+};
+
+export type MobileTrainingRoutineTemplatePayload = {
+  expectedTemplateVersion: number;
+  items: Array<{
+    routineExerciseId: string | null;
+    exerciseId: string;
+    targets: MobileTrainingRoutineTargetsDto;
+  }>;
+};
+
+export type MobileTrainingSessionDto = {
+  id: string;
+  routineId: string | null;
+  name: string;
+  logDate: string;
+  startedAt: string;
+};
+
+export type MobileTrainingSessionStartPayload = {
+  routineId: string | null;
+  idempotencyKey: string;
+};
+
+export type MobileTrainingSessionStartedResponse = {
+  status: "started";
+  session: MobileTrainingSessionDto;
+};
+
+export type MobileTrainingSessionActiveResponse = {
+  status: "active";
+  code: "ACTIVE_SESSION_EXISTS";
+  session: MobileTrainingSessionDto;
+};
+
+export type MobileTrainingSessionConflictResponse = {
+  status: "conflict";
+  code: "IDEMPOTENCY_KEY_REUSED";
+  message: string;
+};
+
+export type MobileTrainingSessionStartResponse =
+  | MobileTrainingSessionStartedResponse
+  | MobileTrainingSessionActiveResponse;
+
+export type MobileTrainingSessionStartHttpResponse =
+  | MobileTrainingSessionStartResponse
+  | MobileTrainingSessionConflictResponse;
+
 export type MobileTrainingInitialPlanResponse = {
   routines: number;
   exercises: number;
@@ -322,6 +438,9 @@ export type MobileApiErrorCode =
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
   | "IDEMPOTENCY_KEY_REUSED"
+  | "ACTIVE_SESSION_EXISTS"
+  | "ROUTINE_CHANGED"
+  | "ROUTINE_TEMPLATE_CHANGED"
   | "DATA_UNAVAILABLE";
 
 export type MobileApiErrorResponse = {

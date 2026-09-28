@@ -260,19 +260,37 @@ export function createMobileApiClient({
                 }
               : unavailable('invalid_response', durationMs, 404);
         } else if (response.status === 409) {
-          result =
-            isRecord(responseBody) &&
-            responseBody.error === 'IDEMPOTENCY_KEY_REUSED'
-              ? {
+          const conflictCode = isRecord(responseBody)
+            ? (typeof responseBody.error === 'string'
+                ? responseBody.error
+                : responseBody.code)
+            : undefined;
+          const knownConflict =
+            conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
+            conflictCode === 'ACTIVE_SESSION_EXISTS' ||
+            conflictCode === 'ROUTINE_CHANGED' ||
+            conflictCode === 'ROUTINE_TEMPLATE_CHANGED';
+          if (knownConflict) {
+            const conflictData = conflictCode === 'ACTIVE_SESSION_EXISTS'
+              ? options.parse(responseBody)
+              : undefined;
+            result = conflictCode === 'ACTIVE_SESSION_EXISTS' && conflictData === undefined
+              ? unavailable('invalid_response', durationMs, 409)
+              : {
                   status: 'conflict',
-                  code: 'IDEMPOTENCY_KEY_REUSED',
+                  code: conflictCode,
                   message: responseMessage(
                     responseBody,
-                    'Este intento ya fue usado con otros datos.',
+                    conflictCode === 'ACTIVE_SESSION_EXISTS'
+                      ? 'Ya existe una sesión en curso.'
+                      : 'Los datos cambiaron. Actualizá antes de reintentar.',
                   ),
+                  ...(conflictData === undefined ? {} : { data: conflictData }),
                   meta: meta(durationMs, 409, 'conflict'),
-                }
-              : unavailable('invalid_response', durationMs, 409);
+                };
+          } else {
+            result = unavailable('invalid_response', durationMs, 409);
+          }
         } else if (!response.ok) {
           result = unavailable(
             response.status >= 500 ? 'server' : 'invalid_response',
