@@ -211,6 +211,40 @@ describe('Mobile API client', () => {
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves the active-session conflict body without retrying the mutation', async () => {
+    const body = {
+      status: 'active',
+      code: 'ACTIVE_SESSION_EXISTS',
+      session: {
+        id: '11111111-1111-4111-8111-111111111111',
+        routineId: null,
+        name: 'Sesión libre',
+        logDate: '2026-09-28',
+        startedAt: '2026-09-28T12:00:00.000Z',
+      },
+    };
+    const fetchImplementation = jest.fn<typeof fetch>().mockResolvedValue(
+      response(409, body),
+    );
+    const client = createMobileApiClient(dependencies({ fetchImplementation }).values);
+
+    await expect(client.request({
+      body: { routineId: null, idempotencyKey: 'session:start:1' },
+      method: 'POST',
+      path: '/api/mobile/v1/training/sessions',
+      parse: (value) => value === body ? value : (
+        typeof value === 'object' && value !== null && 'session' in value
+          ? value
+          : undefined
+      ),
+    })).resolves.toMatchObject({
+      status: 'conflict',
+      code: 'ACTIVE_SESSION_EXISTS',
+      data: body,
+    });
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
   it.each([500, 503])('maps HTTP %s to server unavailable', async (status) => {
     const fetchImplementation = jest.fn(async () => response(status, {
       error: 'UNAVAILABLE',

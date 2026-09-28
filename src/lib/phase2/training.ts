@@ -608,33 +608,12 @@ export async function replaceRoutineExercises(input: {
   }>;
 }): Promise<void> {
   const supabase = await createClient();
-  const userId = await getAuthedUserId();
-
-  // Asegura ownership de la rutina.
-  const { data: routine, error: routineErr } = await supabase
-    .from("routines")
-    .select("id, user_id")
-    .eq("id", input.routineId)
-    .maybeSingle();
-  if (routineErr) throw new Error(`Leer rutina: ${routineErr.message}`);
-  if (!routine) throw new Error("Rutina no encontrada.");
-  if (routine.user_id !== userId) throw new Error("Forbidden.");
-
-  const { error: delErr } = await supabase
-    .from("routine_exercises")
-    .delete()
-    .eq("routine_id", input.routineId);
-  if (delErr) throw new Error(`Borrar routine_exercises: ${delErr.message}`);
-
-  if (input.items.length === 0) return;
-
-  const { error: insErr } = await supabase.from("routine_exercises").insert(
-    input.items.map((it) => ({
-      routine_id: input.routineId,
-      exercise_id: it.exercise_id,
-    })),
-  );
-  if (insErr) throw new Error(`Insert routine_exercises: ${insErr.message}`);
+  await getAuthedUserId();
+  const { error } = await supabase.rpc("replace_routine_exercises", {
+    p_routine_id: input.routineId,
+    p_exercise_ids: input.items.map((item) => item.exercise_id),
+  });
+  if (error) throw new Error(`Reemplazar ejercicios de rutina: ${error.message}`);
 }
 
 export async function addExerciseToRoutine(input: {
@@ -702,38 +681,13 @@ export async function syncExerciseActiveRoutineMemberships(input: {
   routineIds: string[];
 }, context?: AuthenticatedRequestContext): Promise<void> {
   const supabase = context?.supabase ?? await createClient();
-  const userId = context?.userId ?? await getAuthedUserId();
+  if (!context) await getAuthedUserId();
   const requestedIds = [...new Set(input.routineIds.filter(Boolean))];
-
-  const { data: activeRoutines, error: routineError } = await supabase
-    .from("routines")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_active", true);
-  if (routineError) throw new Error(`Leer rutinas activas: ${routineError.message}`);
-  const activeIds = new Set((activeRoutines ?? []).map((routine) => String(routine.id)));
-  if (requestedIds.some((id) => !activeIds.has(id))) {
-    throw new Error("Una de las rutinas seleccionadas ya no está activa.");
-  }
-
-  const { data: currentRows, error: currentError } = activeIds.size
-    ? await supabase.from("routine_exercises").select("id, routine_id").eq("exercise_id", input.exerciseId).in("routine_id", [...activeIds])
-    : { data: [], error: null };
-  if (currentError) throw new Error(`Leer uso en rutinas: ${currentError.message}`);
-  const currentByRoutine = new Map((currentRows ?? []).map((row) => [String(row.routine_id), String(row.id)]));
-  const requested = new Set(requestedIds);
-  const removeIds = [...currentByRoutine].filter(([routineId]) => !requested.has(routineId)).map(([, id]) => id);
-  if (removeIds.length) {
-    const { error } = await supabase.from("routine_exercises").delete().in("id", removeIds);
-    if (error) throw new Error(`Quitar ejercicio de rutinas: ${error.message}`);
-  }
-
-  const addIds = requestedIds.filter((routineId) => !currentByRoutine.has(routineId));
-  if (!addIds.length) return;
-  const { error: insertError } = await supabase
-    .from("routine_exercises")
-    .insert(addIds.map((routineId) => ({ routine_id: routineId, exercise_id: input.exerciseId })));
-  if (insertError) throw new Error(`Agregar ejercicio a rutinas: ${insertError.message}`);
+  const { error } = await supabase.rpc("sync_exercise_active_routine_memberships", {
+    p_exercise_id: input.exerciseId,
+    p_routine_ids: requestedIds,
+  });
+  if (error) throw new Error(`Actualizar uso en rutinas: ${error.message}`);
 }
 
 export async function startFreeSession(input: {

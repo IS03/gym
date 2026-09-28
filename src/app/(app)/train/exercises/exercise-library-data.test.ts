@@ -16,7 +16,7 @@ describe("exercise library data contracts", () => {
   it("sincroniza memberships activas de forma idempotente", () => {
     expect(training).toContain("syncExerciseActiveRoutineMemberships");
     expect(training).toContain("new Set(input.routineIds.filter(Boolean))");
-    expect(training).toContain("!currentByRoutine.has(routineId)");
+    expect(training).toContain('supabase.rpc("sync_exercise_active_routine_memberships"');
     expect(actions).toContain("syncExerciseActiveRoutineMemberships({ exerciseId: id, routineIds })");
   });
 
