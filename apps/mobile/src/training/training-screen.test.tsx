@@ -11,8 +11,12 @@ const mockFetchMobileTraining = jest.fn();
 const mockRefresh = jest.fn<() => Promise<void>>();
 const mockUseApiResource = jest.fn();
 const mockHaptic = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 jest.mock('@/api', () => ({
   fetchMobileTraining: (...args: unknown[]) => mockFetchMobileTraining(...args),
   useApiResource: (...args: unknown[]) => mockUseApiResource(...args),
@@ -54,6 +58,7 @@ describe('Training resource screen', () => {
     mockRefresh.mockResolvedValue(undefined);
     mockUseApiResource.mockReset();
     mockHaptic.mockReset();
+    mockPush.mockReset();
   });
 
   it('uses a structure-matched skeleton during initial loading', () => {
@@ -149,5 +154,24 @@ describe('Training resource screen', () => {
     expect(mockHaptic).toHaveBeenCalledTimes(1);
     expect(mockFetchMobileTraining).not.toHaveBeenCalled();
   });
-});
 
+  it('navigates Rutinas to the native Training stack screen', () => {
+    const data = fixture();
+    mockUseApiResource.mockReturnValue({
+      refresh: mockRefresh,
+      state: {
+        status: 'ready',
+        current: { confirmedAt: 1, data },
+        refreshing: false,
+        trigger: 'initial',
+        result: okResult(data),
+      },
+    });
+    const view = renderScreen();
+
+    fireEvent.press(view.getByRole('button', { name: 'Abrir Rutinas' }));
+
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/routines');
+    expect(view.queryByText(/Rutinas estará disponible/)).toBeNull();
+  });
+});

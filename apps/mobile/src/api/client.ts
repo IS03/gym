@@ -259,6 +259,20 @@ export function createMobileApiClient({
                   meta: meta(durationMs, 404, 'not_found'),
                 }
               : unavailable('invalid_response', durationMs, 404);
+        } else if (response.status === 409) {
+          result =
+            isRecord(responseBody) &&
+            responseBody.error === 'IDEMPOTENCY_KEY_REUSED'
+              ? {
+                  status: 'conflict',
+                  code: 'IDEMPOTENCY_KEY_REUSED',
+                  message: responseMessage(
+                    responseBody,
+                    'Este intento ya fue usado con otros datos.',
+                  ),
+                  meta: meta(durationMs, 409, 'conflict'),
+                }
+              : unavailable('invalid_response', durationMs, 409);
         } else if (!response.ok) {
           result = unavailable(
             response.status >= 500 ? 'server' : 'invalid_response',
@@ -356,7 +370,11 @@ export function createMobileApiClient({
     options: Omit<MobileApiRequestOptions<T>, 'method'> & { method?: 'GET' },
   ): Promise<MobileApiReadResult<T>> {
     const result = await request({ ...options, method: 'GET' });
-    if (result.status === 'validation' || result.status === 'not_found') {
+    if (
+      result.status === 'validation' ||
+      result.status === 'not_found' ||
+      result.status === 'conflict'
+    ) {
       return unavailable('invalid_response', result.meta.durationMs, result.meta.httpStatus);
     }
     return result;

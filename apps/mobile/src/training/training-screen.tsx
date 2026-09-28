@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, RefreshControl, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { fetchMobileTraining, useApiResource, useMobileApi } from '@/api';
 import {
@@ -20,12 +21,11 @@ import {
   type TrainingDeferredAction,
 } from './training-dashboard';
 
-const DEFERRED_MESSAGES: Record<TrainingDeferredAction, string> = {
+const DEFERRED_MESSAGES: Record<Exclude<TrainingDeferredAction, 'routines'>, string> = {
   continueSession: 'Continuar entrenamiento estará disponible en M3.3.',
   exercises: 'Ejercicios estará disponible en M3.1D.',
   history: 'Historial estará disponible en M3.4.',
   newSession: 'Nueva sesión estará disponible en M3.2.',
-  routines: 'Rutinas estará disponible en M3.1C.',
 };
 
 const systemNow = () => new Date();
@@ -82,6 +82,7 @@ function TrainingUnavailable({ onRetry }: { onRetry: () => void }) {
 export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
+  const router = useRouter();
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(
@@ -125,12 +126,16 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
 
   const showDeferredFeedback = useCallback((action: TrainingDeferredAction) => {
     haptics.selection();
+    if (action === 'routines') {
+      router.push('/(tabs)/train/routines');
+      return;
+    }
     const message = DEFERRED_MESSAGES[action];
     setNotice(message);
     void AccessibilityInfo.announceForAccessibility(message);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => setNotice(null), 4_000);
-  }, []);
+  }, [router]);
 
   if (!current && state.status === 'loading') {
     return <TrainingSkeleton />;

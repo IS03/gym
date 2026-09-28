@@ -190,6 +190,27 @@ describe('Mobile API client', () => {
     });
   });
 
+  it('maps a durable idempotency conflict without retrying the mutation', async () => {
+    const fetchImplementation = jest.fn<typeof fetch>().mockResolvedValue(
+      response(409, {
+        error: 'IDEMPOTENCY_KEY_REUSED',
+        message: 'La clave ya fue usada con otros datos.',
+      }),
+    );
+    const client = createMobileApiClient(dependencies({ fetchImplementation }).values);
+
+    await expect(client.request({
+      body: { name: 'Push' },
+      method: 'POST',
+      path: '/api/mobile/v1/training/routines',
+      parse: (value) => value,
+    })).resolves.toMatchObject({
+      status: 'conflict',
+      code: 'IDEMPOTENCY_KEY_REUSED',
+    });
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
   it.each([500, 503])('maps HTTP %s to server unavailable', async (status) => {
     const fetchImplementation = jest.fn(async () => response(status, {
       error: 'UNAVAILABLE',

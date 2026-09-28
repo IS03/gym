@@ -7,6 +7,7 @@ export default function TrainLayout() {
   return (
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="routines" options={{ title: 'Rutinas' }} />
     </Stack>
   );
 }

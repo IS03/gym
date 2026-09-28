@@ -10,6 +10,7 @@ export type MobileApiUnavailableReason =
 
 export type MobileApiOutcome =
   | 'auth_required'
+  | 'conflict'
   | 'not_found'
   | 'ok'
   | 'unauthorized'
@@ -34,6 +35,7 @@ export type MobileApiReadResult<T> =
 
 export type MobileApiMutationResult<T> =
   | { status: 'ok'; data: T; meta: MobileApiResultMeta }
+  | { status: 'conflict'; code: 'IDEMPOTENCY_KEY_REUSED'; message: string; meta: MobileApiResultMeta }
   | { status: 'validation'; message: string; meta: MobileApiResultMeta }
   | { status: 'not_found'; message: string; meta: MobileApiResultMeta }
   | { status: 'auth_required'; meta: MobileApiResultMeta }
