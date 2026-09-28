@@ -4,6 +4,7 @@ import type { MobileClientRuntime } from './runtime';
 
 export type MobileApiTelemetryOutcome =
   | 'auth_required'
+  | 'conflict'
   | 'not_found'
   | 'ok'
   | 'unauthorized'

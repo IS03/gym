@@ -6,3 +6,12 @@ export {
 } from './training';
 export { MobileApiProvider, useMobileApi } from './provider';
 export { useApiResource } from './resource';
+export {
+  createMobileTrainingRoutine,
+  fetchMobileTrainingRoutines,
+  importMobileTrainingInitialPlan,
+  MOBILE_TRAINING_INITIAL_PLAN_API_PATH,
+  MOBILE_TRAINING_ROUTINES_API_PATH,
+  parseMobileTrainingRoutinesResponse,
+  setMobileTrainingRoutineStatus,
+} from './routines';
