@@ -27,6 +27,19 @@ export class MobileApiNotFoundError extends Error {
   }
 }
 
+export class MobileApiConflictError extends Error {
+  readonly httpStatus = 409;
+
+  constructor(
+    message: string,
+    public readonly code: "IDEMPOTENCY_KEY_REUSED" =
+      "IDEMPOTENCY_KEY_REUSED",
+  ) {
+    super(message);
+    this.name = "MobileApiConflictError";
+  }
+}
+
 export function isRejectedMobileAccessToken(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -59,7 +72,7 @@ export function mobileBearerToken(authorization: string | null): string {
 
 export type MobileAuthenticatedHandlerResult<T> =
   | { status: 200; body: T }
-  | { status: 401 | 503; body: MobileApiErrorResponse };
+  | { status: 400 | 401 | 503; body: MobileApiErrorResponse };
 
 export async function handleMobileAuthenticatedRequest<TContext, TBody>(
   authorization: string | null,
@@ -76,13 +89,19 @@ export async function handleMobileAuthenticatedRequest<TContext, TBody>(
     if (error instanceof MobileApiUnauthorizedError) {
       return { status: 401, body: { error: "UNAUTHORIZED" } };
     }
+    if (error instanceof MobileApiValidationError) {
+      return {
+        status: 400,
+        body: { error: "VALIDATION_ERROR", message: error.message },
+      };
+    }
     return { status: 503, body: { error: "DATA_UNAVAILABLE" } };
   }
 }
 
 export type MobileMutationHandlerResult<T> =
   | { status: 200 | 201; body: T }
-  | { status: 400 | 401 | 404 | 503; body: MobileApiErrorResponse };
+  | { status: 400 | 401 | 404 | 409 | 503; body: MobileApiErrorResponse };
 
 export async function handleMobileMutationRequest<TContext, TBody>(
   authorization: string | null,
@@ -113,6 +132,12 @@ export async function handleMobileMutationRequest<TContext, TBody>(
       return {
         status: 404,
         body: { error: "NOT_FOUND", message: error.message },
+      };
+    }
+    if (error instanceof MobileApiConflictError) {
+      return {
+        status: 409,
+        body: { error: error.code, message: error.message },
       };
     }
     return { status: 503, body: { error: "DATA_UNAVAILABLE" } };

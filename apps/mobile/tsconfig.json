@@ -15,9 +15,12 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "src/**/*.ts",
-    "src/**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "src/**/*.tsx"
   ],
-  "exclude": ["node_modules", "coverage", "ios", "android"]
+  "exclude": [
+    "node_modules",
+    "coverage",
+    "ios",
+    "android"
+  ]
 }

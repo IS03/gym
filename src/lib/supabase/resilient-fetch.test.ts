@@ -256,6 +256,41 @@ describe("Supabase Data API JWT clock-skew retry", () => {
     expect(response.status).toBe(401);
   });
 
+  it("no reintenta PGRST303 para una mutación Mobile con retries deshabilitados", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse());
+
+    const response = await createResilientSupabaseFetch(implementation, {
+      retryMutations: false,
+      sleep: injectedSleep(),
+      logger: { info: vi.fn(), warn: vi.fn() },
+    })(DATA_API_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ p_exercise_id: "exercise-id" }),
+    });
+
+    expect(implementation).toHaveBeenCalledOnce();
+    expect(response.status).toBe(401);
+  });
+
+  it("conserva los retries de lectura cuando las mutaciones no reintentan", async () => {
+    const implementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jwtIssuedAtFutureResponse())
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+    const response = await createResilientSupabaseFetch(implementation, {
+      retryMutations: false,
+      sleep: injectedSleep(),
+      logger: { info: vi.fn(), warn: vi.fn() },
+    })(PROFILES_API_URL);
+
+    expect(implementation).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(200);
+  });
+
   it.each([
     [
       "401 genérico",
@@ -355,6 +390,10 @@ describe("Supabase Data API JWT clock-skew retry", () => {
     const implementation = vi.fn<typeof fetch>((input) => {
       const request = input as Request;
       return new Promise<Response>((_resolve, reject) => {
+        if (request.signal.aborted) {
+          reject(request.signal.reason);
+          return;
+        }
         request.signal.addEventListener(
           "abort",
           () => reject(request.signal.reason),

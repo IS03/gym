@@ -5,9 +5,24 @@ export const MOBILE_NUTRITION_TODAY_API_PATH =
   "/api/mobile/v1/nutrition/today" as const;
 export const MOBILE_NUTRITION_MEALS_API_PATH =
   "/api/mobile/v1/nutrition/meals" as const;
+export const MOBILE_TRAINING_API_PATH = "/api/mobile/v1/training" as const;
+export const MOBILE_TRAINING_ROUTINES_API_PATH =
+  "/api/mobile/v1/training/routines" as const;
+export const MOBILE_TRAINING_INITIAL_PLAN_API_PATH =
+  "/api/mobile/v1/training/routines/initial-plan" as const;
+export const MOBILE_TRAINING_EXERCISES_API_PATH =
+  "/api/mobile/v1/training/exercises" as const;
 
 export function mobileNutritionMealApiPath(id: string) {
   return `${MOBILE_NUTRITION_MEALS_API_PATH}/${encodeURIComponent(id)}` as const;
+}
+
+export function mobileTrainingRoutineApiPath(id: string) {
+  return `${MOBILE_TRAINING_ROUTINES_API_PATH}/${encodeURIComponent(id)}` as const;
+}
+
+export function mobileTrainingExerciseApiPath(id: string) {
+  return `${MOBILE_TRAINING_EXERCISES_API_PATH}/${encodeURIComponent(id)}` as const;
 }
 
 export type MobileReadResult<T> =
@@ -98,6 +113,145 @@ export type MobileHomeResponse = {
   };
 };
 
+export type MobileTrainingActiveSessionDto = {
+  id: string;
+  name: string;
+  logDate: string;
+};
+
+export type MobileTrainingCalendarDayDto = {
+  date: string;
+  colors: MobileRoutineColorKey[];
+};
+
+export type MobileTrainingResponse = {
+  activeSession: MobileReadResult<MobileTrainingActiveSessionDto | null>;
+  calendar: MobileReadResult<{
+    month: string;
+    days: MobileTrainingCalendarDayDto[];
+  }>;
+};
+
+export type MobileTrainingRoutineDto = {
+  id: string;
+  name: string;
+  color: MobileRoutineColorKey | null;
+  order: number;
+  isActive: boolean;
+  exerciseCount: number;
+  setCount: number;
+};
+
+export type MobileTrainingRoutinesResponse = {
+  routines: MobileReadResult<MobileTrainingRoutineDto[]>;
+  initialPlan: MobileReadResult<{
+    imported: boolean;
+    routinesFound: number;
+  }>;
+};
+
+export type MobileTrainingRoutineCreatePayload = {
+  name: string;
+  color: MobileRoutineColorKey | null;
+  idempotencyKey: string;
+};
+
+export type MobileTrainingRoutineCreateResponse = {
+  routine: MobileTrainingRoutineDto;
+};
+
+export type MobileTrainingRoutineStatusPayload = {
+  isActive: boolean;
+};
+
+export type MobileTrainingRoutineStatusResponse = {
+  routine: {
+    id: string;
+    isActive: boolean;
+    updatedAt: string;
+  };
+};
+
+export type MobileTrainingInitialPlanResponse = {
+  routines: number;
+  exercises: number;
+};
+
+export type MobileTrainingMuscleGroup =
+  | "pecho"
+  | "espalda"
+  | "piernas"
+  | "hombros"
+  | "bíceps"
+  | "tríceps"
+  | "abdomen"
+  | "cardio";
+
+export type MobileTrainingExerciseMutationDto = {
+  name: string;
+  muscleGroup: MobileTrainingMuscleGroup | null;
+  muscleGroupLabel: string | null;
+  implement: string | null;
+  weightMode: string | null;
+  suggestedSets: number | null;
+  suggestedReps: number | null;
+  suggestedWeight: number | null;
+  suggestedRir: number | null;
+  suggestedRestMinSeconds: number | null;
+  suggestedRestMaxSeconds: number | null;
+  notes: string | null;
+};
+
+export type MobileTrainingExerciseDto = MobileTrainingExerciseMutationDto & {
+  id: string;
+  isActive: boolean;
+  routineIds: string[];
+  updatedAt: string;
+};
+
+export type MobileTrainingActiveRoutineDto = {
+  id: string;
+  name: string;
+  color: MobileRoutineColorKey | null;
+};
+
+export type MobileTrainingExercisesResponse = {
+  catalog: MobileReadResult<{
+    exercises: MobileTrainingExerciseDto[];
+    routines: MobileTrainingActiveRoutineDto[];
+  }>;
+};
+
+export type MobileTrainingExerciseCreatePayload = {
+  exercise: MobileTrainingExerciseMutationDto;
+  routineIds: [] | [string];
+  idempotencyKey: string;
+};
+
+export type MobileTrainingExerciseMutationResponse = {
+  exercise: MobileTrainingExerciseDto;
+  warning?: string;
+};
+
+export type MobileTrainingExerciseUpdatePayload = {
+  operation: "update";
+  exercise: MobileTrainingExerciseMutationDto;
+  routineIds: string[];
+};
+
+export type MobileTrainingExerciseStatusPayload = {
+  operation: "set_status";
+  isActive: boolean;
+};
+
+export type MobileTrainingExerciseStatusResponse = {
+  exercise: {
+    id: string;
+    isActive: boolean;
+    updatedAt: string;
+  };
+};
+
 export type MobileNutritionSummaryDto = {
   calories: number;
   calorieTarget: number | null;
@@ -167,6 +321,7 @@ export type MobileApiErrorCode =
   | "UNAUTHORIZED"
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
+  | "IDEMPOTENCY_KEY_REUSED"
   | "DATA_UNAVAILABLE";
 
 export type MobileApiErrorResponse = {

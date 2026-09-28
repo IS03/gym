@@ -143,7 +143,7 @@ export function buildMobileHomeResponse(
 
 export type MobileHomeHandlerResult =
   | { status: 200; body: MobileHomeResponse }
-  | { status: 401 | 503; body: MobileApiErrorResponse };
+  | { status: 400 | 401 | 503; body: MobileApiErrorResponse };
 
 export async function handleMobileHomeRequest<TContext>(
   authorization: string | null,
