@@ -14,9 +14,12 @@ const mockImport = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRefresh = jest.fn<() => Promise<void>>();
 const mockSetStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockUseApiResource = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-router', () => ({
+  useFocusEffect: () => undefined,
+  useRouter: () => ({ push: mockPush }),
   Stack: {
     Screen: ({ options }: { options: { headerRight?: () => React.ReactNode } }) =>
       options.headerRight?.() ?? null,
@@ -119,6 +122,7 @@ describe('native Training routines', () => {
     mockRefresh.mockResolvedValue(undefined);
     mockSetStatus.mockReset();
     mockUseApiResource.mockReset();
+    mockPush.mockReset();
   });
 
   it('renders loading and preserves stale data during refresh failure', () => {
@@ -238,13 +242,16 @@ describe('native Training routines', () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
-  it('shows editor feedback without navigation or writes', () => {
+  it('opens the native editor without writes', () => {
     mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: readyState() });
     const view = renderScreen();
 
     fireEvent.press(view.getByRole('button', { name: /Abrir rutina PUSH/ }));
 
-    expect(view.getByText('El editor de PUSH llega en el próximo paso.')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(tabs)/train/routines/[id]',
+      params: { id: routines[1].id },
+    });
     expect(mockSetStatus).not.toHaveBeenCalled();
   });
 

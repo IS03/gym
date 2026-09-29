@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -114,7 +114,7 @@ function RoutineRow({
         testID={`routine-color-${routine.id}-${routine.color ?? 'none'}`}
       />
       <Pressable
-        accessibilityHint="El editor de rutinas estará disponible en el próximo paso"
+        accessibilityHint="Abre el editor de rutina"
         accessibilityLabel={`Abrir rutina ${routine.name}, ${metadata}`}
         accessibilityRole="button"
         onPress={() => onOpen(routine)}
@@ -400,6 +400,7 @@ export function RoutinesScreen({
   createIdempotencyKey?: () => string;
 }) {
   const { client } = useMobileApi();
+  const router = useRouter();
   const { colors } = useOwnlevelTheme();
   const insets = useSafeAreaInsets();
   const [archivedExpanded, setArchivedExpanded] = useState(false);
@@ -460,10 +461,14 @@ export function RoutinesScreen({
     void refresh();
   }, [refresh]);
 
+  useFocusEffect(useCallback(() => {
+    void refresh();
+  }, [refresh]));
+
   const openEditorFeedback = useCallback((routine: MobileTrainingRoutine) => {
     haptics.selection();
-    announce(`El editor de ${routine.name} llega en el próximo paso.`);
-  }, [announce]);
+    router.push({ pathname: '/(tabs)/train/routines/[id]', params: { id: routine.id } });
+  }, [router]);
 
   const setRoutineStatus = useCallback((routine: MobileTrainingRoutine) => {
     if (!client || pending) return;
