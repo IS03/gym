@@ -30,6 +30,7 @@ import {
   toggleAdjustment, type TargetsDraft,
 } from './routine-editor-model';
 import { trainingRoutineColor, trainingRoutineColorLabel } from './routine-colors';
+import { StartWorkoutModal } from './start-workout-modal';
 
 const COLORS: MobileRoutineColorKey[] = [
   'violet', 'indigo', 'blue', 'cyan', 'green', 'yellow', 'orange', 'rose',
@@ -400,6 +401,7 @@ export function RoutineEditorScreen() {
   const [advanced, setAdvanced] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -682,7 +684,7 @@ export function RoutineEditorScreen() {
         ) : null}
         {dirty ? <AppText muted variant="caption">Hay cambios sin guardar; las actualizaciones se posponen hasta guardarlos.</AppText> : null}
         {detail.routine.isActive ? (
-          <Button label="Iniciar entrenamiento" onPress={() => { if (guardStructure()) announce('El inicio de entrenamiento se incorpora en el próximo paso.'); }} />
+          <Button disabled={Boolean(pending)} label="Iniciar entrenamiento" onPress={() => { if (guardStructure()) setStartOpen(true); }} />
         ) : (
           <Surface style={styles.archivedNotice}>
             <AppText variant="label">Rutina archivada</AppText>
@@ -754,6 +756,7 @@ export function RoutineEditorScreen() {
       </View> : null}
       {identityOpen ? <IdentityModal detail={detail} onClose={() => { identityOpenRef.current = false; setIdentityOpen(false); void refresh(); }} onSubmit={(name, color) => void submitIdentity(name, color)} pending={pending === 'identity'} /> : null}
       {pickerOpen ? <ExercisePicker client={client} detail={detail} onAdd={addExercise} onClose={() => setPickerOpen(false)} pending={pending === 'template'} /> : null}
+      {startOpen ? <StartWorkoutModal initialRoutineId={detail.routine.id} onClose={() => setStartOpen(false)} onContinue={(sessionId) => { setStartOpen(false); router.replace(`/(tabs)/train/session/${sessionId}`); }} onStarted={(sessionId) => { setStartOpen(false); router.replace(`/(tabs)/train/session/${sessionId}`); }} /> : null}
     </>
   );
 }

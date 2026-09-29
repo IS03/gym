@@ -16,6 +16,7 @@ const mockIdentity = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockRequest = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 const mockDispatch = jest.fn();
 const mockStackOptions = jest.fn();
 const mockUsePreventRemove = jest.fn();
@@ -31,7 +32,13 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({
     dispatch: mockDispatch,
   }),
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, replace: mockReplace }),
+}));
+jest.mock('./start-workout-modal', () => ({
+  StartWorkoutModal: ({ initialRoutineId }: { initialRoutineId: string }) => {
+    const { Text } = jest.requireActual('react-native') as typeof import('react-native');
+    return <Text>Start Workout Modal {initialRoutineId}</Text>;
+  },
 }));
 jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({
   usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
@@ -83,6 +90,7 @@ describe('native routine editor', () => {
     mockStatus.mockReset();
     mockRequest.mockReset();
     mockBack.mockReset();
+    mockReplace.mockReset();
     mockDispatch.mockReset();
     mockStackOptions.mockReset();
     mockUsePreventRemove.mockReset();
@@ -90,13 +98,13 @@ describe('native routine editor', () => {
     mockFetch.mockResolvedValue(loaded());
   });
 
-  it('shows real detail, archived existing exercise and a non-writing Start boundary', async () => {
+  it('shows real detail and opens start flow with this routine without starting on entry', async () => {
     const view = renderScreen();
     await waitFor(() => expect(view.getByText('PUSH')).toBeTruthy());
     expect(view.getByText('1 ejercicio · 1 serie')).toBeTruthy();
     expect(view.getByText('Ejercicio archivado')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Iniciar entrenamiento' }));
-    expect(view.getByText(/El inicio de entrenamiento se incorpora/)).toBeTruthy();
+    expect(view.getByText('Start Workout Modal 11111111-1111-4111-8111-111111111111')).toBeTruthy();
     expect(mockTemplate).not.toHaveBeenCalled();
     expect(mockRequest).not.toHaveBeenCalled();
   });
@@ -131,6 +139,8 @@ describe('native routine editor', () => {
     await waitFor(() => expect(view.getByText('PUSH')).toBeTruthy());
     fireEvent.press(view.getByRole('button', { name: 'Press, expandir' }));
     fireEvent.changeText(view.getByLabelText('Serie 1, reps'), '10');
+    fireEvent.press(view.getByRole('button', { name: 'Iniciar entrenamiento' }));
+    expect(view.queryByText(/Start Workout Modal/)).toBeNull();
     fireEvent.press(view.getByRole('button', { name: '+ Agregar ejercicio' }));
     expect(view.getByText(/Guardá los objetivos pendientes/)).toBeTruthy();
     expect(mockCatalog).not.toHaveBeenCalled();
