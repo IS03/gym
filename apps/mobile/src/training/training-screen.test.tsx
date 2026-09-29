@@ -12,10 +12,18 @@ const mockRefresh = jest.fn<() => Promise<void>>();
 const mockUseApiResource = jest.fn();
 const mockHaptic = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useFocusEffect: () => undefined,
+}));
+jest.mock('./start-workout-modal', () => ({
+  StartWorkoutModal: () => {
+    const { Text } = jest.requireActual('react-native') as typeof import('react-native');
+    return <Text>Start Workout Modal</Text>;
+  },
 }));
 jest.mock('@/api', () => ({
   fetchMobileTraining: (...args: unknown[]) => mockFetchMobileTraining(...args),
@@ -59,6 +67,7 @@ describe('Training resource screen', () => {
     mockUseApiResource.mockReset();
     mockHaptic.mockReset();
     mockPush.mockReset();
+    mockReplace.mockReset();
   });
 
   it('uses a structure-matched skeleton during initial loading', () => {
@@ -134,7 +143,7 @@ describe('Training resource screen', () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it('turns future CTAs into temporary native feedback without API writes', () => {
+  it('opens start flow from New Session without writing on entry', () => {
     const data = fixture();
     mockUseApiResource.mockReturnValue({
       refresh: mockRefresh,
@@ -150,9 +159,25 @@ describe('Training resource screen', () => {
 
     fireEvent.press(view.getByRole('button', { name: '+ Nueva sesión' }));
 
-    expect(view.getByText('Nueva sesión estará disponible en M3.2.')).toBeTruthy();
+    expect(view.getByText('Start Workout Modal')).toBeTruthy();
     expect(mockHaptic).toHaveBeenCalledTimes(1);
     expect(mockFetchMobileTraining).not.toHaveBeenCalled();
+  });
+
+  it('routes an active session to the bridge and keeps History deferred', () => {
+    const data = fixture();
+    data.activeSession = { status: 'ok', data: {
+      id: '11111111-1111-4111-8111-111111111111', name: 'PUSH', logDate: '2026-09-21',
+    } };
+    mockUseApiResource.mockReturnValue({
+      refresh: mockRefresh,
+      state: { status: 'ready', current: { confirmedAt: 1, data }, refreshing: false, trigger: 'initial', result: okResult(data) },
+    });
+    const view = renderScreen();
+    fireEvent.press(view.getByRole('button', { name: 'Continuar entrenamiento →' }));
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/11111111-1111-4111-8111-111111111111');
+    fireEvent.press(view.getByRole('button', { name: 'Abrir Historial' }));
+    expect(view.getByText('Historial estará disponible en M3.4.')).toBeTruthy();
   });
 
   it('navigates Rutinas to the native Training stack screen', () => {

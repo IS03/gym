@@ -13,6 +13,7 @@ export default function TrainLayout() {
         options={{ headerBackButtonMenuEnabled: false, title: 'Rutinas' }}
       />
       <Stack.Screen name="exercises" options={{ title: 'Biblioteca' }} />
+      <Stack.Screen name="session/[id]" options={{ title: 'Entrenar' }} />
     </Stack>
   );
 }

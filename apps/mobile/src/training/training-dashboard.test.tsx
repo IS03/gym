@@ -28,6 +28,8 @@ function fixture(): MobileTrainingResponse {
 
 function renderDashboard(data = fixture()) {
   const onDeferredAction = jest.fn<(action: TrainingDeferredAction) => void>();
+  const onNewSession = jest.fn();
+  const onContinueSession = jest.fn();
   const onRefresh = jest.fn();
   const view = render(
     <OwnlevelThemeProvider initialMode="light">
@@ -36,22 +38,24 @@ function renderDashboard(data = fixture()) {
         isStale={false}
         notice={null}
         onDeferredAction={onDeferredAction}
+        onNewSession={onNewSession}
+        onContinueSession={onContinueSession}
         onRefresh={onRefresh}
         requestedMonth="2026-09"
         today="2026-09-21"
       />
     </OwnlevelThemeProvider>,
   );
-  return { ...view, onDeferredAction, onRefresh };
+  return { ...view, onDeferredAction, onNewSession, onContinueSession, onRefresh };
 }
 
 describe('native Training landing', () => {
-  it('renders no active session as an honest deferred New Session CTA', () => {
+  it('opens the real start flow from New Session', () => {
     const view = renderDashboard();
 
     fireEvent.press(view.getByRole('button', { name: '+ Nueva sesión' }));
 
-    expect(view.onDeferredAction).toHaveBeenCalledWith('newSession');
+    expect(view.onNewSession).toHaveBeenCalledTimes(1);
     expect(view.queryByText('Sesión en curso')).toBeNull();
   });
 
@@ -73,7 +77,7 @@ describe('native Training landing', () => {
     fireEvent.press(
       view.getByRole('button', { name: 'Continuar entrenamiento →' }),
     );
-    expect(view.onDeferredAction).toHaveBeenCalledWith('continueSession');
+    expect(view.onContinueSession).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
   });
 
   it('keeps the calendar when active-session status is unavailable', () => {
@@ -147,6 +151,8 @@ describe('native Training landing', () => {
           isStale
           notice={null}
           onDeferredAction={onDeferredAction}
+          onNewSession={jest.fn()}
+          onContinueSession={jest.fn()}
           onRefresh={onRefresh}
           requestedMonth="2026-09"
           today="2026-09-21"

@@ -30,10 +30,8 @@ import {
 } from './routine-colors';
 
 export type TrainingDeferredAction =
-  | 'continueSession'
   | 'exercises'
   | 'history'
-  | 'newSession'
   | 'routines';
 
 type TrainingDashboardProps = {
@@ -41,6 +39,8 @@ type TrainingDashboardProps = {
   isStale: boolean;
   notice: string | null;
   onDeferredAction: (action: TrainingDeferredAction) => void;
+  onNewSession: () => void;
+  onContinueSession: (id: string) => void;
   onRefresh: () => void;
   requestedMonth: string;
   today: string;
@@ -68,11 +68,13 @@ function TrainingHeader() {
 
 function SessionSection({
   activeSession,
-  onAction,
+  onNewSession,
+  onContinueSession,
   onRefresh,
 }: {
   activeSession: MobileTrainingResponse['activeSession'];
-  onAction: (action: TrainingDeferredAction) => void;
+  onNewSession: () => void;
+  onContinueSession: (id: string) => void;
   onRefresh: () => void;
 }) {
   const { colors } = useOwnlevelTheme();
@@ -91,12 +93,12 @@ function SessionSection({
   if (!activeSession.data) {
     return (
       <Button
-        accessibilityHint="Muestra información sobre la disponibilidad del inicio de sesión"
         label="+ Nueva sesión"
-        onPress={() => onAction('newSession')}
+        onPress={onNewSession}
       />
     );
   }
+  const session = activeSession.data;
   return (
     <Surface
       elevated
@@ -118,9 +120,8 @@ function SessionSection({
         </View>
       </View>
       <Button
-        accessibilityHint="Muestra información sobre la disponibilidad del entrenamiento activo"
         label="Continuar entrenamiento →"
-        onPress={() => onAction('continueSession')}
+        onPress={() => onContinueSession(session.id)}
       />
     </Surface>
   );
@@ -320,6 +321,8 @@ export function TrainingDashboard({
   isStale,
   notice,
   onDeferredAction,
+  onNewSession,
+  onContinueSession,
   onRefresh,
   requestedMonth,
   today,
@@ -339,7 +342,8 @@ export function TrainingDashboard({
       ) : null}
       <SessionSection
         activeSession={data.activeSession}
-        onAction={onDeferredAction}
+        onNewSession={onNewSession}
+        onContinueSession={onContinueSession}
         onRefresh={onRefresh}
       />
       {notice ? (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, RefreshControl, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { fetchMobileTraining, useApiResource, useMobileApi } from '@/api';
 import {
@@ -20,11 +20,10 @@ import {
   TrainingDashboard,
   type TrainingDeferredAction,
 } from './training-dashboard';
+import { StartWorkoutModal } from './start-workout-modal';
 
 const DEFERRED_MESSAGES: Record<Exclude<TrainingDeferredAction, 'routines' | 'exercises'>, string> = {
-  continueSession: 'Continuar entrenamiento estará disponible en M3.3.',
   history: 'Historial estará disponible en M3.4.',
-  newSession: 'Nueva sesión estará disponible en M3.2.',
 };
 
 const systemNow = () => new Date();
@@ -83,6 +82,7 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   const { colors } = useOwnlevelTheme();
   const router = useRouter();
   const [notice, setNotice] = useState<string | null>(null);
+  const [startOpen, setStartOpen] = useState(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(
     (signal: AbortSignal) => {
@@ -102,6 +102,7 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
     [client, now],
   );
   const { refresh, state } = useApiResource(load);
+  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
   const current =
     state.status === 'ready'
       ? state.current
@@ -140,6 +141,18 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
     noticeTimer.current = setTimeout(() => setNotice(null), 4_000);
   }, [router]);
 
+  const openStart = useCallback(() => {
+    haptics.selection();
+    setStartOpen(true);
+  }, []);
+  const toBridge = useCallback((id: string, replace = false) => {
+    setStartOpen(false);
+    void refresh();
+    const path = `/(tabs)/train/session/${id}` as const;
+    if (replace) router.replace(path);
+    else router.push(path);
+  }, [refresh, router]);
+
   if (!current && state.status === 'loading') {
     return <TrainingSkeleton />;
   }
@@ -148,6 +161,7 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   }
 
   return (
+    <>
     <ScrollScreen
       refreshControl={
         <RefreshControl
@@ -167,11 +181,15 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
         isStale={state.status !== 'ready'}
         notice={notice}
         onDeferredAction={showDeferredFeedback}
+        onNewSession={openStart}
+        onContinueSession={(id) => toBridge(id)}
         onRefresh={runRefresh}
         requestedMonth={requestedMonth}
         today={today}
       />
     </ScrollScreen>
+    {startOpen ? <StartWorkoutModal onClose={() => setStartOpen(false)} onContinue={(id) => toBridge(id, true)} onStarted={(id) => toBridge(id, true)} /> : null}
+    </>
   );
 }
 
