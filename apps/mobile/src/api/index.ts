@@ -6,6 +6,7 @@ export {
 } from './training';
 export { MobileApiProvider, useMobileApi } from './provider';
 export { useApiResource } from './resource';
+export { fetchRoutineDetail, replaceRoutineTemplate, updateRoutineIdentity } from './routine-editor';
 export {
   createMobileTrainingExercise,
   fetchMobileTrainingExercises,
