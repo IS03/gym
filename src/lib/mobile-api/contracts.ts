@@ -441,9 +441,25 @@ export type MobileApiErrorCode =
   | "ACTIVE_SESSION_EXISTS"
   | "ROUTINE_CHANGED"
   | "ROUTINE_TEMPLATE_CHANGED"
+  | "SESSION_EXERCISE_CHANGED"
+  | "SESSION_CHANGED"
+  | "SESSION_CLOSED"
+  | "SESSION_EXERCISE_REMOVED"
+  | "SESSION_EXERCISE_ALREADY_EXISTS"
+  | "NO_COMPLETED_SETS"
+  | "SESSION_NOT_COMPLETED"
+  | "SESSION_DISCARDED"
   | "DATA_UNAVAILABLE";
 
 export type MobileApiErrorResponse = {
   error: MobileApiErrorCode;
   message?: string;
 };
+
+export type {
+  SessionDetailDto, SessionExerciseDto, SessionExercisePayloadDto, SessionExerciseSyncDto,
+  SessionSetDto, SessionMetadataDto, QuickSessionHistoryDto, SessionStructuralDto,
+  SessionExerciseOrderInput, SessionExerciseOrderDto,
+  SessionFinishMetadataDto, SessionFinishInput, SessionFinishedDto, SessionCorrectionSetDto, SessionCorrectionInput,
+  SessionCorrectedDto, SessionDiscardedDto, TrainingHistorySessionDto, TrainingHistoryResponse, TrainingDayResponse,
+} from "./training-session";

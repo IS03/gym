@@ -8,6 +8,8 @@ export { MobileApiProvider, useMobileApi } from './provider';
 export { useApiResource } from './resource';
 export { fetchRoutineDetail, replaceRoutineTemplate, updateRoutineIdentity } from './routine-editor';
 export { startMobileTrainingSession, parseMobileTrainingSessionStartResponse } from './training-sessions';
+export { fetchSessionDetail, fetchSessionExerciseSync, saveSessionExercise, addSessionExercise, removeSessionExercise, cancelSession, canonicalSessionExercisePayload } from './active-session';
+export { reorderSessionExercises, parseSessionExerciseOrder } from './active-session';
 export {
   createMobileTrainingExercise,
   fetchMobileTrainingExercises,

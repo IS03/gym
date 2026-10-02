@@ -376,7 +376,7 @@ export async function createExerciseFromSessionAction(formData: FormData) {
 export async function removeSessionExerciseAction(formData: FormData) {
   const sessionId = str(formData, "session_id");
   const id = str(formData, "id");
-  await removeSessionExercise(id);
+  await removeSessionExercise({ id, sessionId, expectedUpdatedAt: str(formData, "expected_updated_at") });
   revalidatePath(`/train/session/${sessionId}`);
 }
 

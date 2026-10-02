@@ -1,0 +1,15 @@
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+jest.mock('react-native-reanimated', () => {
+  const mock = require('react-native-reanimated/mock');
+  const React = require('react');
+  return {
+    ...mock,
+    // Shared values and refs are stable across renders, as on the device.
+    useSharedValue: initial => React.useRef({ value: initial, get() { return this.value; }, set(value) { this.value = value; },
+      modify(modifier) { this.value = modifier(this.value); } }).current,
+    useAnimatedRef: () => React.useRef(null),
+    useFrameCallback: jest.fn(),
+    withTiming: jest.fn(value => value),
+    withSpring: jest.fn(value => value),
+  };
+});

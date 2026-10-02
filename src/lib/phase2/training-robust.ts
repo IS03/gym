@@ -128,6 +128,7 @@ export type WorkoutSaveErrorCategory =
   | "conflict"
   | "timeout"
   | "session_closed"
+  | "removed"
   | "validation";
 
 export class WorkoutSaveError extends Error {
@@ -170,6 +171,7 @@ function throwWorkoutSaveRpcError(value: unknown): never {
     );
   }
   if (
+    message === "SESSION_CLOSED" ||
     normalized.includes("sesión ya finalizó") ||
     normalized.includes("sesion ya finalizo") ||
     normalized.includes("sesión ya fue finalizada")
@@ -180,7 +182,10 @@ function throwWorkoutSaveRpcError(value: unknown): never {
       value,
     );
   }
-  if (code === "P0001" || code === "22P02" || code === "23514") {
+  if (message === "SESSION_EXERCISE_REMOVED" || message === "TRAINING_SESSION_EXERCISE_NOT_FOUND" || message === "TRAINING_SESSION_NOT_FOUND") {
+    throw new WorkoutSaveError("removed", "Este ejercicio o sesión ya no está disponible. Actualizá para continuar.", value);
+  }
+  if (code === "P0001" || code === "22023" || code === "22P02" || code === "23514") {
     throw new WorkoutSaveError(
       "validation",
       message ?? "Los datos del ejercicio no son válidos.",
@@ -594,17 +599,9 @@ export async function finishWorkoutSession(input: {
 }
 
 export async function cancelWorkoutSession(sessionId: string) {
-  const { supabase, userId } = await getAuthedContext();
-  const { data, error } = await supabase
-    .from("workout_sessions")
-    .delete()
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .eq("status", "in_progress")
-    .select("id")
-    .maybeSingle();
-  if (error) throw new Error(`Cancelar sesión: ${error.message}`);
-  if (!data) throw new Error("La sesión no existe o ya fue finalizada.");
+  const { supabase } = await getAuthedContext();
+  const { error } = await supabase.rpc("cancel_workout_session", { p_session_id: sessionId });
+  if (error) throwRpcError("Cancelar sesión", error);
 }
 
 function sessionDisplayName(
@@ -624,8 +621,10 @@ function sessionDurationMilliseconds(
 export async function listCompletedSessionHistory(input?: {
   limit?: number;
   logDate?: string;
-}) {
-  const { supabase, userId } = await getAuthedContext();
+  /** Keyset cursor: sessions strictly older than this (ended_at, id). */
+  before?: { endedAt: string; id: string };
+}, context?: AuthenticatedRequestContext) {
+  const { supabase, userId } = context ?? await getAuthedContext();
   const limit = Math.min(Math.max(input?.limit ?? 20, 1), 100);
   const logDate = input?.logDate?.trim();
   const { data: matchingDays, error: matchingDaysError } = logDate
@@ -645,7 +644,13 @@ export async function listCompletedSessionHistory(input?: {
     .eq("user_id", userId)
     .eq("status", "completed")
     .not("ended_at", "is", null)
-    .order("ended_at", { ascending: false });
+    .order("ended_at", { ascending: false })
+    .order("id", { ascending: false });
+  if (input?.before) {
+    // Pass the PostgreSQL timestamp through verbatim: microseconds are the key.
+    const { endedAt, id } = input.before;
+    sessionsQuery = sessionsQuery.or(`ended_at.lt."${endedAt}",and(ended_at.eq."${endedAt}",id.lt.${id})`);
+  }
   if (matchingDayIds.length > 0) {
     sessionsQuery = sessionsQuery.in("day_log_id", matchingDayIds.map((day) => day.id));
   }

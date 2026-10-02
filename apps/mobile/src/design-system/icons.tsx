@@ -11,6 +11,7 @@ export type AppIconName =
   | 'flame'
   | 'filter'
   | 'nutrition'
+  | 'note'
   | 'profile'
   | 'progress'
   | 'refresh'
@@ -36,6 +37,7 @@ const iconNames: Record<
   flame: { ios: 'flame.fill', android: 'local_fire_department' },
   filter: { ios: 'line.3.horizontal.decrease', android: 'filter_list' },
   nutrition: { ios: 'fork.knife', android: 'restaurant' },
+  note: { ios: 'note.text', android: 'edit_note' },
   profile: { ios: 'person.fill', android: 'person' },
   progress: { ios: 'chart.line.uptrend.xyaxis', android: 'show_chart' },
   refresh: { ios: 'arrow.clockwise', android: 'refresh' },

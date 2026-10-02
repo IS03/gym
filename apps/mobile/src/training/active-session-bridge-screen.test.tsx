@@ -1,72 +1,436 @@
-import { fireEvent, render } from '@testing-library/react-native';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { type ReactElement, useSyncExternalStore } from 'react';
+import { ActionSheetIOS, Alert, DeviceEventEmitter, Modal, RefreshControl, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { State, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import Animated, { withSpring, withTiming } from 'react-native-reanimated';
+import type { MobileApiClient } from '@/api/client';
+import type { SessionDetailDto } from '@/api/active-session';
+import { OwnlevelThemeProvider, spacing } from '@/design-system';
+import { ActiveSessionController, type ActiveSessionApi } from './active-session-controller';
+import { SessionDraftRepository } from './active-session-storage';
+import { ActiveSessionView } from './active-session-screen';
+import { EXERCISE_ID, NEXT_VERSION, SECOND_ID, SESSION_ID, testDetail } from './active-session-test-fixtures';
+import { DRAG_DELAY, LIFT_SCALE, PRESS_SCALE } from './session-native-interactions';
+import { exercisePayload } from './active-session-model';
 
-import type { MobileTrainingResponse } from '@/api/training';
-import { OwnlevelThemeProvider } from '@/design-system';
-
-import { ActiveSessionBridgeScreen } from './active-session-bridge-screen';
-
-const mockRefresh = jest.fn<() => Promise<void>>();
-const mockUseApiResource = jest.fn();
 const mockReplace = jest.fn();
-const routeId = '11111111-1111-4111-8111-111111111111';
-const otherId = '22222222-2222-4222-8222-222222222222';
-
+const mockCatalog = jest.fn();
+const mockSelection = jest.fn();
+const mockSuccess = jest.fn();
+const mockWarning = jest.fn();
+jest.mock('@/platform/haptics', () => ({ haptics: { selection: () => mockSelection(), success: () => mockSuccess(), warning: () => mockWarning() } }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-router', () => ({
-  useFocusEffect: () => undefined,
-  useLocalSearchParams: () => ({ id: routeId }),
-  useRouter: () => ({ replace: mockReplace }),
-}));
-jest.mock('@/api', () => ({
-  useApiResource: (...args: unknown[]) => mockUseApiResource(...args),
-  useMobileApi: () => ({ client: {} }),
-  fetchMobileTraining: jest.fn(),
-}));
-
-function state(activeSession: MobileTrainingResponse['activeSession']) {
-  const data: MobileTrainingResponse = { activeSession, calendar: { status: 'unavailable' } };
-  return { status: 'ready', refreshing: false, current: { confirmedAt: 1, data } };
+jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace }), useNavigation: () => ({ dispatch: jest.fn() }), useFocusEffect: () => undefined }));
+jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({ usePreventRemove: () => undefined }));
+jest.mock('./active-session-native-storage', () => ({ activeSessionStorage: {} }));
+jest.mock('@/api', () => ({ fetchMobileTrainingExercises: (...args: unknown[]) => mockCatalog(...args),
+  useApiResource: jest.requireActual<typeof import('@/api/resource')>('@/api/resource').useApiResource }));
+const meta = { durationMs: 1, httpStatus: 200, outcome: 'ok' as const };
+// fireGestureHandler emits BEGAN and ACTIVE in the same tick, which the handle
+// treats as an early (movement) activation, i.e. a scroll. Model the real hold.
+function afterHold<T>(run: () => T): T {
+  const pressed = Date.now(), spy = jest.spyOn(Date, 'now').mockReturnValueOnce(pressed).mockReturnValue(pressed + DRAG_DELAY);
+  try { return run(); } finally { spy.mockRestore(); }
 }
-function renderScreen() {
-  return render(<OwnlevelThemeProvider initialMode="light"><ActiveSessionBridgeScreen /></OwnlevelThemeProvider>);
+function fixture(detail: SessionDetailDto = testDetail()) {
+  const store = new Map<string, string>();
+  const api: ActiveSessionApi = {
+    detail: jest.fn<ActiveSessionApi['detail']>().mockResolvedValue({ status: 'ok', data: detail, meta }),
+    sync: jest.fn<ActiveSessionApi['sync']>().mockResolvedValue({ status: 'ok', data: { status: 'active', updatedAt: NEXT_VERSION, payload: detail.exercises[0].payload }, meta }),
+    save: jest.fn<ActiveSessionApi['save']>().mockResolvedValue({ status: 'ok', data: { sessionExerciseId: EXERCISE_ID, updatedAt: NEXT_VERSION }, meta }),
+    add: jest.fn<ActiveSessionApi['add']>(), remove: jest.fn<ActiveSessionApi['remove']>(),
+    cancel: jest.fn<ActiveSessionApi['cancel']>().mockResolvedValue({ status: 'ok', data: { status: 'cancelled', sessionId: SESSION_ID }, meta }),
+    reorder: jest.fn<ActiveSessionApi['reorder']>().mockImplementation(async input => ({ status: 'ok', data: {
+      status: 'reordered', sessionId: SESSION_ID, sessionUpdatedAt: NEXT_VERSION, orderedSessionExerciseIds: input.orderedSessionExerciseIds }, meta })),
+  };
+  const repository = new SessionDraftRepository({ getItem: async key => store.get(key) ?? null, setItem: async (key, value) => { store.set(key, value); },
+    removeItem: async key => { store.delete(key); }, getAllKeys: async () => [...store.keys()] }, 'owner', SESSION_ID);
+  const controller = new ActiveSessionController(api, repository);
+  const client = {} as MobileApiClient;
+  function Screen() {
+    const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+    return <GestureHandlerRootView><SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 47, left: 0, right: 0, bottom: 83 } }}>
+      <OwnlevelThemeProvider initialMode="light"><ActiveSessionView controller={controller} state={state} client={client} /></OwnlevelThemeProvider>
+    </SafeAreaProvider></GestureHandlerRootView>;
+  }
+  return { controller, api, repository, Screen };
 }
-
-describe('post-start bridge', () => {
+// The session opens with every exercise collapsed; most cases work on PRESS's
+// rows, so open it like the user does and start haptic counts after that tap.
+function renderWithPressOpen(screen: ReactElement) {
+  const view = render(screen);
+  fireEvent(view.getByLabelText('Expandir PRESS'), 'accessibilityTap'); mockSelection.mockClear();
+  return view;
+}
+describe('native active session screen', () => {
   beforeEach(() => {
-    mockReplace.mockReset();
-    mockRefresh.mockReset();
-    mockRefresh.mockResolvedValue(undefined);
-    mockUseApiResource.mockReset();
+    mockReplace.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); mockWarning.mockReset();
+    jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+  }); afterEach(() => { jest.restoreAllMocks(); });
+  it('shows loading and real unavailable/not-found states rather than a false inactive session', async () => {
+    const { controller, api, Screen } = fixture(); const view = render(<Screen />);
+    expect(view.getByTestId('active-session-loading')).toBeTruthy();
+    (api.detail as jest.MockedFunction<ActiveSessionApi['detail']>).mockResolvedValue({ status: 'unavailable', reason: 'network', meta: { ...meta, outcome: 'unavailable' } });
+    await act(async () => { await controller.refresh(); }); expect(view.getByText('No pudimos cargar la sesión')).toBeTruthy();
+    (api.detail as jest.MockedFunction<ActiveSessionApi['detail']>).mockResolvedValue({ status: 'not_found', message: 'absent', meta: { ...meta, outcome: 'not_found' } });
+    await act(async () => { await controller.refresh(); }); expect(view.getByText('Sesión no disponible')).toBeTruthy();
+    controller.dispose();
   });
-
-  it('shows loading then verified matching session, not a fake editor', () => {
-    mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: { status: 'loading' } });
-    expect(renderScreen().getByTestId('session-bridge-loading')).toBeTruthy();
-    mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: state({ status: 'ok', data: { id: routeId, name: 'PUSH', logDate: '2026-09-28' } }) });
-    const view = renderScreen();
-    expect(view.getByTestId('session-bridge-active')).toBeTruthy();
-    expect(view.getByRole('header', { name: 'Sesión en curso' })).toBeTruthy();
-    expect(view.getByText(/El registro de series se incorpora/)).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Volver a Entrenar' }));
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/train');
+  it('opens with every exercise collapsed, including partially completed ones', async () => {
+    const detail = testDetail(); detail.exercises[0].payload.sets[0].isCompleted = true;
+    detail.exercises[0].payload.sets.push({ ...detail.exercises[0].payload.sets[0], setNumber: 2, isCompleted: false });
+    const { controller, Screen } = fixture(detail); await controller.refresh(); const view = render(<Screen />);
+    expect(view.getByLabelText('Expandir PRESS')).toBeTruthy(); expect(view.getByLabelText('Expandir ROW')).toBeTruthy();
+    expect(view.queryByLabelText('Peso serie 1 de PRESS')).toBeNull(); expect(mockSelection).not.toHaveBeenCalled();
+    controller.dispose();
   });
-
-  it('handles inactive and different active session from server truth', () => {
-    mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: state({ status: 'ok', data: null }) });
-    expect(renderScreen().getByTestId('session-bridge-inactive')).toBeTruthy();
-    mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: state({ status: 'ok', data: { id: otherId, name: 'PULL', logDate: '2026-09-28' } }) });
-    const view = renderScreen();
-    expect(view.getByTestId('session-bridge-different')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Continuar sesión actual' }));
-    expect(mockReplace).toHaveBeenCalledWith(`/(tabs)/train/session/${otherId}`);
+  it('renders actuals, targets/RIR and immediate completion without a finish CTA', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await waitFor(() => expect(view.getByLabelText('Peso serie 1 de PRESS')).toBeTruthy());
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '45,5');
+    fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap');
+    await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(api.save).toHaveBeenCalledWith(EXERCISE_ID, expect.any(String), expect.objectContaining({ isCompleted: true, sets: [expect.objectContaining({ actualWeightKg: 45.5, targetRir: 2 })] }));
+    expect(view.getByLabelText('RIR objetivo serie 1: 2')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Finalizar entrenamiento' })).toBeNull();
+    expect(view.queryByText('Descanso · PRESS')).toBeNull();
+    controller.dispose();
   });
-
-  it('retries unavailable instead of assuming the session ended', () => {
-    mockUseApiResource.mockReturnValue({ refresh: mockRefresh, state: state({ status: 'unavailable' }) });
-    const view = renderScreen();
-    expect(view.getByTestId('session-bridge-unavailable')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Reintentar' }));
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  it('shows independent quick-history empty/unavailable states in a native modal', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await waitFor(() => expect(view.getByRole('button', { name: 'Historial de PRESS' })).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Historial de PRESS' })); expect(view.getByText('Todavía sin registros')).toBeTruthy();
+    fireEvent.press(view.getByLabelText('Cerrar Historial'));
+    const detail = testDetail(); detail.quickHistory = { status: 'unavailable' };
+    (api.detail as jest.MockedFunction<ActiveSessionApi['detail']>).mockResolvedValue({ status: 'ok', data: detail, meta });
+    await act(async () => { await controller.refresh(); });
+    fireEvent.press(view.getByRole('button', { name: 'Historial de PRESS' }));
+    expect(view.getByText(/Podés seguir entrenando/)).toBeTruthy();
+    controller.dispose();
+  });
+  it('starts rest manually and preserves the snapshot duration', async () => {
+    const { controller, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await waitFor(() => expect(view.getByRole('button', { name: 'Iniciar descanso' })).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Iniciar descanso' }));
+    expect(view.getByText('Descanso · PRESS')).toBeTruthy(); expect(controller.getTimer()).not.toBeNull();
+    const end = controller.getTimer()!.endAt;
+    fireEvent.press(view.getByLabelText('Sumar 15 segundos')); expect(controller.getTimer()!.endAt).toBe(end + 15000);
+    fireEvent.press(view.getByRole('button', { name: 'Saltar' })); expect(controller.getTimer()).toBeNull();
+    controller.dispose();
+  });
+  it('requires destructive confirmation and returns only after cancellation is confirmed', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent.press(view.getByRole('button', { name: 'Más opciones' }));
+    fireEvent.press(view.getByRole('button', { name: 'Cancelar entrenamiento' })); expect(api.cancel).not.toHaveBeenCalled();
+    const options = alert.mock.calls.at(-1)?.[2];
+    await act(async () => { options?.find(option => option.text === 'Cancelar entrenamiento')?.onPress?.(); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(api.cancel).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(tabs)/train'));
+    controller.dispose();
+  });
+  it('gives one subtle haptic for each expand/collapse, decision, routine toggle and check action', async () => {
+    const detail = testDetail(); detail.exercises[0].routineExerciseId = detail.exercises[1].id;
+    const { controller, Screen } = fixture(detail); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent(view.getByRole('button', { name: 'Contraer PRESS' }), 'accessibilityTap'); expect(mockSelection).toHaveBeenCalledTimes(1);
+    expect(view.queryByLabelText('Peso serie 1 de PRESS')).toBeNull();
+    fireEvent(view.getByRole('button', { name: 'Expandir PRESS' }), 'accessibilityTap'); expect(mockSelection).toHaveBeenCalledTimes(2);
+    for (const label of ['+ Peso', '+ Peso', '+ Repeticiones', '+ Repeticiones']) {
+      fireEvent.press(view.getByRole('button', { name: label })); await act(async () => { await controller.flush(EXERCISE_ID); });
+    }
+    expect(controller.getExercise(EXERCISE_ID)?.draft.decision).toBe('maintain'); expect(mockSelection).toHaveBeenCalledTimes(6);
+    fireEvent(view.getByLabelText('Tomar resultado de hoy'), 'valueChange', true); await act(async () => { await controller.flush(EXERCISE_ID); });
+    fireEvent(view.getByLabelText('Tomar resultado de hoy'), 'valueChange', false); await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(mockSelection).toHaveBeenCalledTimes(8);
+    fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap'); await act(async () => { await controller.flush(EXERCISE_ID); });
+    fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap'); await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(mockSelection).toHaveBeenCalledTimes(10); expect(mockSuccess).not.toHaveBeenCalled(); expect(mockWarning).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+  it('shares all five column widths and preserves touch targets and input gestures', async () => {
+    const { controller, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    const header = view.getByTestId('series-column-header', { includeHiddenElements: true });
+    const row = view.getByTestId('series-column-row');
+    const widths = (node: typeof header) => node.children.filter(child => typeof child !== 'string').map(child => StyleSheet.flatten(child.props.style));
+    expect(header.children).toHaveLength(5); expect(widths(row)).toEqual(widths(header));
+    expect(view.getByLabelText('Peso serie 1 de PRESS').props.onLongPress).toBeUndefined();
+    expect(view.getByLabelText('Reps serie 1 de PRESS').props.onLongPress).toBeUndefined();
+    expect(StyleSheet.flatten(view.getByLabelText('Peso serie 1 de PRESS').props.style).minHeight).toBeGreaterThanOrEqual(44);
+    expect(StyleSheet.flatten(view.getByLabelText('Mover serie 1').props.style).minHeight).toBeGreaterThanOrEqual(44);
+    controller.dispose();
+  });
+  it('drags complete series directly, renumbers once, then swipes reset/delete with a minimum of one', async () => {
+    const detail = testDetail(); const first = detail.exercises[0].payload.sets[0];
+    detail.exercises[0].payload.sets = [first, { ...first, setNumber: 2, actualWeightKg: 17.5, actualReps: 10, targetRir: 1, notes: 'second' }];
+    const { controller, api, Screen } = fixture(detail); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    const ids = controller.getExercise(EXERCISE_ID)!.draft.sets.map(set => set.localId);
+    for (const id of ids) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 80 } } });
+    act(() => afterHold(() => fireGestureHandler(getByGestureTestId(`drag-set-handle-${ids[1]}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: 0, absoluteY: 100 },
+      { state: State.ACTIVE, translationY: -90, absoluteY: 10 }, { state: State.END, translationY: -90, absoluteY: 10 },
+    ])));
+    await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(controller.getExercise(EXERCISE_ID)?.draft.sets[0]).toMatchObject({ setNumber: 1, actualWeightKg: '17,5', notes: 'second', targetRir: 1 });
+    expect(api.save).toHaveBeenCalledTimes(1); expect(mockSelection).toHaveBeenCalledTimes(2);
+    expect(ActionSheetIOS.showActionSheetWithOptions).not.toHaveBeenCalled(); expect(view.queryByText('Organizar series')).toBeNull();
+    const swipe = (row: string) => act(() => fireGestureHandler(getByGestureTestId(`swipe-set-handle-${row}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationX: 0 }, { state: State.ACTIVE, translationX: -120 }, { state: State.END, translationX: -120 },
+    ]));
+    swipe(ids[1]); fireEvent.press(view.getByLabelText('Resetear · Serie 1')); await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(controller.getExercise(EXERCISE_ID)?.draft.sets[0]).toMatchObject({ actualWeightKg: '', actualReps: '', isCompleted: false, targetRir: 1, notes: null });
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    swipe(ids[1]); fireEvent.press(view.getByLabelText('Eliminar · Serie 1'));
+    await act(async () => { alert.mock.calls.at(-1)?.[2]?.find(button => button.text === 'Eliminar')?.onPress?.(); await controller.flush(EXERCISE_ID); });
+    expect(controller.getExercise(EXERCISE_ID)?.draft.sets).toHaveLength(1); expect(controller.getExercise(EXERCISE_ID)?.draft.sets[0].setNumber).toBe(1);
+    swipe(ids[0]); expect(view.getByLabelText('Eliminar · Serie 1')).toBeDisabled();
+    expect(view.queryByText('Más opciones del ejercicio')).toBeNull(); expect(api.detail).toHaveBeenCalledTimes(1);
+    expect(api.save).toHaveBeenCalledTimes(3); controller.dispose();
+  });
+  it('swipes the exercise header for notes/reset/removal, keeping destructive confirmations', async () => {
+    const { controller, api, repository, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    expect(view.queryByText('Nota de esta sesión')).toBeNull(); expect(view.queryByRole('button', { name: 'Agregar nota' })).toBeNull();
+    const swipe = () => act(() => fireGestureHandler(getByGestureTestId(`swipe-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationX: 0 }, { state: State.ACTIVE, translationX: -180 }, { state: State.END, translationX: -180 },
+    ]));
+    swipe(); fireEvent.press(view.getByLabelText('Agregar nota · PRESS'));
+    fireEvent(view.UNSAFE_getAllByType(Modal).find(node => node.props.visible)!, 'show');
+    fireEvent.changeText(view.getByLabelText('Nota de PRESS'), 'nota compacta');
+    fireEvent.press(view.getByLabelText('Guardar nota')); await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(view.getByText('Nota')).toBeTruthy(); expect(view.queryByText('nota compacta')).toBeNull();
+    swipe(); fireEvent.press(view.getByLabelText('Editar nota · PRESS')); fireEvent(view.UNSAFE_getAllByType(Modal).find(node => node.props.visible)!, 'show'); expect(view.getByLabelText('Nota de PRESS').props.value).toBe('nota compacta');
+    fireEvent.press(view.getByLabelText('Cerrar Nota del ejercicio'));
+    expect(view.queryByTestId('swipe-PRESS-Descartar cambios')).toBeNull();
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '.');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    swipe(); fireEvent.press(view.getByLabelText('Descartar cambios · PRESS')); expect(api.sync).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenLastCalledWith('¿Descartar cambios?', 'Se descartarán los cambios de este ejercicio que todavía no están guardados.', expect.any(Array));
+    await act(async () => { alert.mock.calls.at(-1)?.[2]?.find(button => button.text === 'Descartar cambios')?.onPress?.(); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(controller.getExercise(EXERCISE_ID)?.draft.notes).toBe(''); expect(await repository.readDraft(EXERCISE_ID)).toBeNull();
+    swipe(); fireEvent.press(view.getByLabelText('Quitar · PRESS'));
+    expect(alert).toHaveBeenLastCalledWith('¿Quitar PRESS?', expect.any(String), expect.any(Array)); expect(api.remove).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+  it('reacts immediately to tap, springs back, and never starts drag from a tap or numeric input', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    jest.mocked(withTiming).mockClear(); jest.mocked(withSpring).mockClear();
+    act(() => fireGestureHandler(getByGestureTestId(`tap-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE }, { state: State.END },
+    ]));
+    expect(withTiming).toHaveBeenCalledWith(PRESS_SCALE, { duration: 65 }); expect(withSpring).toHaveBeenCalledWith(1, expect.any(Object));
+    expect(view.getByLabelText('Expandir PRESS')).toBeTruthy(); expect(controller.getSnapshot().interaction).toBeNull();
+    expect(api.reorder).not.toHaveBeenCalled(); expect(mockSelection).toHaveBeenCalledTimes(1);
+    fireEvent(view.getByLabelText('Expandir PRESS'), 'accessibilityTap'); mockSelection.mockClear();
+    for (const label of ['Peso serie 1 de PRESS', 'Reps serie 1 de PRESS']) {
+      const input = view.getByLabelText(label); fireEvent.press(input); fireEvent(input, 'longPress');
+      expect(input.props.onLongPress).toBeUndefined();
+    }
+    expect(controller.getSnapshot().interaction).toBeNull(); expect(mockSelection).not.toHaveBeenCalled(); expect(api.reorder).not.toHaveBeenCalled();
+    const row = controller.getExercise(EXERCISE_ID)!.draft.sets[0].localId;
+    expect(getByGestureTestId(`drag-set-handle-${row}`).config).toMatchObject({ activateAfterLongPress: DRAG_DELAY });
+    act(() => fireGestureHandler(getByGestureTestId(`drag-set-handle-${row}`), [{ state: State.BEGAN }, { state: State.FAILED }]));
+    expect(mockSelection).not.toHaveBeenCalled(); expect(api.save).not.toHaveBeenCalled(); controller.dispose();
+  });
+  it('lifts once, reorders exercises only at drop and preserves expanded state until server confirmation', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    let resolve!: (result: Awaited<ReturnType<ActiveSessionApi['reorder']>>) => void;
+    jest.mocked(api.reorder).mockReturnValue(new Promise(done => { resolve = done; }));
+    for (const id of [EXERCISE_ID, SECOND_ID]) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 160 } } });
+    act(() => afterHold(() => fireGestureHandler(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: 0, absoluteY: 100 },
+      { state: State.ACTIVE, translationY: 90, absoluteY: 190 }, { state: State.ACTIVE, translationY: 120, absoluteY: 220 },
+      { state: State.END, translationY: 120, absoluteY: 220 },
+    ])));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(withSpring).toHaveBeenCalledWith(LIFT_SCALE, expect.any(Object)); expect(mockSelection).toHaveBeenCalledTimes(1);
+    expect(api.reorder).toHaveBeenCalledTimes(1); expect(api.reorder).toHaveBeenCalledWith(expect.objectContaining({ orderedSessionExerciseIds: [SECOND_ID, EXERCISE_ID] }));
+    expect(controller.getSnapshot().detail!.exercises.map(row => row.id)).toEqual([EXERCISE_ID, SECOND_ID]);
+    expect(view.getByLabelText('Contraer PRESS')).toBeTruthy(); expect(view.getByLabelText('Expandir ROW')).toBeTruthy();
+    await act(async () => { resolve({ status: 'ok', data: { status: 'reordered', sessionId: SESSION_ID, sessionUpdatedAt: NEXT_VERSION,
+      orderedSessionExerciseIds: [SECOND_ID, EXERCISE_ID] }, meta }); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(controller.getSnapshot().detail!.exercises.map(row => row.id)).toEqual([SECOND_ID, EXERCISE_ID]);
+    expect(view.getByLabelText('Contraer PRESS')).toBeTruthy(); expect(view.getByLabelText('Peso serie 1 de PRESS')).toBeTruthy();
+    expect(mockSelection).toHaveBeenCalledTimes(2); expect(api.detail).toHaveBeenCalledTimes(1); controller.dispose();
+  });
+  it('rolls visual exercise order back on conflict without a success haptic or losing the expanded draft', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '.');
+    jest.mocked(api.reorder).mockResolvedValue({ status: 'conflict', code: 'SESSION_CHANGED', message: 'changed', meta: { ...meta, outcome: 'conflict' } });
+    for (const id of [EXERCISE_ID, SECOND_ID]) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 160 } } });
+    act(() => afterHold(() => fireGestureHandler(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: 0 }, { state: State.ACTIVE, translationY: 120 }, { state: State.END, translationY: 120 },
+    ])));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(controller.getSnapshot().detail!.exercises.map(row => row.id)).toEqual([EXERCISE_ID, SECOND_ID]);
+    expect(view.getByText(/Se conservó el orden confirmado/)).toBeTruthy();
+    expect(view.getByLabelText('Peso serie 1 de PRESS').props.value).toBe('.'); expect(view.getByLabelText('Contraer PRESS')).toBeTruthy();
+    expect(mockSelection).toHaveBeenCalledTimes(1); expect(api.reorder).toHaveBeenCalledTimes(1); controller.dispose();
+  });
+  it('hides idle/saved status, uses a compact saving spinner, and keeps conflicts actionable even collapsed', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    expect(view.queryByText('Sin cambios pendientes')).toBeNull(); expect(view.queryByText('Guardado')).toBeNull();
+    let resolve!: (result: Awaited<ReturnType<ActiveSessionApi['save']>>) => void;
+    jest.mocked(api.save).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '45');
+    await act(async () => { void controller.flush(EXERCISE_ID); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(view.getByTestId(`exercise-saving-${EXERCISE_ID}`)).toBeTruthy(); expect(view.queryByText('Guardando…')).toBeNull();
+    await act(async () => { resolve({ status: 'ok', data: { sessionExerciseId: EXERCISE_ID, updatedAt: NEXT_VERSION }, meta }); await controller.flush(EXERCISE_ID); });
+    expect(view.queryByTestId(`exercise-saving-${EXERCISE_ID}`)).toBeNull(); expect(view.queryByText('Guardado')).toBeNull();
+    jest.mocked(api.save).mockResolvedValue({ status: 'conflict', code: 'SESSION_EXERCISE_CHANGED', message: 'changed', meta: { ...meta, outcome: 'conflict' } });
+    jest.mocked(api.sync).mockResolvedValue({ status: 'ok', data: { status: 'active', updatedAt: NEXT_VERSION,
+      payload: { ...testDetail().exercises[0].payload, notes: 'remote' } }, meta });
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '46'); await act(async () => { await controller.flush(EXERCISE_ID); });
+    fireEvent(view.getByLabelText('Contraer PRESS'), 'accessibilityTap');
+    expect(view.getByText('Cambio en otro dispositivo')).toBeTruthy(); expect(view.getByRole('button', { name: 'Comprobar cambios' })).toBeTruthy(); controller.dispose();
+  });
+  it('keeps unconfirmed/offline writes explicit and provides accessible movement without visual arrow controls', async () => {
+    const detail = testDetail(); detail.exercises[0].payload.sets.push({ ...detail.exercises[0].payload.sets[0], setNumber: 2, notes: 'second' });
+    const { controller, api, Screen } = fixture(detail); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent(view.getByLabelText('Mover serie 2'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    await act(async () => { await controller.flush(EXERCISE_ID); }); expect(controller.getExercise(EXERCISE_ID)!.draft.sets[0].notes).toBe('second');
+    fireEvent(view.getByLabelText('Mover serie 1'), 'accessibilityAction', { nativeEvent: { actionName: 'moveDown' } });
+    await act(async () => { await controller.flush(EXERCISE_ID); }); expect(controller.getExercise(EXERCISE_ID)!.draft.sets[1].notes).toBe('second');
+    fireEvent(view.getByLabelText('Expandir ROW'), 'accessibilityAction', { nativeEvent: { actionName: 'moveUp' } });
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); }); expect(api.reorder).toHaveBeenCalledTimes(1);
+    expect(view.queryByText('↑')).toBeNull(); expect(view.queryByText('↓')).toBeNull();
+    const offline = { status: 'unavailable', reason: 'network', meta: { ...meta, outcome: 'unavailable' } } as const;
+    jest.mocked(api.save).mockResolvedValue(offline); jest.mocked(api.sync).mockResolvedValue(offline);
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '49'); await act(async () => { await controller.flush(EXERCISE_ID); });
+    expect(view.getByText('Pendiente de conexión · Guardado sin confirmar')).toBeTruthy(); expect(view.getByRole('button', { name: 'Comprobar cambios' })).toBeTruthy(); controller.dispose();
+  });
+  it('keeps expanded rows visible across incomplete measurements, expand, drag, swipe, save and foreground reconciliation', async () => {
+    const detail = testDetail(); detail.exercises[0].payload.sets.push({ ...detail.exercises[0].payload.sets[0], setNumber: 2, notes: 'second' });
+    const { controller, api, Screen } = fixture(detail); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    const visibleRows = () => {
+      expect(view.getByTestId('series-column-header', { includeHiddenElements: true })).toHaveStyle({ flexDirection: 'row' });
+      for (const number of [1, 2]) {
+        expect(view.getByLabelText(`Peso serie ${number} de PRESS`)).toBeVisible();
+        expect(view.getByLabelText(`Reps serie ${number} de PRESS`)).toBeVisible();
+      }
+      expect(view.getByRole('button', { name: '+ Agregar serie' })).toBeVisible();
+    };
+    visibleRows();
+    let ids = controller.getExercise(EXERCISE_ID)!.draft.sets.map(row => row.localId);
+    fireEvent(view.getByTestId(`drag-item-${ids[0]}`), 'layout', { nativeEvent: { layout: { height: 80 } } });
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '41'); visibleRows();
+    await act(async () => { await controller.flush(EXERCISE_ID); }); visibleRows();
+    fireEvent(view.getByLabelText('Contraer PRESS'), 'accessibilityTap'); fireEvent(view.getByLabelText('Expandir PRESS'), 'accessibilityTap'); visibleRows();
+    ids = controller.getExercise(EXERCISE_ID)!.draft.sets.map(row => row.localId);
+    for (const id of ids) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 80 } } });
+    act(() => afterHold(() => fireGestureHandler(getByGestureTestId(`drag-set-handle-${ids[1]}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: 0 }, { state: State.ACTIVE, translationY: -90 }, { state: State.END, translationY: -90 },
+    ]))); await act(async () => { await controller.flush(EXERCISE_ID); }); visibleRows();
+    act(() => fireGestureHandler(getByGestureTestId(`swipe-set-handle-${ids[1]}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationX: 0 }, { state: State.ACTIVE, translationX: -120 }, { state: State.END, translationX: -120 },
+    ])); fireEvent.press(view.getByLabelText('Resetear · Serie 1')); await act(async () => { await controller.flush(EXERCISE_ID); }); visibleRows();
+    for (const id of [EXERCISE_ID, SECOND_ID]) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 200 } } });
+    act(() => afterHold(() => fireGestureHandler(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: 0 }, { state: State.ACTIVE, translationY: 120 }, { state: State.END, translationY: 120 },
+    ]))); await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); }); visibleRows();
+    const fresh = { ...detail, session: { ...detail.session, updatedAt: NEXT_VERSION }, exercises: detail.exercises.map(row => row.id === EXERCISE_ID
+      ? { ...row, updatedAt: NEXT_VERSION, payload: exercisePayload(controller.getExercise(EXERCISE_ID)!.draft) } : row).reverse() };
+    jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: fresh, meta });
+    await act(async () => { controller.suspend(); await controller.resume(); }); visibleRows();
+    await act(async () => { await controller.refresh(); }); visibleRows();
+    expect(api.reorder).toHaveBeenCalledTimes(1); controller.dispose();
+  });
+  it('reconciles normal operations silently and does not reserve a recovery banner during background reads', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    let resolve!: (result: Awaited<ReturnType<ActiveSessionApi['detail']>>) => void;
+    jest.mocked(api.detail).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    let refreshing!: Promise<void>;
+    act(() => { refreshing = controller.refresh(); });
+    expect(view.queryByRole('button', { name: 'Comprobar sesión' })).toBeNull();
+    expect(view.getByRole('button', { name: '+ Agregar serie' })).toBeVisible();
+    expect(view.UNSAFE_getByType(RefreshControl).props.refreshing).toBe(false);
+    await act(async () => { resolve({ status: 'ok', data: testDetail(), meta }); await refreshing; });
+    jest.mocked(api.remove).mockResolvedValue({ status: 'ok', data: { status: 'removed', sessionId: SESSION_ID, sessionExerciseId: SECOND_ID }, meta });
+    const detail = testDetail(); detail.exercises = [detail.exercises[0]]; jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: detail, meta });
+    await act(async () => { await controller.remove(SECOND_ID); });
+    expect(view.queryByText('Ejercicio quitado.')).toBeNull(); expect(view.queryByText('Comprobando operación…')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Comprobar sesión' })).toBeNull();
+    expect(view.getByLabelText('Peso serie 1 de PRESS')).toBeVisible(); controller.dispose();
+  });
+  it('has only note/remove in the normal swipe and exposes discard only for meaningful pending changes', async () => {
+    const { controller, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    expect(view.queryByTestId('swipe-PRESS-Resetear')).toBeNull(); expect(view.queryByTestId('swipe-PRESS-Descartar cambios')).toBeNull();
+    expect(view.getByLabelText('Contraer PRESS').props.accessibilityActions.map((action: { name: string }) => action.name)).not.toContain('discard');
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '.');
+    expect(view.getByTestId('swipe-PRESS-Descartar cambios', { includeHiddenElements: true })).toBeTruthy();
+    expect(view.getByLabelText('Contraer PRESS').props.accessibilityActions.map((action: { name: string }) => action.name)).toContain('discard');
+    controller.dispose();
+  });
+  it('keeps the held exercise attached to the finger across renders, suspends scrolling only while dragging and submits one drop', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '.');
+    act(() => controller.startRest(EXERCISE_ID)); const timer = controller.getTimer();
+    for (const id of [EXERCISE_ID, SECOND_ID]) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 160 } } });
+    // Unlike fireGestureHandler's complete event batch, emit separated native
+    // phases so lift's React/controller updates finish BEFORE finger movement.
+    const send = (state: number, oldState: number | undefined, translationY: number) => {
+      const handlerTag = getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`).handlerTag;
+      DeviceEventEmitter.emit(oldState === undefined ? 'onGestureHandlerEvent' : 'onGestureHandlerStateChange', {
+        handlerTag, state, ...(oldState === undefined ? {} : { oldState }), translationY, translationX: 0, absoluteY: 100 + translationY,
+        absoluteX: 100, x: 20, y: 20, velocityX: 0, velocityY: 0, numberOfPointers: 1,
+      });
+    };
+    const gesture = getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`);
+    afterHold(() => { act(() => send(State.BEGAN, State.UNDETERMINED, 0)); act(() => send(State.ACTIVE, State.BEGAN, 0)); });
+    // Lift re-renders the screen; the header's recognizer must not be rebuilt.
+    expect(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`)).toBe(gesture);
+    expect(mockSelection).toHaveBeenCalledTimes(1); expect(controller.getSnapshot().interaction).toBe('exercises');
+    expect(view.UNSAFE_getByType(Animated.ScrollView).props.animatedProps.scrollEnabled).toBe(false);
+    expect(api.reorder).not.toHaveBeenCalled(); expect(api.save).not.toHaveBeenCalled();
+    act(() => send(State.ACTIVE, undefined, 90)); view.rerender(<Screen />);
+    expect(StyleSheet.flatten(view.getByTestId(`drag-item-${EXERCISE_ID}`).props.style).transform[0]).toEqual({ translateY: 90 });
+    act(() => send(State.ACTIVE, undefined, 120)); view.rerender(<Screen />);
+    expect(StyleSheet.flatten(view.getByTestId(`drag-item-${EXERCISE_ID}`).props.style).transform[0]).toEqual({ translateY: 120 });
+    expect(api.reorder).not.toHaveBeenCalled(); expect(api.detail).toHaveBeenCalledTimes(1); expect(mockSelection).toHaveBeenCalledTimes(1);
+    act(() => send(State.END, State.ACTIVE, 120));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(api.reorder).toHaveBeenCalledTimes(1); expect(api.reorder).toHaveBeenCalledWith(expect.objectContaining({ orderedSessionExerciseIds: [SECOND_ID, EXERCISE_ID] }));
+    expect(mockSelection).toHaveBeenCalledTimes(2); expect(controller.getSnapshot().interaction).toBeNull();
+    expect(view.UNSAFE_getByType(Animated.ScrollView).props.animatedProps.scrollEnabled).toBe(true);
+    expect(view.getByLabelText('Contraer PRESS')).toBeTruthy(); expect(view.getByLabelText('Peso serie 1 de PRESS').props.value).toBe('.');
+    expect(controller.getTimer()).toBe(timer); expect(api.save).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+  it('leaves ordinary vertical scrolling enabled without lifting or sending a reorder', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    // Native recognition rejects movement before the 400ms hold. The parent
+    // remains a normal scroll view; it is never globally disabled on press-in.
+    act(() => fireGestureHandler(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN, translationY: 0 }, { state: State.FAILED, translationY: 40 },
+    ]));
+    act(() => fireGestureHandler(getByGestureTestId('session-native-scroll'), [
+      { state: State.BEGAN }, { state: State.ACTIVE }, { state: State.END },
+    ]));
+    expect(view.UNSAFE_getByType(Animated.ScrollView).props.animatedProps.scrollEnabled).toBe(true);
+    expect(controller.getSnapshot().interaction).toBeNull(); expect(mockSelection).not.toHaveBeenCalled(); expect(api.reorder).not.toHaveBeenCalled(); controller.dispose();
+  });
+  it('keeps an early movement activation of the header pan as a scroll: no lift, no claim, no reorder', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    for (const id of [EXERCISE_ID, SECOND_ID]) fireEvent(view.getByTestId(`drag-item-${id}`), 'layout', { nativeEvent: { layout: { height: 160 } } });
+    // iOS can activate the long-press pan from fast movement ~40ms after touch
+    // down (observed on the Simulator). BEGAN and ACTIVE arrive in the same tick.
+    act(() => fireGestureHandler(getByGestureTestId(`drag-exercise-header-${EXERCISE_ID}`), [
+      { state: State.BEGAN }, { state: State.ACTIVE, translationY: -20 }, { state: State.ACTIVE, translationY: -200 }, { state: State.END, translationY: -200 },
+    ]));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(mockSelection).not.toHaveBeenCalled(); expect(withSpring).not.toHaveBeenCalledWith(LIFT_SCALE, expect.any(Object));
+    expect(controller.getSnapshot().interaction).toBeNull();
+    expect(view.UNSAFE_getByType(Animated.ScrollView).props.animatedProps.scrollEnabled).toBe(true);
+    expect(StyleSheet.flatten(view.getByTestId(`drag-item-${EXERCISE_ID}`).props.style).transform[0]).toEqual({ translateY: 0 });
+    expect(api.reorder).not.toHaveBeenCalled(); controller.dispose();
+  });
+  it('allows Cancelar entrenamiento to scroll clear of the native tab bar and safe-area obstruction', async () => {
+    const { controller, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    fireEvent.press(view.getByRole('button', { name: 'Más opciones' }));
+    const scroll = view.UNSAFE_getByType(Animated.ScrollView);
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingBottom).toBe(spacing.xl + 83);
+    expect(scroll.props.contentInsetAdjustmentBehavior).toBe('automatic');
+    expect(view.getByRole('button', { name: 'Cancelar entrenamiento' })).toBeEnabled(); controller.dispose();
   });
 });
