@@ -1,4 +1,4 @@
-import type { SessionDetailDto, SessionExerciseDto, SessionExercisePayloadDto } from '@/api/active-session';
+import type { SessionDetailDto, SessionExerciseDto, SessionExercisePayloadDto, SessionFinishedDto, SessionFinishMetadata } from '@/api/active-session';
 export const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 export const EXERCISE_ID = '22222222-2222-4222-8222-222222222222';
 export const SECOND_ID = '33333333-3333-4333-8333-333333333333';
@@ -19,4 +19,10 @@ export function testDetail(): SessionDetailDto {
     startedAt: VERSION, endedAt: null, updatedAt: VERSION, routineColor: null,
     metadata: { energyLevel: null, performanceLevel: null, painLevel: null, painNote: null, treadmillMinutes: null, treadmillDistanceKm: null, treadmillSpeedKmh: null, treadmillInclinePercent: null, notes: null } },
     exercises: [testExercise(), testExercise(SECOND_ID, 2)], quickHistory: { status: 'ok', data: { [EXERCISE_ID]: [], [SECOND_ID]: [] } } };
+}
+export const FINISHED_VERSION = '2026-09-30T13:05:00.654321+00:00';
+export function testFinished(metadata: SessionFinishMetadata = { energyLevel: null, performanceLevel: null, painLevel: null, notes: null }): SessionFinishedDto {
+  return { status: 'finished', sessionId: SESSION_ID, sessionStatus: 'completed', name: 'Sesión libre', routineId: null, logDate: '2026-09-30',
+    startedAt: VERSION, endedAt: '2026-09-30T13:05:00.000000+00:00', sessionUpdatedAt: FINISHED_VERSION, metadata,
+    exerciseCount: 2, completedExerciseCount: 1, completedSetCount: 1 };
 }

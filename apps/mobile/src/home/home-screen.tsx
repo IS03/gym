@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { fetchMobileHome, useApiResource, useMobileApi } from '@/api';
 import {
@@ -106,6 +106,8 @@ export function HomeScreen() {
     [client],
   );
   const { refresh, state } = useApiResource(load);
+  // Reflect server changes made elsewhere (e.g. a finished session) on return.
+  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
   const current =
     state.status === 'ready'
       ? state.current

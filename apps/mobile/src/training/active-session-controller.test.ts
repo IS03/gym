@@ -3,7 +3,7 @@ import type { MobileApiRequestResult } from '@/api/results';
 import { ActiveSessionController, type ActiveSessionApi } from './active-session-controller';
 import { SessionDraftRepository, type SessionStoragePort } from './active-session-storage';
 import { appendSessionSet, exerciseDraft, moveSessionSet, removeSessionSet, resetSessionSet } from './active-session-model';
-import { EXERCISE_ID, NEXT_VERSION, SECOND_ID, SESSION_ID, VERSION, testDetail, testPayload } from './active-session-test-fixtures';
+import { EXERCISE_ID, NEXT_VERSION, SECOND_ID, SESSION_ID, VERSION, testDetail, testFinished, testPayload } from './active-session-test-fixtures';
 const meta = { durationMs: 0, httpStatus: 200, outcome: 'ok' as const };
 const ok = <T,>(data: T): MobileApiRequestResult<T> => ({ status: 'ok', data, meta });
 const unavailable = { status: 'unavailable', reason: 'network', meta: { ...meta, outcome: 'unavailable' } } as const;
@@ -23,6 +23,7 @@ function setup() {
     cancel: jest.fn<ActiveSessionApi['cancel']>().mockResolvedValue(ok({ status: 'cancelled', sessionId: SESSION_ID })),
     reorder: jest.fn<ActiveSessionApi['reorder']>().mockImplementation(async input => ok({ status: 'reordered', sessionId: SESSION_ID,
       sessionUpdatedAt: NEXT_VERSION, orderedSessionExerciseIds: input.orderedSessionExerciseIds })),
+    finish: jest.fn<ActiveSessionApi['finish']>().mockImplementation(async input => ok(testFinished(input.metadata))),
   };
   let key = 0;
   const controller = new ActiveSessionController(api, repository, () => `intent:${++key}`, () => 10000);
@@ -232,15 +233,16 @@ describe('native active-session controller', () => {
     await controller.cancel(); expect(controller.getSnapshot().intent?.phase).toBe('blocked');
     await controller.discardBlockedIntent(); expect(await repository.readIntent()).toBeNull(); expect(api.cancel).toHaveBeenCalledTimes(1);
   });
-  it('preserves drafts/timer until cancellation replay is confirmed, keeping metadata out of scope', async () => {
+  it('preserves drafts/timer/summary until cancellation replay is confirmed, then discards them with the session', async () => {
     const { controller, api, repository, values } = setup(); await controller.refresh(); controller.startRest(EXERCISE_ID);
     controller.change(EXERCISE_ID, draft => ({ ...draft, notes: 'local' })); await settle();
-    values.set(`${repository.prefix}metadata`, JSON.stringify({ notes: 'future draft' }));
+    controller.updateSummary(summary => ({ ...summary, notes: 'summary draft' })); await settle();
     api.cancel.mockResolvedValueOnce(unavailable); expect(await controller.cancel()).toBe(false);
     expect(await repository.readDraft(EXERCISE_ID)).not.toBeNull(); expect(controller.getTimer()).not.toBeNull();
+    expect((await repository.readSummary())?.notes).toBe('summary draft');
     const key = api.cancel.mock.calls[0][0]; expect(await controller.retryIntent()).toBe(true);
     expect(api.cancel).toHaveBeenLastCalledWith(key); expect(controller.getSnapshot().status).toBe('cancelled');
-    expect(controller.getTimer()).toBeNull(); expect(await repository.readDraft(EXERCISE_ID)).toBeNull(); expect(values.has(`${repository.prefix}metadata`)).toBe(true);
+    expect(controller.getTimer()).toBeNull(); expect(await repository.readDraft(EXERCISE_ID)).toBeNull(); expect(values.has(`${repository.prefix}metadata`)).toBe(false);
   });
   it('retains the cancellation replay key when local cleanup fails midway', async () => {
     const { controller, repository, storage } = setup(); await controller.refresh();
@@ -403,5 +405,134 @@ describe('native active-session controller', () => {
     const detail = testDetail(); detail.exercises = [detail.exercises[1]]; api.detail.mockResolvedValue(ok(detail)); await controller.refresh();
     expect(controller.getSnapshot().notice).toContain('Se quitó un ejercicio en otro lugar');
     expect((await repository.readDraft(EXERCISE_ID))!.draft.sets[0].actualWeightKg).toBe('.');
+  });
+});
+
+describe('native finish (M3.4-2)', () => {
+  beforeEach(() => { jest.useFakeTimers(); }); afterEach(() => { jest.useRealTimers(); });
+  const completeFirstSet = async (controller: ActiveSessionController) => {
+    controller.change(EXERCISE_ID, draft => ({ ...draft, sets: draft.sets.map(set => ({ ...set, isCompleted: true })) }), true);
+    await controller.flush(EXERCISE_ID);
+  };
+  const completedDetail = () => { const detail = testDetail(); detail.session = { ...detail.session, status: 'completed', endedAt: '2026-09-30T13:05:00.000000+00:00' }; return detail; };
+
+  it('persists the summary per session and sends canonical nulls (0 pain kept, empty notes -> null)', async () => {
+    const { controller, repository, api } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    controller.updateSummary(summary => ({ ...summary, painLevel: 0, notes: '' })); await settle();
+    expect(await repository.readSummary()).toEqual({ energyLevel: null, performanceLevel: null, painLevel: 0, notes: '' });
+    const restored = new ActiveSessionController(api, repository); await restored.refresh();
+    expect(restored.getSnapshot().summary).toEqual({ energyLevel: null, performanceLevel: null, painLevel: 0, notes: '' });
+    expect(await controller.finish()).toBe(true);
+    expect(api.finish).toHaveBeenCalledWith({ metadata: { energyLevel: null, performanceLevel: null, painLevel: 0, notes: null }, idempotencyKey: expect.any(String) });
+  });
+  it('drains every scheduled save through CAS before finishing and locks edits meanwhile', async () => {
+    const { controller, api } = setup(); await controller.refresh();
+    controller.change(EXERCISE_ID, draft => ({ ...draft, sets: draft.sets.map(set => ({ ...set, isCompleted: true })) }));
+    controller.change(SECOND_ID, draft => ({ ...draft, notes: 'pending' }));
+    const saved = deferred<Awaited<ReturnType<ActiveSessionApi['save']>>>();
+    api.save.mockReturnValueOnce(saved.promise);
+    const finishing = controller.finish(); await settle();
+    expect(controller.getSnapshot().finishing).toBe(true); expect(controller.canEdit(EXERCISE_ID)).toBe(false); expect(api.finish).not.toHaveBeenCalled();
+    saved.resolve(ok({ sessionExerciseId: EXERCISE_ID, updatedAt: NEXT_VERSION }));
+    expect(await finishing).toBe(true);
+    expect(api.save).toHaveBeenCalledTimes(2);
+    const lastSave = Math.max(...api.save.mock.invocationCallOrder);
+    expect(api.finish.mock.invocationCallOrder[0]).toBeGreaterThan(lastSave);
+  });
+  it.each([
+    ['unconfirmed save (network)', (api: ReturnType<typeof setup>['api']) => { api.save.mockResolvedValueOnce(unavailable); api.sync.mockResolvedValueOnce(unavailable); }],
+    ['conflicting save', (api: ReturnType<typeof setup>['api']) => {
+      api.save.mockResolvedValueOnce({ status: 'conflict', code: 'SESSION_EXERCISE_CHANGED', message: 'changed', meta });
+      api.sync.mockResolvedValueOnce(ok({ status: 'active', updatedAt: NEXT_VERSION, payload: { ...testPayload('remote') } }));
+    }],
+  ])('never finishes over a local draft the server has not confirmed: %s', async (_label, arrange) => {
+    const { controller, api, repository } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    arrange(api); controller.change(SECOND_ID, draft => ({ ...draft, notes: 'local only' }));
+    expect(await controller.finish()).toBe(false);
+    expect(api.finish).not.toHaveBeenCalled(); expect(await repository.readIntent()).toBeNull();
+    expect(controller.getSnapshot().notice).toContain('ROW'); expect(controller.getSnapshot().finishing).toBe(false);
+    expect((await repository.readDraft(SECOND_ID))?.draft.notes).toBe('local only');
+  });
+  it('blocks invalid local values and sessions without completed sets before any request', async () => {
+    const { controller, api } = setup(); await controller.refresh();
+    expect(await controller.finish()).toBe(false); expect(controller.getSnapshot().notice).toContain('al menos una serie');
+    await completeFirstSet(controller);
+    controller.change(EXERCISE_ID, draft => ({ ...draft, sets: draft.sets.map(set => ({ ...set, actualReps: '' })) }));
+    expect(controller.getExercise(EXERCISE_ID)?.phase).toBe('validation');
+    expect(await controller.finish()).toBe(false); expect(api.finish).not.toHaveBeenCalled();
+    expect(controller.canEdit(EXERCISE_ID)).toBe(true);
+  });
+  it('converges a double tap into one finish intent and one request', async () => {
+    const { controller, api } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    const response = deferred<Awaited<ReturnType<ActiveSessionApi['finish']>>>();
+    api.finish.mockReturnValueOnce(response.promise);
+    const first = controller.finish(), second = controller.finish();
+    expect(second).toBe(first); await settle();
+    expect(controller.finish()).toBe(controller.finish());
+    response.resolve(ok(testFinished())); expect(await first).toBe(true);
+    expect(api.finish).toHaveBeenCalledTimes(1);
+  });
+  it('keeps everything on a lost response and replays the SAME key and metadata, then cleans up only after confirmation', async () => {
+    const { controller, api, repository, values } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    controller.startRest(EXERCISE_ID); controller.updateSummary(summary => ({ ...summary, energyLevel: 4, notes: 'buena' })); await settle();
+    api.finish.mockResolvedValueOnce(unavailable);
+    expect(await controller.finish()).toBe(false);
+    const intent = await repository.readIntent();
+    expect(intent).toEqual({ kind: 'finish', metadata: { energyLevel: 4, performanceLevel: null, painLevel: null, notes: 'buena' }, idempotencyKey: expect.any(String) });
+    expect(controller.getSnapshot().intent?.phase).toBe('uncertain'); expect(controller.getSnapshot().finished).toBeNull();
+    expect(controller.getTimer()).not.toBeNull(); expect((await repository.readSummary())?.notes).toBe('buena');
+    expect(controller.canEdit(EXERCISE_ID)).toBe(false);
+    controller.updateSummary(summary => ({ ...summary, notes: 'changed after send' })); expect(controller.getSnapshot().summary.notes).toBe('buena');
+    expect(await controller.retryIntent()).toBe(true);
+    expect(api.finish).toHaveBeenCalledTimes(2);
+    expect(api.finish.mock.calls[1][0]).toEqual(api.finish.mock.calls[0][0]);
+    expect(api.finish.mock.calls[1][0].idempotencyKey).toBe(intent && intent.kind === 'finish' ? intent.idempotencyKey : '');
+    expect(controller.getSnapshot().finished?.status).toBe('finished');
+    expect(controller.getSnapshot().detail?.session.status).toBe('completed');
+    expect(controller.getTimer()).toBeNull();
+    expect([...values.keys()].filter(key => key.startsWith(repository.prefix))).toEqual([]);
+  });
+  it('recovers a pending finish after remount with the persisted key (no second effect)', async () => {
+    const { controller, api, repository } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    api.finish.mockResolvedValueOnce(unavailable); expect(await controller.finish()).toBe(false); controller.dispose();
+    api.detail.mockResolvedValue(ok(completedDetail()));
+    const restored = new ActiveSessionController(api, repository); await restored.refresh();
+    expect(restored.getSnapshot().intent).toMatchObject({ phase: 'uncertain', value: { kind: 'finish' } });
+    expect(await restored.retryIntent()).toBe(true);
+    expect(api.finish.mock.calls[1][0]).toEqual(api.finish.mock.calls[0][0]);
+    expect(await repository.readIntent()).toBeNull(); expect(restored.getSnapshot().finished).not.toBeNull();
+  });
+  it('keeps the replay key if local cleanup fails after a confirmed finish', async () => {
+    const { controller, api, repository, storage } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    const removeItem = storage.removeItem; let failed = false;
+    storage.removeItem = async key => { if (!failed && key.endsWith('timer')) { failed = true; throw new Error('disk'); } return removeItem(key); };
+    controller.startRest(EXERCISE_ID); await settle();
+    expect(await controller.finish()).toBe(false);
+    expect(controller.getSnapshot().intent?.phase).toBe('uncertain'); expect(await repository.readIntent()).not.toBeNull();
+    expect(await controller.retryIntent()).toBe(true); expect(api.finish.mock.calls[1][0]).toEqual(api.finish.mock.calls[0][0]);
+    expect(await repository.readIntent()).toBeNull();
+  });
+  it('treats a session closed elsewhere as a definitive outcome: clears the intent and reads server truth', async () => {
+    const { controller, api, repository } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    api.finish.mockResolvedValueOnce({ status: 'conflict', code: 'SESSION_CLOSED', message: 'La sesión ya no está en curso.', meta });
+    api.detail.mockResolvedValue(ok(completedDetail()));
+    expect(await controller.finish()).toBe(false);
+    expect(await repository.readIntent()).toBeNull(); expect(controller.getSnapshot().intent).toBeNull();
+    expect(controller.getSnapshot().finished).toBeNull(); expect(controller.getSnapshot().detail?.session.status).toBe('completed');
+    expect(controller.getSnapshot().notice).toBe('La sesión ya no está en curso.');
+  });
+  it('returns to editing after NO_COMPLETED_SETS, keeping drafts and the summary', async () => {
+    const { controller, api, repository } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    controller.updateSummary(summary => ({ ...summary, notes: 'keep' })); await settle();
+    api.finish.mockResolvedValueOnce({ status: 'conflict', code: 'NO_COMPLETED_SETS', message: 'Marcá y guardá al menos una serie antes de finalizar.', meta });
+    expect(await controller.finish()).toBe(false);
+    expect(controller.getSnapshot().intent).toBeNull(); expect(controller.canEdit(EXERCISE_ID)).toBe(true);
+    expect((await repository.readSummary())?.notes).toBe('keep'); expect(controller.getSnapshot().notice).toContain('al menos una serie');
+  });
+  it('does not attempt a finish while offline', async () => {
+    const { controller, api } = setup(); await controller.refresh(); await completeFirstSet(controller);
+    api.detail.mockResolvedValueOnce(unavailable); await controller.refresh();
+    expect(await controller.finish()).toBe(false); expect(api.finish).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().notice).toContain('Sin conexión');
   });
 });

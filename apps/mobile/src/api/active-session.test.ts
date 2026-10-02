@@ -4,8 +4,8 @@ import {
   parseSessionDetail, parseSessionExerciseSync, parseSessionExercisePayload,
   fetchSessionDetail, fetchSessionExerciseSync, saveSessionExercise,
   addSessionExercise, removeSessionExercise, cancelSession,
-  canonicalSessionExercisePayload,
-  type SessionDetailDto, type SessionExercisePayloadDto,
+  canonicalSessionExercisePayload, finishSession, parseSessionFinished,
+  type SessionDetailDto, type SessionExercisePayloadDto, type SessionFinishedDto,
 } from './active-session';
 
 const sessionId = '33300000-0000-4000-8000-000000000001';
@@ -135,5 +135,38 @@ describe('M3.3B native session contracts (no UI)', () => {
     expect(await cancelSession(api, sessionId, 'cancel:1')).toMatchObject({ status: 'unavailable' });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(await fetchSessionDetail(api, sessionId)).toMatchObject({ status: 'unavailable', reason: 'invalid_response' });
+  });
+});
+
+describe('M3.4-2 finish contract (no UI)', () => {
+  const finished: SessionFinishedDto = { status: 'finished', sessionId, sessionStatus: 'completed', name: 'SESSION', routineId: null,
+    logDate: '2026-09-29', startedAt: timestamp, endedAt: '2026-09-29T13:00:00.000000+00:00', sessionUpdatedAt: '2026-09-29T13:00:00.123456+00:00',
+    metadata: { energyLevel: 4, performanceLevel: null, painLevel: 0, notes: null }, exerciseCount: 2, completedExerciseCount: 1, completedSetCount: 3 };
+  const body = { metadata: { energyLevel: 4, performanceLevel: null, painLevel: 0, notes: null }, idempotencyKey: 'finish:1' };
+  it('accepts exactly the server truth shape, keeping null distinct from 0', () => {
+    expect(parseSessionFinished(finished)).toEqual(finished);
+    for (const invalid of [{ ...finished, extra: 1 }, { ...finished, sessionStatus: 'discarded' }, { ...finished, completedSetCount: -1 },
+      { ...finished, endedAt: 'later' }, { ...finished, metadata: { ...finished.metadata, painLevel: 11 } },
+      { ...finished, metadata: { ...finished.metadata, energyLevel: 0 } }, { ...finished, metadata: { ...finished.metadata, painNote: 'x' } }]) {
+      expect(parseSessionFinished(invalid)).toBeUndefined();
+    }
+  });
+  it('posts once with the caller key and rejects a response for another session', async () => {
+    const fetch = jest.fn<typeof globalThis.fetch>().mockResolvedValue(response(200, finished));
+    expect(await finishSession(client(fetch), sessionId, body)).toMatchObject({ status: 'ok', data: finished });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0];
+    expect(String(url)).toBe(`https://example.test/api/mobile/v1/training/sessions/${sessionId}/finish`);
+    expect(init?.method).toBe('POST'); expect(JSON.parse(String(init?.body))).toEqual(body);
+    const other = jest.fn<typeof globalThis.fetch>().mockResolvedValue(response(200, { ...finished, sessionId: exerciseId }));
+    expect(await finishSession(client(other), sessionId, body)).toMatchObject({ status: 'unavailable' });
+  });
+  it('maps definitive finish conflicts instead of treating them as an unknown outcome', async () => {
+    for (const error of ['NO_COMPLETED_SETS', 'SESSION_CLOSED', 'IDEMPOTENCY_KEY_REUSED', 'SESSION_NOT_COMPLETED', 'SESSION_DISCARDED']) {
+      const fetch = jest.fn<typeof globalThis.fetch>().mockResolvedValue(response(409, { error, message: 'domain conflict' }));
+      expect(await finishSession(client(fetch), sessionId, body)).toMatchObject({ status: 'conflict', code: error });
+    }
+    const unknown = jest.fn<typeof globalThis.fetch>().mockResolvedValue(response(409, { error: 'SOMETHING_NEW' }));
+    expect(await finishSession(client(unknown), sessionId, body)).toMatchObject({ status: 'unavailable' });
   });
 });

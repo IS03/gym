@@ -283,3 +283,51 @@ export function reorderSessionExercises(client: MobileApiClient, sessionId: stri
       parsed.orderedSessionExerciseIds.every((id, index) => id === body.orderedSessionExerciseIds[index].toLowerCase()) ? parsed : undefined;
   } });
 }
+
+// M3.4-2 — finish. Metadata mirrors the active Web finish exactly (no pain
+// note, treadmill or name). Missing values are null, never 0.
+export type SessionFinishMetadata = {
+  energyLevel: number | null;
+  performanceLevel: number | null;
+  painLevel: number | null;
+  notes: string | null;
+};
+export type SessionFinishInput = { metadata: SessionFinishMetadata; idempotencyKey: string };
+export type SessionFinishedDto = {
+  status: 'finished';
+  sessionId: string;
+  sessionStatus: 'completed';
+  name: string;
+  routineId: string | null;
+  logDate: string;
+  startedAt: string;
+  endedAt: string;
+  sessionUpdatedAt: string;
+  metadata: SessionFinishMetadata;
+  exerciseCount: number;
+  completedExerciseCount: number;
+  completedSetCount: number;
+};
+export function parseSessionFinishMetadata(value: unknown): SessionFinishMetadata | undefined {
+  if (!record(value, ['energyLevel', 'performanceLevel', 'painLevel', 'notes']) || Object.keys(value).length !== 4 ||
+    !number(value.energyLevel, 5, true, 1) || !number(value.performanceLevel, 5, true, 1) || !number(value.painLevel, 10, true) ||
+    !text(value.notes)) return undefined;
+  return value as SessionFinishMetadata;
+}
+function counter(value: unknown): value is number { return typeof value === 'number' && Number.isInteger(value) && value >= 0; }
+export function parseSessionFinished(value: unknown): SessionFinishedDto | undefined {
+  if (!record(value, ['status', 'sessionId', 'sessionStatus', 'name', 'routineId', 'logDate', 'startedAt', 'endedAt', 'sessionUpdatedAt',
+    'metadata', 'exerciseCount', 'completedExerciseCount', 'completedSetCount']) || Object.keys(value).length !== 13 ||
+    value.status !== 'finished' || value.sessionStatus !== 'completed' || !id(value.sessionId) || typeof value.name !== 'string' ||
+    !value.name.trim() || (value.routineId !== null && !id(value.routineId)) || !date(value.logDate) || !timestamp(value.startedAt) ||
+    !timestamp(value.endedAt) || !timestamp(value.sessionUpdatedAt) || !counter(value.exerciseCount) ||
+    !counter(value.completedExerciseCount) || !counter(value.completedSetCount)) return undefined;
+  const metadata = parseSessionFinishMetadata(value.metadata);
+  return metadata ? { ...(value as SessionFinishedDto), sessionId: value.sessionId.toLowerCase(), metadata } : undefined;
+}
+export function finishSession(client: MobileApiClient, sessionId: string, body: SessionFinishInput): Promise<MobileApiMutationResult<SessionFinishedDto>> {
+  return client.request({ method: 'POST', path: `${path(sessionId)}/finish`, body, parse: value => {
+    const parsed = parseSessionFinished(value);
+    return parsed?.sessionId === sessionId.toLowerCase() ? parsed : undefined;
+  } });
+}

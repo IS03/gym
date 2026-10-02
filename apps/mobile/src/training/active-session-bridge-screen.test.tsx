@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { type ReactElement, useSyncExternalStore } from 'react';
 import { ActionSheetIOS, Alert, DeviceEventEmitter, Modal, RefreshControl, StyleSheet } from 'react-native';
@@ -12,7 +12,7 @@ import { OwnlevelThemeProvider, spacing } from '@/design-system';
 import { ActiveSessionController, type ActiveSessionApi } from './active-session-controller';
 import { SessionDraftRepository } from './active-session-storage';
 import { ActiveSessionView } from './active-session-screen';
-import { EXERCISE_ID, NEXT_VERSION, SECOND_ID, SESSION_ID, testDetail } from './active-session-test-fixtures';
+import { EXERCISE_ID, NEXT_VERSION, SECOND_ID, SESSION_ID, testDetail, testFinished } from './active-session-test-fixtures';
 import { DRAG_DELAY, LIFT_SCALE, PRESS_SCALE } from './session-native-interactions';
 import { exercisePayload } from './active-session-model';
 
@@ -45,6 +45,7 @@ function fixture(detail: SessionDetailDto = testDetail()) {
     cancel: jest.fn<ActiveSessionApi['cancel']>().mockResolvedValue({ status: 'ok', data: { status: 'cancelled', sessionId: SESSION_ID }, meta }),
     reorder: jest.fn<ActiveSessionApi['reorder']>().mockImplementation(async input => ({ status: 'ok', data: {
       status: 'reordered', sessionId: SESSION_ID, sessionUpdatedAt: NEXT_VERSION, orderedSessionExerciseIds: input.orderedSessionExerciseIds }, meta })),
+    finish: jest.fn<ActiveSessionApi['finish']>().mockImplementation(async input => ({ status: 'ok', data: testFinished(input.metadata), meta })),
   };
   const repository = new SessionDraftRepository({ getItem: async key => store.get(key) ?? null, setItem: async (key, value) => { store.set(key, value); },
     removeItem: async key => { store.delete(key); }, getAllKeys: async () => [...store.keys()] }, 'owner', SESSION_ID);
@@ -87,7 +88,7 @@ describe('native active session screen', () => {
     expect(view.queryByLabelText('Peso serie 1 de PRESS')).toBeNull(); expect(mockSelection).not.toHaveBeenCalled();
     controller.dispose();
   });
-  it('renders actuals, targets/RIR and immediate completion without a finish CTA', async () => {
+  it('renders actuals, targets/RIR and immediate completion; the finish CTA only opens the summary', async () => {
     const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
     await waitFor(() => expect(view.getByLabelText('Peso serie 1 de PRESS')).toBeTruthy());
     fireEvent.changeText(view.getByLabelText('Peso serie 1 de PRESS'), '45,5');
@@ -95,7 +96,8 @@ describe('native active session screen', () => {
     await act(async () => { await controller.flush(EXERCISE_ID); });
     expect(api.save).toHaveBeenCalledWith(EXERCISE_ID, expect.any(String), expect.objectContaining({ isCompleted: true, sets: [expect.objectContaining({ actualWeightKg: 45.5, targetRir: 2 })] }));
     expect(view.getByLabelText('RIR objetivo serie 1: 2')).toBeTruthy();
-    expect(view.queryByRole('button', { name: 'Finalizar entrenamiento' })).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
+    expect(view.getByTestId('finish-session-sheet')).toBeTruthy(); expect(api.finish).not.toHaveBeenCalled();
     expect(view.queryByText('Descanso · PRESS')).toBeNull();
     controller.dispose();
   });
@@ -432,5 +434,70 @@ describe('native active session screen', () => {
     expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingBottom).toBe(spacing.xl + 83);
     expect(scroll.props.contentInsetAdjustmentBehavior).toBe('automatic');
     expect(view.getByRole('button', { name: 'Cancelar entrenamiento' })).toBeEnabled(); controller.dispose();
+  });
+});
+
+describe('native finish screen (M3.4-2)', () => {
+  beforeEach(() => { mockReplace.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); }); afterEach(() => { jest.restoreAllMocks(); });
+  const completedDetail = () => { const detail = testDetail(); detail.exercises[0].payload.sets[0].isCompleted = true; detail.exercises[0].payload.isCompleted = true;
+    detail.session = { ...detail.session, status: 'completed', endedAt: '2026-09-30T13:05:00.000000+00:00',
+      metadata: { ...detail.session.metadata, energyLevel: 4, painLevel: 0 } }; return detail; };
+  async function completeSet(view: ReturnType<typeof render>, controller: ActiveSessionController) {
+    fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap');
+    await act(async () => { await controller.flush(EXERCISE_ID); });
+  }
+  it('finishes with the summary, then shows the post-workout base and the read-only completed session', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await completeSet(view, controller);
+    jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
+    fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
+    expect(view.getAllByText('Sin responder')).toHaveLength(3);
+    fireEvent.press(view.getByTestId('summary-energyLevel-4')); fireEvent.press(view.getByTestId('summary-painLevel-0'));
+    fireEvent.press(view.getByTestId('summary-performanceLevel-3')); fireEvent.press(view.getByTestId('summary-performanceLevel-3'));
+    await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Guardar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    expect(api.finish).toHaveBeenCalledTimes(1);
+    expect(api.finish).toHaveBeenCalledWith({ metadata: { energyLevel: 4, performanceLevel: null, painLevel: 0, notes: null }, idempotencyKey: expect.any(String) });
+    expect(mockSuccess).toHaveBeenCalledTimes(1);
+    expect(view.getByTestId('post-workout-sheet')).toBeTruthy(); expect(view.getByText('Entrenamiento guardado')).toBeTruthy();
+    const sheet = within(view.getByTestId('post-workout-sheet'));
+    expect(sheet.getByText('1 serie completada · 1 ejercicio')).toBeTruthy(); expect(sheet.getByText('4/5')).toBeTruthy(); expect(sheet.getByText('0/10')).toBeTruthy();
+    expect(sheet.queryByText('Rendimiento')).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Ver sesión' }));
+    expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(view.getByTestId('completed-session')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Finalizar entrenamiento' })).toBeNull(); expect(view.queryByLabelText('Peso serie 1 de PRESS')).toBeNull();
+    expect(view.getByLabelText('Serie 1: 40 kg × 8, completada')).toBeTruthy();
+    controller.dispose();
+  });
+  it('routes Ir al inicio to Home after a confirmed finish', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await completeSet(view, controller); jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
+    await act(async () => { await controller.finish(); for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    fireEvent.press(view.getByRole('button', { name: 'Ir al inicio' }));
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/home'); controller.dispose();
+  });
+  it('keeps an unknown finish outcome explicit and recovers it from the sheet with the same key', async () => {
+    const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await completeSet(view, controller);
+    jest.mocked(api.finish).mockResolvedValueOnce({ status: 'unavailable', reason: 'network', meta: { ...meta, outcome: 'unavailable' } });
+    fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
+    await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Guardar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    expect(view.getByText(/No pudimos confirmar si el entrenamiento se guardó/)).toBeTruthy();
+    expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(mockSuccess).not.toHaveBeenCalled();
+    jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
+    await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Comprobar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    expect(jest.mocked(api.finish).mock.calls[1][0]).toEqual(jest.mocked(api.finish).mock.calls[0][0]);
+    expect(view.getByTestId('post-workout-sheet')).toBeTruthy(); controller.dispose();
+  });
+  it('opens an already completed session read-only without the active editor or a post-workout sheet', async () => {
+    const { controller, Screen } = fixture(completedDetail()); await controller.refresh(); const view = render(<Screen />);
+    expect(view.getByTestId('completed-session')).toBeTruthy(); expect(view.getByText('SESIÓN FINALIZADA')).toBeTruthy();
+    expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(view.queryByRole('button', { name: 'Finalizar entrenamiento' })).toBeNull();
+    expect(view.getByText('4/5')).toBeTruthy(); expect(view.getByText('0/10')).toBeTruthy(); expect(view.queryByText('Rendimiento')).toBeNull();
+    controller.dispose();
+  });
+  it('shows a discarded session as such, never as a fresh completion', async () => {
+    const detail = completedDetail(); detail.session.status = 'discarded';
+    const { controller, Screen } = fixture(detail); await controller.refresh(); const view = render(<Screen />);
+    expect(view.getByTestId('discarded-session')).toBeTruthy(); expect(view.getByText('SESIÓN ELIMINADA')).toBeTruthy(); controller.dispose();
   });
 });

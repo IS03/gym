@@ -1,12 +1,13 @@
 import {
-  addSessionExercise, cancelSession, fetchSessionDetail, fetchSessionExerciseSync, removeSessionExercise, reorderSessionExercises, saveSessionExercise,
-  type SessionAddInput, type SessionDetailDto, type SessionExerciseDto, type SessionExerciseOrderDto, type SessionExerciseOrderInput, type SessionExercisePayloadDto, type SessionExerciseSyncDto, type SessionStructuralDto,
+  addSessionExercise, cancelSession, fetchSessionDetail, fetchSessionExerciseSync, finishSession, removeSessionExercise, reorderSessionExercises, saveSessionExercise,
+  type SessionAddInput, type SessionDetailDto, type SessionExerciseDto, type SessionExerciseOrderDto, type SessionExerciseOrderInput, type SessionExercisePayloadDto, type SessionExerciseSyncDto,
+  type SessionFinishedDto, type SessionFinishInput, type SessionStructuralDto,
 } from '@/api/active-session';
 import type { MobileApiClient } from '@/api/client';
 import type { MobileApiRequestResult } from '@/api/results';
 import {
-  draftIsDirty, exerciseDraft, exercisePayload, restSeconds, restoreRestDeadline, sameExercisePayload, setProgress,
-  type RestDeadline, type SessionExerciseDraft, type StoredExerciseDraft,
+  draftIsDirty, emptySessionSummary, exerciseDraft, exercisePayload, finishMetadata, restSeconds, restoreRestDeadline, sameExercisePayload, setProgress,
+  summaryIsValid, type RestDeadline, type SessionExerciseDraft, type SessionSummaryDraft, type StoredExerciseDraft,
 } from './active-session-model';
 import { SessionDraftRepository, type StructuralIntent } from './active-session-storage';
 
@@ -18,13 +19,15 @@ export type ActiveSessionApi = {
   remove: (id: string, version: string, key: string) => Promise<MobileApiRequestResult<SessionStructuralDto>>;
   cancel: (key: string) => Promise<MobileApiRequestResult<SessionStructuralDto>>;
   reorder: (input: SessionExerciseOrderInput) => Promise<MobileApiRequestResult<SessionExerciseOrderDto>>;
+  finish: (input: SessionFinishInput) => Promise<MobileApiRequestResult<SessionFinishedDto>>;
 };
 export function activeSessionApi(client: MobileApiClient, sessionId: string): ActiveSessionApi {
   return { detail: () => fetchSessionDetail(client, sessionId), sync: id => fetchSessionExerciseSync(client, sessionId, id),
     save: (id, expectedUpdatedAt, payload) => saveSessionExercise(client, sessionId, id, { expectedUpdatedAt, payload }),
     add: input => addSessionExercise(client, sessionId, input),
     remove: (id, expectedUpdatedAt, idempotencyKey) => removeSessionExercise(client, sessionId, id, { expectedUpdatedAt, idempotencyKey }),
-    cancel: key => cancelSession(client, sessionId, key), reorder: input => reorderSessionExercises(client, sessionId, input) };
+    cancel: key => cancelSession(client, sessionId, key), reorder: input => reorderSessionExercises(client, sessionId, input),
+    finish: input => finishSession(client, sessionId, input) };
 }
 export type ExercisePhase = 'idle' | 'scheduled' | 'saving' | 'saved' | 'validation' | 'conflict' | 'retryable' | 'unconfirmed' | 'stale' | 'closed' | 'removed';
 export type ExerciseSnapshot = {
@@ -45,6 +48,13 @@ export type SessionSnapshot = {
   notice: string | null;
   intent: { value: StructuralIntent; phase: 'running' | 'uncertain' | 'blocked' } | null;
   interaction: 'sets' | 'exercises' | null;
+  /** Local summary draft for finish; persisted per session, cleared only after a confirmed finish. */
+  summary: SessionSummaryDraft;
+  summaryReady: boolean;
+  /** Pre-finish drain/verification in progress: edits are locked, saves may still drain. */
+  finishing: boolean;
+  /** Server truth returned by a confirmed (or replayed) finish. */
+  finished: SessionFinishedDto | null;
 };
 export type SessionProgress = { completedSets: number; totalSets: number; completedExercises: number; exercises: number; pending: number; errors: number; drafts: number };
 type Entry = {
@@ -65,7 +75,8 @@ export function sessionIntentKey() {
   return typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 export class ActiveSessionController {
-  private snapshot: SessionSnapshot = { status: 'loading', detail: null, refreshing: false, fenced: false, storageError: false, notice: null, intent: null, interaction: null };
+  private snapshot: SessionSnapshot = { status: 'loading', detail: null, refreshing: false, fenced: false, storageError: false, notice: null, intent: null,
+    interaction: null, summary: emptySessionSummary, summaryReady: false, finishing: false, finished: null };
   private progress: SessionProgress = { completedSets: 0, totalSets: 0, completedExercises: 0, exercises: 0, pending: 0, errors: 0, drafts: 0 };
   private readonly entries = new Map<string, Entry>();
   private readonly listeners = new Set<() => void>();
@@ -82,6 +93,7 @@ export class ActiveSessionController {
   private networkReady = false;
   private refreshFlight: Promise<void> | null = null;
   private structuralFlight: Promise<boolean> | null = null;
+  private finishFlight: Promise<boolean> | null = null;
   private drag: { kind: 'sets'; id: string } | { kind: 'exercises'; version: string; ids: string[] } | null = null;
   private orderNeedsCheck = false;
   private readonly localRemovals = new Set<string>();
@@ -136,7 +148,7 @@ export class ActiveSessionController {
   }
   canEdit(id: string) {
     const entry = this.entries.get(id);
-    return !!entry && !this.disposed && !this.snapshot.fenced && !this.snapshot.refreshing && !this.snapshot.intent && !entry.paused &&
+    return !!entry && !this.disposed && !this.snapshot.fenced && !this.snapshot.refreshing && !this.snapshot.intent && !this.snapshot.finishing && !entry.paused &&
       entry.snapshot.storageReady && !entry.stale && entry.snapshot.phase !== 'closed' && entry.snapshot.phase !== 'removed';
   }
   private async safe<T>(operation: () => Promise<MobileApiRequestResult<T>>): Promise<MobileApiRequestResult<T>> {
@@ -310,6 +322,11 @@ export class ActiveSessionController {
     this.networkReady = true;
     this.orderNeedsCheck = false;
     const detail = result.data;
+    if (!this.snapshot.summaryReady) {
+      try { this.update({ summary: (await this.repository.readSummary()) ?? emptySessionSummary, summaryReady: true }); }
+      catch { this.update({ storageError: true }); }
+      if (this.disposed) return;
+    }
     this.update({ status: 'ready', detail, fenced: detail.session.status !== 'in_progress' || !this.intentHydrated, notice: this.snapshot.intent ? 'Hay una operación pendiente de confirmación.' : null });
     for (const exercise of detail.exercises) {
       let entry = this.entries.get(exercise.id);
@@ -450,9 +467,17 @@ export class ActiveSessionController {
     await Promise.all([...this.entries.values()].map(entry => entry.flight));
     await Promise.all([...this.recoveryFlights.values()]);
     if (this.disposed) return false;
-    const result = await this.safe<SessionStructuralDto | SessionExerciseOrderDto>(() => intent.kind === 'add' ? this.api.add(intent.input) : intent.kind === 'remove'
-      ? this.api.remove(intent.exerciseId, intent.expectedUpdatedAt, intent.idempotencyKey) : intent.kind === 'reorder' ? this.api.reorder(intent.input) : this.api.cancel(intent.idempotencyKey));
+    const result = await this.safe<SessionStructuralDto | SessionExerciseOrderDto | SessionFinishedDto>(() => intent.kind === 'add' ? this.api.add(intent.input) : intent.kind === 'remove'
+      ? this.api.remove(intent.exerciseId, intent.expectedUpdatedAt, intent.idempotencyKey) : intent.kind === 'reorder' ? this.api.reorder(intent.input)
+      : intent.kind === 'finish' ? this.api.finish({ metadata: intent.metadata, idempotencyKey: intent.idempotencyKey }) : this.api.cancel(intent.idempotencyKey));
     if (this.disposed) return false;
+    if (result.status === 'ok' && intent.kind === 'finish') return this.confirmFinish(intent, result.data as SessionFinishedDto);
+    if (result.status === 'not_found' && intent.kind === 'finish') {
+      // The session no longer exists (cancelled elsewhere): nothing was finished.
+      try { await this.repository.clearIntent(); }
+      catch { this.update({ storageError: true, intent: { value: intent, phase: 'blocked' }, notice: 'No pudimos limpiar la intención local.' }); return false; }
+      this.update({ intent: null }); await this.loadDetail(); return false;
+    }
     if (result.status === 'ok') {
       if (intent.kind === 'cancel') {
         try { await this.repository.clearSession(); }
@@ -512,6 +537,78 @@ export class ActiveSessionController {
     this.update({ intent: { value: intent, phase: result.status === 'conflict' ? 'blocked' : 'uncertain' },
       notice: result.status === 'conflict' ? result.message : 'No pudimos confirmar la operación. Comprobala antes de volver a editar.' });
     return false;
+  }
+  updateSummary(updater: (summary: SessionSummaryDraft) => SessionSummaryDraft) {
+    if (!this.snapshot.summaryReady || this.snapshot.intent || this.snapshot.finishing || this.snapshot.fenced ||
+      this.snapshot.detail?.session.status !== 'in_progress') return;
+    this.update({ summary: updater(this.snapshot.summary) });
+    void this.repository.writeSummary(this.snapshot.summary).catch(() => this.update({ storageError: true }));
+  }
+  /** One finish intent per user action: a second tap joins the same flight. */
+  finish(): Promise<boolean> {
+    if (this.finishFlight) return this.finishFlight;
+    if (this.structuralFlight) return this.structuralFlight;
+    const flight = this.prepareFinish().finally(() => { if (this.finishFlight === flight) this.finishFlight = null; });
+    this.finishFlight = flight; return flight;
+  }
+  private finishBlockers(): string[] {
+    return (this.snapshot.detail?.exercises ?? []).flatMap(exercise => {
+      const entry = this.entries.get(exercise.id);
+      if (!entry) return [exercise.nameSnapshot];
+      const unconfirmed = entry.snapshot.dirty || entry.stale || entry.attempt || entry.flight || entry.timer || !entry.snapshot.storageReady ||
+        recoveryPhases.has(entry.snapshot.phase) || ['validation', 'saving', 'scheduled'].includes(entry.snapshot.phase);
+      return unconfirmed ? [entry.snapshot.exercise.nameSnapshot] : [];
+    });
+  }
+  private async prepareFinish(): Promise<boolean> {
+    await this.refreshFlight;
+    const detail = this.snapshot.detail;
+    if (!detail || detail.session.status !== 'in_progress' || this.drag || this.disposed || !this.foreground || this.snapshot.intent ||
+      this.snapshot.refreshing || this.snapshot.fenced || !this.snapshot.summaryReady || this.snapshot.storageError) {
+      this.update({ notice: 'No podemos finalizar en este momento. Comprobá la sesión y reintentá.' }); return false;
+    }
+    if (!this.networkReady) { this.update({ notice: 'Sin conexión. Tus cambios se conservan; finalizá cuando vuelva la conexión.' }); return false; }
+    if (!summaryIsValid(this.snapshot.summary)) { this.update({ notice: 'Revisá el resumen antes de finalizar.' }); return false; }
+    if (this.progress.completedSets === 0) { this.update({ notice: 'Marcá al menos una serie antes de finalizar.' }); return false; }
+    // Lock edits, then drain every pending draft through the normal CAS autosave.
+    this.update({ finishing: true, notice: null });
+    let blockers: string[] = [];
+    try {
+      for (let round = 0; round < 3; round++) {
+        await Promise.all([...this.entries.keys()].map(id => this.flush(id)));
+        await Promise.all([...this.recoveryFlights.values()]);
+        if (![...this.entries.values()].some(entry => entry.flight || entry.timer)) break;
+      }
+      if (this.disposed) return false;
+      if (!this.foreground || this.snapshot.fenced || this.snapshot.intent || this.snapshot.refreshing || !this.networkReady ||
+        this.snapshot.detail?.session.status !== 'in_progress') {
+        this.update({ finishing: false, notice: 'La sesión cambió mientras preparábamos la finalización. Comprobala y reintentá.' }); return false;
+      }
+      blockers = this.finishBlockers();
+    } catch { blockers = ['la sesión']; }
+    if (blockers.length) {
+      // Never finish over a local draft the server has not confirmed.
+      this.update({ finishing: false, notice: `No finalizamos todavía: ${blockers.join(', ')} tiene cambios sin confirmar. Revisalos y reintentá.` });
+      this.resumeSaves(); return false;
+    }
+    if (this.progress.completedSets === 0) { this.update({ finishing: false, notice: 'Marcá al menos una serie antes de finalizar.' }); return false; }
+    // Synchronous hand-off: startIntent sets the intent lock before any await.
+    this.update({ finishing: false });
+    return this.startIntent({ kind: 'finish', metadata: finishMetadata(this.snapshot.summary), idempotencyKey: this.generateKey() });
+  }
+  private async confirmFinish(intent: Extract<StructuralIntent, { kind: 'finish' }>, finished: SessionFinishedDto): Promise<boolean> {
+    // Server truth confirmed: only now drop drafts, timer, summary and the replay key.
+    try { await this.repository.clearSession(); }
+    catch { this.update({ storageError: true, intent: { value: intent, phase: 'uncertain' }, notice: 'El entrenamiento se guardó. Reintentá la limpieza local.' }); return false; }
+    for (const entry of this.entries.values()) { entry.paused = true; if (entry.timer) clearTimeout(entry.timer); entry.timer = null; }
+    this.setRest(null, false);
+    const detail = this.snapshot.detail;
+    this.update({ intent: null, fenced: true, notice: null, finished, summary: emptySessionSummary,
+      ...(detail ? { detail: { ...detail, session: { ...detail.session, status: 'completed' as const, endedAt: finished.endedAt,
+        updatedAt: finished.sessionUpdatedAt, metadata: { ...detail.session.metadata, ...finished.metadata } } } } : {}) });
+    // Full completed read-back (exercises/sets) after this flight settles.
+    void this.refresh();
+    return true;
   }
   async discardBlockedIntent() {
     if (this.snapshot.intent?.phase !== 'blocked' || this.structuralFlight) return;

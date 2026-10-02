@@ -46,7 +46,10 @@ export type MobileApiMutationResult<T> =
         | 'SESSION_CHANGED'
         | 'SESSION_CLOSED'
         | 'SESSION_EXERCISE_REMOVED'
-        | 'SESSION_EXERCISE_ALREADY_EXISTS';
+        | 'SESSION_EXERCISE_ALREADY_EXISTS'
+        | 'NO_COMPLETED_SETS'
+        | 'SESSION_NOT_COMPLETED'
+        | 'SESSION_DISCARDED';
       message: string;
       data?: T;
       meta: MobileApiResultMeta;
