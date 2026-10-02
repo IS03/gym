@@ -18,6 +18,8 @@ import { ExerciseEditorModal } from './exercise-editor-modal';
 import { trainingRoutineColor } from './routine-colors';
 import { useActiveSession } from './use-active-session';
 import { NativeReorderItem, NativeReorderList, SessionDragScrollContext } from './session-native-interactions';
+import { FinishSessionSheet } from './finish-session-sheet';
+import { CompletedSessionView } from './completed-session-view';
 
 function SessionClock({ session }: { session: SessionDetailDto['session'] }) {
   const [now, setNow] = useState(Date.now);
@@ -81,6 +83,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   const creatorAfterDismiss = useRef(false);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [finishOpen, setFinishOpen] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useSharedValue(0), contentHeight = useSharedValue(0);
@@ -93,6 +96,9 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   const existingIds = useMemo(() => new Set(detail?.exercises.map(exercise => exercise.exerciseId) ?? []), [detail]);
   const returnToTraining = useCallback(() => router.replace('/(tabs)/train'), [router]);
   useEffect(() => { if (state.status === 'cancelled') { haptics.success(); returnToTraining(); } }, [returnToTraining, state.status]);
+  const returnHome = useCallback(() => router.replace('/(tabs)/home'), [router]);
+  // Confirmed finish (server truth): success feedback once, then the read-only view.
+  useEffect(() => { if (state.finished) haptics.success(); }, [state.finished]);
   usePreventRemove(state.intent?.phase === 'running', ({ data }) => {
     Alert.alert('Hay una operación en curso', 'La intención se conserva para comprobar el resultado cuando vuelvas.', [
       { text: 'Esperar', style: 'cancel' }, { text: 'Volver a Entrenar', onPress: () => navigation.dispatch(data.action) },
@@ -125,7 +131,12 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
       {intentPanel}<Button label="Volver a Entrenar" onPress={returnToTraining} variant="secondary" />
     </>}
   </ScrollScreen>;
-  const locked = state.fenced || state.refreshing || Boolean(state.intent);
+  // A closed session uses its own read-only view. While an intent is unresolved
+  // (e.g. a finish whose outcome is unknown) keep the recovery panel visible here.
+  if (detail.session.status !== 'in_progress' && !state.intent) {
+    return <CompletedSessionView detail={detail} finished={state.finished} onHome={returnHome} onTraining={returnToTraining} />;
+  }
+  const locked = state.fenced || state.refreshing || Boolean(state.intent) || state.finishing;
   const active = detail.session.status === 'in_progress';
   const accent = detail.session.routineId && detail.session.routineColor ? trainingRoutineColor(detail.session.routineColor, isDark) : colors.primary;
   const historyExercise = detail.exercises.find(exercise => exercise.id === historyId);
@@ -155,6 +166,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
         </NativeReorderItem>)}
       </NativeReorderList> :
         <Surface><AppText muted>Esta sesión no tiene ejercicios.</AppText><AppText muted variant="caption">Agregá uno desde tu biblioteca para empezar a registrar series.</AppText></Surface>}
+      {active ? <Button disabled={locked || Boolean(state.interaction)} label="Finalizar entrenamiento" onPress={() => setFinishOpen(true)} /> : null}
       <Button label="Volver a Entrenar" onPress={returnToTraining} variant="secondary" />
       {active ? <View>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: moreOpen }} onPress={() => setMoreOpen(!moreOpen)} style={styles.more}>
@@ -167,6 +179,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
       </View> : null}
     </Animated.ScrollView></GestureDetector></SessionDragScrollContext.Provider></SafeAreaView>
     <RestTimerPanel controller={controller} />
+    {finishOpen && !state.finished ? <FinishSessionSheet controller={controller} onClose={() => setFinishOpen(false)} /> : null}
     <SessionExercisePicker visible={pickerOpen} client={client} existingIds={existingIds} onClose={() => setPickerOpen(false)} onDismiss={creatorDismissed} onCreate={openCreator}
       onAdd={exercise => { setPickerOpen(false); void controller.add({ operation: 'add_existing', exerciseId: exercise.id, idempotencyKey: sessionIntentKey() }); }} />
     {creatorOpen ? <ExerciseEditorModal purpose="session" target={{ mode: 'create' }} routines={[]} pending={Boolean(state.intent) || state.refreshing} createIdempotencyKey={sessionIntentKey}

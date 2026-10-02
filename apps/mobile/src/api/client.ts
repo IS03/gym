@@ -274,7 +274,10 @@ export function createMobileApiClient({
             conflictCode === 'SESSION_CHANGED' ||
             conflictCode === 'SESSION_CLOSED' ||
             conflictCode === 'SESSION_EXERCISE_REMOVED' ||
-            conflictCode === 'SESSION_EXERCISE_ALREADY_EXISTS';
+            conflictCode === 'SESSION_EXERCISE_ALREADY_EXISTS' ||
+            conflictCode === 'NO_COMPLETED_SETS' ||
+            conflictCode === 'SESSION_NOT_COMPLETED' ||
+            conflictCode === 'SESSION_DISCARDED';
           if (knownConflict) {
             const conflictData = conflictCode === 'ACTIVE_SESSION_EXISTS'
               ? options.parse(responseBody)

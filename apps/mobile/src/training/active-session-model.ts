@@ -1,4 +1,4 @@
-import { canonicalSessionExercisePayload, parseSessionExercisePayload, type QuickSessionHistoryDto, type SessionExerciseDto, type SessionExercisePayloadDto, type SessionSetDto } from '@/api/active-session';
+import { canonicalSessionExercisePayload, parseSessionExercisePayload, parseSessionFinishMetadata, type QuickSessionHistoryDto, type SessionFinishMetadata, type SessionExerciseDto, type SessionExercisePayloadDto, type SessionSetDto } from '@/api/active-session';
 
 export type SessionExerciseDraft = Omit<SessionExercisePayloadDto, 'sets' | 'isCompleted'> & {
   sets: (Omit<SessionSetDto, 'actualReps' | 'actualWeightKg'> & { localId: string; actualReps: string; actualWeightKg: string })[];
@@ -133,4 +133,25 @@ export function parseStoredExerciseDraft(value: unknown, sessionId: string, id: 
   const sets = draft.sets.map(set => ({ ...set, localId: typeof set.localId === 'string' && set.localId ? set.localId : rowId() }));
   if (new Set(sets.map(set => set.localId)).size !== sets.length) return null;
   return { ...record, draft: { ...draft, sets } };
+}
+
+// M3.4-2 — session summary entered before finishing (Web parity: energy and
+// performance 1–5, pain 0–10, notes). Unanswered stays null; 0 pain is real.
+export type SessionSummaryDraft = { energyLevel: number | null; performanceLevel: number | null; painLevel: number | null; notes: string };
+export const emptySessionSummary: SessionSummaryDraft = { energyLevel: null, performanceLevel: null, painLevel: null, notes: '' };
+export const SUMMARY_SCALES = { energyLevel: [1, 5], performanceLevel: [1, 5], painLevel: [0, 10] } as const;
+export function finishMetadata(draft: SessionSummaryDraft): SessionFinishMetadata {
+  // Storage keeps '' as NULL; canonicalize so a retry sends the identical payload.
+  return { energyLevel: draft.energyLevel, performanceLevel: draft.performanceLevel, painLevel: draft.painLevel,
+    notes: draft.notes === '' ? null : draft.notes };
+}
+export function summaryIsValid(draft: SessionSummaryDraft): boolean {
+  return parseSessionFinishMetadata(finishMetadata(draft)) !== undefined;
+}
+export function parseStoredSummary(value: unknown): SessionSummaryDraft | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.notes !== 'string') return null;
+  const parsed = parseSessionFinishMetadata({ energyLevel: raw.energyLevel, performanceLevel: raw.performanceLevel, painLevel: raw.painLevel, notes: raw.notes });
+  return parsed ? { energyLevel: parsed.energyLevel, performanceLevel: parsed.performanceLevel, painLevel: parsed.painLevel, notes: raw.notes } : null;
 }

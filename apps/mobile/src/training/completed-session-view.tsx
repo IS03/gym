@@ -1,0 +1,85 @@
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import type { SessionDetailDto, SessionFinishedDto } from '@/api/active-session';
+import { AppIcon, AppText, Button, Heading, ScrollScreen, Surface, radius, spacing, useOwnlevelTheme } from '@/design-system';
+import { compactHistoryDate } from './active-session-model';
+import { completedSessionModel, postWorkoutSummary, type CompletedMetadataItem } from './completed-session-model';
+
+function MetadataList({ items }: { items: CompletedMetadataItem[] }) {
+  return <View style={styles.metadata}>
+    {items.map(item => <View key={item.key} style={item.key === 'notes' ? styles.metadataNote : styles.metadataItem}>
+      <AppText muted variant="caption">{item.label}</AppText>
+      <AppText variant={item.key === 'notes' ? 'body' : 'label'}>{item.value}</AppText>
+    </View>)}
+  </View>;
+}
+
+/** Post-workout base (Web parity): saved confirmation + server-confirmed totals. */
+export function PostWorkoutSheet({ finished, onHome, onViewSession }: { finished: SessionFinishedDto; onHome: () => void; onViewSession: () => void }) {
+  const { colors } = useOwnlevelTheme();
+  const summary = postWorkoutSummary(finished);
+  return <Modal visible transparent animationType="slide" onRequestClose={onViewSession}>
+    <View style={styles.backdrop}>
+      <Pressable accessibilityLabel="Ver sesión terminada" style={styles.flex} onPress={onViewSession} />
+      <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="post-workout-sheet">
+        <View style={styles.row}>
+          <View style={[styles.check, { backgroundColor: colors.brandSubtle }]}><AppIcon name="check" color={colors.success} size={22} /></View>
+          <View style={styles.flex}>
+            <Heading level={2}>Entrenamiento guardado</Heading>
+            <AppText muted variant="caption">{summary.name} se guardó correctamente.</AppText>
+          </View>
+        </View>
+        <View style={[styles.totals, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <AppText variant="label">{summary.line}</AppText>
+          {summary.duration ? <AppText muted variant="caption">{summary.duration}</AppText> : null}
+        </View>
+        {summary.metadata.length ? <MetadataList items={summary.metadata} /> : null}
+        <Button label="Ir al inicio" onPress={onHome} />
+        <Button label="Ver sesión" variant="secondary" onPress={onViewSession} />
+      </SafeAreaView>
+    </View>
+  </Modal>;
+}
+
+/** Read-only closed session. Renders server truth only; no editing affordances. */
+export function CompletedSessionView({ detail, finished, onHome, onTraining }: {
+  detail: SessionDetailDto; finished: SessionFinishedDto | null; onHome: () => void; onTraining: () => void;
+}) {
+  const { colors } = useOwnlevelTheme();
+  const [postWorkoutOpen, setPostWorkoutOpen] = useState(Boolean(finished));
+  const model = completedSessionModel(detail);
+  const discarded = model.status === 'discarded';
+  return <ScrollScreen testID={discarded ? 'discarded-session' : 'completed-session'}>
+    <Surface elevated style={styles.header}>
+      <AppText muted variant="overline">{discarded ? 'SESIÓN ELIMINADA' : 'SESIÓN FINALIZADA'}</AppText>
+      <Heading level={2}>{model.name}</Heading>
+      <AppText muted variant="caption">{[compactHistoryDate(model.logDate), model.duration].filter(Boolean).join(' · ')}</AppText>
+      <AppText variant="label">{model.completedSetCount} {model.completedSetCount === 1 ? 'serie completada' : 'series completadas'} · {model.completedExerciseCount}/{model.exerciseCount} ejercicios</AppText>
+    </Surface>
+    {discarded ? <Surface><AppText muted>Esta sesión fue eliminada del historial. Se muestra sólo como referencia.</AppText></Surface> : null}
+    {model.metadata.length ? <Surface style={styles.section}><AppText variant="label">Resumen</AppText><MetadataList items={model.metadata} /></Surface> : null}
+    {model.exercises.map(exercise => <Surface key={exercise.id} style={styles.section} testID={`completed-exercise-${exercise.id}`}>
+      <View><AppText variant="label">{exercise.name}</AppText>{exercise.identity ? <AppText muted variant="caption">{exercise.identity}</AppText> : null}</View>
+      {exercise.sets.map(set => <View key={set.setNumber} style={styles.set} accessible
+        accessibilityLabel={`Serie ${set.setNumber}: ${set.label}${set.completed ? ', completada' : ', no completada'}`}>
+        <AppText muted style={styles.setNumber} variant="caption">{set.setNumber}</AppText>
+        <AppText style={[styles.flex, set.completed ? null : { color: colors.textMuted }]} variant="caption">{set.label}</AppText>
+        {set.completed ? <AppIcon name="check" color={colors.success} size={16} /> : null}
+      </View>)}
+    </Surface>)}
+    <Button label="Volver a Entrenar" variant="secondary" onPress={onTraining} />
+    {finished && postWorkoutOpen && !discarded ? <PostWorkoutSheet finished={finished} onHome={onHome} onViewSession={() => setPostWorkoutOpen(false)} /> : null}
+  </ScrollScreen>;
+}
+const styles = StyleSheet.create({
+  flex: { flex: 1 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  header: { gap: spacing.xs }, section: { gap: spacing.sm },
+  metadata: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  metadataItem: { minWidth: 88, gap: 2 }, metadataNote: { width: '100%', gap: 2 },
+  set: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 28 }, setNumber: { width: 20 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  sheet: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: spacing.lg, gap: spacing.md },
+  check: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  totals: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 2 },
+});

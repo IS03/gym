@@ -8,12 +8,14 @@ import { OwnlevelThemeProvider } from '@/design-system';
 import { HomeScreen } from './home-screen';
 
 const mockNavigate = jest.fn();
+const mockFocusEffects: (() => void)[] = [];
 const mockPush = jest.fn();
 const mockRefresh = jest.fn<() => Promise<void>>();
 const mockUseApiResource = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
+  useFocusEffect: (effect: () => void) => { mockFocusEffects.push(effect); },
 }));
 
 jest.mock('expo-symbols', () => ({
@@ -183,6 +185,16 @@ describe('Home resource screen', () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it('refreshes confirmed server truth whenever Home regains focus (e.g. after finishing a session)', () => {
+    const data = fixture();
+    mockUseApiResource.mockReturnValue({ refresh: mockRefresh,
+      state: { status: 'ready', current: { confirmedAt: 1, data }, refreshing: false, trigger: 'initial', result: okResult(data) } });
+    mockFocusEffects.length = 0;
+    renderScreen();
+    expect(mockRefresh).not.toHaveBeenCalled();
+    mockFocusEffects.at(-1)!();
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
   it('maps Home actions only to existing tabs and Settings', () => {
     const data = fixture();
     const result = okResult(data);

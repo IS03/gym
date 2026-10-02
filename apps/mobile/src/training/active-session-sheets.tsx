@@ -11,7 +11,7 @@ import { pickerExercises } from './routine-editor-model';
 import { compactActual, compactHistoryDate, historyLoadLabel, quickSessions } from './active-session-model';
 export { SessionNoteSheet } from './session-note-sheet';
 
-function SheetHeader({ title, subtitle, onClose }: { title: string; subtitle: string; onClose: () => void }) {
+export function SheetHeader({ title, subtitle, onClose }: { title: string; subtitle: string; onClose: () => void }) {
   return <View style={styles.header}>
     <View style={styles.flex}><Heading level={2}>{title}</Heading><AppText muted variant="caption">{subtitle}</AppText></View>
     <Pressable accessibilityRole="button" accessibilityLabel={`Cerrar ${title}`} onPress={onClose} style={styles.close}><AppText style={styles.closeText}>×</AppText></Pressable>
