@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -258,6 +259,7 @@ export function ExerciseEditorModal({
   pending,
   routines,
   target,
+  purpose = 'library',
 }: {
   createIdempotencyKey: () => string;
   onClose: () => void;
@@ -270,6 +272,7 @@ export function ExerciseEditorModal({
   pending: boolean;
   routines: MobileTrainingExerciseRoutine[];
   target: EditorTarget;
+  purpose?: 'library' | 'session';
 }) {
   const editing = target.mode === 'edit';
   const exercise = editing ? target.exercise : null;
@@ -295,14 +298,17 @@ export function ExerciseEditorModal({
   };
 
   const save = async () => {
+    if (pending) return;
     let mutation: MobileTrainingExerciseMutation;
     try {
       mutation = exerciseMutationFromForm(values);
+      if (purpose === 'session' && (mutation.suggestedSets ?? 1) > 50) throw new Error('La sesión admite hasta 50 series por ejercicio.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Revisá los valores del ejercicio.');
       return;
     }
     const key = editing ? undefined : submissionKey.current ?? createIdempotencyKey();
+    if (purpose === 'session') Keyboard.dismiss();
     if (!editing) submissionKey.current = key ?? null;
     const saveError = await onSave(mutation, routineIds, key);
     if (saveError) setError(saveError);
@@ -373,7 +379,7 @@ export function ExerciseEditorModal({
               <AppText muted variant="caption">
                 {editing
                   ? 'Actualizá la configuración del ejercicio.'
-                  : 'Agregalo a tu biblioteca para usarlo cuando lo necesites.'}
+                  : purpose === 'session' ? 'Se agregará a tu biblioteca y a esta sesión.' : 'Agregalo a tu biblioteca para usarlo cuando lo necesites.'}
               </AppText>
             </View>
             <Pressable
@@ -388,6 +394,7 @@ export function ExerciseEditorModal({
           </View>
 
           <ScrollView
+            pointerEvents={purpose === 'session' && pending ? 'none' : 'auto'}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
           >
@@ -429,7 +436,7 @@ export function ExerciseEditorModal({
             <View style={[styles.section, styles.numberedSection, { borderBottomColor: colors.border }]}>
               <SectionTitle
                 number={3}
-                subtitle="Se usarán al agregar este ejercicio a una rutina."
+                subtitle={purpose === 'session' ? 'Se usarán al agregarlo a esta sesión.' : 'Se usarán al agregar este ejercicio a una rutina.'}
                 title="Valores por defecto"
               />
               <View style={styles.inputGrid}>
@@ -442,7 +449,7 @@ export function ExerciseEditorModal({
               </View>
             </View>
 
-            <View style={[styles.section, styles.numberedSection, { borderBottomColor: colors.border }]}>
+            {purpose !== 'session' ? <View style={[styles.section, styles.numberedSection, { borderBottomColor: colors.border }]}>
               <SectionTitle
                 number={4}
                 subtitle={editing ? 'Gestioná dónde se utiliza actualmente.' : 'Seleccioná una rutina para tenerlo más a mano.'}
@@ -454,7 +461,7 @@ export function ExerciseEditorModal({
                 routines={routines}
                 selected={routineIds}
               />
-            </View>
+            </View> : null}
 
             <View style={styles.section}>
               <Pressable
@@ -502,7 +509,7 @@ export function ExerciseEditorModal({
           <Surface style={styles.footer}>
             <Button
               disabled={pending}
-              label={pending ? (editing ? 'Guardando…' : 'Creando…') : editing ? 'Guardar cambios' : 'Crear ejercicio'}
+              label={pending ? (editing ? 'Guardando…' : 'Creando…') : editing ? 'Guardar cambios' : purpose === 'session' ? 'Crear y agregar' : 'Crear ejercicio'}
               onPress={() => void save()}
             />
           </Surface>

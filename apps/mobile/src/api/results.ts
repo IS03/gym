@@ -41,7 +41,12 @@ export type MobileApiMutationResult<T> =
         | 'IDEMPOTENCY_KEY_REUSED'
         | 'ACTIVE_SESSION_EXISTS'
         | 'ROUTINE_CHANGED'
-        | 'ROUTINE_TEMPLATE_CHANGED';
+        | 'ROUTINE_TEMPLATE_CHANGED'
+        | 'SESSION_EXERCISE_CHANGED'
+        | 'SESSION_CHANGED'
+        | 'SESSION_CLOSED'
+        | 'SESSION_EXERCISE_REMOVED'
+        | 'SESSION_EXERCISE_ALREADY_EXISTS';
       message: string;
       data?: T;
       meta: MobileApiResultMeta;

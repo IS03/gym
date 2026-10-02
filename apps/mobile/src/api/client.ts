@@ -269,7 +269,12 @@ export function createMobileApiClient({
             conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
             conflictCode === 'ACTIVE_SESSION_EXISTS' ||
             conflictCode === 'ROUTINE_CHANGED' ||
-            conflictCode === 'ROUTINE_TEMPLATE_CHANGED';
+            conflictCode === 'ROUTINE_TEMPLATE_CHANGED' ||
+            conflictCode === 'SESSION_EXERCISE_CHANGED' ||
+            conflictCode === 'SESSION_CHANGED' ||
+            conflictCode === 'SESSION_CLOSED' ||
+            conflictCode === 'SESSION_EXERCISE_REMOVED' ||
+            conflictCode === 'SESSION_EXERCISE_ALREADY_EXISTS';
           if (knownConflict) {
             const conflictData = conflictCode === 'ACTIVE_SESSION_EXISTS'
               ? options.parse(responseBody)

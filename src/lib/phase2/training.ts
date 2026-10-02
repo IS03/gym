@@ -928,23 +928,26 @@ export async function createExerciseFromSession(input: {
   return { exercise, sessionExercise };
 }
 
-export async function removeSessionExercise(id: string): Promise<void> {
+export async function removeSessionExercise(input: {
+  id: string;
+  sessionId: string;
+  expectedUpdatedAt: string;
+}): Promise<void> {
   const supabase = await createClient();
   await getAuthedUserId();
-
-  const { data: row, error: rErr } = await supabase
-    .from("workout_session_exercises")
-    .select("workout_session_id")
-    .eq("id", id)
-    .single();
-  if (rErr) throw new Error(`Leer ejercicio de sesión: ${rErr.message}`);
-  await requireSessionInProgress((row as { workout_session_id: string }).workout_session_id);
-
-  const { error } = await supabase
-    .from("workout_session_exercises")
-    .delete()
-    .eq("id", id);
-  if (error) throw new Error(`Borrar ejercicio de sesión: ${error.message}`);
+  const { error } = await supabase.rpc("remove_workout_exercise", {
+    p_session_id: input.sessionId,
+    p_session_exercise_id: input.id,
+    p_expected_updated_at: input.expectedUpdatedAt,
+  });
+  if (error) {
+    const { message } = asPostgrestError(error);
+    throw new Error(message === "SESSION_EXERCISE_CHANGED"
+      ? "El ejercicio cambió en otro dispositivo. Actualizá antes de quitarlo."
+      : message === "SESSION_CLOSED"
+        ? "La sesión ya finalizó. No se puede modificar."
+        : "No se pudo quitar el ejercicio. Actualizá para comprobar su estado.", { cause: error });
+  }
 }
 
 export async function updateSessionExercise(input: {

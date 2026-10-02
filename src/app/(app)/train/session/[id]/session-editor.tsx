@@ -1014,6 +1014,14 @@ export function SessionEditor({
     if (!window.confirm(`¿Quitar ${name} de esta sesión?`)) return;
     removingExerciseIdsRef.current.add(exerciseId);
     await autosaveRef.current?.pauseAndWait(exerciseId);
+    // A conflict read-back can advance serverVersionsRef while the card still
+    // displays its local override. Do not remove that unseen remote payload.
+    if (autosaveRef.current?.getErrorCategory(exerciseId) === "conflict") {
+      removingExerciseIdsRef.current.delete(exerciseId);
+      autosaveRef.current?.resume(exerciseId);
+      setGlobalError("Comprobá los cambios y usá la versión guardada antes de quitar este ejercicio.");
+      return;
+    }
     setStatuses((current) => ({
       ...current,
       [exerciseId]: { pending: true, saved: false, error: null },
@@ -1021,6 +1029,7 @@ export function SessionEditor({
     const formData = new FormData();
     formData.set("session_id", detail.session.id);
     formData.set("id", exerciseId);
+    formData.set("expected_updated_at", serverVersionsRef.current[exerciseId]);
     try {
       await removeSessionExerciseAction(formData);
       await autosaveRef.current?.remove(exerciseId);

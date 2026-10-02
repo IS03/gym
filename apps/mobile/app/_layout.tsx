@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { MobileAuthProvider, useMobileAuth } from '@/auth';
 import { MobileApiProvider } from '@/api';
@@ -67,7 +68,7 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider>
       <OwnlevelThemeProvider>
         <MobileAuthProvider>
           <MobileApiProvider>
@@ -75,6 +76,6 @@ export default function RootLayout() {
           </MobileApiProvider>
         </MobileAuthProvider>
       </OwnlevelThemeProvider>
-    </SafeAreaProvider>
+    </SafeAreaProvider></GestureHandlerRootView>
   );
 }
