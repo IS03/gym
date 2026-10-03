@@ -2,6 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppState, type AppStateStatus, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MobileApiClient } from '@/api/client';
 import type { MobileApiReadResult } from '@/api/results';
 import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
@@ -10,7 +11,8 @@ import { NutritionDayScreen } from './day-screen';
 import { nutritionFixture } from './day-fixture.test-helper';
 
 const mockRead = jest.fn<MobileApiClient['read']>();
-const mockClient = { read: mockRead };
+const mockRequest = jest.fn<MobileApiClient['request']>();
+const mockClient = { read: mockRead, request: mockRequest };
 let mockUser = 'owner';
 let mockToday = '2026-10-02';
 jest.mock('./day-format', () => ({
@@ -20,6 +22,7 @@ jest.mock('@/api', () => ({ useMobileApi: () => ({ client: mockClient }) }));
 jest.mock('@/auth', () => ({ useMobileAuth: () => ({ session: { user: { id: mockUser } } }) }));
 jest.mock('expo-router', () => ({ useFocusEffect: () => {} }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 const ok = (date: string, data = nutritionFixture(date)): MobileApiReadResult<MobileNutritionDayResponse> => ({
   status: 'ok', data, meta: { durationMs: 10, httpStatus: 200, outcome: 'ok' },
 });
@@ -28,13 +31,58 @@ const failure: MobileApiReadResult<MobileNutritionDayResponse> = { status: 'unav
 const element = () => <OwnlevelThemeProvider initialMode="light"><NutritionDayScreen /></OwnlevelThemeProvider>;
 const appStateListeners: ((state: AppStateStatus) => void)[] = [];
 describe('Native Nutrition day', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear(); mockRequest.mockReset();
     mockRead.mockReset(); mockUser = 'owner'; mockToday = '2026-10-02';
     appStateListeners.length = 0;
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
       appStateListeners.push(listener);
       return { remove: () => { const index = appStateListeners.indexOf(listener); if (index >= 0) appStateListeners.splice(index, 1); } };
     });
+  });
+  it('keeps a form draft through refresh and fences the pre-write response after confirmed create', async () => {
+    let latest = nutritionFixture();
+    mockRead.mockImplementation(async () => ({ status: 'ok', data: latest, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } }) as never);
+    const view = render(element()); await view.findByText('Agregar comida');
+    fireEvent.press(view.getByText('Agregar comida'));
+    fireEvent.changeText(view.getByLabelText('Título'), 'My draft');
+    fireEvent.changeText(view.getByLabelText('Calorías'), '350');
+    let finishOld!: (r: unknown) => void;
+    mockRead.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve as (r: unknown) => void; }));
+    await act(async () => { view.UNSAFE_getByType(RefreshControl).props.onRefresh(); });
+    expect(view.getByLabelText('Título').props.value).toBe('My draft');
+    mockRequest.mockImplementation(async options => {
+      const body = options.body as { idempotencyKey: string };
+      expect(await AsyncStorage.getItem('ownlevel.nutrition.meal.v1.owner')).toContain(body.idempotencyKey);
+      latest = nutritionFixture();
+      if (latest.nutrition.status === 'ok' && latest.nutrition.data.dayState === 'recorded') {
+        latest.nutrition.data.meals[0].title = 'MY DRAFT'; latest.nutrition.data.meals[0].calories = 350;
+        latest.nutrition.data.summary.calories.knownTotal = 350;
+      }
+      return { status: 'ok', data: { status: 'saved', mealId: '41100000-0000-4000-8000-000000000002', sourceDate: mockToday, destinationDate: mockToday, updatedAt: `${mockToday}T13:00:00Z` }, meta: { durationMs: 1, httpStatus: 201, outcome: 'ok' } } as never;
+    });
+    fireEvent.press(view.getByText('Guardar comida'));
+    await view.findByText('MY DRAFT');
+    await act(async () => { finishOld(ok(mockToday)); });
+    expect(view.getByText('MY DRAFT')).toBeTruthy(); expect(view.queryByText('Comida 2026-10-02')).toBeNull();
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+  it('uncertain save may return to the day and is only replayed by explicit recovery', async () => {
+    mockRead.mockImplementation(async options => ok(options.path.split('/').pop()!) as never);
+    mockRequest.mockResolvedValueOnce(failure as never).mockResolvedValueOnce({ status: 'ok',
+      data: { status: 'saved', mealId: '41100000-0000-4000-8000-000000000002', sourceDate: mockToday, destinationDate: mockToday, updatedAt: `${mockToday}T13:00:00Z` },
+      meta: { durationMs: 1, httpStatus: 201, outcome: 'ok' } } as never);
+    const view = render(element()); await view.findByText('Agregar comida'); fireEvent.press(view.getByText('Agregar comida'));
+    fireEvent.changeText(view.getByLabelText('Calorías'), '250'); fireEvent.press(view.getByText('Guardar comida'));
+    await view.findByText('Comprobar intento guardado');
+    fireEvent.press(view.getByText('Volver al día · conservar intento')); await view.findByText('Revisar intento guardado');
+    await act(async () => { appStateListeners.forEach(f => f('background')); appStateListeners.forEach(f => f('active')); });
+    expect(mockRequest).toHaveBeenCalledTimes(1);
+    fireEvent.press(view.getByText('Revisar intento guardado'));
+    expect(view.getByLabelText('Calorías').props.value).toBe('250');
+    fireEvent.press(view.getByText('Comprobar intento guardado')); await view.findByText('Comida guardada.');
+    expect(mockRequest).toHaveBeenCalledTimes(2);
+    expect(mockRequest.mock.calls[1][0].body).toEqual(mockRequest.mock.calls[0][0].body);
   });
   it('loads today, distinguishes target/balance and navigates to date and back', async () => {
     mockRead.mockImplementation(async options => ok(options.path.split('/').pop()!) as never);

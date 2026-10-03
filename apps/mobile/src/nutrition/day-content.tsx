@@ -1,6 +1,7 @@
 import { View, StyleSheet } from 'react-native';
 import type { MobileNutritionDayResponse, NutritionDayContext, NutritionDayMetric } from '@/api/nutrition-day';
-import { AppText, Heading, Surface, spacing } from '@/design-system';
+import type { NutritionDayMeal } from '../../../../src/lib/mobile-api/nutrition-day-contract';
+import { AppText, Button, Heading, Surface, spacing } from '@/design-system';
 import { amount, nutrientAmount, signedAmount } from './day-format';
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -27,7 +28,7 @@ function metricValue(m: NutritionDayMetric, value: number | null): string {
   if (m.valueType === 'duration') return `${Math.floor(value / 60)} h ${value % 60} min`;
   return `${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 }).format(value)}${m.unit ? ` ${m.unit}` : ''}`;
 }
-export function NutritionDayContent({ data }: { data: MobileNutritionDayResponse }) {
+export function NutritionDayContent({ data, onEdit }: { data: MobileNutritionDayResponse; onEdit?: (meal: NutritionDayMeal) => void }) {
   const nutrition = data.nutrition.status === 'ok' ? data.nutrition.data : null;
   const recorded = nutrition?.dayState === 'recorded' ? nutrition : null;
   const energyAmount = (value: number | null) => {
@@ -65,6 +66,8 @@ export function NutritionDayContent({ data }: { data: MobileNutritionDayResponse
               <Detail label="Calorías" value={amount(meal.calories, 'kcal')} />
               <AppText muted>{`Proteína ${amount(meal.proteinG, 'g')} · Carbohidratos ${amount(meal.carbsG, 'g')} · Grasas ${amount(meal.fatG, 'g')}`}</AppText>
               {meal.precision === 'estimated' ? <AppText muted>Valores estimados</AppText> : null}
+              {onEdit && meal.entryKind === 'meal' && meal.sourceType === 'manual' ?
+                <Button label="Editar comida" accessibilityLabel={`Editar ${meal.title || meal.description || 'comida'}`} onPress={() => onEdit(meal)} variant="secondary" /> : null}
             </Surface>)}
         </View>
         <Context data={recorded.context} />
