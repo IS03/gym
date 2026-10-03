@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { SessionDetailDto, SessionFinishedDto } from '@/api/active-session';
@@ -24,7 +24,7 @@ export function PostWorkoutSheet({ finished, onHome, onViewSession }: { finished
       <Pressable accessibilityLabel="Ver sesión terminada" style={styles.flex} onPress={onViewSession} />
       <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="post-workout-sheet">
         <View style={styles.row}>
-          <View style={[styles.check, { backgroundColor: colors.brandSubtle }]}><AppIcon name="check" color={colors.success} size={22} /></View>
+          <View style={[styles.check, { backgroundColor: `${colors.success}22` }]}><AppIcon name="check" color={colors.success} size={22} /></View>
           <View style={styles.flex}>
             <Heading level={2}>Entrenamiento guardado</Heading>
             <AppText muted variant="caption">{summary.name} se guardó correctamente.</AppText>
@@ -43,8 +43,9 @@ export function PostWorkoutSheet({ finished, onHome, onViewSession }: { finished
 }
 
 /** Read-only closed session. Renders server truth only; no editing affordances. */
-export function CompletedSessionView({ detail, finished, onHome, onTraining }: {
-  detail: SessionDetailDto; finished: SessionFinishedDto | null; onHome: () => void; onTraining: () => void;
+export function CompletedSessionView({ detail, finished, onHome, onTraining, onOpenExercise, actions, banner }: {
+  detail: SessionDetailDto; finished: SessionFinishedDto | null; onHome: () => void; onTraining?: () => void;
+  onOpenExercise?: (exerciseId: string) => void; actions?: ReactNode; banner?: ReactNode;
 }) {
   const { colors } = useOwnlevelTheme();
   const [postWorkoutOpen, setPostWorkoutOpen] = useState(Boolean(finished));
@@ -57,10 +58,15 @@ export function CompletedSessionView({ detail, finished, onHome, onTraining }: {
       <AppText muted variant="caption">{[compactHistoryDate(model.logDate), model.duration].filter(Boolean).join(' · ')}</AppText>
       <AppText variant="label">{model.completedSetCount} {model.completedSetCount === 1 ? 'serie completada' : 'series completadas'} · {model.completedExerciseCount}/{model.exerciseCount} ejercicios</AppText>
     </Surface>
+    {banner}
     {discarded ? <Surface><AppText muted>Esta sesión fue eliminada del historial. Se muestra sólo como referencia.</AppText></Surface> : null}
     {model.metadata.length ? <Surface style={styles.section}><AppText variant="label">Resumen</AppText><MetadataList items={model.metadata} /></Surface> : null}
     {model.exercises.map(exercise => <Surface key={exercise.id} style={styles.section} testID={`completed-exercise-${exercise.id}`}>
-      <View><AppText variant="label">{exercise.name}</AppText>{exercise.identity ? <AppText muted variant="caption">{exercise.identity}</AppText> : null}</View>
+      {onOpenExercise ? <Pressable accessibilityRole="button" accessibilityLabel={`Ver historial de ${exercise.name}`} onPress={() => onOpenExercise(exercise.exerciseId)}
+        style={styles.exerciseHeader} testID={`completed-exercise-history-${exercise.id}`}>
+        <View style={styles.flex}><AppText variant="label">{exercise.name}</AppText>{exercise.identity ? <AppText muted variant="caption">{exercise.identity}</AppText> : null}</View>
+        <AppText style={{ color: colors.primary }} variant="caption">Historial</AppText><AppIcon color={colors.primary} name="chevronRight" size={12} />
+      </Pressable> : <View><AppText variant="label">{exercise.name}</AppText>{exercise.identity ? <AppText muted variant="caption">{exercise.identity}</AppText> : null}</View>}
       {exercise.sets.map(set => <View key={set.setNumber} style={styles.set} accessible
         accessibilityLabel={`Serie ${set.setNumber}: ${set.label}${set.completed ? ', completada' : ', no completada'}`}>
         <AppText muted style={styles.setNumber} variant="caption">{set.setNumber}</AppText>
@@ -68,12 +74,13 @@ export function CompletedSessionView({ detail, finished, onHome, onTraining }: {
         {set.completed ? <AppIcon name="check" color={colors.success} size={16} /> : null}
       </View>)}
     </Surface>)}
-    <Button label="Volver a Entrenar" variant="secondary" onPress={onTraining} />
-    {finished && postWorkoutOpen && !discarded ? <PostWorkoutSheet finished={finished} onHome={onHome} onViewSession={() => setPostWorkoutOpen(false)} /> : null}
+    {actions}
+    {onTraining ? <Button label="Volver a Entrenar" variant="secondary" onPress={onTraining} /> : null}
+    {finished && postWorkoutOpen && !discarded ? <PostWorkoutSheet finished={finished} onHome={() => { setPostWorkoutOpen(false); onHome(); }} onViewSession={() => setPostWorkoutOpen(false)} /> : null}
   </ScrollScreen>;
 }
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  flex: { flex: 1 }, exerciseHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44 }, row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   header: { gap: spacing.xs }, section: { gap: spacing.sm },
   metadata: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   metadataItem: { minWidth: 88, gap: 2 }, metadataNote: { width: '100%', gap: 2 },

@@ -1,5 +1,11 @@
 import "server-only";
-import { getWorkoutSessionDetail, listCompletedSessionHistory, listRecentRobustExerciseHistoryByExercise } from "../phase2/training-robust";
+import {
+  getTrainingHistoryDirectory, getWorkoutSessionDetail, listCompletedSessionHistory, listRecentRobustExerciseHistoryByExercise,
+  listRobustExerciseHistory, type RobustExerciseHistoryItem,
+} from "../phase2/training-robust";
+import { listExercises } from "../phase2/training";
+import { buildTrainingHistoryExerciseDetail, sortTrainingHistoryExercises, type TrainingHistoryExerciseSession } from "../phase2/training-history";
+import type { ExerciseReportSession } from "../phase2/exercise-insights";
 import { orderTrainingDaySessions, summarizeTrainingDay } from "../phase2/training-day-summary";
 import type { CompletedSessionSummary } from "../phase2/types";
 import type { AuthenticatedRequestContext } from "../supabase/server";
@@ -15,7 +21,8 @@ import {
   parseSessionFinish, parseSessionFinishedResponse, sessionFinishDomainMetadata,
   parseSessionCorrection, parseSessionCorrectedResponse, sessionCorrectionDomainPayload,
   parseSessionDiscard, parseSessionDiscardedResponse,
-  parseMobileTrainingDate, parseTrainingHistoryCursor, parseTrainingHistoryLimit, encodeTrainingHistoryCursor,
+  parseMobileTrainingDate, parseTrainingHistoryCursor, parseTrainingHistoryLimit, encodeTrainingHistoryCursor, parseExerciseHistoryLimit,
+  type TrainingExerciseHistoryResponse, type TrainingExerciseHistorySessionDto, type TrainingHistoryExercisesResponse,
   type SessionExerciseSyncDto, type SessionStructuralDto, type TrainingDayResponse, type TrainingHistoryResponse,
   type TrainingHistorySessionDto,
 } from "./training-session";
@@ -234,4 +241,60 @@ export async function readMobileTrainingDay(date: unknown, context: MobileSupaba
   const logDate = parseMobileTrainingDate(date);
   const sessions = orderTrainingDaySessions(await listCompletedSessionHistory({ logDate, limit: 100 }, auth(context, performance)));
   return { date: logDate, sessions: sessions.map(historySessionDto), summary: summarizeTrainingDay(sessions) };
+}
+
+/** Exercises with completed history (Web default: recorded, most recent first). */
+export async function listMobileTrainingHistoryExercises(context: MobileSupabaseAuthenticatedContext,
+  performance: RequestPerformanceContext): Promise<TrainingHistoryExercisesResponse> {
+  const directory = await getTrainingHistoryDirectory(auth(context, performance));
+  const recorded = sortTrainingHistoryExercises(directory.exercises.filter((exercise) => exercise.sessions > 0), "recent");
+  return { exercises: recorded.map((exercise) => ({
+    id: exercise.id, name: exercise.name, muscleGroup: exercise.muscleGroup, muscleLabel: exercise.muscleLabel,
+    implement: exercise.implement, weightMode: exercise.weightMode, lastDate: exercise.lastDate, sessions: exercise.sessions,
+    lastMark: exercise.lastMark, bestMark: exercise.bestMark,
+  })) };
+}
+// Same projection as the Web exercise history page.
+function exerciseReportSessions(items: RobustExerciseHistoryItem[]): ExerciseReportSession[] {
+  return items.map((item) => ({
+    sessionId: item.session.id, logDate: item.logDate, completedAt: item.session.ended_at, routineId: item.session.routine_id,
+    routineName: item.session.routine_name_snapshot ?? item.session.session_name ?? "Sesión libre",
+    decision: item.exercise.decision, weightMode: item.exercise.weight_mode_snapshot,
+    sets: item.exercise.sets.map((set) => ({
+      id: set.id, set_number: set.set_number, target_reps: set.target_reps, target_weight_kg: set.target_weight_kg,
+      target_rir: set.target_rir, actual_reps: set.actual_reps, actual_weight_kg: set.actual_weight_kg, is_completed: set.is_completed,
+    })),
+  }));
+}
+function exerciseHistorySessionDto(session: TrainingHistoryExerciseSession): TrainingExerciseHistorySessionDto {
+  return { sessionId: session.sessionId, logDate: session.logDate, routineName: session.routineName, mark: session.mark,
+    completedSets: session.completedSets, rirValues: session.rirValues };
+}
+/** One exercise's completed snapshot history with the Web latest/best marks. */
+export async function readMobileTrainingExerciseHistory(id: unknown, searchParams: URLSearchParams,
+  context: MobileSupabaseAuthenticatedContext, performance: RequestPerformanceContext): Promise<TrainingExerciseHistoryResponse> {
+  const exerciseId = parseMobileTrainingId(id, "El ejercicio").toLowerCase();
+  const limit = parseExerciseHistoryLimit(searchParams.get("limit"));
+  const request = auth(context, performance);
+  const [catalog, items] = await Promise.all([
+    listExercises({ includeArchived: true }, request),
+    listRobustExerciseHistory({ exerciseId, limit: 500 }, request),
+  ]);
+  const exercise = catalog.find((item) => item.id === exerciseId) ?? null;
+  const latestSnapshot = items[0]?.exercise ?? null;
+  if (!exercise && !latestSnapshot) throw new MobileApiNotFoundError();
+  const detail = buildTrainingHistoryExerciseDetail(exerciseReportSessions(items));
+  return {
+    exercise: {
+      id: exerciseId, name: latestSnapshot?.nombre_snapshot ?? exercise?.nombre ?? "Ejercicio",
+      muscleGroup: latestSnapshot?.grupo_muscular_snapshot ?? exercise?.grupo_muscular ?? null,
+      muscleLabel: latestSnapshot?.muscle_group_label_snapshot ?? exercise?.muscle_group_label ?? null,
+      implement: latestSnapshot?.implement_snapshot ?? exercise?.implement ?? null,
+      weightMode: latestSnapshot?.weight_mode_snapshot ?? exercise?.weight_mode ?? null,
+    },
+    latest: detail.latest ? exerciseHistorySessionDto(detail.latest) : null,
+    best: detail.best ? exerciseHistorySessionDto(detail.best) : null,
+    sessions: detail.sessions.slice(0, limit).map(exerciseHistorySessionDto),
+    hasMore: detail.sessions.length > limit,
+  };
 }

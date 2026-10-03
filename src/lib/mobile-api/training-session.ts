@@ -465,3 +465,40 @@ export function parseTrainingHistoryLimit(value: string | null): number {
   if (!/^\d{1,3}$/.test(value) || Number(value) < 1 || Number(value) > 50) throw new MobileApiValidationError("El límite no es válido.");
   return Number(value);
 }
+
+// M3.4-3 — exercise history reads (additive). Marks are computed server-side
+// with the Web domain helpers so Mobile never re-derives "best"/"latest".
+export type TrainingHistoryMarkDto = { weightKg: number | null; reps: number | null };
+export type TrainingHistoryExerciseDto = {
+  id: string;
+  name: string;
+  muscleGroup: string | null;
+  muscleLabel: string | null;
+  implement: string | null;
+  weightMode: string | null;
+  lastDate: string | null;
+  sessions: number;
+  lastMark: TrainingHistoryMarkDto | null;
+  bestMark: TrainingHistoryMarkDto | null;
+};
+export type TrainingHistoryExercisesResponse = { exercises: TrainingHistoryExerciseDto[] };
+export type TrainingExerciseHistorySessionDto = {
+  sessionId: string;
+  logDate: string;
+  routineName: string;
+  mark: TrainingHistoryMarkDto | null;
+  completedSets: number;
+  rirValues: number[];
+};
+export type TrainingExerciseHistoryResponse = {
+  exercise: { id: string; name: string; muscleGroup: string | null; muscleLabel: string | null; implement: string | null; weightMode: string | null };
+  latest: TrainingExerciseHistorySessionDto | null;
+  best: TrainingExerciseHistorySessionDto | null;
+  sessions: TrainingExerciseHistorySessionDto[];
+  hasMore: boolean;
+};
+export function parseExerciseHistoryLimit(value: string | null): number {
+  if (value === null) return 20;
+  if (!/^\d{1,3}$/.test(value) || Number(value) < 1 || Number(value) > 100) throw new MobileApiValidationError("El límite no es válido.");
+  return Number(value);
+}

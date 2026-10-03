@@ -17,13 +17,16 @@ import { DRAG_DELAY, LIFT_SCALE, PRESS_SCALE } from './session-native-interactio
 import { exercisePayload } from './active-session-model';
 
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
+const mockSetOptions = jest.fn();
 const mockCatalog = jest.fn();
 const mockSelection = jest.fn();
 const mockSuccess = jest.fn();
 const mockWarning = jest.fn();
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: () => mockSelection(), success: () => mockSuccess(), warning: () => mockWarning() } }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace }), useNavigation: () => ({ dispatch: jest.fn() }), useFocusEffect: () => undefined }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }), useNavigation: () => ({ dispatch: jest.fn(), setOptions: mockSetOptions }),
+  useFocusEffect: () => undefined }));
 jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({ usePreventRemove: () => undefined }));
 jest.mock('./active-session-native-storage', () => ({ activeSessionStorage: {} }));
 jest.mock('@/api', () => ({ fetchMobileTrainingExercises: (...args: unknown[]) => mockCatalog(...args),
@@ -438,7 +441,8 @@ describe('native active session screen', () => {
 });
 
 describe('native finish screen (M3.4-2)', () => {
-  beforeEach(() => { mockReplace.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); }); afterEach(() => { jest.restoreAllMocks(); });
+  beforeEach(() => { mockReplace.mockReset(); mockNavigate.mockReset(); mockSetOptions.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); });
+  afterEach(() => { jest.restoreAllMocks(); });
   const completedDetail = () => { const detail = testDetail(); detail.exercises[0].payload.sets[0].isCompleted = true; detail.exercises[0].payload.isCompleted = true;
     detail.session = { ...detail.session, status: 'completed', endedAt: '2026-09-30T13:05:00.000000+00:00',
       metadata: { ...detail.session.metadata, energyLevel: 4, painLevel: 0 } }; return detail; };
@@ -452,7 +456,8 @@ describe('native finish screen (M3.4-2)', () => {
     jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
     fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
     expect(view.getAllByText('Sin responder')).toHaveLength(3);
-    fireEvent.press(view.getByTestId('summary-energyLevel-4')); fireEvent.press(view.getByTestId('summary-painLevel-0'));
+    fireEvent.press(view.getByTestId('summary-energyLevel-4'));
+    fireEvent(view.getByTestId('summary-painLevel-slider'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent.press(view.getByTestId('summary-performanceLevel-3')); fireEvent.press(view.getByTestId('summary-performanceLevel-3'));
     await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Guardar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
     expect(api.finish).toHaveBeenCalledTimes(1);
@@ -473,7 +478,28 @@ describe('native finish screen (M3.4-2)', () => {
     await completeSet(view, controller); jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
     await act(async () => { await controller.finish(); for (let i = 0; i < 40; i++) await Promise.resolve(); });
     fireEvent.press(view.getByRole('button', { name: 'Ir al inicio' }));
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/home'); controller.dispose();
+    // The sheet must close: the Train stack stays mounted behind the Home tab.
+    expect(view.queryByTestId('post-workout-sheet')).toBeNull();
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/train'); expect(mockNavigate).toHaveBeenCalledWith('/(tabs)/home'); controller.dispose();
+  });
+  it('records pain on an iOS-style slider: no default, stepped values including 0, Quitar returns to unanswered', async () => {
+    const { controller, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
+    await completeSet(view, controller);
+    fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
+    const slider = view.getByTestId('summary-painLevel-slider');
+    fireEvent(slider, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 328, height: 44 } } });
+    await act(async () => { await Promise.resolve(); }); // RNGH applies handler updates in a microtask
+    expect(controller.getSnapshot().summary.painLevel).toBeNull();
+    // Track travel = 328 - 28 = 300pt → 30pt per step; the thumb center starts at 14pt.
+    act(() => fireGestureHandler(getByGestureTestId('summary-painLevel-tap'), [{ state: State.BEGAN, x: 14 }, { state: State.ACTIVE, x: 14 }, { state: State.END, x: 14 }]));
+    await act(async () => { await Promise.resolve(); });
+    expect(controller.getSnapshot().summary.painLevel).toBe(0); expect(view.getByText('0/10')).toBeTruthy();
+    mockSelection.mockClear();
+    act(() => fireGestureHandler(getByGestureTestId('summary-painLevel-pan'), [{ state: State.BEGAN, x: 14 }, { state: State.ACTIVE, x: 104 }, { state: State.ACTIVE, x: 200 }, { state: State.END, x: 200 }]));
+    expect(controller.getSnapshot().summary.painLevel).toBe(6); expect(mockSelection).toHaveBeenCalledTimes(2);
+    fireEvent.press(view.getByRole('button', { name: 'Quitar dolor' }));
+    expect(controller.getSnapshot().summary.painLevel).toBeNull(); expect(view.queryByRole('button', { name: 'Quitar dolor' })).toBeNull();
+    controller.dispose();
   });
   it('keeps an unknown finish outcome explicit and recovers it from the sheet with the same key', async () => {
     const { controller, api, Screen } = fixture(); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
@@ -491,6 +517,7 @@ describe('native finish screen (M3.4-2)', () => {
   it('opens an already completed session read-only without the active editor or a post-workout sheet', async () => {
     const { controller, Screen } = fixture(completedDetail()); await controller.refresh(); const view = render(<Screen />);
     expect(view.getByTestId('completed-session')).toBeTruthy(); expect(view.getByText('SESIÓN FINALIZADA')).toBeTruthy();
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ title: 'Sesión finalizada' });
     expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(view.queryByRole('button', { name: 'Finalizar entrenamiento' })).toBeNull();
     expect(view.getByText('4/5')).toBeTruthy(); expect(view.getByText('0/10')).toBeTruthy(); expect(view.queryByText('Rendimiento')).toBeNull();
     controller.dispose();

@@ -331,3 +331,5 @@ export function finishSession(client: MobileApiClient, sessionId: string, body: 
     return parsed?.sessionId === sessionId.toLowerCase() ? parsed : undefined;
   } });
 }
+// Shared strict guards for the other Training session contracts.
+export const sessionGuards = { record, id, text, date, timestamp, number, counter, COLORS };

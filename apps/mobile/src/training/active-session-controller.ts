@@ -99,6 +99,8 @@ export class ActiveSessionController {
   private readonly localRemovals = new Set<string>();
   private readonly reportedRemovals = new Set<string>();
 
+  /** Plain server read for the closed-session view (no draft/intent side effects). */
+  readonly readDetail = () => this.api.detail();
   constructor(private readonly api: ActiveSessionApi, private readonly repository: SessionDraftRepository,
     private readonly generateKey: () => string = sessionIntentKey, private readonly now: () => number = Date.now) {}
   getSnapshot = () => this.snapshot;

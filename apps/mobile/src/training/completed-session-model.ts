@@ -13,7 +13,7 @@ export type CompletedSessionModel = {
   completedExerciseCount: number;
   completedSetCount: number;
   metadata: CompletedMetadataItem[];
-  exercises: { id: string; name: string; identity: string; sets: { setNumber: number; label: string; completed: boolean }[] }[];
+  exercises: { id: string; exerciseId: string; name: string; identity: string; sets: { setNumber: number; label: string; completed: boolean }[] }[];
 };
 
 export function sessionDuration(startedAt: string, endedAt: string | null): string | null {
@@ -34,7 +34,7 @@ function setLabel(set: SessionSetDto) { return historyLoadLabel(set); }
 export function completedSessionModel(detail: SessionDetailDto): CompletedSessionModel {
   const { session } = detail;
   const exercises = detail.exercises.map(exercise => ({
-    id: exercise.id, name: exercise.nameSnapshot,
+    id: exercise.id, exerciseId: exercise.exerciseId, name: exercise.nameSnapshot,
     identity: [exercise.muscleGroupLabelSnapshot, exercise.implementSnapshot, exercise.weightModeSnapshot].filter(Boolean).join(' · '),
     sets: exercise.payload.sets.map(set => ({ setNumber: set.setNumber, label: setLabel(set), completed: set.isCompleted })),
   }));

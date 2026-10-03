@@ -1,16 +1,18 @@
 import { useSyncExternalStore } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText, Button, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
 import type { ActiveSessionController } from './active-session-controller';
 import { SUMMARY_SCALES, type SessionSummaryDraft } from './active-session-model';
 import { SheetHeader } from './active-session-sheets';
+import { SummarySlider } from './summary-slider';
 
-type ScaleKey = keyof typeof SUMMARY_SCALES;
-const SCALE_LABELS: Record<ScaleKey, string> = { energyLevel: 'Energía', performanceLevel: 'Rendimiento', painLevel: 'Dolor' };
+type ScaleKey = 'energyLevel' | 'performanceLevel';
+const SCALE_LABELS: Record<ScaleKey, string> = { energyLevel: 'Energía', performanceLevel: 'Rendimiento' };
 
 /** Tapping the selected value clears it: unanswered stays null, never 0. */
-function SummaryScale({ field, value, disabled, onChange }: {
+export function SummaryScale({ field, value, disabled, onChange }: {
   field: ScaleKey; value: number | null; disabled: boolean; onChange: (next: number | null) => void;
 }) {
   const { colors } = useOwnlevelTheme();
@@ -28,10 +30,10 @@ function SummaryScale({ field, value, disabled, onChange }: {
         return <Pressable key={option} testID={`summary-${field}-${option}`} accessibilityRole="radio" disabled={disabled}
           accessibilityLabel={`${label} ${option} de ${maximum}`} accessibilityState={{ selected, disabled }}
           onPress={() => onChange(selected ? null : option)}
-          style={[styles.option, maximum <= 5 ? styles.optionWide : null, {
+          style={[styles.option, {
             borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.surface, opacity: disabled ? 0.5 : 1,
           }]}>
-          <AppText style={{ color: selected ? colors.surface : colors.text }} variant="label">{option}</AppText>
+          <AppText style={{ color: selected ? colors.onPrimary : colors.text }} variant="label">{option}</AppText>
         </Pressable>;
       })}
     </View>
@@ -54,13 +56,16 @@ export function FinishSessionSheet({ controller, onClose }: { controller: Active
     ? 'No pudimos confirmar si el entrenamiento se guardó. Comprobalo antes de seguir: no se va a guardar dos veces.'
     : finishIntent?.phase === 'blocked' ? state.notice ?? 'La finalización necesita revisión.' : !running ? state.notice : null;
   return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} testID="finish-session-sheet">
+    {/* RN Modal content renders outside the app's gesture root. */}
+    <GestureHandlerRootView style={styles.screen}><SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} testID="finish-session-sheet">
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <SheetHeader title="Finalizar entrenamiento" subtitle={`${progress.completedSets}/${progress.totalSets} series · ${progress.completedExercises}/${progress.exercises} ejercicios`} onClose={close} />
+        <SheetHeader title="Finalizar entrenamiento" subtitle={`${progress.completedSets}/${progress.totalSets} series completadas`} onClose={close} />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <AppText muted variant="caption">Resumen opcional. Lo que no completes queda sin responder.</AppText>
-          {(['energyLevel', 'performanceLevel', 'painLevel'] as const).map(field => <SummaryScale key={field} field={field}
+          {(['energyLevel', 'performanceLevel'] as const).map(field => <SummaryScale key={field} field={field}
             value={pendingMetadata ? pendingMetadata[field] : state.summary[field]} disabled={!editable} onChange={value => change({ [field]: value })} />)}
+          <SummarySlider field="painLevel" label="Dolor" minimumLabel="sin dolor" minimum={SUMMARY_SCALES.painLevel[0]} maximum={SUMMARY_SCALES.painLevel[1]}
+            value={pendingMetadata ? pendingMetadata.painLevel : state.summary.painLevel} disabled={!editable} onChange={painLevel => change({ painLevel })} />
           <View style={styles.scale}>
             <AppText variant="label">Notas</AppText>
             <TextInput accessibilityLabel="Notas del entrenamiento" editable={editable} multiline placeholder="¿Cómo te sentiste? Algo para recordar la próxima vez…"
@@ -80,7 +85,7 @@ export function FinishSessionSheet({ controller, onClose }: { controller: Active
           <Button label="Seguir entrenando" variant="quiet" disabled={running} onPress={close} />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeAreaView></GestureHandlerRootView>
   </Modal>;
 }
 const styles = StyleSheet.create({
@@ -88,9 +93,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
   scale: { gap: spacing.sm },
   scaleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  option: { minWidth: sizes.touchTarget, minHeight: sizes.touchTarget, borderWidth: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  optionWide: { flexGrow: 1 },
+  options: { flexDirection: 'row', gap: spacing.xs },
+  option: { flex: 1, minHeight: sizes.touchTarget, borderWidth: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   notes: { minHeight: 96, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: 16, textAlignVertical: 'top' },
   footer: { padding: spacing.lg, gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   pending: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

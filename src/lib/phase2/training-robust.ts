@@ -896,14 +896,14 @@ export async function listRobustExerciseHistory(input: {
   toDate?: string;
   routineId?: string;
   limit?: number;
-}): Promise<RobustExerciseHistoryItem[]> {
+}, context?: AuthenticatedRequestContext): Promise<RobustExerciseHistoryItem[]> {
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 500);
   const items = await queryRobustExerciseHistory({
     exerciseIds: [input.exerciseId],
     fromDate: input.fromDate,
     toDate: input.toDate,
     routineId: input.routineId,
-  });
+  }, context);
   return items.slice(0, limit);
 }
 
@@ -1208,8 +1208,8 @@ export async function loadCompletedTrainingData(
  * One batched historical read model for the exercise tab. Memberships come
  * from completed session snapshots, never from the current routine template.
  */
-export async function getTrainingHistoryDirectory(): Promise<TrainingHistoryDirectory> {
-  const context = await getAuthedContext();
+export async function getTrainingHistoryDirectory(requestContext?: AuthenticatedRequestContext): Promise<TrainingHistoryDirectory> {
+  const context = requestContext ?? await getAuthedContext();
   const [data, catalog, activeRoutines] = await Promise.all([
     loadCompletedTrainingData(context),
     listExercises({ includeArchived: true }, context),

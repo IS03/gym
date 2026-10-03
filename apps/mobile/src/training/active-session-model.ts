@@ -155,3 +155,5 @@ export function parseStoredSummary(value: unknown): SessionSummaryDraft | null {
   const parsed = parseSessionFinishMetadata({ energyLevel: raw.energyLevel, performanceLevel: raw.performanceLevel, painLevel: raw.painLevel, notes: raw.notes });
   return parsed ? { energyLevel: parsed.energyLevel, performanceLevel: parsed.performanceLevel, painLevel: parsed.painLevel, notes: raw.notes } : null;
 }
+/** Shared kg/reps text parser (same limits and messages as the active session). */
+export const parseDraftNumber = numeric;
