@@ -10,11 +10,15 @@ import { NutritionDayContent } from './day-content';
 import { useNutritionDayResource } from './day-resource';
 import type { NutritionDayMeal } from '../../../../src/lib/mobile-api/nutrition-day-contract';
 import { useMealController } from './use-meal-controller';
+import { useDayWriteController } from './use-day-write-controller';
+import { DayWriteEditor } from './day-write-editor';
+import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { MealEditor } from './meal-editor';
 
-function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, onEdit }: {
+function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, onEdit, onActivity, onContext }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
   onAdd?: () => void; onEdit?: (meal: NutritionDayMeal) => void;
+  onActivity?: (data: MobileNutritionDayResponse) => void; onContext?: (data: MobileNutritionDayResponse) => void;
 }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
@@ -51,7 +55,8 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
           <AppText accessibilityRole="alert">No pudimos actualizar. Mostramos la última lectura de esta fecha.</AppText>
           <Button label="Reintentar" onPress={runRefresh} variant="secondary" />
         </View> : null}
-        <NutritionDayContent data={current.data} onEdit={state.status === 'ready' ? onEdit : undefined} />
+        <NutritionDayContent data={current.data} onEdit={state.status === 'ready' ? onEdit : undefined}
+          onActivity={state.status === 'ready' ? onActivity : undefined} onContext={state.status === 'ready' ? onContext : undefined} />
       </>}
     {selector ? <NutritionDateSelector date={date} onClose={() => setSelector(false)} onSelect={onSelect} /> : null}
   </ScrollScreen>;
@@ -66,6 +71,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
   const meals = useMealController(client, userId, invalidate);
+  const writes = useDayWriteController(client, userId, invalidate);
   const [today, setToday] = useState(() => nutritionToday());
   const [selected, setSelected] = useState<string | null>(null);
   // Today follows Cordoba midnight on focus/foreground; a chosen date stays fixed.
@@ -76,15 +82,21 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
     return () => subscription.remove();
   }, [updateToday]);
   const date = selected ?? today;
-  const editable = meals?.state.phase === 'idle' && !meals.state.intent;
+  const editable = meals?.state.phase === 'idle' && !meals.state.intent && writes?.state.phase === 'idle' && !writes.state.intent;
   return <>
     <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
       onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
       onAdd={editable ? () => meals.controller.open(date) : undefined}
-      onEdit={editable ? meal => meals.controller.open(date, meal) : undefined} />
+      onEdit={editable ? meal => meals.controller.open(date, meal) : undefined}
+      onActivity={editable ? data => writes.controller.open('metrics', data) : undefined}
+      onContext={editable ? data => writes.controller.open('context', data) : undefined} />
     {meals?.state.message && !meals.state.editor ? <View style={styles.header}><AppText accessibilityRole="alert">{meals.state.message}</AppText>
       {meals.state.intent ? <Button label="Revisar intento guardado" onPress={() => meals.controller.showRecovery()} /> : null}
       {meals.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento" onPress={() => void meals.controller.recover()} /> : null}</View> : null}
+    {writes?.state.message && !writes.state.draft ? <View style={styles.header}><AppText accessibilityRole="alert">{writes.state.message}</AppText>
+      {writes.state.intent ? <Button label="Revisar intento de actividad/contexto" onPress={() => writes.controller.showRecovery()} /> : null}
+      {writes.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento del día" onPress={() => void writes.controller.recover()} /> : null}</View> : null}
+    {writes ? <DayWriteEditor controller={writes.controller} state={writes.state} /> : null}
     {meals ? <MealEditor controller={meals.controller} state={meals.state} /> : null}
   </>;
 }

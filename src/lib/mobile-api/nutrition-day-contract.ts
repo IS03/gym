@@ -26,6 +26,7 @@ export type NutritionDaySummary = {
   mealCount: number;
 };
 export type NutritionDayContext = {
+  updatedAt?: string;
   calorieTarget: number | null;
   proteinTargetG: number | null;
   waterTargetL: number | null;
@@ -44,6 +45,7 @@ export type NutritionDayData =
   | { dayState: "missing"; summary: null; context: null; meals: [] }
   | { dayState: "recorded"; summary: NutritionDaySummary; context: NutritionDayContext; meals: NutritionDayMeal[] };
 export type NutritionDayMetric = {
+  definitionUpdatedAt?: string;
   id: string;
   systemKey: "steps" | "water" | "mate" | "sleep" | null;
   label: string;
@@ -110,7 +112,7 @@ export function parseNutritionDayData(value: unknown): NutritionDayData | undefi
   for (const [field, total] of [["calories", calories], ["proteinG", proteinG], ["carbsG", carbsG], ["fatG", fatG]] as const) {
     if (meals.filter(m => m?.[field] === null).length !== total.missingCount) return undefined;
   }
-  if (![c.calorieTarget, c.proteinTargetG, c.waterTargetL, c.expenditureKcal, c.targetAutomaticKcal,
+  if ((c.updatedAt !== undefined && !timestamp(c.updatedAt)) || ![c.calorieTarget, c.proteinTargetG, c.waterTargetL, c.expenditureKcal, c.targetAutomaticKcal,
     c.targetOverrideKcal, c.expenditureAutomaticKcal, c.expenditureOverrideKcal].every(nullableNumber)
     || !signedNumber(c.deltaVsTargetKcal) || !signedNumber(c.energyBalanceKcal)
     || !(c.resolvedAt === null || timestamp(c.resolvedAt)) || !record(c.training) || !record(c.work)
@@ -118,7 +120,7 @@ export function parseNutritionDayData(value: unknown): NutritionDayData | undefi
     || !oneOf(c.training.source, ["workout", "override", "none", null])
     || !(c.work.effective === null || typeof c.work.effective === "boolean") || !oneOf(c.work.source, ["schedule", "override", null])) return undefined;
   return { dayState: "recorded", summary: { calories, proteinG, carbsG, fatG, entryCount: s.entryCount, mealCount: s.mealCount },
-    context: { calorieTarget: c.calorieTarget as number | null, proteinTargetG: c.proteinTargetG as number | null,
+    context: { ...(c.updatedAt !== undefined ? { updatedAt: c.updatedAt as string } : {}), calorieTarget: c.calorieTarget as number | null, proteinTargetG: c.proteinTargetG as number | null,
       waterTargetL: c.waterTargetL as number | null, deltaVsTargetKcal: c.deltaVsTargetKcal, expenditureKcal: c.expenditureKcal as number | null,
       energyBalanceKcal: c.energyBalanceKcal, targetAutomaticKcal: c.targetAutomaticKcal as number | null,
       targetOverrideKcal: c.targetOverrideKcal as number | null, expenditureAutomaticKcal: c.expenditureAutomaticKcal as number | null,
@@ -131,13 +133,13 @@ export function parseNutritionDayActivity(value: unknown): { metrics: NutritionD
   if (!record(value) || !Array.isArray(value.metrics)) return undefined;
   const metrics: NutritionDayMetric[] = [];
   for (const m of value.metrics) {
-    if (!record(m) || !uuid(m.id) || typeof m.label !== "string" || !m.label.trim() || !textOrNull(m.unit)
+    if (!record(m) || (m.definitionUpdatedAt !== undefined && !timestamp(m.definitionUpdatedAt)) || !uuid(m.id) || typeof m.label !== "string" || !m.label.trim() || !textOrNull(m.unit)
       || !oneOf(m.systemKey, ["steps", "water", "mate", "sleep", null]) || !oneOf(m.valueType, ["integer", "decimal", "duration"])
       || !nullableNumber(m.value) || !nullableNumber(m.target) || typeof m.isActive !== "boolean"
       || !(m.updatedAt === null || timestamp(m.updatedAt)) || (m.value === null) !== (m.updatedAt === null)
       || (!m.isActive && m.value === null)
       || (m.valueType !== "decimal" && [m.value, m.target].some(n => n !== null && !Number.isInteger(n)))) return undefined;
-    metrics.push({ id: m.id, systemKey: m.systemKey as NutritionDayMetric["systemKey"], label: m.label, unit: m.unit,
+    metrics.push({ ...(m.definitionUpdatedAt !== undefined ? { definitionUpdatedAt: m.definitionUpdatedAt as string } : {}), id: m.id, systemKey: m.systemKey as NutritionDayMetric["systemKey"], label: m.label, unit: m.unit,
       valueType: m.valueType as NutritionDayMetric["valueType"], value: m.value, target: m.target,
       isActive: m.isActive, updatedAt: m.updatedAt });
   }

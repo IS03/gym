@@ -50,6 +50,17 @@ describe("Nutrition day exact-date contract", () => {
       summary: { calories: { knownTotal: 0, missingCount: 0 } }, meals: [{ calories: 0 }],
     } });
   });
+  it("exposes additive context/definition versions without truncating timestamp precision", () => {
+    const raw = snapshot();
+    const precise = `${date}T12:00:00.123456+00:00`;
+    const result = buildMobileNutritionDayResponse(date, { ...raw,
+      nutrition: { ...raw.nutrition, data: { ...raw.nutrition.data, dayLog: { ...raw.nutrition.data.dayLog, updated_at: precise } } },
+      activity: { ...raw.activity, data: { metrics: raw.activity.data.metrics.map(m => ({ ...m, definitionUpdatedAt: precise })) } },
+    });
+    expect(result.nutrition).toMatchObject({ data: { context: { updatedAt: precise } } });
+    expect(result.activity).toMatchObject({ data: { metrics: [{ definitionUpdatedAt: precise }] } });
+    expect(parseMobileNutritionDayResponse(result)).toEqual(result);
+  });
   it("represents partial macro coverage without filling missing values", () => {
     const raw = snapshot();
     raw.nutrition.data.meals.push({ ...raw.nutrition.data.meals[0], id: id(4), final_protein_g: 10 });

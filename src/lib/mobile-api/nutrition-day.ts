@@ -47,7 +47,7 @@ function nutritionData(raw: unknown, date: string): NutritionDayData | undefined
       entryCount: meals.length, mealCount: meals.filter(m => m.entryKind === "meal").length,
     },
     context: {
-      calorieTarget: d.nutrition_target_kcal_snapshot, proteinTargetG: d.protein_target_g_snapshot, waterTargetL: d.water_target_l_snapshot,
+      ...(d.updated_at !== undefined ? { updatedAt: d.updated_at } : {}), calorieTarget: d.nutrition_target_kcal_snapshot, proteinTargetG: d.protein_target_g_snapshot, waterTargetL: d.water_target_l_snapshot,
       deltaVsTargetKcal: d.delta_vs_nutrition_target, expenditureKcal: d.estimated_expenditure_kcal_snapshot, energyBalanceKcal: d.energy_balance_kcal,
       targetAutomaticKcal: d.nutrition_target_automatic_kcal_snapshot, targetOverrideKcal: d.nutrition_target_override_kcal,
       expenditureAutomaticKcal: d.estimated_expenditure_automatic_kcal_snapshot, expenditureOverrideKcal: d.expenditure_override_kcal,
