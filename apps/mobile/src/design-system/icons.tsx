@@ -5,6 +5,7 @@ export type AppIconName =
   | 'brand'
   | 'calendar'
   | 'check'
+  | 'chevronLeft'
   | 'chevronRight'
   | 'clock'
   | 'dumbbell'
@@ -31,6 +32,7 @@ const iconNames: Record<
   },
   calendar: { ios: 'calendar', android: 'calendar_month' },
   check: { ios: 'checkmark.circle.fill', android: 'check_circle' },
+  chevronLeft: { ios: 'chevron.left', android: 'chevron_left' },
   chevronRight: { ios: 'chevron.right', android: 'chevron_right' },
   clock: { ios: 'clock.fill', android: 'schedule' },
   dumbbell: { ios: 'dumbbell.fill', android: 'fitness_center' },

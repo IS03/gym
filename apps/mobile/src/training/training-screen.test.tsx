@@ -164,7 +164,7 @@ describe('Training resource screen', () => {
     expect(mockFetchMobileTraining).not.toHaveBeenCalled();
   });
 
-  it('routes an active session to the bridge and keeps History deferred', () => {
+  it('routes an active session to the bridge, History to its screen and calendar days to the day', () => {
     const data = fixture();
     data.activeSession = { status: 'ok', data: {
       id: '11111111-1111-4111-8111-111111111111', name: 'PUSH', logDate: '2026-09-21',
@@ -177,7 +177,12 @@ describe('Training resource screen', () => {
     fireEvent.press(view.getByRole('button', { name: 'Continuar entrenamiento →' }));
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/11111111-1111-4111-8111-111111111111');
     fireEvent.press(view.getByRole('button', { name: 'Abrir Historial' }));
-    expect(view.getByText('Historial estará disponible en M3.4.')).toBeTruthy();
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/history');
+    expect(view.queryByText('Historial estará disponible en M3.4.')).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Abrir calendario' }));
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/calendar');
+    fireEvent.press(view.getByTestId('training-calendar-today'));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/\(tabs\)\/train\/day\/\d{4}-\d{2}-\d{2}$/));
   });
 
   it('navigates Rutinas to the native Training stack screen', () => {

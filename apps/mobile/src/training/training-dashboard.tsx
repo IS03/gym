@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type {
   MobileTrainingCalendarDay,
@@ -42,6 +42,8 @@ type TrainingDashboardProps = {
   onNewSession: () => void;
   onContinueSession: (id: string) => void;
   onRefresh: () => void;
+  onSelectDay?: (date: string) => void;
+  onOpenCalendar?: () => void;
   requestedMonth: string;
   today: string;
 };
@@ -145,16 +147,23 @@ function calendarDayLabel(
   return parts.join(', ');
 }
 
-function CalendarCard({
+/** Month grid of trained days. Optional handlers make days and months navigable (M3.4-3). */
+export function CalendarCard({
   calendar,
   onRefresh,
   requestedMonth,
   today,
+  onSelectDay,
+  onChangeMonth,
+  onOpenCalendar,
 }: {
   calendar: MobileTrainingResponse['calendar'];
   onRefresh: () => void;
   requestedMonth: string;
   today: string;
+  onSelectDay?: (date: string) => void;
+  onChangeMonth?: (delta: -1 | 1) => void;
+  onOpenCalendar?: () => void;
 }) {
   const { colors, isDark } = useOwnlevelTheme();
   const month = calendar.status === 'ok' ? calendar.data.month : requestedMonth;
@@ -176,7 +185,9 @@ function CalendarCard({
       testID="training-calendar"
     >
       <View style={styles.calendarTitleRow}>
-        <View style={styles.flex}>
+        {onChangeMonth ? <Pressable accessibilityLabel="Mes anterior" accessibilityRole="button" hitSlop={6}
+          onPress={() => onChangeMonth(-1)} style={styles.monthButton}><AppIcon color={colors.primary} name="chevronLeft" size={18} /></Pressable> : null}
+        <View style={[styles.flex, onChangeMonth ? styles.centered : null]}>
           <AppText style={styles.calendarTitle} variant="label">
             {formatTrainingMonth(month)}
           </AppText>
@@ -186,6 +197,10 @@ function CalendarCard({
             </AppText>
           ) : null}
         </View>
+        {onChangeMonth ? <Pressable accessibilityLabel="Mes siguiente" accessibilityRole="button" hitSlop={6}
+          onPress={() => onChangeMonth(1)} style={styles.monthButton}><AppIcon color={colors.primary} name="chevronRight" size={18} /></Pressable> : null}
+        {onOpenCalendar ? <Pressable accessibilityLabel="Abrir calendario" accessibilityRole="button" hitSlop={6}
+          onPress={onOpenCalendar} style={styles.monthButton}><AppIcon color={colors.primary} name="calendar" size={18} /></Pressable> : null}
       </View>
 
       {calendar.status === 'unavailable' ? (
@@ -219,18 +234,21 @@ function CalendarCard({
                 }
                 const day = daysByDate.get(cell.date);
                 const isToday = cell.date === today;
+                const Cell = onSelectDay ? Pressable : View;
                 return (
-                  <View
+                  <Cell
                     accessibilityLabel={calendarDayLabel(
                       day,
                       cell.date,
                       weekdayIndex,
                       today,
                     )}
+                    accessibilityRole={onSelectDay ? 'button' : undefined}
                     accessible
                     key={cell.date}
+                    onPress={onSelectDay ? () => onSelectDay(cell.date) : undefined}
                     style={styles.calendarCell}
-                    testID={isToday ? 'training-calendar-today' : undefined}
+                    testID={isToday ? 'training-calendar-today' : onSelectDay ? `training-calendar-day-${cell.date}` : undefined}
                   >
                     <View
                       style={[
@@ -263,7 +281,7 @@ function CalendarCard({
                         />
                       ))}
                     </View>
-                  </View>
+                  </Cell>
                 );
               })}
             </View>
@@ -290,7 +308,6 @@ function HubCard({
   const { colors } = useOwnlevelTheme();
   return (
     <PressableSurface
-      accessibilityHint="Muestra cuándo estará disponible esta sección"
       accessibilityLabel={`Abrir ${title}`}
       onPress={() => onAction(action)}
       style={styles.hubCard}
@@ -324,6 +341,8 @@ export function TrainingDashboard({
   onNewSession,
   onContinueSession,
   onRefresh,
+  onSelectDay,
+  onOpenCalendar,
   requestedMonth,
   today,
 }: TrainingDashboardProps) {
@@ -358,7 +377,9 @@ export function TrainingDashboard({
       ) : null}
       <CalendarCard
         calendar={data.calendar}
+        onOpenCalendar={onOpenCalendar}
         onRefresh={onRefresh}
+        onSelectDay={onSelectDay}
         requestedMonth={requestedMonth}
         today={today}
       />
@@ -428,6 +449,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  centered: {
+    alignItems: 'center',
+  },
+  monthButton: {
+    alignItems: 'center',
+    height: sizes.touchTarget,
+    justifyContent: 'center',
+    width: sizes.touchTarget,
   },
   dashboard: {
     gap: spacing.xl,

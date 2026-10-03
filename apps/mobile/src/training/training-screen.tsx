@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, RefreshControl, StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { fetchMobileTraining, useApiResource, useMobileApi } from '@/api';
@@ -21,10 +21,6 @@ import {
   type TrainingDeferredAction,
 } from './training-dashboard';
 import { StartWorkoutModal } from './start-workout-modal';
-
-const DEFERRED_MESSAGES: Record<Exclude<TrainingDeferredAction, 'routines' | 'exercises'>, string> = {
-  history: 'Historial estará disponible en M3.4.',
-};
 
 const systemNow = () => new Date();
 
@@ -81,9 +77,7 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
   const router = useRouter();
-  const [notice, setNotice] = useState<string | null>(null);
   const [startOpen, setStartOpen] = useState(false);
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(
     (signal: AbortSignal) => {
       if (!client) {
@@ -113,12 +107,6 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   const today = isoDateForDate(currentDate);
   const requestedMonth = monthForDate(currentDate);
 
-  useEffect(
-    () => () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    },
-    [],
-  );
 
   const runRefresh = useCallback(() => {
     void refresh();
@@ -126,19 +114,9 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
 
   const showDeferredFeedback = useCallback((action: TrainingDeferredAction) => {
     haptics.selection();
-    if (action === 'routines') {
-      router.push('/(tabs)/train/routines');
-      return;
-    }
-    if (action === 'exercises') {
-      router.push('/(tabs)/train/exercises');
-      return;
-    }
-    const message = DEFERRED_MESSAGES[action];
-    setNotice(message);
-    void AccessibilityInfo.announceForAccessibility(message);
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(null), 4_000);
+    if (action === 'routines') router.push('/(tabs)/train/routines');
+    else if (action === 'exercises') router.push('/(tabs)/train/exercises');
+    else router.push('/(tabs)/train/history');
   }, [router]);
 
   const openStart = useCallback(() => {
@@ -179,11 +157,13 @@ export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
       <TrainingDashboard
         data={current.data}
         isStale={state.status !== 'ready'}
-        notice={notice}
+        notice={null}
         onDeferredAction={showDeferredFeedback}
         onNewSession={openStart}
         onContinueSession={(id) => toBridge(id)}
         onRefresh={runRefresh}
+        onSelectDay={(date) => router.push(`/(tabs)/train/day/${date}`)}
+        onOpenCalendar={() => router.push('/(tabs)/train/calendar')}
         requestedMonth={requestedMonth}
         today={today}
       />

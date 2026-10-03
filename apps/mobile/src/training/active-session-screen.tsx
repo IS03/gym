@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Alert, AppState, Keyboard, KeyboardAvoidingView, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedProps, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -19,7 +19,7 @@ import { trainingRoutineColor } from './routine-colors';
 import { useActiveSession } from './use-active-session';
 import { NativeReorderItem, NativeReorderList, SessionDragScrollContext } from './session-native-interactions';
 import { FinishSessionSheet } from './finish-session-sheet';
-import { CompletedSessionView } from './completed-session-view';
+import { CompletedSessionScreen, completedSessionApi, type CompletedSessionApi } from './history-session-screen';
 
 function SessionClock({ session }: { session: SessionDetailDto['session'] }) {
   const [now, setNow] = useState(Date.now);
@@ -96,9 +96,18 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   const existingIds = useMemo(() => new Set(detail?.exercises.map(exercise => exercise.exerciseId) ?? []), [detail]);
   const returnToTraining = useCallback(() => router.replace('/(tabs)/train'), [router]);
   useEffect(() => { if (state.status === 'cancelled') { haptics.success(); returnToTraining(); } }, [returnToTraining, state.status]);
-  const returnHome = useCallback(() => router.replace('/(tabs)/home'), [router]);
+  // Reset the Train stack (the closed session must not stay mounted behind the tab), then go Home.
+  const returnHome = useCallback(() => { router.replace('/(tabs)/train'); router.navigate('/(tabs)/home'); }, [router]);
+  // Closed sessions read through the controller's API; discard goes through the client.
+  const closedId = detail?.session.id ?? '';
+  const closedApi = useMemo<CompletedSessionApi>(() => ({ detail: () => controller.readDetail(),
+    discard: key => completedSessionApi(client, closedId).discard(key) }), [client, closedId, controller]);
   // Confirmed finish (server truth): success feedback once, then the read-only view.
   useEffect(() => { if (state.finished) haptics.success(); }, [state.finished]);
+  const closedStatus = detail && detail.session.status !== 'in_progress' && !state.intent ? detail.session.status : null;
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: closedStatus === 'discarded' ? 'Sesión eliminada' : closedStatus ? 'Sesión finalizada' : 'Entrenar' });
+  }, [closedStatus, navigation]);
   usePreventRemove(state.intent?.phase === 'running', ({ data }) => {
     Alert.alert('Hay una operación en curso', 'La intención se conserva para comprobar el resultado cuando vuelvas.', [
       { text: 'Esperar', style: 'cancel' }, { text: 'Volver a Entrenar', onPress: () => navigation.dispatch(data.action) },
@@ -134,7 +143,8 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   // A closed session uses its own read-only view. While an intent is unresolved
   // (e.g. a finish whose outcome is unknown) keep the recovery panel visible here.
   if (detail.session.status !== 'in_progress' && !state.intent) {
-    return <CompletedSessionView detail={detail} finished={state.finished} onHome={returnHome} onTraining={returnToTraining} />;
+    return <CompletedSessionScreen api={closedApi} sessionId={detail.session.id} initialDetail={detail} finished={state.finished}
+      onHome={returnHome} onTraining={returnToTraining} />;
   }
   const locked = state.fenced || state.refreshing || Boolean(state.intent) || state.finishing;
   const active = detail.session.status === 'in_progress';
