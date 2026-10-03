@@ -1,0 +1,136 @@
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { StrictMode } from 'react';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { AppState, type AppStateStatus, RefreshControl } from 'react-native';
+import type { MobileApiClient } from '@/api/client';
+import type { MobileApiReadResult } from '@/api/results';
+import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
+import { OwnlevelThemeProvider } from '@/design-system';
+import { NutritionDayScreen } from './day-screen';
+import { nutritionFixture } from './day-fixture.test-helper';
+
+const mockRead = jest.fn<MobileApiClient['read']>();
+const mockClient = { read: mockRead };
+let mockUser = 'owner';
+let mockToday = '2026-10-02';
+jest.mock('./day-format', () => ({
+  ...jest.requireActual<typeof import('./day-format')>('./day-format'), nutritionToday: () => mockToday,
+}));
+jest.mock('@/api', () => ({ useMobileApi: () => ({ client: mockClient }) }));
+jest.mock('@/auth', () => ({ useMobileAuth: () => ({ session: { user: { id: mockUser } } }) }));
+jest.mock('expo-router', () => ({ useFocusEffect: () => {} }));
+jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+const ok = (date: string, data = nutritionFixture(date)): MobileApiReadResult<MobileNutritionDayResponse> => ({
+  status: 'ok', data, meta: { durationMs: 10, httpStatus: 200, outcome: 'ok' },
+});
+const failure: MobileApiReadResult<MobileNutritionDayResponse> = { status: 'unavailable', reason: 'network',
+  meta: { durationMs: 1, httpStatus: null, outcome: 'unavailable' } };
+const element = () => <OwnlevelThemeProvider initialMode="light"><NutritionDayScreen /></OwnlevelThemeProvider>;
+const appStateListeners: ((state: AppStateStatus) => void)[] = [];
+describe('Native Nutrition day', () => {
+  beforeEach(() => {
+    mockRead.mockReset(); mockUser = 'owner'; mockToday = '2026-10-02';
+    appStateListeners.length = 0;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+      appStateListeners.push(listener);
+      return { remove: () => { const index = appStateListeners.indexOf(listener); if (index >= 0) appStateListeners.splice(index, 1); } };
+    });
+  });
+  it('loads today, distinguishes target/balance and navigates to date and back', async () => {
+    mockRead.mockImplementation(async options => ok(options.path.split('/').pop()!) as never);
+    const view = render(element());
+    await view.findByText('Comida 2026-10-02');
+    expect(view.getByText('Consumo − objetivo')).toBeTruthy();
+    expect(view.getByText('Balance: consumo − gasto')).toBeTruthy();
+    expect(view.getByText('0 L')).toBeTruthy();
+    fireEvent.press(view.getByLabelText('Día anterior'));
+    await view.findByText('Comida 2026-10-01');
+    expect(view.queryByText('Comida 2026-10-02')).toBeNull();
+    fireEvent.press(view.getByText('Volver a hoy'));
+    await view.findByText('Comida 2026-10-02');
+    fireEvent.press(view.getByText('Elegir fecha'));
+    fireEvent.changeText(view.getByLabelText('Fecha DD/MM/AAAA'), '30/02/2026');
+    fireEvent.press(view.getByText('Consultar fecha'));
+    expect(view.getByText('Ingresá una fecha válida.')).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText('Fecha DD/MM/AAAA'), '20/09/2026');
+    fireEvent.press(view.getByText('Consultar fecha'));
+    await view.findByText('Comida 2026-09-20');
+    const tiny = nutritionFixture('2026-09-20');
+    if (tiny.activity.status === 'ok') tiny.activity.data.metrics[0].value = 0.0001;
+    mockRead.mockResolvedValueOnce(ok('2026-09-20', tiny) as never);
+    await act(async () => { view.UNSAFE_getByType(RefreshControl).props.onRefresh(); });
+    expect(view.getByText('0,0001 L')).toBeTruthy();
+  });
+  it('loads correctly when effects are replayed in Strict Mode', async () => {
+    mockRead.mockImplementation(async options => ok(options.path.split('/').pop()!) as never);
+    const view = render(<StrictMode>{element()}</StrictMode>);
+    await view.findByText('Comida 2026-10-02');
+  });
+  it('aborts the old date and ignores a late response after fast changes', async () => {
+    const pending: { signal?: AbortSignal; resolve: (r: unknown) => void; date: string }[] = [];
+    mockRead.mockImplementation(options => new Promise(resolve => pending.push({ signal: options.signal,
+      date: options.path.split('/').pop()!, resolve: resolve as (r: unknown) => void })));
+    const view = render(element());
+    expect(view.getByText('Cargando día nutricional')).toBeTruthy();
+    fireEvent.press(view.getByLabelText('Día anterior'));
+    fireEvent.press(view.getByLabelText('Día anterior'));
+    expect(pending[0].signal?.aborted).toBe(true);
+    expect(pending[1].signal?.aborted).toBe(true);
+    await act(async () => { pending[2].resolve(ok(pending[2].date)); });
+    await act(async () => { pending[0].resolve(ok(pending[0].date)); pending[1].resolve(ok(pending[1].date)); });
+    expect(view.getByText('Comida 2026-09-30')).toBeTruthy();
+    expect(view.queryByText('Comida 2026-10-02')).toBeNull();
+  });
+  it('refreshes the selected date and keeps its last reading explicitly stale', async () => {
+    mockRead.mockResolvedValueOnce(ok('2026-10-02') as never).mockResolvedValueOnce(failure as never);
+    const view = render(element()); await view.findByText('Comida 2026-10-02');
+    await act(async () => { view.UNSAFE_getByType(RefreshControl).props.onRefresh(); });
+    expect(view.getByText('Comida 2026-10-02')).toBeTruthy();
+    expect(view.getByText('No pudimos actualizar. Mostramos la última lectura de esta fecha.')).toBeTruthy();
+    expect(mockRead.mock.calls.every(([options]) => options.path.endsWith('2026-10-02'))).toBe(true);
+  });
+  it('refreshes on foreground and follows Cordoba midnight when viewing today', async () => {
+    mockRead.mockImplementation(async options => {
+      const date = options.path.split('/').pop()!;
+      return ok(date, { ...nutritionFixture(date), today: date }) as never;
+    });
+    const view = render(element()); await view.findByText('Comida 2026-10-02');
+    act(() => { appStateListeners.slice().forEach(listener => listener('background')); });
+    await act(async () => { appStateListeners.slice().forEach(listener => listener('active')); });
+    expect(mockRead.mock.calls.length).toBeGreaterThanOrEqual(2);
+    mockToday = '2026-10-03';
+    await act(async () => { appStateListeners.slice().forEach(listener => listener('background')); appStateListeners.slice().forEach(listener => listener('active')); });
+    await view.findByText('Comida 2026-10-03');
+  });
+  it('isolates previous private data when the authenticated user changes', async () => {
+    mockRead.mockResolvedValueOnce(ok('2026-10-02') as never).mockResolvedValue(failure as never);
+    const view = render(element()); await view.findByText('Comida 2026-10-02');
+    mockUser = 'second-user'; view.rerender(element());
+    await view.findByText('No pudimos cargar este día');
+    expect(view.queryByText('Comida 2026-10-02')).toBeNull();
+  });
+  it('distinguishes missing day, no meals, partial sections and total failure', async () => {
+    const missing = nutritionFixture();
+    missing.nutrition = { status: 'ok', data: { dayState: 'missing', summary: null, context: null, meals: [] } };
+    mockRead.mockResolvedValueOnce(ok('2026-10-02', missing) as never);
+    const view = render(element()); await view.findByText('Sin día registrado');
+    const empty = nutritionFixture('2026-10-01');
+    if (empty.nutrition.status === 'ok' && empty.nutrition.data.dayState === 'recorded') {
+      empty.nutrition.data.meals = [];
+      empty.nutrition.data.summary = { entryCount: 0, mealCount: 0,
+        calories: { knownTotal: 0, missingCount: 0 }, proteinG: { knownTotal: 0, missingCount: 0 },
+        carbsG: { knownTotal: 0, missingCount: 0 }, fatG: { knownTotal: 0, missingCount: 0 } };
+      empty.nutrition.data.context.deltaVsTargetKcal = -1800;
+      empty.nutrition.data.context.energyBalanceKcal = -2200;
+    }
+    empty.activity = { status: 'unavailable' };
+    mockRead.mockResolvedValueOnce(ok('2026-10-01', empty) as never);
+    fireEvent.press(view.getByLabelText('Día anterior'));
+    await view.findByText('Sin comidas registradas');
+    expect(view.getByText('Las métricas de esta fecha no están disponibles. Deslizá para reintentar.')).toBeTruthy();
+    mockRead.mockResolvedValueOnce(failure as never);
+    fireEvent.press(view.getByLabelText('Día anterior'));
+    await waitFor(() => expect(view.getByText('No pudimos cargar este día')).toBeTruthy());
+    expect(view.queryByText('Sin comidas registradas')).toBeNull();
+  });
+});
