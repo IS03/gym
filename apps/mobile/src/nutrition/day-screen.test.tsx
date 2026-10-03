@@ -40,6 +40,43 @@ describe('Native Nutrition day', () => {
       return { remove: () => { const index = appStateListeners.indexOf(listener); if (index >= 0) appStateListeners.splice(index, 1); } };
     });
   });
+  it('activity draft survives foreground and confirms only changed canonical values', async () => {
+    let latest = nutritionFixture();
+    mockRead.mockImplementation(async () => ok(mockToday, latest) as never);
+    mockRequest.mockImplementation(async options => {
+      const body = options.body as { operation: string; date: string; changes: { value: number | null }[] };
+      expect(body.operation).toBe('metrics'); expect(body.changes).toHaveLength(1); expect(body.changes[0].value).toBe(3.5);
+      latest = nutritionFixture(); if (latest.activity.status === 'ok') latest.activity.data.metrics[0].value = 3.5;
+      return { status: 'ok', data: { status: 'saved', operation: body.operation, date: body.date }, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never;
+    });
+    const view = render(element()); await view.findByText('Editar actividad'); fireEvent.press(view.getByText('Editar actividad'));
+    fireEvent.changeText(view.getByLabelText('Agua'), '3,5');
+    await act(async () => { appStateListeners.forEach(f => f('active')); });
+    expect(view.getByLabelText('Agua').props.value).toBe('3,5');
+    await act(async () => { fireEvent.press(view.getByText('Guardar cambios')); });
+    await waitFor(() => expect(view.queryByTestId('nutrition-day-write-editor')).toBeNull(), { timeout: 4000 });
+    expect(await view.findByText('3,5 L')).toBeTruthy(); expect(mockRequest).toHaveBeenCalledTimes(1);
+  });
+  it('context shows automatic/override/effective and restores automatic explicitly', async () => {
+    let latest = nutritionFixture();
+    mockRead.mockImplementation(async () => ok(mockToday, latest) as never);
+    mockRequest.mockImplementation(async options => {
+      const body = options.body as { operation: string; date: string; changes: { target: { action: string; value?: number } } };
+      latest = nutritionFixture(); if (latest.nutrition.status === 'ok' && latest.nutrition.data.dayState === 'recorded') {
+        latest.nutrition.data.context.targetOverrideKcal = body.changes.target.action === 'clear' ? null : body.changes.target.value!;
+        latest.nutrition.data.context.calorieTarget = latest.nutrition.data.context.targetOverrideKcal ?? 1800;
+      }
+      return { status: 'ok', data: { status: 'saved', operation: body.operation, date: body.date }, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never;
+    });
+    const view = render(element()); await view.findByText('Ajustar contexto'); fireEvent.press(view.getByText('Ajustar contexto'));
+    expect(view.getByText('Automático: 1.800 kcal')).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText('Override objetivo'), '1900'); await act(async () => { fireEvent.press(view.getByText('Guardar cambios')); });
+    await waitFor(() => expect(view.queryByTestId('nutrition-day-write-editor')).toBeNull());
+    fireEvent.press(await view.findByText('Ajustar contexto')); expect(view.getByText('Override diario: 1.900 kcal')).toBeTruthy(); expect(view.getByText('Efectivo: 1.900 kcal')).toBeTruthy();
+    fireEvent.press(view.getByText('Usar objetivo automático')); await act(async () => { fireEvent.press(view.getByText('Guardar cambios')); });
+    await waitFor(() => expect(view.queryByTestId('nutrition-day-write-editor')).toBeNull());
+    expect(mockRequest.mock.calls[1][0].body).toMatchObject({ operation: 'context', changes: { target: { action: 'clear' } } });
+  });
   it('keeps a form draft through refresh and fences the pre-write response after confirmed create', async () => {
     let latest = nutritionFixture();
     mockRead.mockImplementation(async () => ({ status: 'ok', data: latest, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } }) as never);

@@ -2,6 +2,7 @@ import { View, StyleSheet } from 'react-native';
 import type { MobileNutritionDayResponse, NutritionDayContext, NutritionDayMetric } from '@/api/nutrition-day';
 import type { NutritionDayMeal } from '../../../../src/lib/mobile-api/nutrition-day-contract';
 import { AppText, Button, Heading, Surface, spacing } from '@/design-system';
+import { canWriteDay } from './day-write-model';
 import { amount, nutrientAmount, signedAmount } from './day-format';
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -10,9 +11,10 @@ function Detail({ label, value }: { label: string; value: string }) {
 function effective(value: boolean | null): string { return value === null ? 'Sin dato' : value ? 'Sí' : 'No'; }
 const sources = { workout: 'sesión registrada', override: 'ajuste diario', none: 'sin sesión', schedule: 'horario' };
 const mealLabels = { breakfast: 'Desayuno', lunch: 'Almuerzo', snack: 'Merienda', dinner: 'Cena', extra: 'Extra' };
-function Context({ data }: { data: NutritionDayContext }) {
+function Context({ data, onAdjust }: { data: NutritionDayContext; onAdjust?: () => void }) {
   return <Surface>
     <Heading level={2}>Contexto del día</Heading>
+    {onAdjust ? <Button label="Ajustar contexto" onPress={onAdjust} variant="secondary" /> : null}
     <Detail label="Entrenamiento efectivo" value={`${effective(data.training.effective)}${data.training.source ? ` · ${sources[data.training.source]}` : ''}`} />
     <Detail label="Trabajo efectivo" value={`${effective(data.work.effective)}${data.work.source ? ` · ${sources[data.work.source]}` : ''}`} />
     <Detail label="Objetivo automático" value={amount(data.targetAutomaticKcal, 'kcal')} />
@@ -28,7 +30,7 @@ function metricValue(m: NutritionDayMetric, value: number | null): string {
   if (m.valueType === 'duration') return `${Math.floor(value / 60)} h ${value % 60} min`;
   return `${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 }).format(value)}${m.unit ? ` ${m.unit}` : ''}`;
 }
-export function NutritionDayContent({ data, onEdit }: { data: MobileNutritionDayResponse; onEdit?: (meal: NutritionDayMeal) => void }) {
+export function NutritionDayContent({ data, onEdit, onActivity, onContext }: { data: MobileNutritionDayResponse; onEdit?: (meal: NutritionDayMeal) => void; onActivity?: (data: MobileNutritionDayResponse) => void; onContext?: (data: MobileNutritionDayResponse) => void }) {
   const nutrition = data.nutrition.status === 'ok' ? data.nutrition.data : null;
   const recorded = nutrition?.dayState === 'recorded' ? nutrition : null;
   const energyAmount = (value: number | null) => {
@@ -70,10 +72,11 @@ export function NutritionDayContent({ data, onEdit }: { data: MobileNutritionDay
                 <Button label="Editar comida" accessibilityLabel={`Editar ${meal.title || meal.description || 'comida'}`} onPress={() => onEdit(meal)} variant="secondary" /> : null}
             </Surface>)}
         </View>
-        <Context data={recorded.context} />
+        <Context data={recorded.context} onAdjust={onContext && canWriteDay('context', data) ? () => onContext(data) : undefined} />
       </>}
     <Surface>
       <Heading level={2}>Actividad</Heading>
+      {onActivity && canWriteDay('metrics', data) ? <Button label="Editar actividad" onPress={() => onActivity(data)} variant="secondary" /> : null}
       {data.activity.status === 'unavailable' ? <AppText muted>Las métricas de esta fecha no están disponibles. Deslizá para reintentar.</AppText>
         : data.activity.data.metrics.length === 0 ? <AppText muted>No hay métricas disponibles para esta fecha.</AppText>
         : data.activity.data.metrics.map(m => <View key={m.id} style={styles.metric}>

@@ -103,7 +103,7 @@ describe('Reliable manual meal writes',()=>{
     const second={...first,intent:{...first.intent,idempotencyKey:'second'}};
     await f.repository.write(second); await f.repository.clear(first.intent.idempotencyKey);
     expect((await f.repository.read())?.intent.idempotencyKey).toBe('second');
-    await expect(f.repository.write(first)).rejects.toThrow('Another pending meal intent');
+    await expect(f.repository.write(first)).rejects.toThrow('Another pending nutrition intent');
   });
   it('does not send a delayed intent after the user scope is disposed',async()=>{
     const f=fixture(); await f.controller.initialize(); f.controller.open(date); f.controller.change('calories','250');
