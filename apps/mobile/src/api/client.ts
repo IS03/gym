@@ -267,6 +267,10 @@ export function createMobileApiClient({
             : undefined;
           const knownConflict =
             conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
+            conflictCode === 'POSSIBLE_DUPLICATE' ||
+            conflictCode === 'MEAL_CHANGED' ||
+            conflictCode === 'MEAL_UNAVAILABLE' ||
+            conflictCode === 'DAY_HAS_HISTORICAL_SUMMARY' ||
             conflictCode === 'ACTIVE_SESSION_EXISTS' ||
             conflictCode === 'ROUTINE_CHANGED' ||
             conflictCode === 'ROUTINE_TEMPLATE_CHANGED' ||
@@ -279,10 +283,10 @@ export function createMobileApiClient({
             conflictCode === 'SESSION_NOT_COMPLETED' ||
             conflictCode === 'SESSION_DISCARDED';
           if (knownConflict) {
-            const conflictData = conflictCode === 'ACTIVE_SESSION_EXISTS'
+            const conflictData = conflictCode === 'ACTIVE_SESSION_EXISTS' || conflictCode === 'MEAL_CHANGED'
               ? options.parse(responseBody)
               : undefined;
-            result = conflictCode === 'ACTIVE_SESSION_EXISTS' && conflictData === undefined
+            result = (conflictCode === 'ACTIVE_SESSION_EXISTS' || conflictCode === 'MEAL_CHANGED') && conflictData === undefined
               ? unavailable('invalid_response', durationMs, 409)
               : {
                   status: 'conflict',

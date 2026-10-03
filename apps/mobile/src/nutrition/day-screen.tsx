@@ -8,9 +8,13 @@ import { displayNutritionDate, nutritionToday, shiftNutritionDate } from './day-
 import { NutritionDateSelector } from './date-selector';
 import { NutritionDayContent } from './day-content';
 import { useNutritionDayResource } from './day-resource';
+import type { NutritionDayMeal } from '../../../../src/lib/mobile-api/nutrition-day-contract';
+import { useMealController } from './use-meal-controller';
+import { MealEditor } from './meal-editor';
 
-function NutritionDayView({ date, today, onSelect, onToday, onServerToday }: {
+function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, onEdit }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
+  onAdd?: () => void; onEdit?: (meal: NutritionDayMeal) => void;
 }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
@@ -36,6 +40,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday }: {
         <Button accessibilityLabel="Día siguiente" disabled={!next} label="›" onPress={() => { if (next) onSelect(next); }} variant="secondary" />
       </View>
       {date !== today ? <Button label="Volver a hoy" onPress={onToday} variant="quiet" /> : null}
+      {onAdd ? <Button label="Agregar comida" onPress={onAdd} /> : null}
     </View>
     {!current ? state.status === 'loading' ? <LoadingState label="Cargando día nutricional" />
       : <UnavailableState title="No pudimos cargar este día"
@@ -46,7 +51,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday }: {
           <AppText accessibilityRole="alert">No pudimos actualizar. Mostramos la última lectura de esta fecha.</AppText>
           <Button label="Reintentar" onPress={runRefresh} variant="secondary" />
         </View> : null}
-        <NutritionDayContent data={current.data} />
+        <NutritionDayContent data={current.data} onEdit={state.status === 'ready' ? onEdit : undefined} />
       </>}
     {selector ? <NutritionDateSelector date={date} onClose={() => setSelector(false)} onSelect={onSelect} /> : null}
   </ScrollScreen>;
@@ -54,6 +59,13 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday }: {
 
 export function NutritionDayScreen() {
   const { session } = useMobileAuth();
+  return <NutritionUserDayScreen key={session?.user.id ?? 'anonymous'} userId={session?.user.id ?? 'anonymous'} />;
+}
+function NutritionUserDayScreen({ userId }: { userId: string }) {
+  const { client } = useMobileApi();
+  const [revision, setRevision] = useState(0);
+  const invalidate = useCallback(() => setRevision(v => v + 1), []);
+  const meals = useMealController(client, userId, invalidate);
   const [today, setToday] = useState(() => nutritionToday());
   const [selected, setSelected] = useState<string | null>(null);
   // Today follows Cordoba midnight on focus/foreground; a chosen date stays fixed.
@@ -64,8 +76,17 @@ export function NutritionDayScreen() {
     return () => subscription.remove();
   }, [updateToday]);
   const date = selected ?? today;
-  return <NutritionDayView key={`${session?.user.id ?? 'anonymous'}:${date}`} date={date} today={today}
-    onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday} />;
+  const editable = meals?.state.phase === 'idle' && !meals.state.intent;
+  return <>
+    <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
+      onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
+      onAdd={editable ? () => meals.controller.open(date) : undefined}
+      onEdit={editable ? meal => meals.controller.open(date, meal) : undefined} />
+    {meals?.state.message && !meals.state.editor ? <View style={styles.header}><AppText accessibilityRole="alert">{meals.state.message}</AppText>
+      {meals.state.intent ? <Button label="Revisar intento guardado" onPress={() => meals.controller.showRecovery()} /> : null}
+      {meals.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento" onPress={() => void meals.controller.recover()} /> : null}</View> : null}
+    {meals ? <MealEditor controller={meals.controller} state={meals.state} /> : null}
+  </>;
 }
 const styles = StyleSheet.create({
   header: { gap: spacing.md }, dates: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, choose: { flex: 1 },
