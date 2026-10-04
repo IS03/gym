@@ -8,6 +8,7 @@ import type { MobileApiReadResult } from '@/api/results';
 import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { OwnlevelThemeProvider } from '@/design-system';
 import { NutritionDayScreen } from './day-screen';
+import { reportFixture } from './report-fixture.test-helper';
 import { nutritionFixture } from './day-fixture.test-helper';
 import { quickOptions, quickPreview, quickReceipt, quickDate } from './quick-fixture.test-helper';
 import { personalFood } from './food-fixture.test-helper';
@@ -42,6 +43,17 @@ describe('Native Nutrition day', () => {
       appStateListeners.push(listener);
       return { remove: () => { const index = appStateListeners.indexOf(listener); if (index >= 0) appStateListeners.splice(index, 1); } };
     });
+  });
+  it('report entry opens a highlighted date in the existing Nutrition resource', async () => {
+    mockToday = '2026-10-04';
+    mockRead.mockImplementation(async options => options.path.includes('/reports?')
+      ? {status:'ok',data:reportFixture(),meta:{durationMs:1,httpStatus:200,outcome:'ok'}} as never
+      : ok(options.path.split('/').pop()!,nutritionFixture(options.path.split('/').pop()!)) as never);
+    const view=render(element());await view.findByText('Reporte nutricional');
+    fireEvent.press(view.getByText('Reporte nutricional'));await view.findByTestId('nutrition-report-screen');
+    await view.findByText('Días destacados');fireEvent.press(view.getByText(/Más cerca del objetivo/));
+    await waitFor(()=>expect(view.queryByTestId('nutrition-report-screen')).toBeNull());
+    await waitFor(()=>expect(mockRead.mock.calls.some(([o])=>o.path.endsWith('/days/2026-10-03'))).toBe(true));
   });
   it('quick composition survives foreground refresh and registers against the displayed destination', async () => {
     mockToday = quickDate;

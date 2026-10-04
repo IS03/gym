@@ -1,3 +1,4 @@
+import { NutritionReports } from './report-screen';
 import {useConfigurationController} from './use-config-controller';
 import {ConfigurationEditor} from './config-editor';
 import {useSavedController} from './use-saved-controller';
@@ -24,10 +25,10 @@ import { FoodEditor } from './food-editor';
 import { foodQuickOption } from '@/api/nutrition-food';
 import { QuickEditor } from './quick-editor';
 
-function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onManageSaved, onConfigure, onEdit, onActivity, onContext }: {
+function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onManageSaved, onConfigure, onReport, onEdit, onActivity, onContext }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
   onAdd?: () => void; onEdit?: (meal: NutritionDayMeal) => void;
-  onConfigure?: () => void; addChoices?: ReactNode; onManageFoods?: () => void; onManageSaved?: () => void;
+  onConfigure?: () => void; onReport?: () => void; addChoices?: ReactNode; onManageFoods?: () => void; onManageSaved?: () => void;
   onActivity?: (data: MobileNutritionDayResponse) => void; onContext?: (data: MobileNutritionDayResponse) => void;
 }) {
   const { client } = useMobileApi();
@@ -57,6 +58,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
       {onAdd ? <Button label="Agregar comida" onPress={onAdd} /> : null}
       {addChoices}
       {onManageSaved ? <Button label="Administrar comidas guardadas" variant="quiet" onPress={onManageSaved} /> : null}
+      {onReport ? <Button label="Reporte nutricional" variant="quiet" onPress={onReport} /> : null}
       {onConfigure ? <Button label="Configurar nutrición" variant="quiet" onPress={onConfigure} /> : null}
       {onManageFoods ? <Button label="Administrar alimentos" variant="quiet" onPress={onManageFoods} /> : null}
     </View>
@@ -92,6 +94,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const quickController=quick?.controller;
   const invalidateQuick=useCallback(()=>{if(quickController)void quickController.loadOptions();},[quickController]);
   const saved=useSavedController(client,userId,invalidateQuick);
+  const [reportOpen, setReportOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [today, setToday] = useState(() => nutritionToday());
   const [selected, setSelected] = useState<string | null>(null);
@@ -109,6 +112,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
     <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
       onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
       onAdd={editable ? () => setAdding(true) : undefined}
+      onReport={() => setReportOpen(true)}
       onConfigure={editable?()=>config.controller.open():undefined}
       onManageSaved={editable?()=>saved.controller.open():undefined}
       onManageFoods={editable ? () => foods.controller.open(null) : undefined}
@@ -121,6 +125,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
       onEdit={editable ? meal => meals.controller.open(date, meal) : undefined}
       onActivity={editable ? data => writes.controller.open('metrics', data) : undefined}
       onContext={editable ? data => writes.controller.open('context', data) : undefined} />
+    {reportOpen ? <NutritionReports onClose={() => setReportOpen(false)} onDate={setSelected} /> : null}
     {meals?.state.message && !meals.state.editor ? <View style={styles.header}><AppText accessibilityRole="alert">{meals.state.message}</AppText>
       {meals.state.intent ? <Button label="Revisar intento guardado" onPress={() => meals.controller.showRecovery()} /> : null}
       {meals.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento" onPress={() => void meals.controller.recover()} /> : null}</View> : null}
