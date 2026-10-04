@@ -52,7 +52,7 @@ describe('Date-scoped authenticated routes',()=>{
   const receipt={status:'saved',date,operation:op};rpc.mockResolvedValueOnce({data:[{response_status:200,response_body:receipt,replayed:true}],error:null});
   const fn=op==='metrics'?metrics:context;const r=await fn(request(op==='metrics'?intent:ci),{params:Promise.resolve({date})});expect(r.status).toBe(200);expect(await r.json()).toEqual(receipt);expect(rpc).toHaveBeenCalledTimes(1);expect(rpc.mock.calls[0][0]).toBe('mobile_mutate_nutrition_day');
  });
- it.each(['METRICS_CHANGED','METRIC_UNAVAILABLE','CONTEXT_CHANGED','CONTEXT_UNAVAILABLE','IDEMPOTENCY_KEY_REUSED'])('preserves %s',async error=>{
+ it.each(['METRICS_CHANGED','METRIC_UNAVAILABLE','METRIC_FUTURE_DATE','CONTEXT_CHANGED','CONTEXT_UNAVAILABLE','IDEMPOTENCY_KEY_REUSED'])('preserves %s',async error=>{
   const body={error,message:'changed'};rpc.mockResolvedValueOnce({data:[{response_status:409,response_body:body}],error:null});
   const r=await metrics(request(),{params:Promise.resolve({date})});expect(r.status).toBe(409);expect(await r.json()).toEqual(body);
  });

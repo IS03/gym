@@ -25,7 +25,7 @@ function Context({ data, onAdjust }: { data: NutritionDayContext; onAdjust?: () 
     {data.resolvedAt === null ? <AppText muted>Este día no tiene contexto nutricional resuelto.</AppText> : null}
   </Surface>;
 }
-function metricValue(m: NutritionDayMetric, value: number | null): string {
+export function metricValue(m: NutritionDayMetric, value: number | null): string {
   if (value === null) return 'Sin dato';
   if (m.valueType === 'duration') return `${Math.floor(value / 60)} h ${value % 60} min`;
   return `${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 }).format(value)}${m.unit ? ` ${m.unit}` : ''}`;

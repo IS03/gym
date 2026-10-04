@@ -20,6 +20,25 @@ export class DayWriteController {
       draft:intent?.draft??null,message:intent ? 'Hay un intento guardado. Comprobalo explícitamente antes de enviar otro.':null});}
     catch{this.update({phase:'blocked',message:'No pudimos leer el intento local. Comprobá el almacenamiento.'});}
   }
+  /**
+   * Nutrition and Daily Metrics share ONE persisted intent per user. On entering a
+   * surface, re-read it so neither keeps a stale in-memory copy. An open draft
+   * without an intent change is never touched.
+   */
+  async resync(){
+    if(this.disposed||this.busy)return;
+    let stored:StoredDayWrite|null;
+    try{stored=await this.repository.read();}catch{this.update({phase:'blocked',message:'No pudimos leer el intento local. Comprobá el almacenamiento.'});return;}
+    if(this.disposed||this.busy)return;
+    const current=this.state.intent;
+    if(stored&&(current?.intent.idempotencyKey!==stored.intent.idempotencyKey||!!current?.receipt!==!!stored.receipt)){
+      this.update({intent:stored,phase:stored.receipt?'confirmed':'uncertain',draft:stored.draft,errors:{},
+        message:'Hay un intento guardado. Comprobalo explícitamente antes de enviar otro.'});
+    }else if(!stored&&current){
+      // Resolved on the other surface: release the stale copy; server truth is re-read.
+      this.update({intent:null,phase:'idle',draft:null,truth:null,errors:{},message:null});this.invalidate();
+    }else if(!stored&&this.state.phase==='blocked'){this.update({phase:'idle',message:null});}
+  }
   open(kind:DayWriteDraft['kind'],data:MobileNutritionDayResponse){
     if(this.state.phase!=='idle'||this.state.intent||!canWriteDay(kind,data))return;
     this.update({draft:dayWriteDraft(kind,data),message:null,errors:{},truth:null});
@@ -41,7 +60,12 @@ export class DayWriteController {
     if(!built.intent){this.update({errors:built.errors,message:built.empty?'No hay cambios para guardar.':null});return;}
     const stored:StoredDayWrite={version:1,intent:built.intent,draft:d};
     this.busy=true;this.update({phase:'pending',errors:{},message:null});
-    try{await this.repository.write(stored);this.update({intent:stored});await this.send(stored);}
+    try{
+      // Mutual exclusion across surfaces: adopt another surface's pending intent, never send a second one.
+      const pending=await this.repository.read();
+      if(pending){this.update({intent:pending,phase:pending.receipt?'confirmed':'uncertain',draft:pending.draft,
+        message:'Ya hay otro intento guardado. Comprobalo antes de enviar uno nuevo.'});return;}
+      await this.repository.write(stored);this.update({intent:stored});await this.send(stored);}
     catch{this.update({phase:'blocked',message:'No pudimos completar el almacenamiento del intento. Comprobalo antes de enviar otro.'});}
     finally{this.busy=false;}
   }

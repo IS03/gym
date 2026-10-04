@@ -289,6 +289,7 @@ export function createMobileApiClient({
             conflictCode === 'FOOD_NAME_EXISTS' ||
             conflictCode === 'METRICS_CHANGED' ||
             conflictCode === 'METRIC_UNAVAILABLE' ||
+            conflictCode === 'METRIC_FUTURE_DATE' ||
             conflictCode === 'CONTEXT_CHANGED' ||
             conflictCode === 'CONTEXT_UNAVAILABLE' ||
             conflictCode === 'POSSIBLE_DUPLICATE' ||

@@ -61,6 +61,7 @@ export type MobileApiMutationResult<T> =
         | 'FOOD_NAME_EXISTS'
         | 'METRICS_CHANGED'
         | 'METRIC_UNAVAILABLE'
+        | 'METRIC_FUTURE_DATE'
         | 'CONTEXT_CHANGED'
         | 'CONTEXT_UNAVAILABLE'
         | 'POSSIBLE_DUPLICATE'

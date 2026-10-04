@@ -108,7 +108,10 @@ export async function updateDailyActivity(input: {
     p_water_l: parseOptionalNumber(input.waterL, "Agua", { min: 0, max: 50 }),
     p_mate_l: parseOptionalNumber(input.mateL, "Mate", { min: 0, max: 50 }),
   });
-  if (error) throw new Error(`Guardar actividad diaria: ${error.message}`);
+  if (error) {
+    if (error.message.includes("metric_future_date")) throw new Error("No se pueden registrar métricas en una fecha futura.");
+    throw new Error(`Guardar actividad diaria: ${error.message}`);
+  }
   const { data, error: readError } = await supabase.from("day_logs").select("*")
     .eq("id", input.dayLogId).eq("user_id", userId).single();
   if (readError) throw new Error(`Leer actividad diaria: ${readError.message}`);
