@@ -60,6 +60,7 @@ function RootNavigator() {
         <Stack.Protected guard={Boolean(session)}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
+          <Stack.Screen name="history" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
     </NavigationThemeProvider>

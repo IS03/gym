@@ -1,6 +1,6 @@
 import type { MobileApiReadResult, MobileApiRequestResult } from '@/api/results';
 import type {
-  BodyMeasurement, BodyMeasurementIntent, BodyMeasurementReceipt, BodyOverview, BodyPage, BodyWeightEntry, BodyWeightIntent, BodyWeightReceipt,
+  BodyDay, BodyMeasurement, BodyMeasurementIntent, BodyMeasurementReceipt, BodyOverview, BodyPage, BodyWeightEntry, BodyWeightIntent, BodyWeightReceipt,
 } from '@/api/body';
 import { parseInputNutritionDate, shiftNutritionDate } from '@/nutrition/day-format';
 import {
@@ -10,6 +10,8 @@ import type { BodyEditor, BodyIntentRepository, MeasurementEditor, StoredBodyInt
 
 type Page<T> = BodyPage<T> & { today: string };
 export type BodyApi = {
+  day?: (date: string) => Promise<MobileApiReadResult<BodyDay>>;
+  measurementById?: (id: string) => Promise<MobileApiRequestResult<BodyMeasurement>>;
   overview: () => Promise<MobileApiReadResult<BodyOverview>>;
   weights: (before: string) => Promise<MobileApiReadResult<Page<BodyWeightEntry>>>;
   measurements: (before: string) => Promise<MobileApiReadResult<Page<BodyMeasurement>>>;
@@ -17,6 +19,9 @@ export type BodyApi = {
   measurement: (intent: BodyMeasurementIntent) => Promise<MobileApiRequestResult<BodyMeasurementReceipt>>;
 };
 export type BodyRead = {
+  day?: BodyDay;
+  measurementTruth?: BodyMeasurement | null;
+  measurementTruthId?: string;
   status: 'loading' | 'ready' | 'unavailable'; overview: BodyOverview | null; refreshing: boolean; stale: boolean;
   weights: BodyWeightEntry[]; weightsCursor: string | null; measurements: BodyMeasurement[]; measurementsCursor: string | null;
   loadingMore: 'weights' | 'measurements' | null; moreError: boolean;
@@ -33,6 +38,7 @@ const sameDraft = (a: object, b: object) => JSON.stringify(a) === JSON.stringify
 export class BodyController {
   private state: BodyState = { read: emptyRead, phase: 'loading', editor: null, intent: null, message: null, errors: {}, notice: null };
   private busy = false; private disposed = false; private generation = 0; private listeners = new Set<() => void>();
+  private selectedDate: string | null = null;
   constructor(private api: BodyApi, private repository: BodyIntentRepository,
     private key: () => string = () => `body:${Date.now()}:${Math.random().toString(36).slice(2)}`) {}
   getSnapshot = () => this.state;
@@ -40,6 +46,7 @@ export class BodyController {
   private update(patch: Partial<BodyState>) { if (!this.disposed) { this.state = { ...this.state, ...patch }; this.listeners.forEach(f => f()); } }
   private updateRead(patch: Partial<BodyRead>) { this.update({ read: { ...this.state.read, ...patch } }); }
   dispose() { this.disposed = true; this.generation++; this.listeners.clear(); }
+  setDate(date: string | null) { if (this.selectedDate !== date) { this.selectedDate = date; void this.load(); } }
 
   async initialize() {
     try {
@@ -56,12 +63,27 @@ export class BodyController {
     const generation = ++this.generation;
     this.updateRead(this.state.read.overview ? { refreshing: true } : { status: 'loading' });
     let result: MobileApiReadResult<BodyOverview>;
-    try { result = await this.api.overview(); } catch { result = { status: 'unavailable', reason: 'network', meta: { durationMs: 0, httpStatus: null, outcome: 'unavailable' } }; }
+    const editor = this.state.editor;
+    const editorDate = editor?.kind === 'weight' ? parseDateFromDraft(editor) : editor?.baseline?.measuredOn;
+    const exactDate = editorDate ?? this.selectedDate;
+    const measurementId = editor?.kind === 'measurement' ? editor.baseline?.id : null;
+    const unavailable = { status: 'unavailable' as const, reason: 'network' as const, meta: { durationMs: 0, httpStatus: null, outcome: 'unavailable' as const } };
+    const [overviewResult, dayResult, measurementResult] = await Promise.all([
+      this.api.overview().catch(() => unavailable),
+      exactDate && this.api.day ? this.api.day(exactDate).catch(() => unavailable) : null,
+      measurementId && this.api.measurementById ? this.api.measurementById(measurementId).catch(() => unavailable) : null,
+    ]);
+    result = overviewResult;
     if (this.disposed || generation !== this.generation) return false;
     if (result.status === 'ok') {
       const o = result.data;
-      this.update({ read: { status: 'ready', overview: o, refreshing: false, stale: false, weights: o.weights.items, weightsCursor: o.weights.nextBefore,
-        measurements: o.measurements.items, measurementsCursor: o.measurements.nextBefore, loadingMore: null, moreError: false } });
+      const day = dayResult?.status === 'ok' ? dayResult.data : this.state.read.day?.date === exactDate ? this.state.read.day : undefined;
+      const measurementTruth = measurementResult?.status === 'ok' ? measurementResult.data : measurementResult?.status === 'not_found' ? null : undefined;
+      this.update({ read: { status: 'ready', overview: o, refreshing: false, stale: !!exactDate && !!this.api.day && dayResult?.status !== 'ok',
+        weights: o.weights.items, weightsCursor: o.weights.nextBefore,
+        measurements: measurementTruth ? mergeByKey(o.measurements.items, [measurementTruth], m => m.id) : o.measurements.items,
+        measurementsCursor: o.measurements.nextBefore, loadingMore: null, moreError: false, day,
+        measurementTruth, measurementTruthId: measurementResult && measurementTruth !== undefined ? measurementId ?? undefined : undefined } });
       return true;
     }
     // Keep the last confirmed read visible but marked stale; never fabricate empty.
@@ -89,16 +111,16 @@ export class BodyController {
   }
 
   private canEdit() { return !this.busy && !this.state.intent && this.state.phase === 'idle' && this.state.read.status === 'ready' && !!this.state.read.overview; }
-  openWeight(entry?: BodyWeightEntry) {
+  openWeight(entry?: BodyWeightEntry, date?: string) {
     const today = this.state.read.overview?.today;
     if (!this.canEdit() || this.state.editor || !today) return;
     this.update({ editor: entry ? { kind: 'weight', mode: 'edit', baseline: entry.weightKg, draft: weightDraft(entry.date, entry.weightKg) }
-      : { kind: 'weight', mode: 'create', baseline: null, draft: weightDraft(today, null) }, errors: {}, message: null, notice: null });
+      : { kind: 'weight', mode: 'create', baseline: null, draft: weightDraft(date ?? today, null) }, errors: {}, message: null, notice: null });
   }
-  openMeasurement(measurement?: BodyMeasurement) {
+  openMeasurement(measurement?: BodyMeasurement, date?: string) {
     const today = this.state.read.overview?.today;
     if (!this.canEdit() || this.state.editor || !today) return;
-    this.update({ editor: { kind: 'measurement', mode: measurement ? 'edit' : 'create', baseline: measurement ?? null, draft: measurementDraft(measurement ?? null, today) },
+    this.update({ editor: { kind: 'measurement', mode: measurement ? 'edit' : 'create', baseline: measurement ?? null, draft: measurementDraft(measurement ?? null, date ?? today) },
       errors: {}, message: null, notice: null });
   }
   change(key: string, value: string) {
@@ -117,6 +139,7 @@ export class BodyController {
   close() {
     if (this.busy || this.state.intent) return;
     this.update({ editor: null, phase: this.state.phase === 'blocked' ? 'blocked' : 'idle', errors: {}, message: null });
+    if (this.selectedDate && this.state.read.day?.date !== this.selectedDate) void this.load();
   }
 
   async saveWeight() {
@@ -227,6 +250,7 @@ export class BodyController {
     if (!fresh) { this.update({ phase: 'confirmed', message: 'Guardado confirmado. Falta actualizar la lectura; no vuelvas a enviarlo.' }); return; }
     await this.repository.clear(stored.intent.idempotencyKey);
     this.update({ phase: 'idle', intent: null, editor: null, errors: {}, message: null, notice: successNotice(stored) });
+    if (this.selectedDate && this.state.read.day?.date !== this.selectedDate) await this.load();
   }
   /** After a conflict the draft stays; the user rebases it on server truth explicitly. */
   reviewTruth() {
@@ -234,14 +258,20 @@ export class BodyController {
     if (this.busy || this.state.phase !== 'conflict' || read.status !== 'ready' || !editor) return;
     if (editor.kind === 'weight') {
       const date = parseDateFromDraft(editor);
-      const known = date ? weightAt(read.weights, read.weightsCursor !== null, date) : { known: false as const };
+      const exact = date && read.day?.date === date && !read.stale && read.day.weight.status === 'ok' ? read.day.weight.data : undefined;
+      const known = this.api.day ? exact !== undefined ? { known: true as const, weightKg: exact?.weightKg ?? null } : { known: false as const }
+        : date ? weightAt(read.weights, read.weightsCursor !== null, date) : { known: false as const };
+      if (!known.known) { this.update({ message: 'No pudimos confirmar el valor exacto de esa fecha. Actualizá la lectura antes de reintentar.' }); return; }
       const next: WeightEditor = known.known ? { ...editor, baseline: known.weightKg, mode: known.weightKg === null ? 'create' : editor.mode } : editor;
       this.update({ phase: 'idle', editor: next, message: known.known
         ? `Valor actual en el servidor: ${formatKg(known.weightKg)}. Revisá tu borrador antes de guardar de nuevo.`
         : 'Revisá tu borrador antes de guardar de nuevo.' });
       return;
     }
-    const current = editor.baseline ? read.measurements.find(m => m.id === editor.baseline!.id) : undefined;
+    if (editor.baseline && this.api.measurementById && read.measurementTruthId !== editor.baseline.id) {
+      this.update({ message: 'No pudimos confirmar esa medición. Actualizá la lectura antes de reintentar.' }); return;
+    }
+    const current = editor.baseline ? this.api.measurementById ? read.measurementTruth ?? undefined : read.measurements.find(m => m.id === editor.baseline!.id) : undefined;
     const next: MeasurementEditor = editor.baseline && !current ? { ...editor, mode: 'create', baseline: null } : current ? { ...editor, baseline: current } : editor;
     this.update({ phase: 'idle', editor: next, message: editor.baseline && !current
       ? 'Esa medición ya no existe. Si guardás, se registra como nueva.' : 'Revisá tu borrador frente a los valores actuales antes de guardar de nuevo.' });

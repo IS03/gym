@@ -1,12 +1,19 @@
 import type { MobileApiClient } from './client';
+import { parseBodyDay } from '../../../../src/lib/mobile-api/body-day-contract';
 import {
-  parseBodyMeasurementPage, parseBodyMeasurementReceipt, parseBodyOverview, parseBodyWeightPage, parseBodyWeightReceipt, bodyRecord,
+  parseBodyMeasurement, parseBodyMeasurementPage, parseBodyMeasurementReceipt, parseBodyOverview, parseBodyWeightPage, parseBodyWeightReceipt, bodyRecord,
   type BodyMeasurementIntent, type BodyWeightIntent,
 } from '../../../../src/lib/mobile-api/body-contract';
 import { isNutritionDate } from '../../../../src/lib/mobile-api/nutrition-day-contract';
+export type { BodyDay } from '../../../../src/lib/mobile-api/body-day-contract';
 
 export * from '../../../../src/lib/mobile-api/body-contract';
 const BASE = '/api/mobile/v1/body';
+export const fetchBodyMeasurement = (client: MobileApiClient, id: string, signal?: AbortSignal) =>
+  client.request({ method: 'GET', path: `${BASE}/measurements/${encodeURIComponent(id)}`, signal,
+    parse: v => { const m = parseBodyMeasurement(v); return m?.id === id.toLowerCase() ? m : undefined; } });
+export const fetchBodyDay = (client: MobileApiClient, date: string, signal?: AbortSignal) =>
+  client.read({ path: `${BASE}/days/${encodeURIComponent(date)}`, signal, parse: v => { const p = parseBodyDay(v); return p?.date === date ? p : undefined; } });
 const sectionPage = <T,>(parse: (v: unknown) => T | undefined) => (v: unknown) => {
   if (!bodyRecord(v) || !isNutritionDate(v.today)) return undefined;
   const page = parse({ items: v.items, nextBefore: v.nextBefore });

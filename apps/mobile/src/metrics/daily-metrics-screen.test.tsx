@@ -13,7 +13,7 @@ const mockMutate = jest.fn<(client: unknown, intent: unknown) => Promise<unknown
 const mockStore = new Map<string, string>();
 const mockFocus: (() => void)[] = [];
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocusEffect: (effect: () => void) => { mockFocus.push(effect); } }));
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ push: mockPush }), useFocusEffect: (effect: () => void) => { mockFocus.push(effect); } }));
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: jest.fn(), warning: jest.fn() } }));
 jest.mock('@/auth', () => ({ useMobileAuth: () => ({ session: { user: { id: 'owner' } } }) }));
 const mockClient = { request: jest.fn(), read: jest.fn() };

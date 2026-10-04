@@ -8,6 +8,8 @@ import { formatDuration } from '@/home/format';
 import { dayHeading, plural, volumeLabel } from './history-model';
 import { ListCard, ReadStateScreen, SessionRow, StaleNotice } from './history-components';
 import { useRead } from './use-read';
+import { historyReturnParams } from '@/history/navigation';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
 
 function Stat({ value, label }: { value: string | null; label: string }) {
   return <View style={styles.stat}><AppText variant="label">{value ?? '—'}</AppText><AppText muted variant="caption">{label}</AppText></View>;
@@ -17,6 +19,7 @@ function Stat({ value, label }: { value: string | null; label: string }) {
 export function TrainingDayScreen() {
   const params = useLocalSearchParams<{ date: string }>();
   const date = typeof params.date === 'string' ? params.date : '';
+  const origin = historyReturnParams(params);
   const { client } = useMobileApi();
   const router = useRouter();
   const navigation = useNavigation();
@@ -27,9 +30,10 @@ export function TrainingDayScreen() {
   const { state, reload } = useRead(load);
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
   useLayoutEffect(() => { if (valid) navigation.setOptions({ title: dayHeading(date) }); }, [date, navigation, valid]);
-  if (state.status !== 'ready') return <ReadStateScreen state={state} onRetry={() => void reload()} testID="training-day" />;
+  if (state.status !== 'ready') return <ReadStateScreen header={<ReturnToHistoryDay />} state={state} onRetry={() => void reload()} testID="training-day" />;
   const { sessions, summary } = state.data;
   return <ScrollScreen testID="training-day" refreshControl={<RefreshControl refreshing={state.refreshing} onRefresh={() => void reload()} tintColor={colors.primary} />}>
+    <ReturnToHistoryDay />
     {state.stale ? <StaleNotice onRetry={() => void reload()} /> : null}
     {sessions.length === 0 ? <EmptyState title="Sin entrenamientos" description="No hay entrenamientos terminados este día."
       action={<Button label="Volver al calendario" variant="secondary" onPress={() => router.back()} />} /> : <>
@@ -44,7 +48,7 @@ export function TrainingDayScreen() {
       </Surface>
       <AppText muted variant="label">Sesiones del día</AppText>
       <ListCard>{sessions.map((session, index) => <SessionRow key={session.id} session={session} divided={index > 0}
-        onPress={() => router.push(`/(tabs)/train/history/${session.id}`)} />)}</ListCard>
+        onPress={() => router.push(origin ? { pathname: '/(tabs)/train/history/[id]', params: { id: session.id, ...origin } } : `/(tabs)/train/history/${session.id}`)} />)}</ListCard>
     </>}
   </ScrollScreen>;
 }

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { selectedRouteDate } from '@/history/navigation';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
+import { useDomainDate } from '@/history/use-domain-date';
 import { useMobileApi } from '@/api';
 import { useMobileAuth } from '@/auth';
 import { AppText, Button, Heading, InlineUnavailable, ScrollScreen, SkeletonBlock, Surface, spacing, useOwnlevelTheme } from '@/design-system';
@@ -37,6 +40,7 @@ function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
   return <ScrollScreen testID="daily-metrics-screen" refreshControl={<RefreshControl refreshing={state.status === 'ready' && state.refreshing}
     onRefresh={() => void refresh()} tintColor={colors.primary} />}>
     <View style={styles.header}>
+      <ReturnToHistoryDay />
       <AppText variant="overline">{date === serverToday ? 'Hoy' : 'Métricas del día'}</AppText>
       <AppText accessibilityRole="header" variant="heading">{displayNutritionDate(date)}</AppText>
       <View style={styles.dates}>
@@ -83,12 +87,13 @@ export function DailyMetricsScreen() {
   return <DailyMetricsUserScreen key={userId} userId={userId} />;
 }
 function DailyMetricsUserScreen({ userId }: { userId: string }) {
+  const routeDate = selectedRouteDate(useLocalSearchParams());
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
   const writes = useDayWriteController(client, userId, invalidate);
   const [today, setToday] = useState(() => nutritionToday()); // initial guess only; replaced by the server's today
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useDomainDate(routeDate);
   const writeController = writes?.controller;
   // Entering the surface re-reads the shared persisted intent (Nutrition may have changed it).
   useFocusEffect(useCallback(() => { if (writeController) void writeController.resync(); }, [writeController]));

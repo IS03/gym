@@ -604,7 +604,7 @@ export async function cancelWorkoutSession(sessionId: string) {
   if (error) throwRpcError("Cancelar sesión", error);
 }
 
-function sessionDisplayName(
+export function sessionDisplayName(
   session: Pick<WorkoutSession, "routine_name_snapshot" | "session_name">,
 ) {
   return session.routine_name_snapshot ?? session.session_name ?? "Sesión libre";

@@ -13,7 +13,8 @@ export function dayWriteDraft(kind: DayWriteDraft['kind'], baseline: MobileNutri
 }
 export function canWriteDay(kind: DayWriteDraft['kind'], data: MobileNutritionDayResponse) {
   // Metrics are recorded only up to the SERVER's today (M5.2); the server rejects later dates too.
-  return kind === 'metrics' ? data.date <= data.today && data.activity.status === 'ok' && data.activity.data.metrics.length > 0 && data.activity.data.metrics.every(m => !!m.definitionUpdatedAt)
+  return kind === 'metrics' ? data.date <= data.today && data.activity.status === 'ok'
+    && data.activity.data.metrics.some(m => m.isActive || (data.date < data.today && m.value !== null)) && data.activity.data.metrics.every(m => !!m.definitionUpdatedAt)
     : data.nutrition.status === 'ok' && data.nutrition.data.dayState === 'recorded' && !!data.nutrition.data.context.updatedAt;
 }
 export function draftDirty(d: DayWriteDraft) {
@@ -40,6 +41,7 @@ export function buildDayWriteIntent(d: DayWriteDraft, idempotencyKey: string): {
   if (d.kind === 'metrics' && d.baseline.activity.status === 'ok') {
     const changes=[];
     for (const m of d.baseline.activity.data.metrics) {
+      if (!m.isActive && d.baseline.date >= d.baseline.today) continue;
       const input=d.metrics[m.id];
       const value=input ? metricInputValue(input,m.valueType) : undefined;
       if (value === undefined || (m.systemKey === 'steps' && value !== null && value>2147483647)) { errors[m.id]=m.valueType==='duration' ? 'Usá horas enteras y minutos de 0 a 59.' : 'Usá un valor no negativo del tipo indicado.'; continue; }

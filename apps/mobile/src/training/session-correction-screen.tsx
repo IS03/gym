@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { usePreventRemove } from 'expo-router/build/react-navigation/core/usePreventRemove';
 import { useMobileApi } from '@/api';
 import type { MobileApiClient } from '@/api/client';
@@ -145,12 +146,14 @@ export function SessionCorrectionScreen() {
   const { state, reload } = useRead(load);
   // A new read remounts the form, discarding local edits only on explicit reload.
   const [generation, setGeneration] = useState(0);
-  if (state.status !== 'ready' || !client) return <ReadStateScreen state={state} onRetry={() => void reload()} testID="session-correction" notFoundTitle="Sesión no disponible" />;
+  if (state.status !== 'ready' || !client) return <ReadStateScreen header={<ReturnToHistoryDay />} state={state} onRetry={() => void reload()} testID="session-correction" notFoundTitle="Sesión no disponible" />;
   if (state.data.session.status !== 'completed') return <ScrollScreen testID="session-correction-closed">
+    <ReturnToHistoryDay />
     <UnavailableState title="No se puede corregir" description={state.data.session.status === 'discarded' ? 'La sesión fue eliminada.' : 'Sólo se pueden corregir sesiones finalizadas.'}
       action={<Button label="Volver" onPress={() => router.back()} />} />
   </ScrollScreen>;
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <ReturnToHistoryDay />
     <CorrectionForm key={`${state.data.session.updatedAt}:${generation}`} client={client} detail={state.data}
       onReload={() => { setGeneration(value => value + 1); void reload(); }} />
   </View>;
