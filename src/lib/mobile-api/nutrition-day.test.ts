@@ -113,6 +113,22 @@ describe("Nutrition read server and route", () => {
     await readMobileNutritionDay(date, context(rpc), { requestKind: "navigation" });
     expect(rpc).toHaveBeenCalledExactlyOnceWith("mobile_read_nutrition_day", { p_log_date: date }, { get: true });
   });
+  it("an account without definitions is initialized once with the canonical ensure and re-read (M5.3)", async () => {
+    const empty = snapshot(); empty.activity.data.metrics = [];
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: empty, error: null })
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: snapshot(), error: null });
+    const result = await readMobileNutritionDay(date, context(rpc), { requestKind: "navigation" });
+    expect(rpc.mock.calls.map(call => call[0])).toEqual(["mobile_read_nutrition_day", "ensure_user_metrics", "mobile_read_nutrition_day"]);
+    expect(rpc.mock.calls[1]).toEqual(["ensure_user_metrics"]);
+    expect(result.activity.status === "ok" && result.activity.data.metrics).toHaveLength(1);
+    // A failed initialization never turns the read into an error: it stays the confirmed empty list.
+    const failing = vi.fn().mockResolvedValueOnce({ data: empty, error: null }).mockResolvedValueOnce({ data: null, error: { code: "42501" } });
+    const fallback = await readMobileNutritionDay(date, context(failing), { requestKind: "navigation" });
+    expect(failing).toHaveBeenCalledTimes(2);
+    expect(fallback.activity.status === "ok" && fallback.activity.data.metrics).toEqual([]);
+  });
   it("authenticates Bearer, returns private headers and maps validation/unavailability", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: snapshot(), error: null });
     vi.mocked(authenticateMobileAccessToken).mockResolvedValue(context(rpc));

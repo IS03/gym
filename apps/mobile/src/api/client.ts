@@ -290,6 +290,11 @@ export function createMobileApiClient({
             conflictCode === 'METRICS_CHANGED' ||
             conflictCode === 'METRIC_UNAVAILABLE' ||
             conflictCode === 'METRIC_FUTURE_DATE' ||
+            conflictCode === 'METRIC_CHANGED' ||
+            conflictCode === 'METRIC_HAS_HISTORY' ||
+            conflictCode === 'SYSTEM_METRIC_IMMUTABLE' ||
+            conflictCode === 'SYSTEM_METRIC_PROTECTED' ||
+            conflictCode === 'METRIC_ORDER_CHANGED' ||
             conflictCode === 'CONTEXT_CHANGED' ||
             conflictCode === 'CONTEXT_UNAVAILABLE' ||
             conflictCode === 'POSSIBLE_DUPLICATE' ||
