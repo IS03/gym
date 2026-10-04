@@ -5,7 +5,10 @@ import {useSavedController} from './use-saved-controller';
 import {SavedEditor} from './saved-editor';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AppState, RefreshControl, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { selectedRouteDate } from '@/history/navigation';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
+import { useDomainDate } from '@/history/use-domain-date';
 import { useMobileApi } from '@/api';
 import { useMobileAuth } from '@/auth';
 import { AppText, Button, LoadingState, ScrollScreen, UnavailableState, spacing, useOwnlevelTheme } from '@/design-system';
@@ -47,6 +50,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
       testID="nutrition-refresh" tintColor={colors.primary} />
   }>
     <View style={styles.header}>
+      <ReturnToHistoryDay />
       <AppText variant="overline">{date === today ? 'Hoy' : 'Día nutricional'}</AppText>
       <AppText accessibilityRole="header" variant="heading">{displayNutritionDate(date)}</AppText>
       <View style={styles.dates}>
@@ -83,6 +87,7 @@ export function NutritionDayScreen() {
   return <NutritionUserDayScreen key={session?.user.id ?? 'anonymous'} userId={session?.user.id ?? 'anonymous'} />;
 }
 function NutritionUserDayScreen({ userId }: { userId: string }) {
+  const routeDate = selectedRouteDate(useLocalSearchParams());
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
@@ -97,7 +102,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [today, setToday] = useState(() => nutritionToday());
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useDomainDate(routeDate);
   // Today follows Cordoba midnight on focus/foreground; a chosen date stays fixed.
   const updateToday = useCallback(() => setToday(nutritionToday()), []);
   useFocusEffect(useCallback(() => { updateToday(); }, [updateToday]));

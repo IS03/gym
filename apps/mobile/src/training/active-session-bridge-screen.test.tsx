@@ -25,7 +25,7 @@ const mockSuccess = jest.fn();
 const mockWarning = jest.fn();
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: () => mockSelection(), success: () => mockSuccess(), warning: () => mockWarning() } }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }), useNavigation: () => ({ dispatch: jest.fn(), setOptions: mockSetOptions }),
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }), useNavigation: () => ({ dispatch: jest.fn(), setOptions: mockSetOptions }),
   useFocusEffect: () => undefined }));
 jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({ usePreventRemove: () => undefined }));
 jest.mock('./active-session-native-storage', () => ({ activeSessionStorage: {} }));

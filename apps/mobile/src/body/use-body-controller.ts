@@ -3,18 +3,20 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { MobileApiClient } from '@/api/client';
-import { fetchBodyMeasurements, fetchBodyOverview, fetchBodyWeights, mutateBodyMeasurement, mutateBodyWeight } from '@/api/body';
+import { fetchBodyDay, fetchBodyMeasurement, fetchBodyMeasurements, fetchBodyOverview, fetchBodyWeights, mutateBodyMeasurement, mutateBodyWeight } from '@/api/body';
 import { shouldRefreshOnForeground } from '@/api/resource';
 import { BodyController, type BodyState } from './body-controller';
 import { BodyIntentRepository } from './body-storage';
 
 /** One controller per client/user. Focus/foreground re-read server truth; drafts stay. */
-export function useBodyController(client: MobileApiClient | null, userId: string) {
+export function useBodyController(client: MobileApiClient | null, userId: string, date: string | null = null) {
   const [current, setCurrent] = useState<{ client: MobileApiClient; userId: string; controller: BodyController; state: BodyState } | null>(null);
   useEffect(() => {
     if (!client) return;
     const life = new AbortController();
     const controller = new BodyController({
+      day: date => fetchBodyDay(client, date, life.signal),
+      measurementById: id => fetchBodyMeasurement(client, id, life.signal),
       overview: () => fetchBodyOverview(client, life.signal),
       weights: before => fetchBodyWeights(client, before, life.signal),
       measurements: before => fetchBodyMeasurements(client, before, life.signal),
@@ -29,6 +31,7 @@ export function useBodyController(client: MobileApiClient | null, userId: string
   }, [client, userId]);
   const active = current?.client === client && current.userId === userId ? current : null;
   const controller = active?.controller;
+  useEffect(() => { controller?.setDate(date); }, [controller, date]);
   useFocusEffect(useCallback(() => { if (controller && controller.getSnapshot().phase !== 'loading') void controller.load(); }, [controller]));
   return active;
 }

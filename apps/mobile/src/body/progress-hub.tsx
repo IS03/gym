@@ -8,6 +8,11 @@ export function ProgressHub() {
   const router = useRouter();
   const { colors } = useOwnlevelTheme();
   return <ScrollScreen testID="progress-hub">
+    <PressableSurface accessibilityLabel="Abrir Historial" style={styles.card} onPress={() => { haptics.selection(); router.push('/history'); }}>
+      <IconCircle icon="activity" />
+      <View style={styles.flex}><AppText variant="label">Historial</AppText><AppText muted variant="caption">Tus registros por día y calendario.</AppText></View>
+      <AppIcon color={colors.textMuted} name="chevronRight" size={16} />
+    </PressableSurface>
     <PressableSurface accessibilityLabel="Abrir Cuerpo" accessibilityHint="Peso y medidas corporales" style={styles.card}
       onPress={() => { haptics.selection(); router.push('/(tabs)/progress/body'); }}>
       <IconCircle icon="activity" />

@@ -62,7 +62,7 @@ export function isBodyTimestamp(v: unknown): v is string {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(v) && Number.isFinite(Date.parse(v));
 }
 
-function parseEntry(v: unknown): BodyWeightEntry | undefined {
+export function parseBodyWeightEntry(v: unknown): BodyWeightEntry | undefined {
   return bodyRecord(v) && keys(v, ["date", "weightKg"]) && isNutritionDate(v.date) && isBodyWeight(v.weightKg) ? { date: v.date, weightKg: v.weightKg } : undefined;
 }
 const MEASUREMENT_KEYS = ["id", "measuredOn", ...BODY_MEASUREMENT_FIELDS, "armCm", "thighCm", "condition", "notes",
@@ -84,12 +84,12 @@ function parsePage<T>(v: unknown, item: (x: unknown) => T | undefined, cursor: (
   if (v.nextBefore !== null && v.nextBefore !== dates.at(-1)) return;
   return { items, nextBefore: v.nextBefore };
 }
-export const parseBodyWeightPage = (v: unknown) => parsePage(v, parseEntry, e => e.date);
+export const parseBodyWeightPage = (v: unknown) => parsePage(v, parseBodyWeightEntry, e => e.date);
 export const parseBodyMeasurementPage = (v: unknown) => parsePage(v, parseBodyMeasurement, m => m.measuredOn);
 export function parseBodyOverview(v: unknown): BodyOverview | undefined {
   if (!bodyRecord(v) || !keys(v, ["today", "current", "profileWeightKg", "weights", "measurements"]) || !isNutritionDate(v.today)
     || (v.profileWeightKg !== null && !isBodyWeight(v.profileWeightKg))) return;
-  const current = v.current === null ? null : parseEntry(v.current);
+  const current = v.current === null ? null : parseBodyWeightEntry(v.current);
   const weights = parseBodyWeightPage(v.weights), measurements = parseBodyMeasurementPage(v.measurements);
   if (current === undefined || !weights || !measurements) return;
   return { today: v.today, current, profileWeightKg: v.profileWeightKg as number | null, weights, measurements };
@@ -108,7 +108,7 @@ export function parseBodyWeightReceipt(v: unknown): BodyWeightReceipt | undefine
     || v.status !== "confirmed" || (v.operation !== "set" && v.operation !== "delete") || !isNutritionDate(v.date)
     || (v.operation === "set" ? !isBodyWeight(v.weightKg) : v.weightKg !== null)
     || (v.profileWeightKg !== null && !isBodyWeight(v.profileWeightKg)) || typeof v.currentWeightChanged !== "boolean") return;
-  const current = v.current === null ? null : parseEntry(v.current);
+  const current = v.current === null ? null : parseBodyWeightEntry(v.current);
   return current === undefined ? undefined : { ...(v as BodyWeightReceipt), current };
 }
 export function parseBodyMeasurementFields(v: unknown): BodyMeasurementFields | undefined {

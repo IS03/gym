@@ -43,11 +43,12 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
 }
 
 /** Loading / unavailable / not-found screens shared by history reads. Returns null when ready. */
-export function ReadStateScreen<T>({ state, onRetry, notFoundTitle = 'No disponible', testID }: {
-  state: ReadState<T>; onRetry: () => void; notFoundTitle?: string; testID: string;
+export function ReadStateScreen<T>({ state, onRetry, notFoundTitle = 'No disponible', testID, header }: {
+  state: ReadState<T>; onRetry: () => void; notFoundTitle?: string; testID: string; header?: React.ReactNode;
 }) {
   if (state.status === 'ready') return null;
   return <ScrollScreen testID={`${testID}-${state.status}`}>
+    {header}
     {state.status === 'loading' ? <><SkeletonBlock height={72} /><SkeletonBlock height={88} /><SkeletonBlock height={88} /></>
       : state.status === 'not_found' ? <UnavailableState title={notFoundTitle} description="Puede que se haya eliminado o que no pertenezca a tu cuenta." />
         : <UnavailableState title="No pudimos cargar los datos" description="Tus datos siguen seguros. Revisá la conexión e intentá nuevamente."

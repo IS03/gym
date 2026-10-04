@@ -45,6 +45,8 @@ export class DayWriteController {
   }
   changeMetric(id:string,field:keyof MetricInput,value:string){
     const d=this.state.draft;if(!d||!d.metrics[id]||this.state.intent||this.busy||!['idle','conflict'].includes(this.state.phase))return;
+    const metric=d.baseline.activity.status==='ok'?d.baseline.activity.data.metrics.find(m=>m.id===id):undefined;
+    if(metric&&!metric.isActive&&d.baseline.date>=d.baseline.today)return;
     this.update({draft:{...d,metrics:{...d.metrics,[id]:{...d.metrics[id],[field]:value}}},errors:{}});
   }
   changeContext(field:'target'|'expenditure',value:string){

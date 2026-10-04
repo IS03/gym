@@ -9,6 +9,7 @@ import type { MobileApiClient } from '@/api/client';
 import type { SessionDetailDto } from '@/api/active-session';
 import type { RestDeadline } from './active-session-model';
 import { AppIcon, AppText, Button, Heading, InlineUnavailable, ProgressBar, ScrollScreen, SkeletonBlock, Surface, UnavailableState, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { haptics } from '@/platform/haptics';
 import { ActiveSessionController, sessionIntentKey } from './active-session-controller';
 import { ActiveExerciseCard } from './active-session-exercise-card';
@@ -156,6 +157,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic"
       refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { setPullRefreshing(true); void controller.refresh().finally(() => setPullRefreshing(false)); }} tintColor={colors.primary} />}>
       <Surface elevated style={[styles.sessionHeader, { borderLeftColor: accent }]}>
+        <ReturnToHistoryDay />
         <AppText muted variant="overline">{active ? 'TU ENTRENAMIENTO' : 'SESIÓN CERRADA'}</AppText>
         <View style={styles.row}><Heading level={2} style={styles.flex}>{detail.session.name}</Heading>
           {state.refreshing || state.intent?.phase === 'running' ? <ActivityIndicator testID="session-background-sync" accessibilityLabel="Sincronizando sesión" size="small" color={colors.textMuted} /> : null}

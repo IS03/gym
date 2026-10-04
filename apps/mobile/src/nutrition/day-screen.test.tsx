@@ -24,7 +24,7 @@ jest.mock('./day-format', () => ({
 }));
 jest.mock('@/api', () => ({ useMobileApi: () => ({ client: mockClient }) }));
 jest.mock('@/auth', () => ({ useMobileAuth: () => ({ session: { user: { id: mockUser } } }) }));
-jest.mock('expo-router', () => ({ useFocusEffect: () => {} }));
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ navigate: jest.fn() }), useFocusEffect: () => {} }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 const ok = (date: string, data = nutritionFixture(date)): MobileApiReadResult<MobileNutritionDayResponse> => ({

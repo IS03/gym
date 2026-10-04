@@ -39,6 +39,9 @@ export function DayWriteEditor({controller,state}:{controller:DayWriteController
         <AppText>{displayNutritionDate(d.baseline.date)} · Sólo esta fecha</AppText>
         <AppText muted>{d.kind==='metrics'?'Vacío significa sin registro. Cero es un valor. Se guardan juntos sólo los cambios.':'Estos ajustes diarios no cambian tu plan ni la configuración general.'}</AppText>
         {d.kind==='metrics'?metrics.map(m=>{
+          if(!m.isActive&&d.baseline.date>=d.baseline.today)return <Surface key={m.id}>
+            <AppText variant="label">{m.label} · archivada</AppText><AppText>{metricDisplay(m)} · Sólo lectura hoy</AppText>
+          </Surface>;
           const raw=d.metrics[m.id];return <Surface key={m.id}>
             <AppText variant="label">{m.label}{m.isActive?'':' · archivada'}</AppText>
             <AppText muted>{m.valueType==='duration'?'Duración en horas y minutos':`${m.valueType==='integer'?'Entero':'Decimal · coma o punto'}${m.unit?' · '+m.unit:''}`}</AppText>

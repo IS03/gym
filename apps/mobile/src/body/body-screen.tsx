@@ -1,4 +1,7 @@
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { selectedRouteDate } from '@/history/navigation';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { useMobileApi } from '@/api';
 import { useMobileAuth } from '@/auth';
 import type { BodyMeasurement, BodyWeightEntry } from '@/api/body';
@@ -74,11 +77,12 @@ function MeasurementSection({ state, controller, editable }: { state: BodyState;
   </View>;
 }
 
-export function BodyView({ state, controller }: { state: BodyState; controller: BodyController }) {
+export function BodyView({ state, controller, date }: { state: BodyState; controller: BodyController; date?: string | null }) {
   const { colors } = useOwnlevelTheme();
   const { read, editor } = state;
   if (!read.overview) {
     return <ScrollScreen testID={read.status === 'loading' ? 'body-loading' : 'body-unavailable'}>
+      <ReturnToHistoryDay />
       {read.status === 'loading' ? <><SkeletonBlock height={140} /><SkeletonBlock height={140} /></>
         : <UnavailableState title="No pudimos cargar Cuerpo" description="Tus datos siguen seguros. Revisá la conexión e intentá nuevamente."
           action={<Button label="Reintentar" onPress={() => void controller.load()} />} />}
@@ -87,6 +91,7 @@ export function BodyView({ state, controller }: { state: BodyState; controller: 
   const editable = state.phase === 'idle' && !state.intent && !editor;
   return <>
     <ScrollScreen testID="body-screen" refreshControl={<RefreshControl refreshing={read.refreshing} onRefresh={() => void controller.load()} tintColor={colors.primary} />}>
+      <ReturnToHistoryDay />
       {read.stale ? <Surface><InlineUnavailable actionLabel="Reintentar" message="No se pudo actualizar. Mostramos la última lectura confirmada." onAction={() => void controller.load()} /></Surface> : null}
       {state.notice ? <Surface accessibilityRole="alert"><AppText variant="caption">{state.notice}</AppText>
         <Button label="Entendido" variant="quiet" onPress={() => controller.dismissNotice()} /></Surface> : null}
@@ -94,8 +99,10 @@ export function BodyView({ state, controller }: { state: BodyState; controller: 
         <Button label="Comprobar" onPress={() => void controller.recover()} /></Surface> : null}
       {state.phase === 'blocked' && !editor ? <Surface><AppText style={{ color: colors.danger }} variant="caption">{state.message}</AppText></Surface> : null}
       {read.moreError ? <AppText style={{ color: colors.danger }} variant="caption">No pudimos cargar más registros. Probá de nuevo.</AppText> : null}
-      <WeightSection state={state} controller={controller} editable={editable} />
-      <MeasurementSection state={state} controller={controller} editable={editable} />
+      {date ? <BodyDate state={state} controller={controller} date={date} editable={editable} /> : <>
+        <WeightSection state={state} controller={controller} editable={editable} />
+        <MeasurementSection state={state} controller={controller} editable={editable} />
+      </>}
     </ScrollScreen>
     {editor?.kind === 'weight' ? <WeightEditorSheet editor={editor} state={state} controller={controller} /> : null}
     {editor?.kind === 'measurement' ? <MeasurementEditorSheet editor={editor} state={state} controller={controller} /> : null}
@@ -109,9 +116,33 @@ export function BodyScreen() {
 }
 function BodyUserScreen({ userId }: { userId: string }) {
   const { client } = useMobileApi();
-  const body = useBodyController(client, userId);
+  const date = selectedRouteDate(useLocalSearchParams());
+  const body = useBodyController(client, userId, date);
   if (!body) return <ScrollScreen testID="body-loading"><SkeletonBlock height={140} /></ScrollScreen>;
-  return <BodyView state={body.state} controller={body.controller} />;
+  return <BodyView state={body.state} controller={body.controller} date={date} />;
+}
+function BodyDate({ state, controller, date, editable }: { state: BodyState; controller: BodyController; date: string; editable: boolean }) {
+  const day = state.read.day?.date === date ? state.read.day : null;
+  if (!day && state.read.refreshing) return <SkeletonBlock height={160} />;
+  if (!day) return <Surface><Heading level={2}>{formatBodyDate(date)}</Heading><InlineUnavailable message="No hay una lectura confirmada de esta fecha." actionLabel="Reintentar" onAction={() => void controller.load()} /></Surface>;
+  return <>
+    <Heading level={2}>{formatBodyDate(date)}</Heading>
+    <Surface><Heading level={2}>Peso</Heading>
+      {day.weight.status === 'unavailable' ? <AppText>No pudimos cargar el peso de esta fecha.</AppText> : <>
+        <AppText>{day.weight.data ? formatKg(day.weight.data.weightKg) : 'Sin registro de peso.'}</AppText>
+        <Button label={day.weight.data ? 'Editar peso' : 'Registrar peso'} disabled={!editable || state.read.stale} onPress={() => { if (day.weight.status === 'ok') controller.openWeight(day.weight.data ?? undefined, date); }} />
+      </>}
+    </Surface>
+    <Surface><Heading level={2}>Medidas</Heading>
+      {day.measurement.status === 'unavailable' ? <AppText>No pudimos cargar la medición de esta fecha.</AppText> : <>
+        {day.measurement.data ? <>
+          {measurementValues(day.measurement.data).map(v => <AppText key={v.field}>{v.label}: {v.value}</AppText>)}
+          {measurementBadges(day.measurement.data).map(b => <AppText key={b.text} muted>{b.text}</AppText>)}
+        </> : <AppText>Sin medición corporal.</AppText>}
+        <Button label={day.measurement.data ? 'Editar medición' : 'Registrar medidas'} disabled={!editable || state.read.stale} onPress={() => { if (day.measurement.status === 'ok') controller.openMeasurement(day.measurement.data ?? undefined, date); }} />
+      </>}
+    </Surface>
+  </>;
 }
 
 const styles = StyleSheet.create({

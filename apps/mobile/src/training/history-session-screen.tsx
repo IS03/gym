@@ -1,6 +1,8 @@
 import { useCallback, useLayoutEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { historyReturnParams } from '@/history/navigation';
+import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { useMobileApi } from '@/api';
 import type { MobileApiClient } from '@/api/client';
 import { fetchSessionDetail, type SessionDetailDto, type SessionFinishedDto } from '@/api/active-session';
@@ -33,6 +35,7 @@ export function CompletedSessionScreen({ api, sessionId, initialDetail, finished
   onHome: () => void; onTraining?: () => void;
 }) {
   const router = useRouter();
+  const origin = historyReturnParams(useLocalSearchParams());
   const navigation = useNavigation();
   const { colors } = useOwnlevelTheme();
   const load = useCallback((signal: AbortSignal) => api.detail(signal), [api]);
@@ -47,10 +50,10 @@ export function CompletedSessionScreen({ api, sessionId, initialDetail, finished
   useLayoutEffect(() => {
     if (status && status !== 'in_progress') navigation.setOptions({ title: status === 'discarded' ? 'Sesión eliminada' : 'Sesión finalizada' });
   }, [navigation, status]);
-  if (state.status !== 'ready') return <ReadStateScreen state={state} onRetry={() => void reload()} testID="history-session" notFoundTitle="Sesión no disponible" />;
+  if (state.status !== 'ready') return <ReadStateScreen header={<ReturnToHistoryDay />} state={state} onRetry={() => void reload()} testID="history-session" notFoundTitle="Sesión no disponible" />;
   const detail = state.data;
   if (detail.session.status === 'in_progress') {
-    return <ScrollScreen testID="history-session-in-progress"><UnavailableState title="La sesión está en curso" description="Abrila para seguir entrenando o finalizarla."
+    return <ScrollScreen testID="history-session-in-progress"><ReturnToHistoryDay /><UnavailableState title="La sesión está en curso" description="Abrila para seguir entrenando o finalizarla."
       action={<Button label="Abrir sesión" onPress={() => router.replace(`/(tabs)/train/session/${sessionId}`)} />} /></ScrollScreen>;
   }
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)/train/history'); };
@@ -83,12 +86,12 @@ export function CompletedSessionScreen({ api, sessionId, initialDetail, finished
   };
   const actions = detail.session.status === 'completed' ? <View style={styles.actions}>
     {notice ? <Surface accessibilityRole="alert"><AppText style={{ color: notice.tone === 'danger' ? colors.danger : colors.warning }} variant="caption">{notice.text}</AppText></Surface> : null}
-    <Button label="Corregir sesión" variant="secondary" disabled={discarding} onPress={() => router.push(`/(tabs)/train/correct/${sessionId}`)} />
+    <Button label="Corregir sesión" variant="secondary" disabled={discarding} onPress={() => router.push(origin ? { pathname: '/(tabs)/train/correct/[id]', params: { id: sessionId, ...origin } } : `/(tabs)/train/correct/${sessionId}`)} />
     <Button label={discarding ? 'Eliminando…' : pendingKey ? 'Reintentar eliminación' : 'Eliminar sesión'} variant="quiet" disabled={discarding}
       onPress={pendingKey ? () => void runDiscard() : confirmDiscard} />
   </View> : null;
   return <CompletedSessionView detail={detail} finished={finished} onHome={onHome} onTraining={onTraining} actions={actions}
-    banner={state.stale ? <Surface><AppText muted variant="caption">No se pudo actualizar. Mostramos la última lectura confirmada.</AppText></Surface> : null}
+    banner={<><ReturnToHistoryDay />{state.stale ? <Surface><AppText muted variant="caption">No se pudo actualizar. Mostramos la última lectura confirmada.</AppText></Surface> : null}</>}
     onOpenExercise={exerciseId => router.push(`/(tabs)/train/history/exercise/${exerciseId}`)} />;
 }
 

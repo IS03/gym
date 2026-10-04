@@ -14,7 +14,7 @@ import { MID, TODAY, conflict, fakeApi, measurement, memoryStorage, ok, overview
 const mockPush = jest.fn();
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: {} }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocusEffect: () => undefined }));
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ push: mockPush }), useFocusEffect: () => undefined }));
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: jest.fn(), warning: jest.fn() } }));
 
 const flush = () => act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
