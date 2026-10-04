@@ -24,7 +24,9 @@ export async function nutritionFoodResponse(request: Request, mode: 'list' | 'de
     if (mode !== 'write') {
       const params = new URL(request.url).searchParams, filter = params.get('filter') ?? 'active', q = params.get('q') ?? '';
       if (!['active','archived','all'].includes(filter) || q.length > 200 || [...params.keys()].some(k => !['filter','q'].includes(k))) throw new MobileApiValidationError('Filtro inválido.');
-      const { data, error } = await auth.supabase.rpc('mobile_read_foods', { p_id: mode === 'detail' ? id : null }, { get: true });
+      // GET RPC arguments become URL strings: omit the optional UUID so Postgres
+      // uses its NULL default instead of trying to cast the literal "null".
+      const { data, error } = await auth.supabase.rpc('mobile_read_foods', mode === 'detail' ? { p_id: id } : {}, { get: true });
       if (error || !Array.isArray(data)) throw new Error('Foods unavailable');
       const foods = data.map(mobileFood);
       if (foods.some(f => !f) || new Set(foods.map(f => f!.id)).size !== foods.length) throw new Error('Invalid food data');

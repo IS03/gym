@@ -1,5 +1,6 @@
 import { beforeEach,describe,expect,it,vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { MobileApiUnauthorizedError } from './auth';
 import { parseFoodFields,parseFoodIntent,parsePersonalFood,parseFoodsResponse } from './nutrition-food-contract';
 import { parseQuickIntent,parseQuickSelection } from './nutrition-quick-contract';
@@ -41,7 +42,25 @@ describe('Personal Foods Mobile API',()=>{
    const body=await response.json();expect(body.foods).toHaveLength(count);if(count)expect(body.foods[0].user_id).toBeUndefined();expect(response.headers.get('cache-control')).toBe('no-store');
   }
   expect((await GET(request('/foods?filter=global'))).status).toBe(400);
-  expect(rpc).toHaveBeenCalledWith('mobile_read_foods',{p_id:null},{get:true});
+  expect(rpc).toHaveBeenCalledWith('mobile_read_foods',{},{get:true});
+ });
+ it('catalog GET uses the SQL default through real PostgREST serialization; detail sends a UUID',async()=>{
+  const urls: URL[]=[];
+  const fetch=vi.fn(async(input: RequestInfo | URL,init?: RequestInit)=>{
+   const url=new URL(String(input));urls.push(url);expect(init?.method).toBe('GET');
+   // Mirrors Postgres UUID input validation, including the literal "null".
+   if(url.searchParams.has('p_id') && url.searchParams.get('p_id')!==id)
+    return new Response(JSON.stringify({code:'22P02',message:'invalid UUID input',details:null,hint:null}),{status:400,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify([raw]),{status:200,headers:{'content-type':'application/json'}});
+  });
+  const supabase=createClient('https://example.supabase.co','public-test-key',{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch}});
+  vi.mocked(authenticateMobileMutationAccessToken).mockResolvedValue({userId:id,supabase} as never);
+  const catalog=await GET(request('/foods?q=cafe'));
+  expect(catalog.status).toBe(200);expect(await catalog.json()).toMatchObject({status:'ok',foods:[{id}]});
+  expect(urls[0].pathname).toBe('/rest/v1/rpc/mobile_read_foods');expect(urls[0].searchParams.has('p_id')).toBe(false);
+  const food=await detail(request('/foods/'+id),ctx);
+  expect(food.status).toBe(200);expect(await food.json()).toMatchObject({status:'ok',food:{id}});
+  expect(urls[1].searchParams.get('p_id')).toBe(id);expect(fetch).toHaveBeenCalledTimes(2);
  });
  it('detail includes archived truth; absent is explicit and errors never become empty',async()=>{
   rpc.mockResolvedValueOnce({data:[{...raw,is_active:false}],error:null});expect(await (await detail(request(),ctx)).json()).toMatchObject({food:{isActive:false}});
