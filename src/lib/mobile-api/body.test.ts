@@ -70,13 +70,15 @@ describe("M5.1 Body API", () => {
     const body = await response.json();
     expect(body.weights.items).toHaveLength(30); expect(body.weights.nextBefore).toBe(body.weights.items[29].date);
     expect(body.measurements).toEqual({ items: [measurement], nextBefore: null });
-    expect(rpc).toHaveBeenCalledWith("mobile_read_body", { p_weights_before: null, p_weights_limit: 30, p_measurements_before: null, p_measurements_limit: 20 }, { get: true });
+    expect(rpc).toHaveBeenCalledWith("mobile_read_body", { p_weights_before: null, p_weights_limit: 30, p_measurements_before: null, p_measurements_limit: 20 });
+    // Never a GET rpc: postgrest-js would send the null cursors as the string "null".
+    expect(rpc.mock.calls[0]).toHaveLength(2);
     expect(vi.mocked(authenticateMobileAccessToken)).toHaveBeenCalledWith("token");
   });
   it("section pages use the keyset cursor; invalid cursors and unreadable snapshots are not empty", async () => {
     rpc.mockResolvedValue({ data: { today, current: null, profileWeightKg: null, weights: [], measurements: [] }, error: null });
     expect(await (await weightsGET(request("/api/mobile/v1/body/weights?before=2026-09-01"))).json()).toEqual({ today, items: [], nextBefore: null });
-    expect(rpc).toHaveBeenCalledWith("mobile_read_body", { p_weights_before: "2026-09-01", p_weights_limit: 30, p_measurements_before: null, p_measurements_limit: 0 }, { get: true });
+    expect(rpc).toHaveBeenCalledWith("mobile_read_body", { p_weights_before: "2026-09-01", p_weights_limit: 30, p_measurements_before: null, p_measurements_limit: 0 });
     expect((await measurementsGET(request("/api/mobile/v1/body/measurements?before=nope"))).status).toBe(400);
     rpc.mockResolvedValue({ data: null, error: { code: "XX000" } });
     expect((await overviewGET(request("/api/mobile/v1/body"))).status).toBe(503);

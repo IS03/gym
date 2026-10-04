@@ -41,7 +41,9 @@ export async function bodyReadResponse(request: Request, section: BodySection) {
       p_weights_limit: section === "measurements" ? 0 : BODY_PAGE_SIZES.weights,
       p_measurements_before: section === "measurements" ? before : null,
       p_measurements_limit: section === "weights" ? 0 : BODY_PAGE_SIZES.measurements,
-    }, { get: true });
+    });
+    // POST on purpose: a GET rpc serializes null cursors as the text "null",
+    // which Postgres rejects for date parameters (first page would always fail).
     const dto = error ? undefined : bodyReadDto(section, data);
     if (!dto) throw new Error("Body read unavailable");
     status = 200; body = dto;
