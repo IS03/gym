@@ -186,6 +186,7 @@ describe("PR 7 — experiencia nutricional", () => {
     for (const value of ["abdomen_cm", "arm_right_cm", "arm_left_cm", "thigh_right_cm", "thigh_left_cm", "calf_right_cm", "calf_left_cm"]) expect(body).toContain(value);
     expect(body).toContain("Revisar medición");
     expect(body).toContain("Los lados no se promedian");
-    expect(body).toContain("entry.import_run_id?null");
+    // M5.1 decision: imported measurements can be deleted too.
+    expect(body).not.toContain("entry.import_run_id?null");
   });
 });

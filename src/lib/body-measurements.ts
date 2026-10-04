@@ -1,4 +1,5 @@
 import { createClient, type AuthenticatedRequestContext } from "@/lib/supabase/server";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
 import {
   BODY_MEASUREMENT_FIELDS,
   type BodyMeasurement,
@@ -52,8 +53,9 @@ function parseMeasurement(value: string | null | undefined, label: string): numb
   return rounded;
 }
 
-export function parseBodyMeasurementInput(input: RawMeasurementInput): BodyMeasurementInput {
+export function parseBodyMeasurementInput(input: RawMeasurementInput, today = todayInCordoba()): BodyMeasurementInput {
   assertIsoDate(input.measuredOn);
+  if (input.measuredOn > today) throw new Error("No se pueden registrar medidas en una fecha futura.");
   const result: BodyMeasurementInput = {
     measuredOn: input.measuredOn,
     waistCm: parseMeasurement(input.waistCm, "Cintura"),
@@ -185,7 +187,8 @@ export async function updateBodyMeasurement(
   const { supabase, userId } = await getAuthedContext(context);
   const { data, error } = await supabase
     .from("body_measurements")
-    .update(rowPayload(input, { preserveLegacy: true }))
+    // A saved correction verifies a suspect measurement; import provenance stays.
+    .update({ ...rowPayload(input, { preserveLegacy: true }), quality_status: "verified", quality_note: null })
     .eq("id", input.id)
     .eq("user_id", userId)
     .select("*")

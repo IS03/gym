@@ -8,6 +8,7 @@ import {
   parseOptionalWeight,
   type WeightHistoryPoint,
 } from "../weight-history";
+import { todayInCordoba } from "../phase2/cordoba-date";
 import {
   nullableMealMacrosMatch,
   normalizeMealText,
@@ -21,6 +22,11 @@ function assertIsoDate(date: string): asserts date is IsoDate {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new Error("Fecha inválida. Usá YYYY-MM-DD.");
   }
+}
+
+/** Body weight is recorded only up to today's product day (America/Argentina/Cordoba). */
+function assertNotFutureWeightDate(date: string): void {
+  if (date > todayInCordoba()) throw new Error("No se puede registrar peso en una fecha futura.");
 }
 
 async function getAuthedUserId() {
@@ -372,6 +378,7 @@ export async function recordWeightForDate(input: {
   weightKg: number;
 }): Promise<WeightHistoryMutation> {
   assertIsoDate(input.date);
+  assertNotFutureWeightDate(input.date);
   const parsed = parseOptionalWeight(String(input.weightKg));
   if (!parsed.ok || parsed.value === null) {
     throw new Error(parsed.ok ? "El peso es obligatorio." : parsed.error);
@@ -404,6 +411,7 @@ export async function updateWeightHistoryEntry(input: {
   weightKg: number;
 }): Promise<WeightHistoryMutation> {
   assertIsoDate(input.logDate);
+  assertNotFutureWeightDate(input.logDate);
   const parsed = parseOptionalWeight(String(input.weightKg));
   if (!parsed.ok || parsed.value === null) {
     throw new Error(parsed.ok ? "El peso es obligatorio." : parsed.error);

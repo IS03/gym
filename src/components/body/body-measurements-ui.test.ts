@@ -13,6 +13,11 @@ describe("PR 16 — UI de medidas corporales", () => {
     expect(source).not.toContain("(legacy)");
   });
 
+  it("permite eliminar también mediciones importadas (decisión M5.1)", () => {
+    expect(source).not.toContain("import_run_id?null");
+    expect(source).toContain("setDeleteTarget(entry)");
+  });
+
   it("conserva valores históricos en el payload de edición", () => {
     expect(source).toContain("for(const field of BODY_MEASUREMENT_FIELDS)");
     expect(source).toContain("setValues(toValues(entry))");
