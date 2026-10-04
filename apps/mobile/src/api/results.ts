@@ -39,6 +39,10 @@ export type MobileApiMutationResult<T> =
       status: 'conflict';
       code:
         | 'IDEMPOTENCY_KEY_REUSED'
+        | 'QUICK_SOURCE_CHANGED'
+        | 'QUICK_SOURCE_UNAVAILABLE'
+        | 'QUICK_SOURCE_UNUSABLE'
+        | 'SAVED_NAME_EXISTS'
         | 'METRICS_CHANGED'
         | 'METRIC_UNAVAILABLE'
         | 'CONTEXT_CHANGED'

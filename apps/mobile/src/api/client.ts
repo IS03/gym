@@ -267,6 +267,10 @@ export function createMobileApiClient({
             : undefined;
           const knownConflict =
             conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
+            conflictCode === 'QUICK_SOURCE_CHANGED' ||
+            conflictCode === 'QUICK_SOURCE_UNAVAILABLE' ||
+            conflictCode === 'QUICK_SOURCE_UNUSABLE' ||
+            conflictCode === 'SAVED_NAME_EXISTS' ||
             conflictCode === 'METRICS_CHANGED' ||
             conflictCode === 'METRIC_UNAVAILABLE' ||
             conflictCode === 'CONTEXT_CHANGED' ||

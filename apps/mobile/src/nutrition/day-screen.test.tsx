@@ -9,6 +9,8 @@ import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { OwnlevelThemeProvider } from '@/design-system';
 import { NutritionDayScreen } from './day-screen';
 import { nutritionFixture } from './day-fixture.test-helper';
+import { quickOptions, quickPreview, quickReceipt, quickDate } from './quick-fixture.test-helper';
+import type { QuickSelection } from '@/api/nutrition-quick';
 
 const mockRead = jest.fn<MobileApiClient['read']>();
 const mockRequest = jest.fn<MobileApiClient['request']>();
@@ -39,6 +41,29 @@ describe('Native Nutrition day', () => {
       appStateListeners.push(listener);
       return { remove: () => { const index = appStateListeners.indexOf(listener); if (index >= 0) appStateListeners.splice(index, 1); } };
     });
+  });
+  it('quick composition survives foreground refresh and registers against the displayed destination', async () => {
+    mockToday = quickDate;
+    mockRead.mockImplementation(async options => options.path.endsWith('quick-options')
+      ? { status: 'ok', data: quickOptions(), meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never
+      : ok(options.path.split('/').pop()!, { ...nutritionFixture(options.path.split('/').pop()!), today: quickDate }) as never);
+    mockRequest.mockImplementation(async options => {
+      if (options.path.endsWith('meal-preview')) return { status: 'ok', data: quickPreview(options.body as QuickSelection), meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never;
+      expect((options.body as QuickSelection).date).toBe(quickDate);
+      expect(await AsyncStorage.getItem('ownlevel.nutrition.quick.v1.owner')).not.toBeNull();
+      return { status: 'ok', data: quickReceipt, meta: { durationMs: 1, httpStatus: 201, outcome: 'ok' } } as never;
+    });
+    const view = render(element()); await view.findByText('Agregar comida');
+    fireEvent.press(view.getByText('Agregar comida')); await act(async () => { fireEvent.press(view.getByText('Rápido')); });
+    await act(async () => { fireEvent.press(view.getAllByText('Revisar PASTA')[0]); });
+    fireEvent.changeText(view.getByLabelText('Cantidad de INGREDIENTE'), '150,25');
+    await act(async () => { appStateListeners.forEach(f => f('background')); appStateListeners.forEach(f => f('active')); });
+    expect(view.getByLabelText('Cantidad de INGREDIENTE').props.value).toBe('150,25');
+    await act(async () => { fireEvent.press(view.getByText('Actualizar vista previa')); });
+    await act(async () => { fireEvent.press(view.getByText('Registrar comida')); });
+    await waitFor(() => expect(view.queryByTestId('quick-meal-editor')).toBeNull());
+    expect(mockRequest.mock.calls.filter(([o]) => o.path.endsWith('meal-registrations'))).toHaveLength(1);
+    expect(await AsyncStorage.getItem('ownlevel.nutrition.quick.v1.owner')).toBeNull();
   });
   it('activity draft survives foreground and confirms only changed canonical values', async () => {
     let latest = nutritionFixture();
@@ -81,7 +106,7 @@ describe('Native Nutrition day', () => {
     let latest = nutritionFixture();
     mockRead.mockImplementation(async () => ({ status: 'ok', data: latest, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } }) as never);
     const view = render(element()); await view.findByText('Agregar comida');
-    fireEvent.press(view.getByText('Agregar comida'));
+    fireEvent.press(view.getByText('Agregar comida')); fireEvent.press(view.getByText('Manual'));
     fireEvent.changeText(view.getByLabelText('Título'), 'My draft');
     fireEvent.changeText(view.getByLabelText('Calorías'), '350');
     let finishOld!: (r: unknown) => void;
@@ -109,7 +134,7 @@ describe('Native Nutrition day', () => {
     mockRequest.mockResolvedValueOnce(failure as never).mockResolvedValueOnce({ status: 'ok',
       data: { status: 'saved', mealId: '41100000-0000-4000-8000-000000000002', sourceDate: mockToday, destinationDate: mockToday, updatedAt: `${mockToday}T13:00:00Z` },
       meta: { durationMs: 1, httpStatus: 201, outcome: 'ok' } } as never);
-    const view = render(element()); await view.findByText('Agregar comida'); fireEvent.press(view.getByText('Agregar comida'));
+    const view = render(element()); await view.findByText('Agregar comida'); fireEvent.press(view.getByText('Agregar comida')); fireEvent.press(view.getByText('Manual'));
     fireEvent.changeText(view.getByLabelText('Calorías'), '250'); fireEvent.press(view.getByText('Guardar comida'));
     await view.findByText('Comprobar intento guardado');
     fireEvent.press(view.getByText('Volver al día · conservar intento')); await view.findByText('Revisar intento guardado');
