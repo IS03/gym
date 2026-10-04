@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useMobileApi } from '@/api';
 import { useMobileAuth } from '@/auth';
 import { AppText, Button, Heading, InlineUnavailable, ScrollScreen, SkeletonBlock, Surface, spacing, useOwnlevelTheme } from '@/design-system';
@@ -23,6 +23,7 @@ function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
 }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
+  const router = useRouter();
   const { state, refresh } = useNutritionDayResource(client, date);
   const [selector, setSelector] = useState(false);
   const current = state.status === 'ready' ? state.current : state.status === 'unavailable' ? state.previous : undefined;
@@ -70,6 +71,8 @@ function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
               onPress={() => writes.controller.open('metrics', data)} /> : null}
           </Surface>}
       </>}
+    {/* M5.3: the reusable definitions surface. This day re-reads on focus, so changes show on return. */}
+    <Button label="Administrar métricas" onPress={() => router.push('/settings/metrics')} variant="secondary" />
     {selector ? <NutritionDateSelector date={date} onClose={() => setSelector(false)} onSelect={value => onSelect(value === serverToday ? null : value)} /> : null}
   </ScrollScreen>;
 }

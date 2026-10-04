@@ -91,6 +91,23 @@ describe('Progress → Métricas diarias', () => {
     expect(within(view.getByTestId(`daily-metric-${ids.custom}`)).getByText('12,5 g')).toBeTruthy();
     expect(within(view.getByTestId(`daily-metric-${ids.sleep}`)).getByText('Sin dato')).toBeTruthy();
   });
+  it('opens Administrar métricas (reusable /settings/metrics) and reflects definition changes when it regains focus', async () => {
+    const view = wrap(<DailyMetricsScreen />); await flush();
+    fireEvent.press(view.getByRole('button', { name: 'Administrar métricas' }));
+    expect(mockPush).toHaveBeenCalledWith('/settings/metrics');
+    // Back from the definitions screen: renamed + reordered on the server.
+    mockFetchDay.mockImplementation(async (_c, d) => {
+      const base = day(d);
+      if (base.activity.status !== 'ok') return { status: 'ok', data: base, meta };
+      const [steps, sleep, custom] = base.activity.data.metrics;
+      return { status: 'ok', data: { ...base, activity: { status: 'ok', data: { metrics: [{ ...custom, label: 'Proteína' }, steps, { ...sleep, target: 420 }] } } }, meta };
+    });
+    await act(async () => { mockFocus.forEach(effect => effect()); }); await flush();
+    const labels = view.getAllByTestId(/^daily-metric-/).map(node => node.props.testID);
+    expect(labels).toEqual([`daily-metric-${ids.custom}`, `daily-metric-${ids.steps}`, `daily-metric-${ids.sleep}`]);
+    expect(view.getByText('Proteína')).toBeTruthy();
+    expect(within(view.getByTestId(`daily-metric-${ids.sleep}`)).getByText(/Objetivo actual: 7 h 0 min/)).toBeTruthy();
+  });
   it('entering the screen picks up an intent another surface left pending', async () => {
     const view = wrap(<DailyMetricsScreen />); await flush();
     const intent = { operation: 'metrics', date: TODAY, idempotencyKey: 'nutrition:1', changes: [{ metricId: ids.steps, definitionUpdatedAt: '2026-09-01T12:00:00.123456Z', expectedUpdatedAt: `${TODAY}T10:00:00Z`, value: 500 }] };
