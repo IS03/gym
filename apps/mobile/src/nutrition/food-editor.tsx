@@ -1,3 +1,4 @@
+import { FoodSearchControls } from './food-search-controls';
 import { useEffect } from 'react';
 import { Alert,KeyboardAvoidingView,Modal,Platform,StyleSheet,TextInput,View } from 'react-native';
 import { AppText,Button,Heading,LoadingState,ScrollScreen,Surface,spacing,useOwnlevelTheme } from '@/design-system';
@@ -29,8 +30,7 @@ export function FoodEditor({controller,state,quick,onChoose}:{controller:FoodCon
     <Heading level={2}>{state.mode==='browse'?'Alimentos personales':state.mode==='create'?'Nuevo alimento':'Editar alimento'}</Heading>
     {state.date?<AppText variant="label">{`Destino · ${displayNutritionDate(state.date)}`}</AppText>:null}
     {state.mode==='browse'?<>
-     <TextInput accessibilityLabel="Buscar alimento" placeholder="Buscar alimento" value={state.search} onChangeText={v=>controller.query(v)} style={[styles.input,{color:colors.text,borderColor:colors.border}]} placeholderTextColor={colors.textMuted}/>
-     <View style={styles.actions}>{(['active','archived','all'] as const).map((filter,i)=><Button key={filter} label={['Activos','Archivados','Todos'][i]} variant={state.filter===filter?'primary':'secondary'} onPress={()=>controller.setFilter(filter)}/>)}</View>
+     <FoodSearchControls search={state.search} filter={state.filter} onSearch={v=>controller.query(v)} onFilter={f=>controller.setFilter(f)}/>
      <Button label="Nuevo alimento" disabled={locked} onPress={()=>controller.begin()}/>
      {state.listLoading?<LoadingState label="Cargando alimentos"/>:null}
      {state.listError?<Surface><AppText accessibilityRole="alert">No pudimos actualizar el catálogo.{state.foods?' Mostramos la última lectura.':''}</AppText><Button label="Reintentar catálogo" onPress={()=>void controller.load()}/></Surface>:null}

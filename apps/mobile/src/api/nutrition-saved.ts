@@ -1,0 +1,6 @@
+import type { MobileApiClient } from './client';
+import {parseSavedList,parseSavedDetail,parseSavedReceipt,type SavedIntent} from '../../../../src/lib/mobile-api/nutrition-saved-contract';
+export * from '../../../../src/lib/mobile-api/nutrition-saved-contract';
+export function fetchSavedMeals(client:MobileApiClient,filter='active',q='',signal?:AbortSignal){return client.read({path:`/api/mobile/v1/nutrition/saved-meals?filter=${filter}&q=${encodeURIComponent(q)}`,signal,parse:parseSavedList});}
+export function fetchSavedMeal(client:MobileApiClient,id:string,signal?:AbortSignal){return client.read({path:`/api/mobile/v1/nutrition/saved-meals/${id}`,signal,parse:v=>{const d=parseSavedDetail(v);return d&&(!d.meal||d.meal.id===id)?d:undefined;}});}
+export function mutateSavedMeal(client:MobileApiClient,intent:SavedIntent,signal?:AbortSignal){return client.request({method:intent.operation==='create'?'POST':intent.operation==='delete'?'DELETE':'PATCH',path:intent.operation==='create'?'/api/mobile/v1/nutrition/saved-meals':`/api/mobile/v1/nutrition/saved-meals/${intent.id}`,body:intent,signal,parse:v=>{const r=parseSavedReceipt(v);return r&&r.operation===intent.operation&&(!intent.id||r.id===intent.id)?r:undefined;}});}

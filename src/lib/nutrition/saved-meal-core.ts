@@ -1,3 +1,4 @@
+import { scaleSavedNutrients, sumSavedNutrients } from '../mobile-api/saved-meal-math';
 import type {
   SavedMeal,
   SavedMealItem,
@@ -49,59 +50,23 @@ type BaseSnapshot = Pick<
   | "base_fat_g"
 >;
 
-function roundMacro(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function scaleNullable(value: number | null, factor: number) {
-  return value === null ? null : roundMacro(value * factor);
-}
-
 /** Escala un snapshot sin inventar calorías ni transformar null en cero. */
 export function scaleSavedMealItem(
   item: BaseSnapshot,
   quantityInput: unknown,
+  maxFractionDigits = 2,
 ): ScaledSavedMealItem {
-  const quantity = parseFoodQuantity(quantityInput);
+  const quantity = parseFoodQuantity(quantityInput, maxFractionDigits);
   if (!Number.isFinite(item.base_quantity) || item.base_quantity <= 0) {
     throw new Error("La cantidad base del ingrediente no es válida.");
   }
-  const factor = quantity / item.base_quantity;
-  return {
-    id: item.id,
-    label: item.label,
-    quantity,
-    unit: item.unit,
-    calories: item.base_calories === null
-      ? null
-      : Math.round(item.base_calories * factor),
-    proteinG: scaleNullable(item.base_protein_g, factor),
-    carbsG: scaleNullable(item.base_carbs_g, factor),
-    fatG: scaleNullable(item.base_fat_g, factor),
-  };
-}
-
-function sumKnown(
-  items: ScaledSavedMealItem[],
-  read: (item: ScaledSavedMealItem) => number | null,
-  round: (value: number) => number,
-) {
-  if (items.length === 0 || items.some((item) => read(item) === null)) {
-    return null;
-  }
-  return round(items.reduce((total, item) => total + (read(item) as number), 0));
+  return { id:item.id, label:item.label, quantity, unit:item.unit,
+    ...scaleSavedNutrients({baseQuantity:item.base_quantity,baseCalories:item.base_calories,baseProteinG:item.base_protein_g,baseCarbsG:item.base_carbs_g,baseFatG:item.base_fat_g},quantity) };
 }
 
 /** Un solo valor desconocido vuelve desconocido el total de ese nutriente. */
-export function sumSavedMealItems(
-  items: ScaledSavedMealItem[],
-): SavedMealTotals {
-  return {
-    calories: sumKnown(items, (item) => item.calories, Math.round),
-    proteinG: sumKnown(items, (item) => item.proteinG, roundMacro),
-    carbsG: sumKnown(items, (item) => item.carbsG, roundMacro),
-    fatG: sumKnown(items, (item) => item.fatG, roundMacro),
-  };
+export function sumSavedMealItems(items: ScaledSavedMealItem[]): SavedMealTotals {
+  return sumSavedNutrients(items);
 }
 
 function searchable(value: string) {

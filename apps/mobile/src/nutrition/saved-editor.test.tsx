@@ -1,0 +1,20 @@
+import {act,fireEvent,render} from '@testing-library/react-native';
+import {describe,expect,it,jest} from '@jest/globals';
+import {OwnlevelThemeProvider} from '@/design-system';
+import {SavedController,type SavedApi} from './saved-controller';
+import {SavedIntentRepository} from './saved-storage';
+import {SavedEditor} from './saved-editor';
+import {personalSaved,savedReceipt} from './saved-fixture.test-helper';
+import {personalFood} from './food-fixture.test-helper';
+jest.mock('expo-symbols',()=>({SymbolView:()=>null}));
+const meta={durationMs:1,httpStatus:200,outcome:'ok' as const};
+function fixture(){const map=new Map<string,string>(),port={getItem:async(k:string)=>map.get(k)??null,setItem:async(k:string,v:string)=>{map.set(k,v);},removeItem:async(k:string)=>{map.delete(k);}};
+ const api:SavedApi={list:jest.fn<SavedApi['list']>().mockResolvedValue({status:'ok',data:{status:'ok',meals:[personalSaved]},meta}),detail:async()=>({status:'ok',data:{status:'ok',meal:personalSaved},meta}),foods:async()=>({status:'ok',data:{status:'ok',foods:[personalFood]},meta}),write:jest.fn<SavedApi['write']>().mockResolvedValue({status:'ok',data:savedReceipt,meta})};
+ const c=new SavedController(api,new SavedIntentRepository(port,'owner'));const element=()=><OwnlevelThemeProvider initialMode="light"><SavedEditor controller={c} state={c.getSnapshot()}/></OwnlevelThemeProvider>;
+ const view=render(element());c.subscribe(()=>view.rerender(element()));return {c,api,view,open:async()=>act(async()=>{await c.initialize();c.open();})};}
+describe('Native Saved Meal management',()=>{
+ it('list filters and manual create preserve unknown versus zero and save',async()=>{const f=fixture();await f.open();await act(async()=>{fireEvent.press(f.view.getByText('Archivadas'));});expect(f.api.list).toHaveBeenLastCalledWith('archived','');fireEvent.press(f.view.getByText('Crear manual'));fireEvent.changeText(f.view.getByLabelText('Nombre'),'Manual');fireEvent.changeText(f.view.getByLabelText('Proteína (g)'),'0');expect(f.view.getByLabelText('Calorías').props.value).toBe('');await act(async()=>{fireEvent.press(f.view.getByText('Guardar plantilla'));});expect(f.api.write).toHaveBeenCalledWith(expect.objectContaining({operation:'create',fields:expect.objectContaining({calories:null,proteinG:0})}));});
+ it('composed uses personal Food picker, 2-decimal quantity and canonical totals',async()=>{const f=fixture();await f.open();fireEvent.press(f.view.getByText('Crear compuesta'));fireEvent.changeText(f.view.getByLabelText('Nombre'),'Compuesta');await act(async()=>{fireEvent.press(f.view.getByText('Agregar ingrediente'));});fireEvent.press(f.view.getByText('Elegir CAFÉ'));expect(f.view.getByLabelText('Cantidad 1').props.value).toBe('');fireEvent.changeText(f.view.getByLabelText('Cantidad 1'),'0,25');expect(f.view.getByText('45 kcal · P sin dato · C 2,22 · G 0')).toBeTruthy();await act(async()=>{fireEvent.press(f.view.getByText('Guardar plantilla'));});expect(f.api.write).toHaveBeenCalledWith(expect.objectContaining({fields:expect.objectContaining({templateType:'composite',items:[{kind:'food',id:personalFood.id,version:personalFood.version,quantity:0.25}]})}));});
+ it('refresh cannot destroy the editor draft and pending locks the form',async()=>{const f=fixture();await f.open();fireEvent.press(f.view.getByText('Editar CAFÉ'));fireEvent.changeText(f.view.getByLabelText('Calorías'),'100');await act(async()=>{await f.c.load();});expect(f.view.getByLabelText('Calorías').props.value).toBe('100');(f.api.write as jest.Mock<SavedApi['write']>).mockImplementation(()=>new Promise(()=>{}));await act(async()=>{fireEvent.press(f.view.getByText('Guardar plantilla'));});expect(f.view.getByLabelText('Calorías').props.editable).toBe(false);});
+ it('unavailable stays distinct from empty',async()=>{const f=fixture();(f.api.list as jest.Mock<SavedApi['list']>).mockResolvedValue({status:'unavailable',reason:'server',meta:{...meta,httpStatus:503,outcome:'unavailable'}});await f.open();expect(f.view.getByText(/No pudimos actualizar las guardadas/)).toBeTruthy();expect(f.view.queryByText('No tenés guardadas en este filtro.')).toBeNull();});
+});
