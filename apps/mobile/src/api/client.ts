@@ -267,6 +267,11 @@ export function createMobileApiClient({
             : undefined;
           const knownConflict =
             conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
+            conflictCode === 'CONFIG_CHANGED' ||
+            conflictCode === 'PHYSICAL_CHANGED' ||
+            conflictCode === 'CONFIG_DAY_CHANGED' ||
+            conflictCode === 'ENERGY_PROFILE_REQUIRED' ||
+            conflictCode === 'PHYSICAL_WEIGHT_REQUIRED' ||
             conflictCode === 'QUICK_SOURCE_CHANGED' ||
             conflictCode === 'QUICK_SOURCE_UNAVAILABLE' ||
             conflictCode === 'QUICK_SOURCE_UNUSABLE' ||

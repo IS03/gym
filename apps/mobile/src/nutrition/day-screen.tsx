@@ -1,3 +1,5 @@
+import {useConfigurationController} from './use-config-controller';
+import {ConfigurationEditor} from './config-editor';
 import {useSavedController} from './use-saved-controller';
 import {SavedEditor} from './saved-editor';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -22,10 +24,10 @@ import { FoodEditor } from './food-editor';
 import { foodQuickOption } from '@/api/nutrition-food';
 import { QuickEditor } from './quick-editor';
 
-function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onManageSaved, onEdit, onActivity, onContext }: {
+function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onManageSaved, onConfigure, onEdit, onActivity, onContext }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
   onAdd?: () => void; onEdit?: (meal: NutritionDayMeal) => void;
-  addChoices?: ReactNode; onManageFoods?: () => void; onManageSaved?: () => void;
+  onConfigure?: () => void; addChoices?: ReactNode; onManageFoods?: () => void; onManageSaved?: () => void;
   onActivity?: (data: MobileNutritionDayResponse) => void; onContext?: (data: MobileNutritionDayResponse) => void;
 }) {
   const { client } = useMobileApi();
@@ -55,6 +57,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
       {onAdd ? <Button label="Agregar comida" onPress={onAdd} /> : null}
       {addChoices}
       {onManageSaved ? <Button label="Administrar comidas guardadas" variant="quiet" onPress={onManageSaved} /> : null}
+      {onConfigure ? <Button label="Configurar nutrición" variant="quiet" onPress={onConfigure} /> : null}
       {onManageFoods ? <Button label="Administrar alimentos" variant="quiet" onPress={onManageFoods} /> : null}
     </View>
     {!current ? state.status === 'loading' ? <LoadingState label="Cargando día nutricional" />
@@ -81,6 +84,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
+  const config = useConfigurationController(client, userId, invalidate);
   const meals = useMealController(client, userId, invalidate);
   const writes = useDayWriteController(client, userId, invalidate);
   const quick = useQuickController(client, userId, invalidate);
@@ -100,11 +104,12 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   }, [updateToday]);
   const date = selected ?? today;
   const editable = meals?.state.phase === 'idle' && !meals.state.intent && writes?.state.phase === 'idle' && !writes.state.intent
-    && quick?.state.phase === 'idle' && !quick.state.intent && foods?.state.phase === 'idle' && !foods.state.intent && saved?.state.phase==='idle' && !saved.state.intent;
+    && quick?.state.phase === 'idle' && !quick.state.intent && foods?.state.phase === 'idle' && !foods.state.intent && saved?.state.phase==='idle' && !saved.state.intent && config?.state.phase==='idle' && !config.state.intent;
   return <>
     <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
       onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
       onAdd={editable ? () => setAdding(true) : undefined}
+      onConfigure={editable?()=>config.controller.open():undefined}
       onManageSaved={editable?()=>saved.controller.open():undefined}
       onManageFoods={editable ? () => foods.controller.open(null) : undefined}
       addChoices={adding ? <View style={styles.header} testID="nutrition-add-choice">
@@ -132,6 +137,8 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
       {foods.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento de alimentos" onPress={() => void foods.controller.recover()} /> : null}</View> : null}
     {saved?<SavedEditor controller={saved.controller} state={saved.state}/>:null}
     {saved?.state.message&&!saved.state.open?<View style={styles.header}><AppText accessibilityRole="alert">{saved.state.message}</AppText>{saved.state.intent?<Button label="Revisar intento de guardadas" onPress={()=>saved.controller.showRecovery()}/>:null}{saved.state.phase==='blocked'?<Button label="Comprobar almacenamiento de guardadas" onPress={()=>void saved.controller.recover()}/>:null}</View>:null}
+    {config ? <ConfigurationEditor controller={config.controller} state={config.state} /> : null}
+    {config?.state.message && !config.state.open ? <View style={styles.header}><AppText accessibilityRole="alert">{config.state.message}</AppText>{config.state.intent ? <Button label="Revisar intento de configuración" onPress={()=>config.controller.showRecovery()} /> : null}{config.state.phase==='blocked'?<Button label="Comprobar almacenamiento de configuración" onPress={()=>void config.controller.recover()}/>:null}</View>:null}
     {writes ? <DayWriteEditor controller={writes.controller} state={writes.state} /> : null}
     {meals ? <MealEditor controller={meals.controller} state={meals.state} /> : null}
   </>;
