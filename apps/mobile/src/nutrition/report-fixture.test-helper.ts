@@ -1,0 +1,9 @@
+import { REPORT_METRICS, REPORT_NUTRIENTS, type NutritionReport, type ReportQuery } from '@/api/nutrition-report';
+export function reportFixture(query:ReportQuery={period:'7'}):NutritionReport {
+ const end=query.to??'2026-10-04', count=query.period==='14'?14:query.period==='30'?30:query.from?Math.round((Date.parse(end)-Date.parse(query.from))/86400000)+1:7;
+ const stat={value:100,denominator:1,partialDays:0};
+ const metrics=Object.fromEntries(REPORT_METRICS.map(k=>[k,stat])) as NutritionReport['summary']['metrics'];
+ const dates=Array.from({length:count},(_,i)=>new Date(Date.parse(end)-i*86400000).toISOString().slice(0,10));
+ const nutrients=Object.fromEntries(REPORT_NUTRIENTS.map(k=>[k,{value:k==='fat'?0:100,knownMeals:1,missingMeals:0,status:'complete'}])) as NutritionReport['days'][number]['nutrients'];
+ return {today:'2026-10-04',range:{requested:query,preset:query.period,start:dates.at(-1)!,end,days:count,notice:null},status:'complete',summary:{metrics,accumulatedBalance:stat,belowTargetDays:1,exactTargetDays:0,aboveTargetDays:0,deficitDays:1,neutralDays:0,surplusDays:0,proteinHitDays:1,proteinComparableDays:1,goalStages:['Etapa']},coverage:{registeredDays:count,completedRegisteredDays:count-1,finalizedDays:count-1,missingDays:0,todayRegistered:true,nutrients:Object.fromEntries(REPORT_NUTRIENTS.map(k=>[k,{knownDays:count-1,partialDays:0,unknownDays:0}])) as NutritionReport['coverage']['nutrients']},days:dates.map(date=>({date,exists:true,hasNutrition:true,imported:false,isToday:date==='2026-10-04',mealCount:1,nutrients,targetCalories:200,targetProteinG:100,expenditureKcal:200,targetDeviationKcal:-100,energyBalanceKcal:-100,goalStage:'Etapa'})),evolution:[...dates].reverse().map(date=>({start:date,end:date,includesToday:date==='2026-10-04',metrics})),highlights:[{date:dates[1]!,kind:'closest_target',title:'Más cerca del objetivo'}]};
+}

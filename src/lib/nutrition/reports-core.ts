@@ -242,10 +242,7 @@ type MealCoverage = {
 export function nutritionMealCoverage(meals: NutritionReportMealFact[]) {
   const result = new Map<string, MealCoverage>();
   for (const meal of meals) {
-    if (meal.deleted_at !== null) continue;
-    if (meal.entry_kind !== "meal" && meal.entry_kind !== "legacy_daily_summary") continue;
-    const values = [meal.final_calories, meal.final_protein_g, meal.final_carbs_g, meal.final_fat_g];
-    if (!values.some((value) => typeof value === "number" && Number.isFinite(value))) continue;
+    if (!isNutritionReportMeal(meal)) continue;
     const current = result.get(meal.day_log_id) ?? {
       count: 0,
       hasNutrition: false,
@@ -265,6 +262,13 @@ export function nutritionMealCoverage(meals: NutritionReportMealFact[]) {
     result.set(meal.day_log_id, current);
   }
   return result;
+}
+
+/** Shared eligibility for persisted report totals and their coverage metadata. */
+export function isNutritionReportMeal(meal: NutritionReportMealFact) {
+  return meal.deleted_at === null && (meal.entry_kind === "meal" || meal.entry_kind === "legacy_daily_summary")
+    && [meal.final_calories, meal.final_protein_g, meal.final_carbs_g, meal.final_fat_g]
+      .some(value => typeof value === "number" && Number.isFinite(value));
 }
 
 export function completedWorkoutDayLogIds(workouts: NutritionReportWorkoutFact[]) {
