@@ -93,6 +93,13 @@ describe("persistencia de historial de peso", () => {
     expect(builder.update).toHaveBeenCalledWith({ weight_kg: 64.8 });
   });
 
+  it("rechaza registrar o editar peso en una fecha futura (día Córdoba) sin tocar day_logs", async () => {
+    await expect(recordWeightForDate({ date: "2999-01-01", weightKg: 64.8 })).rejects.toThrow("fecha futura");
+    await expect(updateWeightHistoryEntry({ logDate: "2999-01-01", weightKg: 64.8 })).rejects.toThrow("fecha futura");
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(builder.update).not.toHaveBeenCalled();
+  });
+
   it("editar y eliminar sólo cambian weight_kg y siempre acotan la fila al usuario", async () => {
     builder.single.mockResolvedValue({
       data: { id: "day-1", log_date: "2026-08-11", weight_kg: 65 },

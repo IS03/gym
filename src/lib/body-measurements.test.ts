@@ -55,6 +55,11 @@ describe("medidas corporales", () => {
     expect(() => parseBodyMeasurementInput({ measuredOn: "2026-08-13", waistCm: "78.123" })).toThrow("dos decimales");
   });
 
+  it("rechaza medidas en una fecha futura respecto del día de Córdoba", () => {
+    expect(() => parseBodyMeasurementInput({ measuredOn: "2026-08-14", waistCm: "78" }, "2026-08-13")).toThrow("fecha futura");
+    expect(parseBodyMeasurementInput({ measuredOn: "2026-08-13", waistCm: "78" }, "2026-08-13")).toMatchObject({ waistCm: 78 });
+  });
+
   it("mantiene lectura histórica, pero no ofrece los campos históricos para nuevos registros", () => {
     expect(EDITABLE_BODY_MEASUREMENT_FIELDS).not.toContain("arm_cm");
     expect(EDITABLE_BODY_MEASUREMENT_FIELDS).not.toContain("thigh_cm");
@@ -118,6 +123,10 @@ describe("medidas corporales", () => {
     const updatePayload = builder.update.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(updatePayload).not.toHaveProperty("arm_cm");
     expect(updatePayload).not.toHaveProperty("thigh_cm");
+    // Saving a correction verifies a suspect measurement and clears its quality note.
+    expect(updatePayload).toMatchObject({ quality_status: "verified", quality_note: null });
+    expect(updatePayload).not.toHaveProperty("legacy_import_source");
+    expect(updatePayload).not.toHaveProperty("source_payload");
     expect(builder.eq).toHaveBeenCalledWith("user_id", "user-1");
 
     await deleteBodyMeasurement("measurement-1");

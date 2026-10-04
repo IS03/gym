@@ -267,6 +267,10 @@ export function createMobileApiClient({
             : undefined;
           const knownConflict =
             conflictCode === 'IDEMPOTENCY_KEY_REUSED' ||
+            conflictCode === 'WEIGHT_CHANGED' ||
+            conflictCode === 'BODY_FUTURE_DATE' ||
+            conflictCode === 'MEASUREMENT_CHANGED' ||
+            conflictCode === 'MEASUREMENT_DATE_TAKEN' ||
             conflictCode === 'CONFIG_CHANGED' ||
             conflictCode === 'PHYSICAL_CHANGED' ||
             conflictCode === 'CONFIG_DAY_CHANGED' ||

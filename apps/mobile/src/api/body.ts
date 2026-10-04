@@ -1,0 +1,30 @@
+import type { MobileApiClient } from './client';
+import {
+  parseBodyMeasurementPage, parseBodyMeasurementReceipt, parseBodyOverview, parseBodyWeightPage, parseBodyWeightReceipt, bodyRecord,
+  type BodyMeasurementIntent, type BodyWeightIntent,
+} from '../../../../src/lib/mobile-api/body-contract';
+import { isNutritionDate } from '../../../../src/lib/mobile-api/nutrition-day-contract';
+
+export * from '../../../../src/lib/mobile-api/body-contract';
+const BASE = '/api/mobile/v1/body';
+const sectionPage = <T,>(parse: (v: unknown) => T | undefined) => (v: unknown) => {
+  if (!bodyRecord(v) || !isNutritionDate(v.today)) return undefined;
+  const page = parse({ items: v.items, nextBefore: v.nextBefore });
+  return page ? { today: v.today, ...page } : undefined;
+};
+export const fetchBodyOverview = (client: MobileApiClient, signal?: AbortSignal) =>
+  client.read({ path: BASE, signal, parse: parseBodyOverview });
+export const fetchBodyWeights = (client: MobileApiClient, before: string, signal?: AbortSignal) =>
+  client.read({ path: `${BASE}/weights?before=${encodeURIComponent(before)}`, signal, parse: sectionPage(parseBodyWeightPage) });
+export const fetchBodyMeasurements = (client: MobileApiClient, before: string, signal?: AbortSignal) =>
+  client.read({ path: `${BASE}/measurements?before=${encodeURIComponent(before)}`, signal, parse: sectionPage(parseBodyMeasurementPage) });
+export const mutateBodyWeight = (client: MobileApiClient, intent: BodyWeightIntent, signal?: AbortSignal) =>
+  client.request({ method: intent.operation === 'set' ? 'PUT' : 'DELETE', path: `${BASE}/weights/${encodeURIComponent(intent.date)}`, body: intent, signal,
+    parse: (v: unknown) => { const r = parseBodyWeightReceipt(v); return r && r.operation === intent.operation && r.date === intent.date ? r : undefined; } });
+export const mutateBodyMeasurement = (client: MobileApiClient, intent: BodyMeasurementIntent, signal?: AbortSignal) =>
+  client.request({ method: intent.operation === 'create' ? 'POST' : intent.operation === 'update' ? 'PUT' : 'DELETE',
+    path: intent.measurementId ? `${BASE}/measurements/${encodeURIComponent(intent.measurementId)}` : `${BASE}/measurements`, body: intent, signal,
+    parse: (v: unknown) => {
+      const r = parseBodyMeasurementReceipt(v);
+      return r && r.operation === intent.operation && (!intent.measurementId || r.measurementId === intent.measurementId.toLowerCase()) ? r : undefined;
+    } });

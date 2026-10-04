@@ -39,6 +39,10 @@ export type MobileApiMutationResult<T> =
       status: 'conflict';
       code:
         | 'IDEMPOTENCY_KEY_REUSED'
+        | 'WEIGHT_CHANGED'
+        | 'BODY_FUTURE_DATE'
+        | 'MEASUREMENT_CHANGED'
+        | 'MEASUREMENT_DATE_TAKEN'
         | 'CONFIG_CHANGED'
         | 'PHYSICAL_CHANGED'
         | 'CONFIG_DAY_CHANGED'
