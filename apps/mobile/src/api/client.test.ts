@@ -398,3 +398,13 @@ describe('Mobile API client', () => {
     expect(serialized).not.toContain('query-value');
   });
 });
+
+
+describe('Saved Meal catalog conflict codes',()=>{
+ it.each(['SAVED_CHANGED','SAVED_UNAVAILABLE','SAVED_FOOD_CHANGED','SAVED_FOOD_UNAVAILABLE'])('%s stays explicit without retry',async code=>{
+  const fetchImplementation=jest.fn(async()=>response(409,{error:code,message:'Review source'})) as unknown as typeof fetch;
+  const d=dependencies({fetchImplementation});const client=createMobileApiClient(d.values);
+  const result=await client.request({method:'PATCH',path:'/api/mobile/v1/nutrition/saved-meals/id',body:{},parse:()=>undefined});
+  expect(result).toMatchObject({status:'conflict',code,message:'Review source'});expect(fetchImplementation).toHaveBeenCalledTimes(1);
+ });
+});

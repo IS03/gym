@@ -271,6 +271,10 @@ export function createMobileApiClient({
             conflictCode === 'QUICK_SOURCE_UNAVAILABLE' ||
             conflictCode === 'QUICK_SOURCE_UNUSABLE' ||
             conflictCode === 'SAVED_NAME_EXISTS' ||
+            conflictCode === 'SAVED_CHANGED' ||
+            conflictCode === 'SAVED_UNAVAILABLE' ||
+            conflictCode === 'SAVED_FOOD_CHANGED' ||
+            conflictCode === 'SAVED_FOOD_UNAVAILABLE' ||
             conflictCode === 'FOOD_CHANGED' ||
             conflictCode === 'FOOD_UNAVAILABLE' ||
             conflictCode === 'FOOD_NAME_EXISTS' ||

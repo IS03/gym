@@ -61,6 +61,7 @@ function normalizeNestedItems(row: SavedMeal & { saved_meal_items?: SavedMealIte
   const { saved_meal_items: nestedItems = [], ...meal } = row;
   return {
     ...meal,
+    ...(meal.template_type === 'composite' && nestedItems.length ? (() => { const t=sumSavedMealItems(nestedItems.map(i=>scaleSavedMealItem(i,i.quantity,3))); return {calories:t.calories,protein_g:t.proteinG,carbs_g:t.carbsG,fat_g:t.fatG}; })() : {}),
     items: [...nestedItems].toSorted(
       (left, right) => left.position - right.position,
     ),
@@ -90,7 +91,7 @@ export async function listActiveSavedMeals(
   const auth = context ?? await requireAuthenticatedRequestContext();
   const { data, error } = await auth.supabase
     .from("saved_meals")
-    .select(`${SAVED_MEAL_SUMMARY_SELECT},saved_meal_items(count)`)
+    .select(`${SAVED_MEAL_SUMMARY_SELECT},saved_meal_items(${SAVED_MEAL_ITEM_SELECT})`)
     .eq("user_id", auth.userId)
     .eq("is_active", true)
     .order("name");
@@ -99,10 +100,9 @@ export async function listActiveSavedMeals(
     throw new SavedMealProductError("No pudimos leer las comidas habituales.");
   }
   return (data ?? []).map((row) => {
-    const nested = (row as typeof row & { saved_meal_items?: Array<{ count: number }> }).saved_meal_items;
-    const meal: Record<string, unknown> = { ...row };
-    delete meal.saved_meal_items;
-    return { ...(meal as unknown as Omit<SavedMealSummary, "itemCount">), itemCount: nested?.[0]?.count ?? 0 };
+    const normalized = normalizeNestedItems(row as never);
+    const { items, ...meal } = normalized;
+    return { ...meal, itemCount: items.length };
   });
 }
 
