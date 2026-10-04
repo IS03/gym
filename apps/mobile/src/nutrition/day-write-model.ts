@@ -12,7 +12,8 @@ export function dayWriteDraft(kind: DayWriteDraft['kind'], baseline: MobileNutri
     expenditure: c?.expenditureOverrideKcal === null || c?.expenditureOverrideKcal === undefined ? '' : String(c.expenditureOverrideKcal) };
 }
 export function canWriteDay(kind: DayWriteDraft['kind'], data: MobileNutritionDayResponse) {
-  return kind === 'metrics' ? data.activity.status === 'ok' && data.activity.data.metrics.length > 0 && data.activity.data.metrics.every(m => !!m.definitionUpdatedAt)
+  // Metrics are recorded only up to the SERVER's today (M5.2); the server rejects later dates too.
+  return kind === 'metrics' ? data.date <= data.today && data.activity.status === 'ok' && data.activity.data.metrics.length > 0 && data.activity.data.metrics.every(m => !!m.definitionUpdatedAt)
     : data.nutrition.status === 'ok' && data.nutrition.data.dayState === 'recorded' && !!data.nutrition.data.context.updatedAt;
 }
 export function draftDirty(d: DayWriteDraft) {

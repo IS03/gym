@@ -7,6 +7,7 @@ export default function ProgressLayout() {
     <Stack screenOptions={useStackScreenOptions()}>
       <Stack.Screen name="index" options={{ title: 'Progreso' }} />
       <Stack.Screen name="body" options={{ title: 'Cuerpo' }} />
+      <Stack.Screen name="metrics" options={{ title: 'Métricas diarias' }} />
     </Stack>
   );
 }

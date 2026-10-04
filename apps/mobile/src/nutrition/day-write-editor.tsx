@@ -35,7 +35,7 @@ export function DayWriteEditor({controller,state}:{controller:DayWriteController
   return <Modal animationType="slide" onRequestClose={close} presentationStyle="fullScreen" visible>
     <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={styles.screen}>
       <ScrollScreen safeAreaEdges={['top','left','right','bottom']} testID="nutrition-day-write-editor">
-        <Heading level={2}>{d.kind==='metrics'?'Editar actividad':'Ajustar contexto'}</Heading>
+        <Heading level={2}>{d.kind==='metrics'?'Métricas del día':'Ajustar contexto'}</Heading>
         <AppText>{displayNutritionDate(d.baseline.date)} · Sólo esta fecha</AppText>
         <AppText muted>{d.kind==='metrics'?'Vacío significa sin registro. Cero es un valor. Se guardan juntos sólo los cambios.':'Estos ajustes diarios no cambian tu plan ni la configuración general.'}</AppText>
         {d.kind==='metrics'?metrics.map(m=>{

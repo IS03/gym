@@ -5,7 +5,7 @@ export type MetricChange = { metricId: string; definitionUpdatedAt: string; expe
 export type DayWriteIntent = { operation: 'metrics'; date: string; idempotencyKey: string; changes: MetricChange[] }
   | { operation: 'context'; date: string; idempotencyKey: string; expectedUpdatedAt: string; changes: { target?: OverrideChange; expenditure?: OverrideChange } };
 export type DayWriteReceipt = { status: 'saved'; operation: 'metrics' | 'context'; date: string };
-export type DayWriteConflict = { error: 'METRICS_CHANGED' | 'METRIC_UNAVAILABLE' | 'CONTEXT_CHANGED' | 'CONTEXT_UNAVAILABLE' | 'IDEMPOTENCY_KEY_REUSED'; message: string };
+export type DayWriteConflict = { error: 'METRICS_CHANGED' | 'METRIC_UNAVAILABLE' | 'METRIC_FUTURE_DATE' | 'CONTEXT_CHANGED' | 'CONTEXT_UNAVAILABLE' | 'IDEMPOTENCY_KEY_REUSED'; message: string };
 export type DayWriteResponse = DayWriteReceipt | DayWriteConflict;
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const numeric = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 9999999999.9999 && /^\d+(?:\.\d{1,4})?$/.test(String(v));
@@ -37,5 +37,5 @@ export function parseDayWriteIntent(v: unknown): DayWriteIntent | undefined {
 export function parseDayWriteResponse(v: unknown): DayWriteResponse | undefined {
   if (!record(v)) return;
   if (v.status === 'saved' && ['metrics','context'].includes(String(v.operation)) && isNutritionDate(v.date)) return { status: 'saved', operation: v.operation as DayWriteReceipt['operation'], date: v.date };
-  if (['METRICS_CHANGED','METRIC_UNAVAILABLE','CONTEXT_CHANGED','CONTEXT_UNAVAILABLE','IDEMPOTENCY_KEY_REUSED'].includes(String(v.error)) && typeof v.message === 'string') return { error: v.error as DayWriteConflict['error'], message: v.message };
+  if (['METRICS_CHANGED','METRIC_UNAVAILABLE','METRIC_FUTURE_DATE','CONTEXT_CHANGED','CONTEXT_UNAVAILABLE','IDEMPOTENCY_KEY_REUSED'].includes(String(v.error)) && typeof v.message === 'string') return { error: v.error as DayWriteConflict['error'], message: v.message };
 }

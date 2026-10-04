@@ -35,6 +35,12 @@ async function context(auth?: AuthenticatedRequestContext) {
   return auth ?? requireAuthenticatedRequestContext();
 }
 
+/** The database rejects values after today's product day (M5.2); show it plainly. */
+function metricWriteError(prefix: string, error: { message: string }, cause?: unknown): Error {
+  if (error.message.includes("metric_future_date")) return new Error("No se pueden registrar métricas en una fecha futura.");
+  return new Error(`${prefix}: ${error.message}`, cause === undefined ? undefined : { cause });
+}
+
 export async function getUserMetrics(auth?: AuthenticatedRequestContext): Promise<UserMetric[]> {
   const { supabase, userId } = await context(auth);
   const ensured = await supabase.rpc("ensure_user_metrics");
@@ -241,7 +247,7 @@ export async function saveDailyMetricValue(input: {
     metric_date: input.date,
     value,
   }, { onConflict: "user_id,metric_date,metric_id" });
-  if (error) throw new Error(`Guardar valor: ${error.message}`);
+  if (error) throw metricWriteError("Guardar valor", error);
 }
 
 export async function saveDailyMetricValues(input: {
@@ -305,7 +311,7 @@ async function saveDailyMetricValuesInternal(input: {
       p_historical: historical,
     });
     if (saved.error) {
-      throw new Error(`Guardar valores diarios: ${saved.error.message}`, { cause: saved.error });
+      throw metricWriteError("Guardar valores diarios", saved.error, saved.error);
     }
   });
 }
