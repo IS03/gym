@@ -1,9 +1,10 @@
+import { foodQuickOption, type FoodDetail } from '@/api/nutrition-food';
 import type { MobileApiReadResult, MobileApiRequestResult } from '@/api/results';
 import { sameQuickSelection, type QuickOptions, type QuickOption, type QuickPreview, type QuickResponse, type QuickIntent, type QuickSelection } from '@/api/nutrition-quick';
 import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { QuickIntentRepository, type StoredQuickIntent } from './quick-storage';
 import { quickDraft, selectionFromDraft, type QuickDraft } from './quick-model';
-export type QuickApi = { options: () => Promise<MobileApiReadResult<QuickOptions>>; preview: (s: QuickSelection) => Promise<MobileApiRequestResult<QuickPreview>>;
+export type QuickApi = { food?: (id: string) => Promise<MobileApiReadResult<FoodDetail>>; options: () => Promise<MobileApiReadResult<QuickOptions>>; preview: (s: QuickSelection) => Promise<MobileApiRequestResult<QuickPreview>>;
   confirm: (i: QuickIntent) => Promise<MobileApiRequestResult<QuickResponse>>; read: (date: string) => Promise<MobileApiReadResult<MobileNutritionDayResponse>> };
 export type QuickState = { phase: 'loading' | 'idle' | 'pending' | 'uncertain' | 'confirmed' | 'conflict' | 'blocked';
   open: boolean; date: string | null; options: QuickOptions | null; optionsLoading: boolean; optionsError: boolean;
@@ -25,11 +26,11 @@ export class QuickController {
         message: stored.receipt ? 'El intento está confirmado. Falta actualizar los datos.' : 'Hay un intento rápido sin resultado confirmado. Comprobalo antes de guardar otra comida.' } : { phase: 'idle' });
     } catch { this.update({ phase: 'blocked', message: 'No pudimos leer el intento local. Comprobá el almacenamiento.' }); }
   }
-  open(date: string) {
+  open(date: string, option?: QuickOption) {
     if (this.state.phase !== 'idle' || this.state.intent || this.busy) return;
-    this.previewGeneration++;
-    this.update({ open: true, date, draft: null, previousDraft: null, preview: null, previewLoading: false, message: null, errors: {}, truth: null });
-    void this.loadOptions();
+    this.previewGeneration++; this.optionsGeneration++;
+    this.update({ optionsLoading: false, optionsError: false, open: true, date, draft: null, previousDraft: null, preview: null, previewLoading: false, message: null, errors: {}, truth: null });
+    if (option) this.choose(option); else void this.loadOptions();
   }
   close() {
     if (this.busy) return;
@@ -42,6 +43,16 @@ export class QuickController {
   async loadOptions() {
     if (this.disposed) return;
     const generation = ++this.optionsGeneration; this.update({ optionsLoading: true, optionsError: false });
+    if (this.state.draft?.option.source.kind === 'food') {
+      const source = this.state.draft.option.source;
+      try {
+        const result = await this.api.food?.(source.id);
+        if (this.disposed || generation !== this.optionsGeneration) return;
+        this.update({ optionsLoading: false, optionsError: result?.status !== 'ok',
+          ...(this.state.phase === 'conflict' ? { truth: result?.status === 'ok' && result.data.food?.isActive ? foodQuickOption(result.data.food) : null } : {}) });
+      } catch { if (generation === this.optionsGeneration) this.update({ optionsLoading: false, optionsError: true, truth: null }); }
+      return;
+    }
     try { const result = await this.api.options();
       if (this.disposed || generation !== this.optionsGeneration) return;
       if (result.status !== 'ok') { this.update({ optionsLoading: false, optionsError: true }); return; }
@@ -54,7 +65,7 @@ export class QuickController {
   }
   choose(option: QuickOption) {
     if (this.state.phase !== 'idle' || this.state.intent || this.busy || !this.state.date) return;
-    this.previewGeneration++; this.update({ draft: quickDraft(this.state.date, option), previousDraft: null, preview: null, message: null, errors: {}, truth: null });
+    this.previewGeneration++; this.optionsGeneration++; this.update({ optionsLoading: false, draft: quickDraft(this.state.date, option), previousDraft: null, preview: null, message: null, errors: {}, truth: null });
     void this.requestPreview();
   }
   back() {

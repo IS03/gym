@@ -172,7 +172,7 @@ export function FoodMealForm({
           <div className="space-y-1">
             <Label htmlFor="food-meal-quantity">Cantidad</Label>
             <div className="flex items-center gap-2">
-              <Input id="food-meal-quantity" type="text" inputMode="decimal" value={quantity} onChange={(event) => { if (isLocalizedDecimalDraft(event.target.value)) { mutationKeyRef.current = null; setQuantity(event.target.value); } }} pattern="[0-9]*[.,]?[0-9]*" disabled={pending} />
+              <Input id="food-meal-quantity" type="text" inputMode="decimal" value={quantity} onChange={(event) => { if (isLocalizedDecimalDraft(event.target.value, 3)) { mutationKeyRef.current = null; setQuantity(event.target.value); } }} pattern="[0-9]*[.,]?[0-9]*" disabled={pending} />
               <span className="min-w-16 text-sm font-medium text-muted-foreground">{selected.serving_unit}</span>
             </div>
             <p className="text-xs text-muted-foreground">Misma unidad que la porción base: {formatFoodQuantity(selected.serving_quantity, selected.serving_unit)}.</p>

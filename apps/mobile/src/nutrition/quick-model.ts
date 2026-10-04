@@ -6,10 +6,10 @@ export function quickDraft(date: string, option: QuickOption): QuickDraft {
 }
 export function selectionFromDraft(draft: QuickDraft): { selection?: QuickSelection; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
-  const quantities = draft.option.templateType === 'composite' ? draft.option.items.map(i => {
+  const quantities = draft.option.templateType === 'composite' || draft.option.source.kind === 'food' ? draft.option.items.map(i => {
     const text = draft.quantities[i.id]?.trim() ?? '';
-    const quantity = /^\d+(?:[,.]\d{1,2})?$/.test(text) ? Number(text.replace(',', '.')) : 0;
-    if (quantity <= 0 || quantity > 1_000_000) errors[i.id] = 'Ingresá una cantidad positiva, con hasta dos decimales.';
+    const quantity = new RegExp(`^\\d+(?:[,.]\\d{1,${draft.option.source.kind === 'food' ? 3 : 2}})?$`).test(text) ? Number(text.replace(',', '.')) : 0;
+    if (quantity <= 0 || quantity > 1_000_000) errors[i.id] = `Ingresá una cantidad positiva, con hasta ${draft.option.source.kind === 'food' ? 'tres' : 'dos'} decimales.`;
     return { itemId: i.id, quantity };
   }) : null;
   if (Object.keys(errors).length) return { errors };

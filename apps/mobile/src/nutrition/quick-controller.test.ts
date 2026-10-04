@@ -1,4 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import { foodQuickOption } from '@/api/nutrition-food';
+import { personalFood } from './food-fixture.test-helper';
 import { QuickController, type QuickApi } from './quick-controller';
 import { QuickIntentRepository } from './quick-storage';
 import { quickDraft, selectionFromDraft } from './quick-model';
@@ -85,6 +87,12 @@ describe('Reliable quick registration', () => {
     const restored = new QuickController(f.api, f.repository, f.invalidate); await restored.initialize();
     expect(f.api.confirm).toHaveBeenCalledTimes(1); restored.showRecovery(); await restored.recover();
     expect(f.api.confirm).toHaveBeenLastCalledWith(stored.intent); expect(await f.repository.read()).toBeNull();
+  });
+  it('food quantity ambiguity survives restart and replays the same source version/quantity', async () => {
+    const f = fixture(); await f.open(foodQuickOption(personalFood)); f.controller.change(personalFood.id, '0,375'); await f.controller.requestPreview();
+    (f.api.confirm as jest.Mock<QuickApi['confirm']>).mockResolvedValueOnce(failure); await f.controller.save(); const stored = (await f.repository.read())!;
+    const restored = new QuickController(f.api, f.repository, f.invalidate); await restored.initialize(); expect(restored.getSnapshot().draft?.quantities[personalFood.id]).toBe('0,375');
+    expect(f.api.confirm).toHaveBeenCalledTimes(1); await restored.recover(); expect(f.api.confirm).toHaveBeenLastCalledWith(stored.intent); expect(await f.repository.read()).toBeNull();
   });
   it('confirmed receipt recovery reads only, and a wrong-date read never clears the intent', async () => {
     const f = fixture(); await f.open(); (f.api.read as jest.Mock<QuickApi['read']>).mockResolvedValueOnce(failure);

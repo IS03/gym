@@ -15,12 +15,15 @@ import { DayWriteEditor } from './day-write-editor';
 import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { MealEditor } from './meal-editor';
 import { useQuickController } from './use-quick-controller';
+import { useFoodController } from './use-food-controller';
+import { FoodEditor } from './food-editor';
+import { foodQuickOption } from '@/api/nutrition-food';
 import { QuickEditor } from './quick-editor';
 
-function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onEdit, onActivity, onContext }: {
+function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onEdit, onActivity, onContext }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
   onAdd?: () => void; onEdit?: (meal: NutritionDayMeal) => void;
-  addChoices?: ReactNode;
+  addChoices?: ReactNode; onManageFoods?: () => void;
   onActivity?: (data: MobileNutritionDayResponse) => void; onContext?: (data: MobileNutritionDayResponse) => void;
 }) {
   const { client } = useMobileApi();
@@ -49,6 +52,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
       {date !== today ? <Button label="Volver a hoy" onPress={onToday} variant="quiet" /> : null}
       {onAdd ? <Button label="Agregar comida" onPress={onAdd} /> : null}
       {addChoices}
+      {onManageFoods ? <Button label="Administrar alimentos" variant="quiet" onPress={onManageFoods} /> : null}
     </View>
     {!current ? state.status === 'loading' ? <LoadingState label="Cargando día nutricional" />
       : <UnavailableState title="No pudimos cargar este día"
@@ -77,6 +81,7 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const meals = useMealController(client, userId, invalidate);
   const writes = useDayWriteController(client, userId, invalidate);
   const quick = useQuickController(client, userId, invalidate);
+  const foods = useFoodController(client, userId);
   const [adding, setAdding] = useState(false);
   const [today, setToday] = useState(() => nutritionToday());
   const [selected, setSelected] = useState<string | null>(null);
@@ -89,13 +94,15 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   }, [updateToday]);
   const date = selected ?? today;
   const editable = meals?.state.phase === 'idle' && !meals.state.intent && writes?.state.phase === 'idle' && !writes.state.intent
-    && quick?.state.phase === 'idle' && !quick.state.intent;
+    && quick?.state.phase === 'idle' && !quick.state.intent && foods?.state.phase === 'idle' && !foods.state.intent;
   return <>
     <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
       onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
       onAdd={editable ? () => setAdding(true) : undefined}
+      onManageFoods={editable ? () => foods.controller.open(null) : undefined}
       addChoices={adding ? <View style={styles.header} testID="nutrition-add-choice">
         <Button disabled={!editable} label="Rápido" onPress={() => { setAdding(false); quick?.controller.open(date); }} />
+        <Button disabled={!editable} label="Alimento" variant="secondary" onPress={() => { setAdding(false); foods?.controller.open(date); }} />
         <Button disabled={!editable} label="Manual" variant="secondary" onPress={() => { setAdding(false); meals?.controller.open(date); }} />
         <Button label="Cancelar" variant="quiet" onPress={() => setAdding(false)} />
       </View> : undefined}
@@ -111,7 +118,11 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
     {quick?.state.message && !quick.state.open ? <View style={styles.header}><AppText accessibilityRole="alert">{quick.state.message}</AppText>
       {quick.state.intent ? <Button label="Revisar intento rápido" onPress={() => quick.controller.showRecovery()} /> : null}
       {quick.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento rápido" onPress={() => void quick.controller.recover()} /> : null}</View> : null}
-    {quick ? <QuickEditor controller={quick.controller} state={quick.state} /> : null}
+    {quick && !(foods?.state.open && foods.state.mode === 'register') ? <QuickEditor controller={quick.controller} state={quick.state} /> : null}
+    {foods && quick ? <FoodEditor controller={foods.controller} state={foods.state} quick={quick} onChoose={food => { quick.controller.open(foods.state.date!, foodQuickOption(food)); foods.controller.registration(); }} /> : null}
+    {foods?.state.message && !foods.state.open ? <View style={styles.header}><AppText accessibilityRole="alert">{foods.state.message}</AppText>
+      {foods.state.intent ? <Button label="Revisar intento de catálogo" onPress={() => foods.controller.showRecovery()} /> : null}
+      {foods.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento de alimentos" onPress={() => void foods.controller.recover()} /> : null}</View> : null}
     {writes ? <DayWriteEditor controller={writes.controller} state={writes.state} /> : null}
     {meals ? <MealEditor controller={meals.controller} state={meals.state} /> : null}
   </>;

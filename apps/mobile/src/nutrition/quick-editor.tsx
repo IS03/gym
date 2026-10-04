@@ -7,7 +7,7 @@ const shown = (v: number | null) => v === null ? 'sin dato' : new Intl.NumberFor
 function Nutrients({ value }: { value: QuickNutrients }) {
   return <AppText selectable>{`${shown(value.calories)} kcal · P ${shown(value.proteinG)} · C ${shown(value.carbsG)} · G ${shown(value.fatG)}`}</AppText>;
 }
-export function QuickEditor({ controller, state }: { controller: QuickController; state: QuickState }) {
+export function QuickEditor({ controller, state, embedded = false, onBack }: { controller: QuickController; state: QuickState; embedded?: boolean; onBack?: () => void }) {
   const { colors } = useOwnlevelTheme();
   if (!state.open || !state.date) return null;
   const running = state.phase === 'pending' || state.phase === 'loading';
@@ -30,10 +30,9 @@ export function QuickEditor({ controller, state }: { controller: QuickController
       </View>) : <AppText>{title === 'Guardadas' ? 'Todavía no tenés habituales activas.' : 'No hay sugeridas de los 60 días anteriores a hoy.'}</AppText>
       : null}
   </Surface>;
-  return <Modal animationType="slide" presentationStyle="fullScreen" visible onRequestClose={close}>
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+  const body = <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ScrollScreen safeAreaEdges={['top','left','right','bottom']} testID="quick-meal-editor">
-        <Heading level={2}>Agregar rápido</Heading>
+        <Heading level={2}>{state.draft?.option.source.kind === 'food' ? 'Agregar alimento' : 'Agregar rápido'}</Heading>
         <AppText variant="label">{`Destino · ${displayNutritionDate(state.date)}`}</AppText>
         {!state.draft ? <>
           {state.optionsLoading ? <LoadingState label="Cargando opciones rápidas" /> : null}
@@ -43,6 +42,7 @@ export function QuickEditor({ controller, state }: { controller: QuickController
           <Button disabled={state.optionsLoading} label="Actualizar opciones" onPress={() => void controller.loadOptions()} variant="secondary" />
         </> : <>
           <Heading level={2}>{state.draft.option.name}</Heading>
+          {state.draft.option.source.kind === 'food' ? <AppText muted>{`Porción base: ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 3 }).format(state.draft.option.items[0].quantity)} ${state.draft.option.items[0].unit}. Usá la misma unidad.`}</AppText> : null}
           {state.draft.option.templateType === 'composite' ? <AppText muted>Las cantidades se aplican sólo a esta comida. La habitual no se modifica.</AppText> : null}
           {state.draft.option.items.map(item => <View style={styles.field} key={item.id}>
             <AppText variant="label">{`${item.label} (${item.unit})`}</AppText>
@@ -63,13 +63,13 @@ export function QuickEditor({ controller, state }: { controller: QuickController
           </Surface> : null}
           {state.phase === 'idle' ? <>
             <Button disabled={state.previewLoading} label="Actualizar vista previa" onPress={() => void controller.requestPreview()} variant="secondary" />
-            <Button disabled={!state.preview || state.previewLoading} label="Registrar comida" onPress={() => void controller.save()} />
+            <Button disabled={!state.preview || state.previewLoading} label={state.draft.option.source.kind === 'food' ? 'Agregar al día' : 'Registrar comida'} onPress={() => void controller.save()} />
             {state.draft.option.source.kind === 'suggestion' ? <Button disabled={!state.preview || state.previewLoading}
               label="Guardar como habitual" onPress={() => void controller.save('saveSuggestion')} variant="secondary" /> : null}
             <Button label="Elegir otra opción" onPress={() => {
               if (controller.dirty()) Alert.alert('¿Descartar ajustes?', 'Podés volver a elegir otra opción.', [
-                { text: 'Cancelar', style: 'cancel' }, { text: 'Descartar', style: 'destructive', onPress: () => controller.back() },
-              ]); else controller.back();
+                { text: 'Cancelar', style: 'cancel' }, { text: 'Descartar', style: 'destructive', onPress: () => (onBack ?? (() => controller.back()))() },
+              ]); else (onBack ?? (() => controller.back()))();
             }} variant="quiet" />
           </> : null}
         </>}
@@ -79,14 +79,14 @@ export function QuickEditor({ controller, state }: { controller: QuickController
             <Button label="Revisar la versión actual" onPress={() => controller.reviewTruth()} variant="secondary" /></>
             : <AppText>No hay una opción actual confirmada. Conservamos tu selección y cantidades.</AppText>}
           <Button disabled={state.optionsLoading} label="Actualizar fuente" onPress={() => void controller.loadOptions()} variant="secondary" />
-          <Button label="Elegir otra opción" onPress={() => controller.back()} variant="quiet" />
+          <Button label="Elegir otra opción" onPress={() => (onBack ?? (() => controller.back()))()} variant="quiet" />
         </Surface> : null}
         {['uncertain','confirmed','blocked'].includes(state.phase) ? <Button label={state.intent?.receipt ? 'Actualizar datos confirmados' : 'Comprobar intento guardado'} onPress={() => void controller.recover()} /> : null}
         {running ? <Button label="Procesando…" disabled onPress={() => {}} /> : null}
         <Button disabled={running} label={state.intent ? 'Volver al día · conservar intento' : 'Cancelar'} onPress={close} variant="quiet" />
       </ScrollScreen>
-    </KeyboardAvoidingView>
-  </Modal>;
+    </KeyboardAvoidingView>;
+  return embedded ? body : <Modal animationType="slide" presentationStyle="fullScreen" visible onRequestClose={close}>{body}</Modal>;
 }
 const styles = StyleSheet.create({ screen: { flex: 1 }, option: { gap: spacing.sm, paddingVertical: spacing.sm }, field: { gap: spacing.xs },
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, padding: spacing.md, fontSize: 17 } });

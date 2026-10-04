@@ -46,6 +46,7 @@ try {
   await admin.query(blockers.slice(0,blockers.indexOf('-- body_measurements'))+'commit;');
   for(const name of ['20260830171201_saved_meals.sql','20260908223000_food_calories_decimal.sql','20261004010134_mobile_quick_registration.sql']) await admin.query(await file(name));
   await admin.query('grant usage on schema extensions to authenticated; grant select on public.profiles, public.workout_sessions to authenticated');
+  if (process.env.OWNLEVEL_TEST_EXPAND_M422 === '1') await admin.query(await file('20261004015101_mobile_personal_foods.sql'));
   const today=(await admin.query("select (statement_timestamp() at time zone 'America/Argentina/Cordoba')::date::text d")).rows[0].d;
   const yesterday=(await admin.query('select ($1::date-1)::text d',[today])).rows[0].d;
   const sourceDay=(await a.query('select (public.get_or_create_day_log($1)).id id',[yesterday])).rows[0].id;
