@@ -51,6 +51,13 @@ describe("PR29 — escalado canónico de alimentos", () => {
     expect(parseFoodQuantity("165.5")).toBe(165.5);
   });
 
+  it("consume una base válida de tres decimales sin redondear la cantidad", () => {
+    expect(scaleFoodNutrition({ ...baseFood, serving_quantity: 0.125, calories: 22.5 }, "0,125").calories).toBe(23);
+    expect(scaleFoodNutrition({ ...baseFood, serving_quantity: 0.125, calories: 22.5 }, "0.375").calories).toBe(68);
+    expect(() => scaleFoodNutrition(baseFood, "1.2345")).toThrow("cantidad válida");
+    expect(() => parseFoodQuantity("1.234")).toThrow("cantidad válida"); // composed rule unchanged
+  });
+
   it("no inventa calorías ausentes o en cero", () => {
     expect(() => scaleFoodNutrition({ ...baseFood, calories: null }, 100)).toThrow("Completá las calorías");
     expect(() => scaleFoodNutrition({ ...baseFood, calories: 0 }, 100)).toThrow("no tiene calorías registrables");

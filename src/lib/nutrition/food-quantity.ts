@@ -39,8 +39,8 @@ export class FoodQuantityError extends Error {
   }
 }
 
-export function parseFoodQuantity(value: unknown): number {
-  const parsed = parseLocalizedDecimal(value);
+export function parseFoodQuantity(value: unknown, maxFractionDigits = 2): number {
+  const parsed = parseLocalizedDecimal(value, maxFractionDigits);
   if (parsed === null || !Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_FOOD_QUANTITY) {
     throw new FoodQuantityError("invalid_quantity", "Ingresá una cantidad válida.");
   }
@@ -59,7 +59,7 @@ export function scaleFoodNutrition(
   food: ScalableFoodNutrition,
   quantityInput: unknown,
 ): ScaledFoodNutrition {
-  const quantity = parseFoodQuantity(quantityInput);
+  const quantity = parseFoodQuantity(quantityInput, 3);
   if (!Number.isFinite(food.serving_quantity) || food.serving_quantity <= 0) {
     throw new FoodQuantityError("invalid_quantity", "La porción base del alimento no es válida.");
   }
@@ -103,5 +103,5 @@ export function foodRegistrability(food: Pick<Food, "calories">) {
 }
 
 export function formatFoodQuantity(quantity: number, unit: string) {
-  return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(quantity)} ${unit}`;
+  return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 3 }).format(quantity)} ${unit}`;
 }

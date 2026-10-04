@@ -10,6 +10,7 @@ import { OwnlevelThemeProvider } from '@/design-system';
 import { NutritionDayScreen } from './day-screen';
 import { nutritionFixture } from './day-fixture.test-helper';
 import { quickOptions, quickPreview, quickReceipt, quickDate } from './quick-fixture.test-helper';
+import { personalFood } from './food-fixture.test-helper';
 import type { QuickSelection } from '@/api/nutrition-quick';
 
 const mockRead = jest.fn<MobileApiClient['read']>();
@@ -63,6 +64,27 @@ describe('Native Nutrition day', () => {
     await act(async () => { fireEvent.press(view.getByText('Registrar comida')); });
     await waitFor(() => expect(view.queryByTestId('quick-meal-editor')).toBeNull());
     expect(mockRequest.mock.calls.filter(([o]) => o.path.endsWith('meal-registrations'))).toHaveLength(1);
+    expect(await AsyncStorage.getItem('ownlevel.nutrition.quick.v1.owner')).toBeNull();
+  });
+  it('Alimento uses the captured destination and rereads Nutrition after registration', async () => {
+    mockRead.mockImplementation(async options => options.path.includes('/foods')
+      ? { status: 'ok', data: { status: 'ok', foods: [personalFood] }, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never
+      : ok(options.path.split('/').pop()!) as never);
+    mockRequest.mockImplementation(async options => {
+      const selection = options.body as QuickSelection;
+      return { status: 'ok', data: options.path.endsWith('meal-preview') ? quickPreview(selection) : { ...quickReceipt, date: selection.date }, meta: { durationMs: 1, httpStatus: 200, outcome: 'ok' } } as never;
+    });
+    const view = render(element()); await view.findByText('Agregar comida');
+    fireEvent.press(view.getByText('Agregar comida')); await act(async () => { fireEvent.press(view.getByText('Alimento')); });
+    await act(async () => { fireEvent.press(view.getByText('Usar CAFÉ')); });
+    expect(view.getByText('Destino · viernes, 2 de octubre de 2026')).toBeTruthy();
+    fireEvent.changeText(view.getByLabelText('Cantidad de CAFÉ'), '0,375');
+    await act(async () => { appStateListeners.forEach(f => f('background')); appStateListeners.forEach(f => f('active')); });
+    expect(view.getByLabelText('Cantidad de CAFÉ').props.value).toBe('0,375');
+    await act(async () => { fireEvent.press(view.getByText('Actualizar vista previa')); });
+    await act(async () => { fireEvent.press(view.getByText('Agregar al día')); });
+    await waitFor(() => expect(view.queryByTestId('quick-meal-editor')).toBeNull());
+    expect(mockRequest.mock.calls.filter(([o]) => o.path.endsWith('meal-registrations'))[0][0].body).toMatchObject({ date: mockToday, source: { kind: 'food' } });
     expect(await AsyncStorage.getItem('ownlevel.nutrition.quick.v1.owner')).toBeNull();
   });
   it('activity draft survives foreground and confirms only changed canonical values', async () => {

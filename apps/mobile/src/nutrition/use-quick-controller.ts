@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import type { MobileApiClient } from '@/api/client';
 import { fetchMobileNutritionDay } from '@/api/nutrition-day';
 import { confirmQuickMeal, fetchQuickOptions, previewQuickMeal } from '@/api/nutrition-quick';
+import { fetchFood } from '@/api/nutrition-food';
 import { shouldRefreshOnForeground } from '@/api/resource';
 import { QuickController, type QuickState } from './quick-controller';
 import { QuickIntentRepository } from './quick-storage';
@@ -12,7 +13,7 @@ export function useQuickController(client: MobileApiClient | null, userId: strin
   useEffect(() => {
     if (!client) return;
     const lifetime = new AbortController();
-    const controller = new QuickController({ options: () => fetchQuickOptions(client, lifetime.signal), preview: s => previewQuickMeal(client, s, lifetime.signal),
+    const controller = new QuickController({ food: id => fetchFood(client, id, lifetime.signal), options: () => fetchQuickOptions(client, lifetime.signal), preview: s => previewQuickMeal(client, s, lifetime.signal),
       confirm: i => confirmQuickMeal(client, i, lifetime.signal), read: d => fetchMobileNutritionDay(client, d, lifetime.signal) }, new QuickIntentRepository(AsyncStorage, userId), invalidate);
     const unsubscribe = controller.subscribe(() => setCurrent({ client, userId, controller, state: controller.getSnapshot() }));
     void controller.initialize();

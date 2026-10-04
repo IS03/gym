@@ -271,6 +271,9 @@ export function createMobileApiClient({
             conflictCode === 'QUICK_SOURCE_UNAVAILABLE' ||
             conflictCode === 'QUICK_SOURCE_UNUSABLE' ||
             conflictCode === 'SAVED_NAME_EXISTS' ||
+            conflictCode === 'FOOD_CHANGED' ||
+            conflictCode === 'FOOD_UNAVAILABLE' ||
+            conflictCode === 'FOOD_NAME_EXISTS' ||
             conflictCode === 'METRICS_CHANGED' ||
             conflictCode === 'METRIC_UNAVAILABLE' ||
             conflictCode === 'CONTEXT_CHANGED' ||
