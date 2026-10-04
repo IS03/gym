@@ -1,5 +1,6 @@
 -- Run after M6 EXPAND. Entire fixture and privilege probes roll back.
 begin;
+select set_config('request.jwt.claims','{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 insert into auth.users(id,email) values
  ('61000000-0000-4000-8000-000000000001','m6-rollback-owner@example.invalid'),
  ('61000000-0000-4000-8000-000000000002','m6-rollback-other@example.invalid');
@@ -46,6 +47,8 @@ select d.user_id,d.id,'completed',d.log_date+time '23:30' at time zone 'America/
  (d.log_date+1)+time '00:30' at time zone 'America/Argentina/Cordoba'
 from public.day_logs d cross join generate_series(1,1002) i where d.user_id='61000000-0000-4000-8000-000000000001'
  and d.log_date=(statement_timestamp() at time zone 'America/Argentina/Cordoba')::date-10;
+-- Mixed day uses genuine records from separate owners, not configuration.
+insert into public.body_measurements(user_id,measured_on,waist_cm) values ('61000000-0000-4000-8000-000000000001',(statement_timestamp() at time zone 'America/Argentina/Cordoba')::date-1,81);
 -- Foreign facts must not leak.
 insert into public.day_logs(user_id,log_date,weight_kg) values ('61000000-0000-4000-8000-000000000002',(statement_timestamp() at time zone 'America/Argentina/Cordoba')::date-12,90);
 select set_config('request.jwt.claims','{"sub":"61000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
@@ -66,7 +69,7 @@ begin
  assert (r->'days'->8->>'metricValuesCount')::int=1001, 'more than REST cap';
  assert (r->'days'->9->>'measurementsCount')::int=1, 'measurement only';
  assert (r->'days'->10->>'hasWeight')::boolean, 'zero weight is still a fact';
- assert (r->'days'->11->>'hasExplicitOverrides')::boolean, 'explicit false work override';
+ assert (r->'days'->11->>'hasExplicitOverrides')::boolean and (r->'days'->11->>'measurementsCount')::int=1, 'explicit false work override and mixed sources';
  assert not (r->'days'->0->>'hasWeight')::boolean, 'foreign ownership';
  f := r->'days'->1;
  assert f->>'completedSessionsCount'='0' and f->>'nutritionEntriesCount'='0' and f->>'metricValuesCount'='0'
@@ -77,20 +80,25 @@ begin
  begin perform public.mobile_read_history_range(t-62,t); raise exception 'accepted oversized range'; exception when sqlstate '22023' then null; end;
  begin perform public.mobile_read_history_range(t+1,t+2); raise exception 'accepted future'; exception when sqlstate '22023' then null; end;
  begin perform public.mobile_read_history_range(t,null); raise exception 'accepted half range'; exception when sqlstate '22023' then null; end;
- b := public.mobile_read_body_day(t-2); assert b->'weight'->'data'->>'weightKg'='0', 'exact zero weight';
+ b := public.mobile_read_body_day(t-2); assert (b->'weight'->'data'->>'weightKg')::numeric=0, 'exact zero weight';
  b := public.mobile_read_body_day(t-3); assert b->'weight'->'data'='null'::jsonb, 'no latest weight substitute';
  assert b->'measurement'->'data'->>'qualityStatus'='suspect' and (b->'measurement'->'data'->>'imported')::boolean, 'quality/import preserved';
  assert public.mobile_read_body_measurement((b->'measurement'->'data'->>'id')::uuid)=b->'measurement'->'data', 'identity baseline';
  snap := public.mobile_read_nutrition_day(t);
- assert exists (select from jsonb_array_elements(snap->'activity'->'data'->'metrics') m where m->>'isActive'='false' and m->>'value'='0'), 'archived today visible';
+ assert exists (select from jsonb_array_elements(snap->'activity'->'data'->'metrics') m where m->>'isActive'='false' and (m->>'value')::numeric=0), 'archived today visible';
  snap := public.mobile_read_nutrition_day(t-4);
- assert exists (select from jsonb_array_elements(snap->'activity'->'data'->'metrics') m where m->>'isActive'='false' and m->>'value'='0'), 'archived historical';
+ assert exists (select from jsonb_array_elements(snap->'activity'->'data'->'metrics') m where m->>'isActive'='false' and (m->>'value')::numeric=0), 'archived historical';
  perform public.mobile_read_nutrition_day(t-1000); perform public.mobile_read_body_day(t-1000); perform public.mobile_read_history_range(t-61,t);
  assert (select count(*) from public.day_logs)=before_days and (select count(*) from public.user_metrics)=before_definitions, 'no read materialization/ensure';
  assert not has_function_privilege('anon','public.mobile_read_history_range(date,date)','execute'), 'anon revoked';
  assert (select count(*) from public.day_logs where user_id='61000000-0000-4000-8000-000000000002')=0, 'RLS';
 end;
 $$;
+reset role;
+-- Removing the last preserved fact makes that date inactive without deleting its day_log.
+delete from public.body_measurements where user_id='61000000-0000-4000-8000-000000000001' and measured_on=(statement_timestamp() at time zone 'America/Argentina/Cordoba')::date-3;
+set local role authenticated;
+do $$ declare r jsonb; t date:=(statement_timestamp() at time zone 'America/Argentina/Cordoba')::date; begin r:=public.mobile_read_history_range(t-3,t-3); assert r->'days'->0->>'measurementsCount'='0'; assert r->'days'->0->>'hasExplicitOverrides'='false'; end $$;
 reset role;
 -- Each source permission failure remains null while independent facts survive.
 revoke select on public.workout_sessions from authenticated;
