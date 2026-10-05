@@ -282,12 +282,28 @@ export async function performLocalLogout(client: SupabaseClient): Promise<Mobile
     const { error } = await client.auth.signOut({ scope: 'local' });
 
     if (error && !isConfirmedInvalidSession(error)) {
-      return { type: 'TRANSIENT_FAILURE', message: authMessages.restoreFailed };
+      // Offline/server errors still remove the local session in supabase-js: the
+      // device is signed out even though the server-side revocation failed.
+      return (await hasLocalSession(client))
+        ? { type: 'TRANSIENT_FAILURE', message: authMessages.restoreFailed }
+        : { type: 'SESSION_MISSING' };
     }
 
     return { type: 'SESSION_MISSING' };
   } catch {
-    return { type: 'TRANSIENT_FAILURE', message: authMessages.restoreFailed };
+    return (await hasLocalSession(client))
+      ? { type: 'TRANSIENT_FAILURE', message: authMessages.restoreFailed }
+      : { type: 'SESSION_MISSING' };
+  }
+}
+
+/** Whether a session is still stored on this device. Unknown counts as present (never a false sign-out). */
+async function hasLocalSession(client: SupabaseClient): Promise<boolean> {
+  try {
+    const { data } = await client.auth.getSession();
+    return data.session !== null;
+  } catch {
+    return true;
   }
 }
 

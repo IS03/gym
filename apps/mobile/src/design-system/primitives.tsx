@@ -300,6 +300,7 @@ export function SectionHeader({
 type PressableSurfaceProps = PropsWithChildren<{
   accessibilityHint?: string;
   accessibilityLabel: string;
+  disabled?: boolean;
   onPress: () => void;
   style?: ViewStyle;
 }>;
@@ -308,6 +309,7 @@ export function PressableSurface({
   accessibilityHint,
   accessibilityLabel,
   children,
+  disabled = false,
   onPress,
   style,
 }: PressableSurfaceProps) {
@@ -317,6 +319,8 @@ export function PressableSurface({
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.surface,
@@ -325,6 +329,7 @@ export function PressableSurface({
           backgroundColor: pressed ? colors.surfaceRaised : colors.surface,
           borderColor: colors.border,
         },
+        disabled ? styles.pressableDisabled : null,
         style,
       ]}
     >
@@ -479,6 +484,9 @@ const styles = StyleSheet.create({
     minHeight: sizes.touchTarget,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+  },
+  pressableDisabled: {
+    opacity: 0.5,
   },
   separator: {
     height: sizes.separator,

@@ -6,22 +6,25 @@ export type ConfigState={phase:'loading'|'idle'|'pending'|'uncertain'|'confirmed
 export type ConfigApi={read:()=>Promise<MobileApiReadResult<NutritionConfig>>;write:(i:ConfigIntent)=>Promise<MobileApiRequestResult<ConfigReceipt>>;refreshToday:(date:string)=>Promise<boolean>};
 export class ConfigurationController{
  private state:ConfigState={phase:'loading',open:false,operation:null,config:null,baseline:null,draft:null,intent:null,loading:false,readError:false,message:null,errors:{}};
- private busy=false;private disposed=false;private generation=0;private listeners=new Set<()=>void>();
+ private busy=false;private disposed=false;private requested:ConfigOperation|null=null;private generation=0;private listeners=new Set<()=>void>();
  constructor(private api:ConfigApi,private repository:ConfigurationIntentRepository,private invalidate:()=>void,private key:()=>string=()=>`config:${Date.now()}:${Math.random().toString(36).slice(2)}`){}
  getSnapshot=()=>this.state;subscribe=(f:()=>void)=>{this.listeners.add(f);return()=>{this.listeners.delete(f);};};
  private update(p:Partial<ConfigState>){if(!this.disposed){this.state={...this.state,...p};this.listeners.forEach(f=>f());}}
  dispose(){this.disposed=true;this.generation++;this.listeners.clear();}
  async initialize(){try{const i=await this.repository.read();this.update(i?{phase:i.receipt?'confirmed':'uncertain',intent:i,operation:i.intent.operation,draft:i.draft,message:'Hay un intento de configuración guardado. Comprobalo antes de guardar nuevamente.'}:{phase:'idle'});}catch{this.update({phase:'blocked',message:'No pudimos leer el intento local de configuración.'});}}
- open(){if(this.state.phase!=='idle'||this.state.intent||this.busy)return;this.update({open:true,operation:null,draft:null,baseline:null,message:null});void this.load();}
- close(){if(this.busy)return;this.update({open:false,...(!this.state.intent?{phase:'idle',operation:null,draft:null,baseline:null,message:null}: {})});}
+ // open() shows the index; open(op) goes straight to that operation once server truth is read (e.g. Settings → physical).
+ open(op?:ConfigOperation){if(this.state.phase!=='idle'||this.state.intent||this.busy)return;this.requested=op??null;this.update({open:true,operation:null,draft:null,baseline:null,message:null});void this.load();}
+ close(){if(this.busy)return;this.requested=null;this.update({open:false,...(!this.state.intent?{phase:'idle',operation:null,draft:null,baseline:null,message:null}: {})});}
  showRecovery(){if(!this.busy&&this.state.intent){this.update({open:true});void this.load();}}
  async load():Promise<boolean>{const g=++this.generation;this.update({loading:true});
   try{const r=await this.api.read();if(this.disposed||g!==this.generation)return false;
-   this.update(r.status==='ok'?{config:r.data,readError:false,loading:false}:{readError:true,loading:false});return r.status==='ok';
+   this.update(r.status==='ok'?{config:r.data,readError:false,loading:false}:{readError:true,loading:false});
+   if(r.status==='ok'&&this.requested&&this.state.open&&!this.state.operation){const op=this.requested;this.requested=null;this.begin(op);}
+   return r.status==='ok';
   }catch{if(g===this.generation)this.update({readError:true,loading:false});return false;}}
  begin(op:ConfigOperation){if(this.busy||this.state.intent||this.state.phase!=='idle'||this.state.loading||this.state.readError||!this.state.config)return;
   const draft=configurationDraft(op,this.state.config);if(draft)this.update({operation:op,draft,baseline:this.state.config,errors:{},message:null});}
- back(){if(this.busy||this.state.intent)return;this.update({phase:'idle',operation:null,draft:null,baseline:null,errors:{},message:null});}
+ back(){if(this.busy||this.state.intent)return;this.requested=null;this.update({phase:'idle',operation:null,draft:null,baseline:null,errors:{},message:null});}
  dirty(){return !!this.state.operation&&!!this.state.draft&&JSON.stringify(this.state.draft)!==JSON.stringify(this.state.baseline?configurationDraft(this.state.operation,this.state.baseline):null);}
  change(key:string,value:string){if(this.busy||this.state.phase!=='idle'||this.state.intent||!this.state.draft||!(key in this.state.draft))return;this.update({draft:{...this.state.draft,[key]:value},errors:{},message:null});}
  async save(){if(this.disposed||this.busy||this.state.phase!=='idle'||this.state.intent||!this.state.operation||!this.state.draft||!this.state.baseline)return;

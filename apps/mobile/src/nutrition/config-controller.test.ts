@@ -24,6 +24,15 @@ describe('configuration forms and controller',()=>{
   jest.mocked(x.api.write).mockImplementation(async i=>{expect(await x.repository.read()).toMatchObject({intent:i});expect(x.controller.getSnapshot().phase).toBe('pending');return ok({status:'confirmed',operation:i.operation,date:i.date,version,weightRecorded:false});});
   await x.controller.save();expect(x.api.write).toHaveBeenCalledTimes(1);expect(x.api.refreshToday).toHaveBeenCalledWith(today);expect(x.invalidate).toHaveBeenCalledTimes(1);expect(await x.repository.read()).toBeNull();expect(x.controller.getSnapshot()).toMatchObject({phase:'idle',draft:null});
  });
+ it('open(op) goes straight to that operation once truth is read; a failed read keeps the request for the retry',async()=>{
+  const x=setup();await x.controller.initialize();x.controller.open('physical');await tick();
+  expect(x.controller.getSnapshot()).toMatchObject({open:true,operation:'physical',draft:{weightKg:'80'}});
+  x.controller.close();jest.mocked(x.api.read).mockResolvedValueOnce(unavailable);x.controller.open('physical');await tick();
+  expect(x.controller.getSnapshot()).toMatchObject({open:true,operation:null,readError:true});
+  await x.controller.load();expect(x.controller.getSnapshot()).toMatchObject({operation:'physical',readError:false});
+  x.controller.back();await x.controller.load();expect(x.controller.getSnapshot().operation).toBeNull();
+  x.controller.close();x.controller.open();await tick();expect(x.controller.getSnapshot()).toMatchObject({open:true,operation:null});
+ });
  it('conflict preserves draft; foreground refresh cannot replace it; review uses current version',async()=>{
   const x=setup();await x.controller.initialize();x.controller.open();await tick();x.controller.begin('physical');x.controller.change('weightKg','81,25');
   jest.mocked(x.api.read).mockResolvedValue(ok({...configFixture,physical:{status:'ok',data:{...(configFixture.physical.status==='ok'?configFixture.physical.data: {} as never),version:'b'.repeat(64),weightKg:90}}}));

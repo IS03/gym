@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -8,8 +9,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { MobileAuthProvider, useMobileAuth } from '@/auth';
 import { MobileApiProvider } from '@/api';
-import { OwnlevelThemeProvider, useOwnlevelTheme } from '@/design-system';
+import { createThemePreferenceStorage, OwnlevelThemeProvider, useOwnlevelTheme } from '@/design-system';
+import { NutritionConfigurationProvider } from '@/nutrition/config-provider';
 import { useStackScreenOptions } from '@/navigation/use-stack-screen-options';
+
+const themePreference = createThemePreferenceStorage(AsyncStorage);
 
 void SplashScreen.preventAutoHideAsync().catch(() => {
   // Fast refresh can call this after the native splash has already been handled.
@@ -51,6 +55,7 @@ function RootNavigator() {
   return (
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <NutritionConfigurationProvider>
       <Stack screenOptions={screenOptions}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Protected guard={!session}>
@@ -59,10 +64,11 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={Boolean(session)}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
+          <Stack.Screen name="settings" options={{ headerShown: false }} />
           <Stack.Screen name="history" options={{ headerShown: false }} />
         </Stack.Protected>
       </Stack>
+      </NutritionConfigurationProvider>
     </NavigationThemeProvider>
   );
 }
@@ -70,7 +76,7 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider>
-      <OwnlevelThemeProvider>
+      <OwnlevelThemeProvider persistence={themePreference}>
         <MobileAuthProvider>
           <MobileApiProvider>
             <RootNavigator />
