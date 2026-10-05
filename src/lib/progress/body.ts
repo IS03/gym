@@ -46,6 +46,8 @@ export type BodyMetricProgress = {
   trend: BodyTrendDirection;
   confidence: BodyTrendConfidence;
   comparisonEligibility: ProgressComparisonEligibility;
+  /** Change within the reference period (same "change" aggregation), when it has ≥2 observations. */
+  referenceChange: number | null;
 };
 
 export type BodyProgressInsight = {
@@ -206,6 +208,7 @@ function metricProgress(input: {
     trend: trend.direction,
     confidence: trend.confidence,
     comparisonEligibility: { status: "insufficient_data", reason: "current_period_empty" },
+    referenceChange: null,
   };
 }
 
@@ -266,10 +269,11 @@ export function buildBodyProgressReport(input: {
     primaryLabel: "Período actual",
     reference: { type: "other_period", period: input.referencePeriod, label: "Referencia" },
   });
-  const comparisonByKey = new Map(comparison.results.map((result) => [result.metric.key, result.eligibility]));
+  const comparisonByKey = new Map(comparison.results.map((result) => [result.metric.key, result]));
   const metrics = rawMetrics.map((metric) => ({
     ...metric,
-    comparisonEligibility: comparisonByKey.get(metric.key) ?? metric.comparisonEligibility,
+    comparisonEligibility: comparisonByKey.get(metric.key)?.eligibility ?? metric.comparisonEligibility,
+    referenceChange: comparisonByKey.get(metric.key)?.valueB ?? null,
   }));
   const weight = metrics.find((metric) => metric.key === "body.weight");
   if (weight && !weight.latest && finite(input.currentWeightKg)) {

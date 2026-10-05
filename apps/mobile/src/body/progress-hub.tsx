@@ -3,11 +3,14 @@ import { useRouter } from 'expo-router';
 import { AppIcon, AppText, IconCircle, PressableSurface, ScrollScreen, spacing, useOwnlevelTheme } from '@/design-system';
 import { haptics } from '@/platform/haptics';
 
-/** Minimal, extensible Progress hub (M5.1/M5.2). M7 adds its sections around these entries. */
+/** Operational entries (M5/M6). Progress Overview (M7) keeps them under "Revisar datos". */
 export function ProgressHub() {
+  return <ScrollScreen testID="progress-hub"><ProgressDataLinks /></ScrollScreen>;
+}
+export function ProgressDataLinks() {
   const router = useRouter();
   const { colors } = useOwnlevelTheme();
-  return <ScrollScreen testID="progress-hub">
+  return <>
     <PressableSurface accessibilityLabel="Abrir Historial" style={styles.card} onPress={() => { haptics.selection(); router.push('/history'); }}>
       <IconCircle icon="activity" />
       <View style={styles.flex}><AppText variant="label">Historial</AppText><AppText muted variant="caption">Tus registros por día y calendario.</AppText></View>
@@ -31,6 +34,6 @@ export function ProgressHub() {
       </View>
       <AppIcon color={colors.textMuted} name="chevronRight" size={16} />
     </PressableSurface>
-  </ScrollScreen>;
+  </>;
 }
 const styles = StyleSheet.create({ card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, flex: { flex: 1, gap: 2 } });
