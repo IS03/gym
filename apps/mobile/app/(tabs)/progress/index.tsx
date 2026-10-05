@@ -1,1 +1,1 @@
-export { ProgressHub as default } from '@/body/progress-hub';
+export { ProgressOverviewScreen as default } from '@/progress/overview-screen';

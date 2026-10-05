@@ -135,7 +135,7 @@ export async function getNutritionReportWithPrevious(
   };
 }
 
-const DEFAULT_NUTRITION_COMPARISON_METRICS = [
+export const DEFAULT_NUTRITION_COMPARISON_METRICS = [
   "nutrition.calories",
   "nutrition.energy_balance",
   "nutrition.protein",
@@ -144,7 +144,7 @@ const DEFAULT_NUTRITION_COMPARISON_METRICS = [
   "nutrition.expenditure",
 ] as const;
 
-function nutritionSamplesByMetric(days: readonly ReturnType<typeof buildNutritionReportDays>[number][]) {
+export function nutritionSamplesByMetric(days: readonly ReturnType<typeof buildNutritionReportDays>[number][]) {
   return new Map<string, readonly ProgressMetricSample[]>(NUTRITION_PROGRESS_METRICS.map((metric) => [
     metric.key,
     nutritionMetricSamples(metric.key as Parameters<typeof nutritionMetricSamples>[0], days),

@@ -85,22 +85,23 @@ export function NutritionReportDayRow({day,onDate}:{day:ReportDailyRow;onDate:(d
     <AppText muted>Objetivo: {amount(day.targetCalories,'kcal')} · Gasto: {amount(day.expenditureKcal,'kcal')}</AppText>
   </Surface>;
 }
-export function NutritionReports({onClose,onDate}:{onClose:()=>void;onDate:(date:string)=>void}) {
+/** The ONE Nutrition Reports surface: embedded in Nutrition (modal) and as its own route (Progress drilldown). */
+export function NutritionReportsContent({onClose,onDate,initialQuery}:{onClose?:()=>void;onDate:(date:string)=>void;initialQuery?:ReportQuery}) {
   const {client}=useMobileApi();
   const {colors}=useOwnlevelTheme();
-  const [query,setQuery]=useState<ReportQuery>({period:'7'});
-  const [custom,setCustom]=useState(false);
-  const [from,setFrom]=useState(()=>inputNutritionDate(shiftNutritionDate(nutritionToday(),-6)!));
-  const [to,setTo]=useState(()=>inputNutritionDate(nutritionToday()));
+  const [query,setQuery]=useState<ReportQuery>(initialQuery??{period:'7'});
+  const [custom,setCustom]=useState(initialQuery?.period==='custom');
+  const [from,setFrom]=useState(()=>inputNutritionDate(initialQuery?.from??shiftNutritionDate(nutritionToday(),-6)!));
+  const [to,setTo]=useState(()=>inputNutritionDate(initialQuery?.to??nutritionToday()));
   const [error,setError]=useState<string|null>(null);
   const {state,refresh}=useNutritionReportResource(client,query);
   const current=state.status==='ready'?state.current:state.status==='unavailable'?state.previous:undefined;
   const report=current?.data;
   const runRefresh=()=>void refresh();
-  const selectDate=(date:string)=>{onDate(date);onClose();};
+  const selectDate=(date:string)=>{onDate(date);onClose?.();};
   const header=<View style={styles.section}>
     <Heading>Reporte nutricional</Heading>
-    <Button label="Cerrar reporte" variant="quiet" onPress={onClose}/>
+    {onClose?<Button label="Cerrar reporte" variant="quiet" onPress={onClose}/>:null}
     <AppText>Período: {labels[query.period]}</AppText>
     <View style={styles.wrap}>{REPORT_PRESETS.map(p=><Button key={p} label={labels[p]} variant={query.period===p?'primary':'secondary'} onPress={()=>{
       setError(null);setCustom(p==='custom');if(p!=='custom')setQuery({period:p});
@@ -120,12 +121,16 @@ export function NutritionReports({onClose,onDate}:{onClose:()=>void;onDate:(date
     {state.status==='loading'?<LoadingState label="Cargando reporte nutricional"/>:state.status!=='ready'?<UnavailableState title="No pudimos cargar el reporte" description={report?'Mostramos la última lectura de este período. Revisá la conexión.':'Revisá tu conexión o sesión e intentá nuevamente.'} action={<Button label="Reintentar reporte" onPress={runRefresh}/>}/>:null}
     {report?<NutritionReportSummary report={report} onDate={selectDate}/>:null}
   </View>;
+  return <FlatList testID="nutrition-report-screen" data={report?.days??[]} keyExtractor={d=>d.date} ListHeaderComponent={header}
+    renderItem={({item})=><NutritionReportDayRow day={item} onDate={selectDate}/>} initialNumToRender={7} windowSize={5}
+    keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list} style={{backgroundColor:colors.background}}
+    refreshControl={<RefreshControl onRefresh={runRefresh} refreshing={state.status==='ready'&&state.refreshing} tintColor={colors.primary}/>}/>;
+}
+export function NutritionReports({onClose,onDate}:{onClose:()=>void;onDate:(date:string)=>void}) {
+  const {colors}=useOwnlevelTheme();
   return <Modal animationType="slide" presentationStyle="fullScreen" visible onRequestClose={onClose}>
     <SafeAreaView style={{flex:1,backgroundColor:colors.background}} edges={['top','bottom','left','right']}>
-      <FlatList testID="nutrition-report-screen" data={report?.days??[]} keyExtractor={d=>d.date} ListHeaderComponent={header}
-        renderItem={({item})=><NutritionReportDayRow day={item} onDate={selectDate}/>} initialNumToRender={7} windowSize={5}
-        keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl onRefresh={runRefresh} refreshing={state.status==='ready'&&state.refreshing} tintColor={colors.primary}/>}/>
+      <NutritionReportsContent onClose={onClose} onDate={onDate}/>
     </SafeAreaView>
   </Modal>;
 }

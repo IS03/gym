@@ -1,0 +1,262 @@
+import "server-only";
+import { NextResponse } from "next/server";
+import { listBodyMeasurements } from "@/lib/body-measurements";
+import { getDailyMetricsReport } from "@/lib/daily-metrics/reports";
+import { listWeightHistory } from "@/lib/phase1/day-log";
+import { getMyProfile } from "@/lib/phase1/profile";
+import { todayInCordoba } from "@/lib/phase2/cordoba-date";
+import { NUTRITION_PROGRESS_METRICS, getPreviousProgressPeriod, progressBucketForDays, progressRangeDays } from "@/lib/progress/analytics";
+import { bodyAvailableMetricDefinitions, buildBodyProgressReport, type BodyObservation, type BodyProgressReport } from "@/lib/progress/body";
+import { buildProgressComparison, type ProgressComparisonMetricResult, type ProgressComparisonReport } from "@/lib/progress/comparisons";
+import { buildProgressHomeModel, type ProgressHomeRow, type ProgressHomeInsight } from "@/lib/progress/home";
+import { DEFAULT_NUTRITION_COMPARISON_METRICS, nutritionSamplesByMetric } from "@/lib/nutrition/reports";
+import { aggregateNutritionReport, buildNutritionReportDays, resolveNutritionReportRange, type NutritionReportRange } from "@/lib/nutrition/reports-core";
+import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+import type { RequestPerformanceContext } from "@/lib/request-performance";
+import { MobileApiUnauthorizedError, MobileApiValidationError, mobileBearerToken } from "./auth";
+import { mobileApiResponseHeaders } from "./http";
+import { NutritionReportDayChangedError, readMobileNutritionFacts } from "./nutrition-report-server";
+import {
+  PROGRESS_DEFAULT_PRESET, parseProgressBody, parseProgressMetrics, parseProgressOverview, parseProgressQuery,
+  type BodyObservationDto, type ProgressBody, type ProgressBodyMetric, type ProgressComparison, type ProgressDestination,
+  type ProgressMetricDefinition, type ProgressMetrics, type ProgressOverview, type ProgressPeriod, type ProgressQuery, type ProgressSection,
+} from "./progress-contract";
+import { authenticateMobileAccessToken, type MobileSupabaseAuthenticatedContext } from "./supabase";
+
+type Context = MobileSupabaseAuthenticatedContext;
+const webAuth = (context: Context, requestPerformance?: RequestPerformanceContext): AuthenticatedRequestContext =>
+  ({ supabase: context.supabase as AuthenticatedRequestContext["supabase"], userId: context.userId, requestPerformance });
+
+/** Query params → canonical query (default 30 días). Unknown or repeated params are invalid. */
+export function progressQueryFromParams(params: URLSearchParams, extra: readonly string[] = []): ProgressQuery {
+  const input: Record<string, string> = {};
+  for (const [key, value] of params) {
+    if (key in input) throw new MobileApiValidationError("Parámetro repetido.");
+    if (!["period", "from", "to", ...extra].includes(key)) throw new MobileApiValidationError("Parámetro no válido.");
+    if (extra.includes(key)) continue;
+    input[key] = value;
+  }
+  const query = parseProgressQuery({ period: PROGRESS_DEFAULT_PRESET, ...input });
+  if (!query) throw new MobileApiValidationError("Período no válido.");
+  return query;
+}
+
+/** The canonical period resolver (resolveProgressPeriod via the Reports presets); never beyond today Córdoba. */
+export function resolveMobileProgressPeriod(query: ProgressQuery, today: string): { range: NutritionReportRange; period: ProgressPeriod } {
+  const range = resolveNutritionReportRange(query, today);
+  if (range.error) throw new MobileApiValidationError(range.error);
+  const previous = getPreviousProgressPeriod(range);
+  const days = progressRangeDays(range);
+  return { range, period: {
+    preset: range.preset, start: range.start, end: range.end, days,
+    previousStart: previous.start, previousEnd: previous.end, bucket: progressBucketForDays(days), includesToday: range.end === today,
+  } };
+}
+
+export function comparisonDto(result: ProgressComparisonMetricResult | undefined): ProgressComparison {
+  if (!result) return { status: "insufficient_data", reason: "current_period_empty", current: null, previous: null, deltaAbsolute: null, deltaPercent: null, change: "insufficient_data" };
+  const comparable = result.eligibility.status === "comparable";
+  return {
+    status: result.eligibility.status, reason: result.eligibility.reason, current: result.valueA, previous: result.valueB,
+    deltaAbsolute: comparable ? result.deltaAbsolute : null,
+    deltaPercent: comparable && result.valueB !== null && result.valueB !== 0 ? result.deltaPercent : null,
+    change: result.change,
+  };
+}
+
+/** Web hrefs → Mobile destinations (Progress Home is shared with Web; only the routes differ). */
+function destination(href: string): ProgressDestination | null {
+  const url = new URL(href, "https://ownlevel.invalid");
+  if (url.pathname === "/train/body") return { kind: "body" };
+  if (url.pathname === "/today/reports") return { kind: "nutrition" };
+  if (url.pathname === "/progress/metrics") return { kind: "metrics", metricId: url.searchParams.get("metric") };
+  return null;
+}
+const domainOf = (d: ProgressHomeInsight["domain"]) => d === "activity" ? "metrics" as const : d === "training" ? null : d;
+
+async function isolated<T>(task: () => Promise<T>, label: string): Promise<ProgressSection<T>> {
+  try { return { status: "ok", data: await task() }; }
+  catch (e) {
+    if (e instanceof NutritionReportDayChangedError) throw e;
+    console.warn(`[mobile.progress] ${label} unavailable`);
+    return { status: "unavailable" };
+  }
+}
+
+async function bodyReport(context: Context, range: NutritionReportRange, period: ProgressPeriod) {
+  const auth = webAuth(context);
+  const [profile, weightHistory, measurements] = await Promise.all([getMyProfile(auth), listWeightHistory(1000, auth), listBodyMeasurements(1000, auth)]);
+  const currentWeightKg = profile?.current_weight_kg ?? null;
+  return {
+    report: buildBodyProgressReport({ weightHistory, currentWeightKg, measurements, period: range,
+      referencePeriod: { start: period.previousStart, end: period.previousEnd } }),
+    available: new Set(bodyAvailableMetricDefinitions({ weightHistory, currentWeightKg, measurements }).map(metric => metric.key)),
+  };
+}
+
+async function nutritionReport(context: Context, range: NutritionReportRange, period: ProgressPeriod, today: string) {
+  const previousRange = { start: period.previousStart, end: period.previousEnd };
+  // The SAME M4.3-2 snapshot, once per period; no SQL reimplementation.
+  const [currentFacts, previousFacts] = await Promise.all([
+    readMobileNutritionFacts(context, range, today), readMobileNutritionFacts(context, previousRange, today),
+  ]);
+  const days = buildNutritionReportDays({ range, today, ...currentFacts });
+  const previousDays = buildNutritionReportDays({ range: previousRange, today, ...previousFacts });
+  const comparison = buildProgressComparison({
+    metrics: NUTRITION_PROGRESS_METRICS.filter(metric => metric.key !== "nutrition.calorie_target"),
+    selectedMetricKeys: [...DEFAULT_NUTRITION_COMPARISON_METRICS],
+    samplesByMetric: nutritionSamplesByMetric(days),
+    referenceSamplesByMetric: nutritionSamplesByMetric(previousDays),
+    primaryPeriod: range, primaryLabel: range.preset,
+    reference: { type: "previous_period", period: previousRange, label: "Período anterior" },
+    inProgressDate: range.end === today ? today : null,
+  });
+  return { summary: aggregateNutritionReport(days), comparison };
+}
+
+async function metricsReport(context: Context, query: ProgressQuery, today: string, metricId?: string) {
+  return getDailyMetricsReport({ period: query.period, from: query.from, to: query.to, metricId }, today, webAuth(context));
+}
+
+const byKey = (report: ProgressComparisonReport | null | undefined, key: string) => report?.results.find(result => result.metric.key === key);
+
+export async function buildMobileProgressOverview(context: Context, query: ProgressQuery, today: string): Promise<ProgressOverview> {
+  const { range, period } = resolveMobileProgressPeriod(query, today);
+  const [body, nutrition, metrics] = await Promise.all([
+    isolated(() => bodyReport(context, range, period), "body"),
+    isolated(() => nutritionReport(context, range, period, today), "nutrition"),
+    isolated(() => metricsReport(context, query, today), "metrics"),
+  ]);
+  const activity = metrics.status === "ok" && metrics.data.defaultComparison
+    ? { definitions: metrics.data.definitions, comparison: metrics.data.defaultComparison } : null;
+  const model = buildProgressHomeModel({
+    period: { preset: range.preset, label: range.preset, current: range, previous: { start: period.previousStart, end: period.previousEnd },
+      durationDays: period.days, bucket: period.bucket, includesInProgressDay: period.includesToday, error: null },
+    training: null, // M7.2
+    nutrition: nutrition.status === "ok" ? nutrition.data : null,
+    body: body.status === "ok" ? body.data.report : null,
+    activity,
+    relationships: [], // out of M7
+  });
+  const rows = (items: ProgressHomeRow[]) => items.flatMap(row => {
+    const target = destination(row.href);
+    return target ? [{ id: row.id, label: row.label, value: row.value, detail: row.detail, destination: target }] : [];
+  });
+  const habitKeys = model.habits.filter(row => row.id.startsWith("activity.daily.")).map(row => row.id);
+  const definitions = new Map((activity?.definitions ?? []).map(definition => [definition.id, definition]));
+  const overview: ProgressOverview = {
+    today, period,
+    evolution: rows(model.evolution),
+    changes: model.changes.flatMap(insight => {
+      const domain = domainOf(insight.domain), target = destination(insight.href);
+      return domain && target ? [{ id: insight.id, domain, label: insight.label, description: insight.description, destination: target }] : [];
+    }),
+    nutrition: nutrition.status === "ok" ? { status: "ok", data: {
+      averageKcal: nutrition.data.summary.calories.averageConsumed, averageProteinG: nutrition.data.summary.protein.averageConsumed,
+      averageTargetKcal: nutrition.data.summary.calories.averageTarget, averageTargetProteinG: nutrition.data.summary.protein.averageTarget,
+      accumulatedBalanceKcal: nutrition.data.summary.energy.accumulatedBalance,
+      registeredDays: nutrition.data.summary.registeredDays, completedDays: nutrition.data.summary.completedRegisteredDays, days: period.days,
+      calories: comparisonDto(byKey(nutrition.data.comparison, "nutrition.calories")),
+      protein: comparisonDto(byKey(nutrition.data.comparison, "nutrition.protein")),
+      balance: comparisonDto(byKey(nutrition.data.comparison, "nutrition.energy_balance")),
+    } } : { status: "unavailable" },
+    // Same selection as Web "Tus hábitos" (active, with data, first 3), with structured values.
+    metrics: activity ? { status: "ok", data: { items: habitKeys.flatMap(key => {
+      const result = byKey(activity.comparison, key), id = key.slice("activity.daily.".length), definition = definitions.get(id);
+      if (!result || !definition) return [];
+      const coverage = result.primary.coverage;
+      return [{ id, name: definition.name, unit: definition.unit, valueType: definition.value_type, average: result.valueA,
+        coverage: { registered: coverage.registeredCount, eligible: coverage.eligibleCount, ratio: coverage.coverageRatio },
+        comparison: comparisonDto(result) }];
+    }) } } : { status: "unavailable" },
+    body: body.status === "ok" ? { status: "ok", data: {
+      excludedSuspect: body.data.report.excludedSuspectCount,
+      trackedMetrics: body.data.report.metrics.filter(metric => body.data.available.has(metric.key) && metric.current.length > 0).length,
+    } } : { status: "unavailable" },
+    training: { status: "pending" },
+  };
+  return overview;
+}
+
+const observation = (o: BodyObservation | null): BodyObservationDto | null =>
+  o && o.date ? { date: o.date, value: o.value, imported: o.provenance === "imported", provenanceLabel: o.provenanceLabel } : null;
+
+export function bodyDto(report: BodyProgressReport, available: ReadonlySet<string>, today: string, period: ProgressPeriod): ProgressBody {
+  const metrics = report.metrics.flatMap((metric): ProgressBodyMetric[] => {
+    // Profile weight without a date is never a historical observation.
+    const latest = observation(metric.latest);
+    if (!available.has(metric.key) || !latest) return [];
+    return [{
+      key: metric.key, label: metric.label, unit: metric.unit, latest,
+      first: observation(metric.first), last: observation(metric.last), change: metric.change, referenceChange: metric.referenceChange,
+      trend: metric.trend, confidence: metric.confidence,
+      observations: metric.current.flatMap(o => { const dto = observation(o); return dto ? [dto] : []; }),
+      referenceCount: metric.reference.length,
+      comparison: { status: metric.comparisonEligibility.status, reason: metric.comparisonEligibility.reason },
+    }];
+  });
+  return { today, period, excludedSuspect: report.excludedSuspectCount, metrics };
+}
+
+export async function buildMobileProgressBody(context: Context, query: ProgressQuery, today: string): Promise<ProgressBody> {
+  const { range, period } = resolveMobileProgressPeriod(query, today);
+  const { report, available } = await bodyReport(context, range, period);
+  return bodyDto(report, available, today, period);
+}
+
+export async function buildMobileProgressMetrics(context: Context, query: ProgressQuery, today: string, metricId: string | undefined): Promise<ProgressMetrics> {
+  const { period } = resolveMobileProgressPeriod(query, today);
+  const report = await metricsReport(context, query, today, metricId);
+  const definitions: ProgressMetricDefinition[] = report.definitions.map(definition => ({
+    id: definition.id, systemKey: definition.system_key, name: definition.name, unit: definition.unit, valueType: definition.value_type,
+    isActive: definition.is_active, currentTarget: definition.target_value,
+  }));
+  const metric = report.metric ? definitions.find(definition => definition.id === report.metric!.id) ?? null : null;
+  if (!metric || !report.summary || !report.comparison) {
+    return { today, period, definitions, metric: null, summary: null, previous: null, comparison: null, series: [] };
+  }
+  const result = byKey(report.defaultComparison, `activity.daily.${metric.id}`);
+  const s = report.summary, previous = report.comparison.previous;
+  return {
+    today, period, definitions, metric,
+    summary: { average: s.average, median: s.median, minimum: s.minimum, maximum: s.maximum, registeredDays: s.registeredDays,
+      eligibleDays: s.eligibleDays, coverageRatio: s.coverageRatio, trendDelta: s.trendDelta, trendPercentDelta: s.trendPercentDelta },
+    previous: { average: previous.average, registeredDays: previous.registeredDays, eligibleDays: previous.eligibleDays },
+    comparison: comparisonDto(result),
+    series: (result?.primary.series ?? []).map(point => ({ start: point.start, end: point.end, value: point.value, samples: point.sampleSize })),
+  };
+}
+
+/** Shared GET handler: Bearer identity, canonical period, one bounded retry at Córdoba midnight. */
+export async function progressReadResponse<T>(request: Request, label: string, build: (context: Context, params: URLSearchParams, today: string) => Promise<T>,
+  parse: (v: unknown) => T | undefined) {
+  let status = 503, body: unknown = { error: "DATA_UNAVAILABLE" };
+  try {
+    const context = await authenticateMobileAccessToken(mobileBearerToken(request.headers.get("authorization")));
+    const params = new URL(request.url).searchParams;
+    let today = todayInCordoba();
+    let dto: T | undefined;
+    for (let attempt = 0; attempt < 2 && dto === undefined; attempt++) {
+      try { dto = await build(context, params, today); }
+      catch (e) { if (e instanceof NutritionReportDayChangedError && attempt === 0) { today = e.today; continue; } throw e; }
+    }
+    // The DTO is validated against the shared contract before it leaves the server.
+    if (dto === undefined || !parse(JSON.parse(JSON.stringify(dto)))) throw new Error("Invalid progress DTO");
+    status = 200; body = dto;
+  } catch (e) {
+    if (e instanceof MobileApiUnauthorizedError) { status = 401; body = { error: "UNAUTHORIZED" }; }
+    else if (e instanceof MobileApiValidationError) { status = 400; body = { error: "VALIDATION_ERROR", message: e.message }; }
+    else console.warn(`[mobile.progress] ${label} unavailable`);
+  }
+  return NextResponse.json(body, { status, headers: mobileApiResponseHeaders(request) });
+}
+
+export const progressOverviewResponse = (request: Request) => progressReadResponse(request, "overview",
+  (context, params, today) => buildMobileProgressOverview(context, progressQueryFromParams(params), today), parseProgressOverview);
+export const progressBodyResponse = (request: Request) => progressReadResponse(request, "body",
+  (context, params, today) => buildMobileProgressBody(context, progressQueryFromParams(params), today), parseProgressBody);
+export const progressMetricsResponse = (request: Request) => progressReadResponse(request, "metrics", (context, params, today) => {
+  const metric = params.get("metric");
+  if (metric !== null && !/^[0-9a-f-]{36}$/i.test(metric)) throw new MobileApiValidationError("Métrica no válida.");
+  return buildMobileProgressMetrics(context, progressQueryFromParams(params, ["metric"]), today, metric ?? undefined);
+}, parseProgressMetrics);

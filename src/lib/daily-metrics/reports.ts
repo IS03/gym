@@ -27,6 +27,41 @@ import {
 } from "@/lib/progress/comparisons";
 import { getPreviousProgressPeriod } from "@/lib/progress/analytics";
 
+type ValueRow = { metric_id: unknown; metric_date: unknown; value: unknown };
+type ReportSupabase = AuthenticatedRequestContext["supabase"];
+
+/**
+ * Reads EVERY value of the window. PostgREST caps each response (max rows,
+ * 1000 by default), so a single select silently truncates long periods
+ * (1 year + its previous year easily exceeds it). Pages follow a total order
+ * (metric_date, metric_id is unique per user) and advance by the rows actually
+ * received, so any server cap is safe; an empty page ends the read.
+ */
+export async function readAllDailyMetricValues(
+  supabase: ReportSupabase,
+  userId: string,
+  start: string,
+  end: string,
+  pageSize = 1000,
+): Promise<ValueRow[]> {
+  const rows: ValueRow[] = [];
+  for (let page = 0; page < 1000; page += 1) {
+    const { data, error } = await supabase
+      .from("daily_metric_values")
+      .select("metric_id,metric_date,value")
+      .eq("user_id", userId)
+      .gte("metric_date", start)
+      .lte("metric_date", end)
+      .order("metric_date", { ascending: true })
+      .order("metric_id", { ascending: true })
+      .range(rows.length, rows.length + pageSize - 1);
+    if (error) throw new Error(`Leer valores para Progreso: ${error.message}`, { cause: error });
+    if (!data?.length) return rows;
+    rows.push(...(data as ValueRow[]));
+  }
+  throw new Error("Leer valores para Progreso: demasiadas páginas.");
+}
+
 function numberOrNull(value: unknown) {
   if (value === null) return null;
   const parsed = Number(value);
@@ -60,30 +95,20 @@ export async function getDailyMetricsReport(
   const ensured = await supabase.rpc("ensure_user_metrics");
   if (ensured.error) throw new Error(`Inicializar métricas: ${ensured.error.message}`);
 
-  const [metricResult, valueResult] = await Promise.all([
+  const [metricResult, valueRows] = await Promise.all([
     supabase
       .from("user_metrics")
       .select("id,system_key,name,unit,value_type,target_value,sort_order,is_active,archived_at")
       .eq("user_id", userId),
-    supabase
-      .from("daily_metric_values")
-      .select("metric_id,metric_date,value")
-      .eq("user_id", userId)
-      .gte("metric_date", readStart)
-      .lte("metric_date", readEnd),
+    readAllDailyMetricValues(supabase, userId, readStart, readEnd),
   ]);
   if (metricResult.error) throw new Error(`Leer métricas para Progreso: ${metricResult.error.message}`);
-  if (valueResult.error) {
-    throw new Error(`Leer valores para Progreso: ${valueResult.error.message}`, {
-      cause: valueResult.error,
-    });
-  }
 
   const metrics = (metricResult.data ?? []).map((row) => ({
     ...row,
     target_value: numberOrNull(row.target_value),
   })) as MetricReportDefinition[];
-  const values = (valueResult.data ?? []).map((row) => ({
+  const values = valueRows.map((row) => ({
     metric_id: String(row.metric_id),
     metric_date: String(row.metric_date),
     value: Number(row.value),
