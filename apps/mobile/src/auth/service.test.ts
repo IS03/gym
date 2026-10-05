@@ -251,4 +251,27 @@ describe('native auth lifecycle', () => {
     await expect(performLocalLogout(client)).resolves.toEqual({ type: 'SESSION_MISSING' });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
+
+  it('signs the device out when offline revocation fails but the local session was removed', async () => {
+    const { client, auth } = makeClient();
+    auth.signOut.mockResolvedValue({ error: new Error('network offline') });
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    await expect(performLocalLogout(client)).resolves.toEqual({ type: 'SESSION_MISSING' });
+  });
+
+  it('keeps the session (transient failure) when sign out fails and the session is still stored', async () => {
+    const { client, auth } = makeClient();
+    auth.signOut.mockResolvedValue({ error: new Error('storage unavailable') });
+
+    await expect(performLocalLogout(client)).resolves.toMatchObject({ type: 'TRANSIENT_FAILURE' });
+  });
+
+  it('never reports a false sign-out when the local state cannot be confirmed', async () => {
+    const { client, auth } = makeClient();
+    auth.signOut.mockRejectedValue(new Error('boom'));
+    auth.getSession.mockRejectedValue(new Error('storage unavailable'));
+
+    await expect(performLocalLogout(client)).resolves.toMatchObject({ type: 'TRANSIENT_FAILURE' });
+  });
 });

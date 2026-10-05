@@ -8,6 +8,7 @@ import type { MobileApiReadResult } from '@/api/results';
 import type { MobileNutritionDayResponse } from '@/api/nutrition-day';
 import { OwnlevelThemeProvider } from '@/design-system';
 import { NutritionDayScreen } from './day-screen';
+import { NutritionConfigurationProvider } from './config-provider';
 import { reportFixture } from './report-fixture.test-helper';
 import { nutritionFixture } from './day-fixture.test-helper';
 import { quickOptions, quickPreview, quickReceipt, quickDate } from './quick-fixture.test-helper';
@@ -32,7 +33,7 @@ const ok = (date: string, data = nutritionFixture(date)): MobileApiReadResult<Mo
 });
 const failure: MobileApiReadResult<MobileNutritionDayResponse> = { status: 'unavailable', reason: 'network',
   meta: { durationMs: 1, httpStatus: null, outcome: 'unavailable' } };
-const element = () => <OwnlevelThemeProvider initialMode="light"><NutritionDayScreen /></OwnlevelThemeProvider>;
+const element = () => <OwnlevelThemeProvider initialMode="light"><NutritionConfigurationProvider><NutritionDayScreen /></NutritionConfigurationProvider></OwnlevelThemeProvider>;
 const appStateListeners: ((state: AppStateStatus) => void)[] = [];
 describe('Native Nutrition day', () => {
   beforeEach(async () => {

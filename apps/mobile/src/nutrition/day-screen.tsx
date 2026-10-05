@@ -1,6 +1,5 @@
 import { NutritionReports } from './report-screen';
-import {useConfigurationController} from './use-config-controller';
-import {ConfigurationEditor} from './config-editor';
+import {useNutritionConfiguration} from './config-provider';
 import {useSavedController} from './use-saved-controller';
 import {SavedEditor} from './saved-editor';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -91,7 +90,8 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
-  const config = useConfigurationController(client, userId, invalidate);
+  // Shared with Settings (one controller/intent per user); its editor is hosted by the provider.
+  const config = useNutritionConfiguration(invalidate);
   const meals = useMealController(client, userId, invalidate);
   const writes = useDayWriteController(client, userId, invalidate);
   const quick = useQuickController(client, userId, invalidate);
@@ -147,7 +147,6 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
       {foods.state.phase === 'blocked' ? <Button label="Comprobar almacenamiento de alimentos" onPress={() => void foods.controller.recover()} /> : null}</View> : null}
     {saved?<SavedEditor controller={saved.controller} state={saved.state}/>:null}
     {saved?.state.message&&!saved.state.open?<View style={styles.header}><AppText accessibilityRole="alert">{saved.state.message}</AppText>{saved.state.intent?<Button label="Revisar intento de guardadas" onPress={()=>saved.controller.showRecovery()}/>:null}{saved.state.phase==='blocked'?<Button label="Comprobar almacenamiento de guardadas" onPress={()=>void saved.controller.recover()}/>:null}</View>:null}
-    {config ? <ConfigurationEditor controller={config.controller} state={config.state} /> : null}
     {config?.state.message && !config.state.open ? <View style={styles.header}><AppText accessibilityRole="alert">{config.state.message}</AppText>{config.state.intent ? <Button label="Revisar intento de configuración" onPress={()=>config.controller.showRecovery()} /> : null}{config.state.phase==='blocked'?<Button label="Comprobar almacenamiento de configuración" onPress={()=>void config.controller.recover()}/>:null}</View>:null}
     {writes ? <DayWriteEditor controller={writes.controller} state={writes.state} /> : null}
     {meals ? <MealEditor controller={meals.controller} state={meals.state} /> : null}

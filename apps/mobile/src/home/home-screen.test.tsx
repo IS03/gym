@@ -214,12 +214,14 @@ describe('Home resource screen', () => {
     fireEvent.press(view.getByRole('button', { name: 'Abrir Nutrición' }));
     fireEvent.press(view.getByRole('button', { name: 'Abrir Progreso' }));
     fireEvent.press(view.getByRole('button', { name: 'Abrir perfil y ajustes' }));
+    fireEvent.press(view.getByRole('button', { name: 'Abrir Ajustes' }));
 
     expect(mockNavigate.mock.calls).toEqual([
       ['/(tabs)/train'],
       ['/(tabs)/nutrition'],
       ['/(tabs)/progress'],
     ]);
-    expect(mockPush).toHaveBeenCalledWith('/settings');
+    // Both Settings entries (header + quick action) push the same /settings stack.
+    expect(mockPush.mock.calls).toEqual([['/settings'], ['/settings']]);
   });
 });

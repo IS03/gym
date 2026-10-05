@@ -21,4 +21,6 @@ export { AppIcon } from './icons';
 export type { AppIconName } from './icons';
 export { OwnlevelThemeProvider, useOwnlevelTheme } from './theme';
 export type { ResolvedTheme, ThemeMode } from './theme';
+export { createThemePreferenceStorage, isThemeMode, THEME_PREFERENCE_KEY } from './theme-preference';
+export type { ThemePreferenceStorage } from './theme-preference';
 export { darkColors, lightColors, radius, sizes, spacing, typography } from './tokens';
