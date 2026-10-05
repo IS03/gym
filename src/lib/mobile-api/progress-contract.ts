@@ -23,9 +23,10 @@ export type ProgressComparison = {
   deltaAbsolute: number | null; deltaPercent: number | null; change: ProgressChange;
 };
 export type ProgressCoverage = { registered: number; eligible: number | null; ratio: number | null };
-export type ProgressDestination = { kind: "body" } | { kind: "nutrition" } | { kind: "metrics"; metricId: string | null };
+export type ProgressDestination = { kind: "body" } | { kind: "nutrition" } | { kind: "metrics"; metricId: string | null }
+  | { kind: "training" } | { kind: "training_exercise"; exerciseId: string };
 export type ProgressRow = { id: string; label: string; value: string; detail: string | null; destination: ProgressDestination };
-export type ProgressFinding = { id: string; domain: "body" | "nutrition" | "metrics"; label: string; description: string; destination: ProgressDestination };
+export type ProgressFinding = { id: string; domain: "body" | "nutrition" | "metrics" | "training"; label: string; description: string; destination: ProgressDestination };
 export type ProgressSection<T> = { status: "ok"; data: T } | { status: "unavailable" };
 export type MetricValueType = "integer" | "decimal" | "duration";
 
@@ -38,13 +39,46 @@ export type ProgressMetricHabit = {
   id: string; name: string; unit: string | null; valueType: MetricValueType;
   average: number | null; coverage: ProgressCoverage; comparison: ProgressComparison;
 };
+/** Training load: sessions, days and sets are real zeros when nothing was trained; duration is start→end (includes rests). */
+export type ProgressTrainingSummary = {
+  sessions: number; trainingDays: number; sets: number; minutes: number; sessionsPerWeek: number | null;
+  comparisons: { sessions: ProgressComparison; trainingDays: ProgressComparison; sets: ProgressComparison; minutes: ProgressComparison; setsPerSession: ProgressComparison };
+  performance: { improved: number; stable: number; declined: number; comparable: number; insufficient: number; headline: string };
+};
 export type ProgressOverview = {
   today: string; period: ProgressPeriod;
   evolution: ProgressRow[]; changes: ProgressFinding[];
   nutrition: ProgressSection<ProgressNutritionSummary>;
   metrics: ProgressSection<{ items: ProgressMetricHabit[] }>;
   body: ProgressSection<{ excludedSuspect: number; trackedMetrics: number }>;
-  training: { status: "pending" };
+  training: ProgressSection<ProgressTrainingSummary>;
+};
+export type TrainingPerformanceStatus = "improved" | "stable" | "declined" | "insufficient_data";
+export type TrainingSignal = { kind: string; description: string; currentValue: number | null; referenceValue: number | null; contextValue: number | null };
+export type ProgressTrainingExercise = {
+  id: string; name: string; muscleLabel: string; weightMode: string | null; status: TrainingPerformanceStatus; reason: string;
+  signal: TrainingSignal | null; isPersonalRecord: boolean; sessions: number; sets: number; lastDate: string | null;
+};
+export type ProgressTrainingFeeling = { key: "energy" | "performance" | "pain"; label: string; average: number; scaleMaximum: 5 | 10; registered: number; eligible: number; ratio: number };
+export type ProgressTraining = {
+  today: string; period: ProgressPeriod; summary: ProgressTrainingSummary;
+  series: { start: string; end: string; sessions: number; sets: number; minutes: number }[];
+  exercises: ProgressTrainingExercise[];
+  personalRecords: { exerciseId: string; name: string; description: string }[];
+  feelings: ProgressTrainingFeeling[];
+  muscles: { key: string; label: string; sets: number; sessions: number; exercises: number }[];
+  routines: { id: string; name: string; sessions: number; sets: number; minutes: number }[];
+};
+export type ProgressExerciseMark = { kind: "best_load" | "best_reps" | "best_time"; label: string; value: number; unit: "kg" | "lingotes" | "reps" | "s"; context: string | null; date: string };
+export type ProgressExerciseChartKind = "load" | "reps" | "time";
+export type ProgressTrainingExerciseDetail = {
+  today: string; period: ProgressPeriod;
+  exercise: { id: string; name: string; muscleLabel: string; weightMode: string | null };
+  performance: { status: TrainingPerformanceStatus; reason: string; signal: TrainingSignal | null; isPersonalRecord: boolean; primarySamples: number; referenceSamples: number };
+  comparisons: { sessions: ProgressComparison; sets: ProgressComparison };
+  marks: ProgressExerciseMark[];
+  chart: { kind: ProgressExerciseChartKind; unit: "kg" | "lingotes" | "reps" | "s"; points: { date: string; sessionId: string; value: number; context: number | null }[] } | null;
+  sessions: { sessionId: string; date: string; routineName: string; sets: { reps: number | null; weightKg: number | null }[] }[];
 };
 
 export type BodyObservationDto = { date: string; value: number; imported: boolean; provenanceLabel: string };
@@ -131,6 +165,8 @@ function parseDestination(v: unknown): ProgressDestination | undefined {
   if (!record(v)) return;
   if ((v.kind === "body" || v.kind === "nutrition") && keys(v, ["kind"])) return { kind: v.kind };
   if (v.kind === "metrics" && keys(v, ["kind", "metricId"]) && strOrNull(v.metricId)) return { kind: "metrics", metricId: v.metricId };
+  if (v.kind === "training" && keys(v, ["kind"])) return { kind: "training" };
+  if (v.kind === "training_exercise" && keys(v, ["kind", "exerciseId"]) && str(v.exerciseId)) return { kind: "training_exercise", exerciseId: v.exerciseId };
 }
 function parseRow(v: unknown): ProgressRow | undefined {
   if (!record(v) || !keys(v, ["id", "label", "value", "detail", "destination"]) || !str(v.id) || !str(v.label) || !str(v.value) || !strOrNull(v.detail)) return;
@@ -138,7 +174,7 @@ function parseRow(v: unknown): ProgressRow | undefined {
   return destination ? { ...(v as ProgressRow), destination } : undefined;
 }
 function parseFinding(v: unknown): ProgressFinding | undefined {
-  if (!record(v) || !keys(v, ["id", "domain", "label", "description", "destination"]) || !["body", "nutrition", "metrics"].includes(String(v.domain))
+  if (!record(v) || !keys(v, ["id", "domain", "label", "description", "destination"]) || !["body", "nutrition", "metrics", "training"].includes(String(v.domain))
     || !str(v.id) || !str(v.label) || !str(v.description)) return;
   const destination = parseDestination(v.destination);
   return destination ? { ...(v as ProgressFinding), destination } : undefined;
@@ -176,13 +212,88 @@ export function parseProgressOverview(v: unknown): ProgressOverview | undefined 
   });
   const body = section(v.body, d => record(d) && keys(d, ["excludedSuspect", "trackedMetrics"]) && count(d.excludedSuspect) && count(d.trackedMetrics)
     ? { excludedSuspect: d.excludedSuspect, trackedMetrics: d.trackedMetrics } : undefined);
-  if (!period || period.end > v.today || !evolution || !changes || changes.length > 3 || !nutrition || !metrics || !body
-    || !record(v.training) || v.training.status !== "pending" || !keys(v.training, ["status"])) return;
+  const training = section(v.training, parseTrainingSummary);
+  if (!period || period.end > v.today || !evolution || !changes || changes.length > 3 || !nutrition || !metrics || !body || !training) return;
   // At most 2 findings per domain.
   const perDomain = new Map<string, number>();
   for (const f of changes) perDomain.set(f.domain, (perDomain.get(f.domain) ?? 0) + 1);
   if ([...perDomain.values()].some(n => n > 2)) return;
-  return { today: v.today, period, evolution, changes, nutrition, metrics, body, training: { status: "pending" } };
+  return { today: v.today, period, evolution, changes, nutrition, metrics, body, training };
+}
+
+const COMPARISON_KEYS = ["sessions", "trainingDays", "sets", "minutes", "setsPerSession"] as const;
+export function parseTrainingSummary(v: unknown): ProgressTrainingSummary | undefined {
+  if (!record(v) || !keys(v, ["sessions", "trainingDays", "sets", "minutes", "sessionsPerWeek", "comparisons", "performance"])
+    || !count(v.sessions) || !count(v.trainingDays) || !count(v.sets) || !count(v.minutes) || !numOrNull(v.sessionsPerWeek)
+    || v.trainingDays > v.sessions || !record(v.comparisons) || !keys(v.comparisons, COMPARISON_KEYS)) return;
+  const comparisons = Object.fromEntries(COMPARISON_KEYS.map(k => [k, parseProgressComparison((v.comparisons as Record<string, unknown>)[k])]));
+  if (Object.values(comparisons).some(c => c === undefined)) return;
+  const p = v.performance;
+  if (!record(p) || !keys(p, ["improved", "stable", "declined", "comparable", "insufficient", "headline"]) || !count(p.improved) || !count(p.stable)
+    || !count(p.declined) || !count(p.comparable) || !count(p.insufficient) || !str(p.headline) || p.improved + p.stable + p.declined !== p.comparable) return;
+  return { ...(v as ProgressTrainingSummary), comparisons: comparisons as ProgressTrainingSummary["comparisons"] };
+}
+const PERFORMANCE_STATUSES = ["improved", "stable", "declined", "insufficient_data"];
+function parseSignal(v: unknown): TrainingSignal | null | undefined {
+  if (v === null) return null;
+  if (!record(v) || !keys(v, ["kind", "description", "currentValue", "referenceValue", "contextValue"]) || !str(v.kind) || !str(v.description)
+    || !numOrNull(v.currentValue) || !numOrNull(v.referenceValue) || !numOrNull(v.contextValue)) return;
+  return v as TrainingSignal;
+}
+function parseTrainingExercise(v: unknown): ProgressTrainingExercise | undefined {
+  if (!record(v) || !keys(v, ["id", "name", "muscleLabel", "weightMode", "status", "reason", "signal", "isPersonalRecord", "sessions", "sets", "lastDate"])
+    || !str(v.id) || !str(v.name) || !str(v.muscleLabel) || !strOrNull(v.weightMode) || !PERFORMANCE_STATUSES.includes(String(v.status)) || !str(v.reason)
+    || typeof v.isPersonalRecord !== "boolean" || !count(v.sessions) || !count(v.sets) || (v.lastDate !== null && !isNutritionDate(v.lastDate))) return;
+  const signal = parseSignal(v.signal);
+  // Insufficient data never carries a signal; a PR is always an improvement with evidence.
+  if (signal === undefined || (v.status === "insufficient_data" && signal !== null) || (v.isPersonalRecord && (v.status !== "improved" || !signal))) return;
+  return { ...(v as ProgressTrainingExercise), signal };
+}
+export function parseProgressTraining(v: unknown): ProgressTraining | undefined {
+  if (!record(v) || !keys(v, ["today", "period", "summary", "series", "exercises", "personalRecords", "feelings", "muscles", "routines"]) || !isNutritionDate(v.today)) return;
+  const period = parseProgressPeriod(v.period), summary = parseTrainingSummary(v.summary);
+  const series = list(v.series, p => record(p) && keys(p, ["start", "end", "sessions", "sets", "minutes"]) && isNutritionDate(p.start) && isNutritionDate(p.end)
+    && count(p.sessions) && count(p.sets) && count(p.minutes) ? p as ProgressTraining["series"][number] : undefined);
+  const exercises = list(v.exercises, parseTrainingExercise);
+  const personalRecords = list(v.personalRecords, p => record(p) && keys(p, ["exerciseId", "name", "description"]) && str(p.exerciseId) && str(p.name) && str(p.description)
+    ? p as ProgressTraining["personalRecords"][number] : undefined);
+  const feelings = list(v.feelings, f => record(f) && keys(f, ["key", "label", "average", "scaleMaximum", "registered", "eligible", "ratio"])
+    && ["energy", "performance", "pain"].includes(String(f.key)) && str(f.label) && num(f.average) && (f.scaleMaximum === 5 || f.scaleMaximum === 10)
+    && count(f.registered) && f.registered >= 1 && count(f.eligible) && f.registered <= f.eligible && num(f.ratio) ? f as ProgressTrainingFeeling : undefined);
+  const muscles = list(v.muscles, m => record(m) && keys(m, ["key", "label", "sets", "sessions", "exercises"]) && str(m.key) && str(m.label) && count(m.sets)
+    && count(m.sessions) && count(m.exercises) ? m as ProgressTraining["muscles"][number] : undefined);
+  const routines = list(v.routines, r => record(r) && keys(r, ["id", "name", "sessions", "sets", "minutes"]) && str(r.id) && str(r.name) && count(r.sessions)
+    && count(r.sets) && count(r.minutes) ? r as ProgressTraining["routines"][number] : undefined);
+  if (!period || !summary || !series || !exercises || !personalRecords || !feelings || !muscles || !routines) return;
+  if (series.reduce((t, p) => t + p.sessions, 0) !== summary.sessions || series.reduce((t, p) => t + p.sets, 0) !== summary.sets) return;
+  return { today: v.today, period, summary, series, exercises, personalRecords, feelings, muscles, routines };
+}
+export function parseProgressTrainingExercise(v: unknown): ProgressTrainingExerciseDetail | undefined {
+  if (!record(v) || !keys(v, ["today", "period", "exercise", "performance", "comparisons", "marks", "chart", "sessions"]) || !isNutritionDate(v.today)) return;
+  const period = parseProgressPeriod(v.period);
+  const e = v.exercise, p = v.performance, c = v.comparisons;
+  if (!period || !record(e) || !keys(e, ["id", "name", "muscleLabel", "weightMode"]) || !str(e.id) || !str(e.name) || !str(e.muscleLabel) || !strOrNull(e.weightMode)) return;
+  if (!record(p) || !keys(p, ["status", "reason", "signal", "isPersonalRecord", "primarySamples", "referenceSamples"]) || !PERFORMANCE_STATUSES.includes(String(p.status))
+    || !str(p.reason) || typeof p.isPersonalRecord !== "boolean" || !count(p.primarySamples) || !count(p.referenceSamples)) return;
+  const signal = parseSignal(p.signal);
+  if (signal === undefined || !record(c) || !keys(c, ["sessions", "sets"])) return;
+  const sessionsCmp = parseProgressComparison(c.sessions), setsCmp = parseProgressComparison(c.sets);
+  const marks = list(v.marks, m => record(m) && keys(m, ["kind", "label", "value", "unit", "context", "date"]) && ["best_load", "best_reps", "best_time"].includes(String(m.kind))
+    && str(m.label) && num(m.value) && ["kg", "lingotes", "reps", "s"].includes(String(m.unit)) && strOrNull(m.context) && isNutritionDate(m.date) ? m as ProgressExerciseMark : undefined);
+  const sessions = list(v.sessions, s => record(s) && keys(s, ["sessionId", "date", "routineName", "sets"]) && str(s.sessionId) && isNutritionDate(s.date) && str(s.routineName)
+    && Array.isArray(s.sets) && s.sets.every(x => record(x) && keys(x, ["reps", "weightKg"]) && numOrNull(x.reps) && numOrNull(x.weightKg))
+    ? s as ProgressTrainingExerciseDetail["sessions"][number] : undefined);
+  let chart: ProgressTrainingExerciseDetail["chart"] | undefined = null;
+  if (v.chart !== null) {
+    const ch = v.chart;
+    const points = record(ch) ? list(ch.points, x => record(x) && keys(x, ["date", "sessionId", "value", "context"]) && isNutritionDate(x.date) && str(x.sessionId)
+      && num(x.value) && numOrNull(x.context) ? x as { date: string; sessionId: string; value: number; context: number | null } : undefined) : undefined;
+    chart = record(ch) && keys(ch, ["kind", "unit", "points"]) && ["load", "reps", "time"].includes(String(ch.kind)) && ["kg", "lingotes", "reps", "s"].includes(String(ch.unit)) && points
+      && !points.some((x, i) => i > 0 && x.date < points[i - 1].date) ? { kind: ch.kind as ProgressExerciseChartKind, unit: ch.unit as "kg", points } : undefined;
+  }
+  if (!sessionsCmp || !setsCmp || !marks || !sessions || chart === undefined) return;
+  return { today: v.today, period, exercise: e as ProgressTrainingExerciseDetail["exercise"],
+    performance: { ...(p as ProgressTrainingExerciseDetail["performance"]), signal }, comparisons: { sessions: sessionsCmp, sets: setsCmp }, marks, chart, sessions };
 }
 
 function parseObservation(v: unknown): BodyObservationDto | undefined {

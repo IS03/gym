@@ -7,10 +7,14 @@ vi.mock("./supabase", () => ({ authenticateMobileAccessToken: vi.fn() }));
 vi.mock("@/lib/phase1/profile", () => ({ getMyProfile: vi.fn() }));
 vi.mock("@/lib/phase1/day-log", () => ({ listWeightHistory: vi.fn() }));
 vi.mock("@/lib/body-measurements", () => ({ listBodyMeasurements: vi.fn() }));
+vi.mock("@/lib/phase2/training-robust", () => ({ loadCompletedTrainingData: vi.fn() }));
+vi.mock("@/lib/phase2/training", () => ({ listRoutines: vi.fn() }));
 import { authenticateMobileAccessToken } from "./supabase";
 import { getMyProfile } from "@/lib/phase1/profile";
 import { listWeightHistory } from "@/lib/phase1/day-log";
 import { listBodyMeasurements } from "@/lib/body-measurements";
+import { loadCompletedTrainingData } from "@/lib/phase2/training-robust";
+import { listRoutines } from "@/lib/phase2/training";
 import { GET as overviewGET } from "@/app/api/mobile/v1/progress/route";
 import { GET as bodyGET } from "@/app/api/mobile/v1/progress/body/route";
 import { GET as metricsGET } from "@/app/api/mobile/v1/progress/metrics/route";
@@ -87,6 +91,8 @@ beforeEach(() => {
   vi.mocked(getMyProfile).mockResolvedValue({ current_weight_kg: 80 } as never);
   vi.mocked(listWeightHistory).mockResolvedValue([]);
   vi.mocked(listBodyMeasurements).mockResolvedValue([]);
+  vi.mocked(loadCompletedTrainingData).mockResolvedValue({ sessions: [], sessionExercises: [], sets: [], dateByDayLog: new Map() });
+  vi.mocked(listRoutines).mockResolvedValue([]);
 });
 
 describe("Progress period model (canonical resolver)", () => {
@@ -198,7 +204,7 @@ describe("GET /progress (overview)", () => {
     vi.mocked(listWeightHistory).mockResolvedValue([{ id: "w1", log_date: d(-25), weight_kg: 82 }, { id: "w2", log_date: d(-5), weight_kg: 80.5 }]);
     const o: ProgressOverview = await json(await overviewGET(request("progress")), parseProgressOverview);
     expect(o.period).toMatchObject({ preset: "30", days: 30, end: TODAY });
-    expect(o.training).toEqual({ status: "pending" });
+    expect(o.training.status === "ok" && o.training.data).toMatchObject({ sessions: 0, trainingDays: 0, sets: 0, minutes: 0 });
     expect(o.evolution[0]).toMatchObject({ id: "body.weight", destination: { kind: "body" } });
     expect(o.nutrition.status === "ok" && o.nutrition.data).toMatchObject({ averageKcal: 2200, averageProteinG: 130, averageTargetKcal: 2100,
       calories: { status: "comparable", current: 2200, previous: 2000, deltaAbsolute: 200, deltaPercent: 10 } });
@@ -215,9 +221,11 @@ describe("GET /progress (overview)", () => {
   it("each domain is independently available: a failing source is unavailable, never zero or empty", async () => {
     nutritionFails = true;
     vi.mocked(listWeightHistory).mockRejectedValue(new Error("db"));
+    vi.mocked(loadCompletedTrainingData).mockRejectedValue(new Error("db"));
     const o: ProgressOverview = await json(await overviewGET(request("progress?period=7")), parseProgressOverview);
     expect(o.nutrition).toEqual({ status: "unavailable" });
     expect(o.body).toEqual({ status: "unavailable" });
+    expect(o.training).toEqual({ status: "unavailable" });
     expect(o.metrics.status).toBe("ok");
   });
 });

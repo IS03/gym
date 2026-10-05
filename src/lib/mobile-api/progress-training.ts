@@ -1,0 +1,131 @@
+import "server-only";
+import { loadCompletedTrainingData } from "@/lib/phase2/training-robust";
+import { listRoutines } from "@/lib/phase2/training";
+import { buildTrainingAnalysis, type TrainingAnalysis, type TrainingAnalysisSource } from "@/lib/phase2/training-analysis";
+import { TRAINING_PROGRESS_METRICS } from "@/lib/progress/analytics";
+import { buildProgressComparison, type ProgressComparisonReport, type ProgressTemporalComparisonReference } from "@/lib/progress/comparisons";
+import {
+  buildTrainingGeneralAnalytics, buildTrainingLoadComparison, trainingLoadSamples, trainingPerformanceStrategy,
+  type TrainingExercisePerformance, type TrainingGeneralAnalytics,
+} from "@/lib/progress/training-performance";
+import { buildTrainingExercisesAnalytics } from "@/lib/progress/training-exercises";
+import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
+import type {
+  ProgressComparison, ProgressPeriod, ProgressTraining, ProgressTrainingExercise, ProgressTrainingExerciseDetail, ProgressTrainingSummary,
+} from "./progress-contract";
+
+type CompareDto = (result: ProgressComparisonReport["results"][number] | undefined) => ProgressComparison;
+
+/** Reliable load metrics only. Global volume mixes non-comparable weight modes and is never used. */
+const LOAD_KEYS = ["training.load.sessions", "training.load.sets", "training.load.duration", "training.load.sets_per_session"] as const;
+
+export type TrainingContext = {
+  source: TrainingAnalysisSource; current: TrainingAnalysis; reference: TrainingAnalysis;
+  referenceDefinition: ProgressTemporalComparisonReference; general: TrainingGeneralAnalytics;
+};
+
+/** ONE historical read (paged loader) shared by summary, exercises, muscles, routines and feelings. */
+export async function loadTrainingContext(auth: AuthenticatedRequestContext, period: ProgressPeriod, today: string): Promise<TrainingContext> {
+  const [source, routines] = await Promise.all([loadCompletedTrainingData(auth), listRoutines({ includeArchived: true }, auth)]);
+  const range = { start: period.start, end: period.end };
+  const previous = { start: period.previousStart, end: period.previousEnd };
+  const current = buildTrainingAnalysis(source, { today, period: "custom", routines, range });
+  const reference = buildTrainingAnalysis(source, { today: previous.end, period: "custom", routines, range: previous });
+  const referenceDefinition: ProgressTemporalComparisonReference = { type: "previous_period", period: previous, label: "Período anterior" };
+  const general = buildTrainingGeneralAnalytics({ source, primary: current, reference, referenceDefinition });
+  return { source, current, reference, referenceDefinition, general };
+}
+
+const byKey = (report: ProgressComparisonReport, key: string) => report.results.find(result => result.metric.key === key);
+
+/** Training days: the engine's own session samples, one per distinct date (zero when nothing was trained). */
+function trainingDaysComparison(ctx: TrainingContext) {
+  const sessionsMetric = TRAINING_PROGRESS_METRICS.find(metric => metric.key === "training.load.sessions")!;
+  const daysMetric = { ...sessionsMetric, key: "training.load.days", label: "Días entrenados", unit: "días" };
+  const dates = [...new Set((trainingLoadSamples(ctx.source).get("training.load.sessions") ?? []).map(sample => sample.date))];
+  return buildProgressComparison({
+    metrics: [daysMetric], samplesByMetric: new Map([[daysMetric.key, dates.map(date => ({ date, value: 1 }))]]),
+    primaryPeriod: ctx.current.range, primaryLabel: ctx.current.range.label, reference: ctx.referenceDefinition,
+  });
+}
+
+export function trainingSummaryDto(ctx: TrainingContext, period: ProgressPeriod, compare: CompareDto): ProgressTrainingSummary {
+  const load = buildTrainingLoadComparison({ source: ctx.source, primary: ctx.current, reference: ctx.reference,
+    referenceDefinition: ctx.referenceDefinition, metricKeys: LOAD_KEYS });
+  const days = trainingDaysComparison(ctx);
+  const s = ctx.current.summary, perf = ctx.general.performance.summary;
+  const trainingDays = days.results[0]?.valueA ?? 0;
+  return {
+    sessions: s.sessions, trainingDays, sets: s.sets, minutes: s.minutes,
+    // A weekly rate only means something over at least two weeks.
+    sessionsPerWeek: period.days >= 14 ? Math.round(s.sessions * 7 / period.days * 10) / 10 : null,
+    comparisons: {
+      sessions: compare(byKey(load, "training.load.sessions")), trainingDays: compare(days.results[0]),
+      sets: compare(byKey(load, "training.load.sets")), minutes: compare(byKey(load, "training.load.duration")),
+      setsPerSession: compare(byKey(load, "training.load.sets_per_session")),
+    },
+    performance: { improved: perf.improved, stable: perf.stable, declined: perf.declined, comparable: perf.comparable, insufficient: perf.insufficient, headline: perf.headline },
+  };
+}
+
+function exerciseDto(item: TrainingExercisePerformance, stats: TrainingAnalysis["exercises"][number] | undefined): ProgressTrainingExercise {
+  return {
+    id: item.exerciseId, name: stats?.name ?? item.name, muscleLabel: stats?.muscleLabel ?? item.muscleLabel, weightMode: item.weightMode,
+    status: item.status, reason: item.reason, signal: item.status === "insufficient_data" ? null : item.signal, isPersonalRecord: item.isPersonalRecord,
+    sessions: stats?.sessions ?? 0, sets: stats?.sets ?? 0, lastDate: stats?.lastDate ?? null,
+  };
+}
+
+export function trainingDto(ctx: TrainingContext, today: string, period: ProgressPeriod, compare: CompareDto): ProgressTraining {
+  const statsById = new Map(ctx.current.exercises.map(exercise => [exercise.id, exercise]));
+  const performance = ctx.general.performance.exercises;
+  return {
+    today, period, summary: trainingSummaryDto(ctx, period, compare),
+    series: ctx.current.timeline.map(point => ({ start: point.start, end: point.end, sessions: point.sessions, sets: point.sets, minutes: point.minutes })),
+    // Trained in the period first (most sessions), then exercises only present in the previous period.
+    exercises: performance.map(item => exerciseDto(item, statsById.get(item.exerciseId)))
+      .sort((a, b) => Number(b.sessions > 0) - Number(a.sessions > 0) || b.sessions - a.sessions || a.name.localeCompare(b.name, "es-AR")),
+    personalRecords: performance.filter(item => item.isPersonalRecord && item.signal).map(item => ({ exerciseId: item.exerciseId, name: item.name, description: item.signal!.description })),
+    feelings: ctx.general.feelings.map(f => ({ key: f.key, label: f.label, average: f.average, scaleMaximum: f.scaleMaximum,
+      registered: f.registeredCount, eligible: f.eligibleCount, ratio: f.coverageRatio })),
+    muscles: ctx.current.muscles.filter(m => m.summary.hasData).map(m => ({ key: m.key, label: m.label, sets: m.summary.sets, sessions: m.summary.sessions, exercises: m.summary.exerciseCount })),
+    routines: ctx.current.routines.filter(r => r.summary.hasData).map(r => ({ id: r.id, name: r.name, sessions: r.summary.sessions, sets: r.summary.sets, minutes: r.summary.minutes })),
+  };
+}
+
+/** Exercise analytics: the Web exercises read model, restricted to mode-compatible metrics (no volume). */
+export function trainingExerciseDto(ctx: TrainingContext, exerciseId: string, today: string, period: ProgressPeriod, compare: CompareDto): ProgressTrainingExerciseDetail | null {
+  const analytics = buildTrainingExercisesAnalytics({ source: ctx.source, primary: ctx.current, reference: ctx.reference,
+    referenceDefinition: ctx.referenceDefinition, selectedExerciseId: exerciseId });
+  const item = analytics.exercises.find(exercise => exercise.id === exerciseId);
+  const selected = analytics.selected;
+  if (!item || !selected) return null;
+  const load = buildTrainingLoadComparison({ source: ctx.source, primary: ctx.current, reference: ctx.reference, referenceDefinition: ctx.referenceDefinition,
+    scope: { exerciseId }, metricKeys: ["training.load.sessions", "training.load.sets"] });
+  const strategy = trainingPerformanceStrategy(selected.weightMode);
+  const unit = strategy === "unit_reps" ? "lingotes" as const : strategy === "time" ? "s" as const : strategy === "bodyweight_reps" ? "reps" as const : "kg" as const;
+  // One point per session, with the validated semantics of the mode; unsupported modes get no chart.
+  const points = strategy === "unsupported" ? [] : [...selected.currentSessions].reverse().flatMap(session => {
+    const sets = session.sets.filter(set => set.is_completed && (set.actual_reps ?? 0) > 0);
+    if (strategy === "load_reps" || strategy === "unit_reps") {
+      const loaded = sets.filter(set => (set.actual_weight_kg ?? 0) > 0);
+      const best = loaded.sort((a, b) => b.actual_weight_kg! - a.actual_weight_kg! || b.actual_reps! - a.actual_reps!)[0];
+      return best ? [{ date: session.logDate, sessionId: session.sessionId, value: best.actual_weight_kg!, context: best.actual_reps }] : [];
+    }
+    const pool = strategy === "bodyweight_reps" ? sets.filter(set => !set.actual_weight_kg) : sets;
+    const best = pool.sort((a, b) => b.actual_reps! - a.actual_reps!)[0];
+    return best ? [{ date: session.logDate, sessionId: session.sessionId, value: best.actual_reps!, context: null }] : [];
+  });
+  const p = selected.performance;
+  return {
+    today, period,
+    exercise: { id: exerciseId, name: item.name, muscleLabel: item.muscleLabel, weightMode: selected.weightMode },
+    performance: { status: p.status, reason: p.reason, signal: p.status === "insufficient_data" ? null : p.signal, isPersonalRecord: p.isPersonalRecord,
+      primarySamples: p.primarySampleSize, referenceSamples: p.referenceSampleSize },
+    comparisons: { sessions: compare(byKey(load, "training.load.sessions")), sets: compare(byKey(load, "training.load.sets")) },
+    marks: selected.marks.flatMap(mark => mark.kind === "best_volume" ? [] : [{ kind: mark.kind, label: mark.label, value: mark.value, unit: mark.unit, context: mark.context, date: mark.logDate }]),
+    chart: strategy === "unsupported" ? null : { kind: strategy === "time" ? "time" : strategy === "bodyweight_reps" ? "reps" : "load", unit, points },
+    sessions: selected.currentSessions.map(session => ({ sessionId: session.sessionId, date: session.logDate, routineName: session.routineName,
+      sets: session.sets.filter(set => set.is_completed).map(set => ({ reps: set.actual_reps, weightKg: set.actual_weight_kg })) })),
+  };
+}

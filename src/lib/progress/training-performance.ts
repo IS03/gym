@@ -89,7 +89,7 @@ export type TrainingPerformanceScope = {
   muscleDetailKey?: string;
 };
 
-type PerformanceStrategy = "load_reps" | "bodyweight_reps" | "unit_reps" | "time" | "unsupported";
+export type PerformanceStrategy = "load_reps" | "bodyweight_reps" | "unit_reps" | "time" | "unsupported";
 type ComparableSet = { reps: number; load: number | null; date: string };
 type ExerciseSnapshot = {
   exerciseId: string;
@@ -115,6 +115,11 @@ function finite(value: number | null | undefined): number | null {
 function normalize(value: string | null | undefined): string | null {
   const normalized = value?.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-AR");
   return normalized || null;
+}
+
+/** The validated comparison strategy for a (normalized, lower-case) weight mode. */
+export function trainingPerformanceStrategy(mode: string | null | undefined): PerformanceStrategy {
+  return strategyFor(normalize(mode));
 }
 
 function strategyFor(mode: string | null): PerformanceStrategy {

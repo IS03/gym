@@ -1,6 +1,6 @@
 import type { MobileApiClient } from './client';
 import {
-  parseProgressBody, parseProgressMetrics, parseProgressOverview, progressQueryString,
+  parseProgressBody, parseProgressMetrics, parseProgressOverview, parseProgressTraining, parseProgressTrainingExercise, progressQueryString,
   type ProgressPeriod, type ProgressQuery,
 } from '../../../../src/lib/mobile-api/progress-contract';
 
@@ -23,4 +23,13 @@ export const fetchProgressMetrics = (client: MobileApiClient, query: ProgressQue
     // A different metric is only valid when the requested one no longer exists.
     if (metricId && data.metric && data.metric.id !== metricId && data.definitions.some(d => d.id === metricId)) return undefined;
     return data;
+  } });
+export const fetchProgressTraining = (client: MobileApiClient, query: ProgressQuery, signal?: AbortSignal) =>
+  client.read({ path: `${BASE}/training?${progressQueryString(query)}`, signal, parse: (raw: unknown) => {
+    const data = parseProgressTraining(raw); return data && samePeriod(data.period, query) ? data : undefined;
+  } });
+export const fetchProgressTrainingExercise = (client: MobileApiClient, query: ProgressQuery, exerciseId: string, signal?: AbortSignal) =>
+  client.read({ path: `${BASE}/training/exercises/${encodeURIComponent(exerciseId)}?${progressQueryString(query)}`, signal, parse: (raw: unknown) => {
+    const data = parseProgressTrainingExercise(raw);
+    return data && samePeriod(data.period, query) && data.exercise.id === exerciseId.toLowerCase() ? data : undefined;
   } });

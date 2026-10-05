@@ -32,8 +32,15 @@ const TODAY = '2026-10-05';
 const period = (preset: ProgressQuery['period'] = '30', start = '2026-09-06', days = 30) => ({ preset, start, end: TODAY, days, previousStart: '2026-08-07', previousEnd: '2026-09-05', bucket: 'week' as const, includesToday: true });
 const cmp = (over: Partial<ProgressComparison> = {}): ProgressComparison => ({ status: 'comparable', reason: 'eligible', current: 2200, previous: 2000, deltaAbsolute: 200, deltaPercent: 10, change: 'increased', ...over });
 const ids = { steps: 'c1000000-0000-4000-8000-000000000001', sleep: 'c1000000-0000-4000-8000-000000000002', custom: 'c1000000-0000-4000-8000-000000000003' };
+export function trainingSummary() {
+  const c = cmp({ current: 12, previous: 9, deltaAbsolute: 3, deltaPercent: 33.3 });
+  return { sessions: 12, trainingDays: 11, sets: 180, minutes: 840, sessionsPerWeek: 2.8,
+    comparisons: { sessions: c, trainingDays: cmp({ current: 11, previous: 9, deltaAbsolute: 2, deltaPercent: 22.2 }), sets: cmp({ current: 180, previous: 150, deltaAbsolute: 30, deltaPercent: 20 }),
+      minutes: cmp({ current: 840, previous: 600, deltaAbsolute: 240, deltaPercent: 40 }), setsPerSession: cmp({ change: 'stable' }) },
+    performance: { improved: 4, stable: 3, declined: 1, comparable: 8, insufficient: 2, headline: '4 de 8 ejercicios mejoraron' } };
+}
 function overview(over: Partial<ProgressOverview> = {}, preset: ProgressQuery['period'] = '30'): ProgressOverview {
-  return { today: TODAY, period: period(preset), training: { status: 'pending' },
+  return { today: TODAY, period: period(preset), training: { status: 'ok', data: trainingSummary() },
     evolution: [{ id: 'body.weight', label: 'Peso', value: '80,5 kg', detail: '−1,5 kg en el período', destination: { kind: 'body' } }],
     changes: [{ id: 'activity:steps', domain: 'metrics', label: 'Pasos', description: 'Subió frente al período anterior.', destination: { kind: 'metrics', metricId: ids.steps } }],
     nutrition: { status: 'ok', data: { averageKcal: 2200, averageProteinG: 130, averageTargetKcal: 2100, averageTargetProteinG: 140, accumulatedBalanceKcal: -3000,
@@ -99,8 +106,12 @@ describe('Progress Overview', () => {
     const sleep = within(view.getByTestId(`progress-habit-${ids.sleep}`));
     expect(sleep.getByText('7 h 30 min')).toBeTruthy(); expect(sleep.getByText(/el período anterior no tiene datos/)).toBeTruthy();
     expect(sleep.getByText('5 de 29 días con dato · cobertura baja')).toBeTruthy();
-    expect(view.getByTestId('progress-explore-training').props.accessibilityState).toEqual({ disabled: true });
-    expect(view.getByText('Análisis de entrenamiento: llega en la próxima actualización.')).toBeTruthy();
+    const training = within(view.getByTestId('progress-training'));
+    expect(training.getByText('+3 sesiones (+33,3%) frente al período anterior.')).toBeTruthy();
+    expect(training.getByText('Ejercicios: 4 mejoraron · 3 estables · 1 bajó · 2 sin comparación')).toBeTruthy();
+    expect(view.queryByText(/volumen/i)).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Tendencias de Entrenamiento' }));
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/(tabs)/progress/trends/training', params: { period: '30' } });
     for (const name of ['Abrir Historial', 'Abrir Cuerpo', 'Abrir Métricas diarias']) expect(view.getByRole('button', { name })).toBeTruthy();
   });
   it('changing the period re-reads; a late response for the previous period is never shown', async () => {
@@ -128,11 +139,12 @@ describe('Progress Overview', () => {
     expect(mockOverview).toHaveBeenLastCalledWith(mockClient, { period: 'custom', from: '2026-09-01', to: '2026-10-05' });
   });
   it('an unavailable domain is explicit (never zero or empty) and drilldowns carry the period', async () => {
-    mockOverview.mockImplementation(async (_c, q) => ok(overview({ nutrition: { status: 'unavailable' }, body: { status: 'unavailable' }, evolution: [] }, q.period)));
+    mockOverview.mockImplementation(async (_c, q) => ok(overview({ nutrition: { status: 'unavailable' }, body: { status: 'unavailable' }, training: { status: 'unavailable' }, evolution: [] }, q.period)));
     const view = wrap(<ProgressOverviewScreen />); await flush();
     expect(view.getByText('No pudimos cargar Nutrición. No significa que no haya datos.')).toBeTruthy();
     expect(view.getByText('No pudimos cargar Cuerpo. El resto del resumen sigue disponible.')).toBeTruthy();
     expect(view.queryByText(/0 kcal/)).toBeNull();
+    expect(view.getByText('No pudimos cargar Entrenamiento. No significa que no haya datos.')).toBeTruthy();
     fireEvent.press(view.getAllByRole('button', { name: 'Pasos' })[0]);
     expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/(tabs)/progress/trends/metrics', params: { period: '30', metric: ids.steps } });
     fireEvent.press(view.getByRole('button', { name: 'Reportes de Nutrición' }));

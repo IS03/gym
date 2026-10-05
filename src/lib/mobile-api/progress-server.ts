@@ -13,15 +13,16 @@ import { DEFAULT_NUTRITION_COMPARISON_METRICS, nutritionSamplesByMetric } from "
 import { aggregateNutritionReport, buildNutritionReportDays, resolveNutritionReportRange, type NutritionReportRange } from "@/lib/nutrition/reports-core";
 import type { AuthenticatedRequestContext } from "@/lib/supabase/server";
 import type { RequestPerformanceContext } from "@/lib/request-performance";
-import { MobileApiUnauthorizedError, MobileApiValidationError, mobileBearerToken } from "./auth";
+import { MobileApiNotFoundError, MobileApiUnauthorizedError, MobileApiValidationError, mobileBearerToken } from "./auth";
 import { mobileApiResponseHeaders } from "./http";
 import { NutritionReportDayChangedError, readMobileNutritionFacts } from "./nutrition-report-server";
 import {
-  PROGRESS_DEFAULT_PRESET, parseProgressBody, parseProgressMetrics, parseProgressOverview, parseProgressQuery,
+  PROGRESS_DEFAULT_PRESET, parseProgressBody, parseProgressMetrics, parseProgressOverview, parseProgressQuery, parseProgressTraining, parseProgressTrainingExercise,
   type BodyObservationDto, type ProgressBody, type ProgressBodyMetric, type ProgressComparison, type ProgressDestination,
   type ProgressMetricDefinition, type ProgressMetrics, type ProgressOverview, type ProgressPeriod, type ProgressQuery, type ProgressSection,
 } from "./progress-contract";
 import { authenticateMobileAccessToken, type MobileSupabaseAuthenticatedContext } from "./supabase";
+import { loadTrainingContext, trainingDto, trainingExerciseDto, trainingSummaryDto } from "./progress-training";
 
 type Context = MobileSupabaseAuthenticatedContext;
 const webAuth = (context: Context, requestPerformance?: RequestPerformanceContext): AuthenticatedRequestContext =>
@@ -70,9 +71,15 @@ function destination(href: string): ProgressDestination | null {
   if (url.pathname === "/train/body") return { kind: "body" };
   if (url.pathname === "/today/reports") return { kind: "nutrition" };
   if (url.pathname === "/progress/metrics") return { kind: "metrics", metricId: url.searchParams.get("metric") };
+  if (url.pathname === "/train/progress") return { kind: "training" };
   return null;
 }
-const domainOf = (d: ProgressHomeInsight["domain"]) => d === "activity" ? "metrics" as const : d === "training" ? null : d;
+const domainOf = (d: ProgressHomeInsight["domain"]) => d === "activity" ? "metrics" as const : d;
+/** Training findings point to their exercise analytics (Web id `training:<exerciseId>`). */
+function findingDestination(insight: ProgressHomeInsight): ProgressDestination | null {
+  if (insight.domain === "training" && insight.id.startsWith("training:")) return { kind: "training_exercise", exerciseId: insight.id.slice("training:".length) };
+  return destination(insight.href);
+}
 
 async function isolated<T>(task: () => Promise<T>, label: string): Promise<ProgressSection<T>> {
   try { return { status: "ok", data: await task() }; }
@@ -122,17 +129,18 @@ const byKey = (report: ProgressComparisonReport | null | undefined, key: string)
 
 export async function buildMobileProgressOverview(context: Context, query: ProgressQuery, today: string): Promise<ProgressOverview> {
   const { range, period } = resolveMobileProgressPeriod(query, today);
-  const [body, nutrition, metrics] = await Promise.all([
+  const [body, nutrition, metrics, training] = await Promise.all([
     isolated(() => bodyReport(context, range, period), "body"),
     isolated(() => nutritionReport(context, range, period, today), "nutrition"),
     isolated(() => metricsReport(context, query, today), "metrics"),
+    isolated(() => loadTrainingContext(webAuth(context), period, today), "training"),
   ]);
   const activity = metrics.status === "ok" && metrics.data.defaultComparison
     ? { definitions: metrics.data.definitions, comparison: metrics.data.defaultComparison } : null;
   const model = buildProgressHomeModel({
     period: { preset: range.preset, label: range.preset, current: range, previous: { start: period.previousStart, end: period.previousEnd },
       durationDays: period.days, bucket: period.bucket, includesInProgressDay: period.includesToday, error: null },
-    training: null, // M7.2
+    training: training.status === "ok" ? training.data.general : null,
     nutrition: nutrition.status === "ok" ? nutrition.data : null,
     body: body.status === "ok" ? body.data.report : null,
     activity,
@@ -148,7 +156,7 @@ export async function buildMobileProgressOverview(context: Context, query: Progr
     today, period,
     evolution: rows(model.evolution),
     changes: model.changes.flatMap(insight => {
-      const domain = domainOf(insight.domain), target = destination(insight.href);
+      const domain = domainOf(insight.domain), target = findingDestination(insight);
       return domain && target ? [{ id: insight.id, domain, label: insight.label, description: insight.description, destination: target }] : [];
     }),
     nutrition: nutrition.status === "ok" ? { status: "ok", data: {
@@ -173,7 +181,7 @@ export async function buildMobileProgressOverview(context: Context, query: Progr
       excludedSuspect: body.data.report.excludedSuspectCount,
       trackedMetrics: body.data.report.metrics.filter(metric => body.data.available.has(metric.key) && metric.current.length > 0).length,
     } } : { status: "unavailable" },
-    training: { status: "pending" },
+    training: training.status === "ok" ? { status: "ok", data: trainingSummaryDto(training.data, period, comparisonDto) } : { status: "unavailable" },
   };
   return overview;
 }
@@ -227,6 +235,17 @@ export async function buildMobileProgressMetrics(context: Context, query: Progre
   };
 }
 
+export async function buildMobileProgressTraining(context: Context, query: ProgressQuery, today: string) {
+  const { period } = resolveMobileProgressPeriod(query, today);
+  return trainingDto(await loadTrainingContext(webAuth(context), period, today), today, period, comparisonDto);
+}
+export async function buildMobileProgressTrainingExercise(context: Context, query: ProgressQuery, today: string, exerciseId: string) {
+  const { period } = resolveMobileProgressPeriod(query, today);
+  const dto = trainingExerciseDto(await loadTrainingContext(webAuth(context), period, today), exerciseId, today, period, comparisonDto);
+  if (!dto) throw new MobileApiNotFoundError();
+  return dto;
+}
+
 /** Shared GET handler: Bearer identity, canonical period, one bounded retry at Córdoba midnight. */
 export async function progressReadResponse<T>(request: Request, label: string, build: (context: Context, params: URLSearchParams, today: string) => Promise<T>,
   parse: (v: unknown) => T | undefined) {
@@ -246,6 +265,7 @@ export async function progressReadResponse<T>(request: Request, label: string, b
   } catch (e) {
     if (e instanceof MobileApiUnauthorizedError) { status = 401; body = { error: "UNAUTHORIZED" }; }
     else if (e instanceof MobileApiValidationError) { status = 400; body = { error: "VALIDATION_ERROR", message: e.message }; }
+    else if (e instanceof MobileApiNotFoundError) { status = 404; body = { error: "NOT_FOUND", message: "No hay registros de este ejercicio." }; }
     else console.warn(`[mobile.progress] ${label} unavailable`);
   }
   return NextResponse.json(body, { status, headers: mobileApiResponseHeaders(request) });
@@ -260,3 +280,9 @@ export const progressMetricsResponse = (request: Request) => progressReadRespons
   if (metric !== null && !/^[0-9a-f-]{36}$/i.test(metric)) throw new MobileApiValidationError("Métrica no válida.");
   return buildMobileProgressMetrics(context, progressQueryFromParams(params, ["metric"]), today, metric ?? undefined);
 }, parseProgressMetrics);
+export const progressTrainingResponse = (request: Request) => progressReadResponse(request, "training",
+  (context, params, today) => buildMobileProgressTraining(context, progressQueryFromParams(params), today), parseProgressTraining);
+export const progressTrainingExerciseResponse = (request: Request, exerciseId: string) => progressReadResponse(request, "training.exercise", (context, params, today) => {
+  if (!/^[0-9a-f-]{36}$/i.test(exerciseId)) throw new MobileApiValidationError("Ejercicio no válido.");
+  return buildMobileProgressTrainingExercise(context, progressQueryFromParams(params), today, exerciseId.toLowerCase());
+}, parseProgressTrainingExercise);
