@@ -8,12 +8,16 @@ import { ProgressDataLinks } from '@/body/progress-hub';
 import { haptics } from '@/platform/haptics';
 import { ProgressPeriodSelector } from './period-selector';
 import { comparisonText, coverageText, formatValue, lowCoverage, queryParams } from './progress-format';
+import { TrainingSummaryCard } from './training-summary';
 import { useProgressResource } from './use-progress-resource';
 
-export type ProgressRoute = '/(tabs)/progress/trends/body' | '/(tabs)/progress/trends/metrics' | '/(tabs)/nutrition/reports';
+export type ProgressRoute = '/(tabs)/progress/trends/body' | '/(tabs)/progress/trends/metrics' | '/(tabs)/nutrition/reports'
+  | '/(tabs)/progress/trends/training' | '/(tabs)/progress/trends/exercise/[id]';
 export function destinationRoute(d: ProgressDestination): { pathname: ProgressRoute; extra: Record<string, string> } {
   if (d.kind === 'body') return { pathname: '/(tabs)/progress/trends/body', extra: {} };
   if (d.kind === 'nutrition') return { pathname: '/(tabs)/nutrition/reports', extra: {} };
+  if (d.kind === 'training') return { pathname: '/(tabs)/progress/trends/training', extra: {} };
+  if (d.kind === 'training_exercise') return { pathname: '/(tabs)/progress/trends/exercise/[id]', extra: { id: d.exerciseId } };
   return { pathname: '/(tabs)/progress/trends/metrics', extra: d.metricId ? { metric: d.metricId } : {} };
 }
 
@@ -54,6 +58,9 @@ function Content({ data, open }: { data: ProgressOverview; open: (d: ProgressDes
 
     <View style={styles.section} testID="progress-habits">
       <Heading level={2}>Tus hábitos</Heading>
+      {data.training.status === 'ok' ? <View testID="progress-training"><PressableSurface accessibilityLabel="Entrenamiento" onPress={() => open({ kind: 'training' })} style={styles.block}>
+        <TrainingSummaryCard summary={data.training.data} compact />
+      </PressableSurface></View> : <Surface><InlineUnavailable message="No pudimos cargar Entrenamiento. No significa que no haya datos." /></Surface>}
       {nutrition ? <View testID="progress-nutrition"><PressableSurface accessibilityLabel="Nutrición" onPress={() => open({ kind: 'nutrition' })} style={styles.block}>
         <AppText variant="label">Nutrición</AppText>
         <AppText>{nutrition.averageKcal === null ? 'Sin días completos con calorías' : `${formatValue(nutrition.averageKcal, 'kcal', 'integer')}/día`}</AppText>
@@ -104,7 +111,7 @@ export function ProgressOverviewScreen() {
       <Entry testID="progress-explore-body" label="Tendencias de Cuerpo" detail="Peso y medidas: cambio, tendencia y registros." icon="activity" onPress={() => go('/(tabs)/progress/trends/body')} />
       <Entry testID="progress-explore-nutrition" label="Reportes de Nutrición" detail="Consumo, objetivos históricos y evolución." icon="nutrition" onPress={() => go('/(tabs)/nutrition/reports')} />
       <Entry testID="progress-explore-metrics" label="Tendencias de Métricas" detail="Promedio, mínimo, máximo y cobertura de tus métricas." icon="water" onPress={() => go('/(tabs)/progress/trends/metrics')} />
-      <Entry testID="progress-explore-training" label="Entrenamiento" detail="Análisis de entrenamiento: llega en la próxima actualización." icon="dumbbell" disabled />
+      <Entry testID="progress-explore-training" label="Tendencias de Entrenamiento" detail="Sesiones, series, duración, rendimiento por ejercicio y PRs." icon="dumbbell" onPress={() => go('/(tabs)/progress/trends/training')} />
     </View>
     <View style={styles.section} testID="progress-review">
       <Heading level={2}>Revisar datos</Heading>

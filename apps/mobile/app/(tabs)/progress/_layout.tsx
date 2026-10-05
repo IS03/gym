@@ -10,6 +10,8 @@ export default function ProgressLayout() {
       <Stack.Screen name="metrics" options={{ title: 'Métricas diarias' }} />
       <Stack.Screen name="trends/body" options={{ title: 'Tendencias de Cuerpo' }} />
       <Stack.Screen name="trends/metrics" options={{ title: 'Tendencias de Métricas' }} />
+      <Stack.Screen name="trends/training" options={{ title: 'Tendencias de Entrenamiento' }} />
+      <Stack.Screen name="trends/exercise/[id]" options={{ title: 'Ejercicio' }} />
     </Stack>
   );
 }

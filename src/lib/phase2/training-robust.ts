@@ -1134,20 +1134,46 @@ export async function getHomeTrainingSnapshot(
   return buildHomeTrainingSnapshot(source, today);
 }
 
+type PageResult<T> = { data: T[] | null; error: { message: string } | null };
+
+/**
+ * Reads EVERY row of an owner-scoped query. PostgREST caps each response (max
+ * rows, 1000 by default) and silently truncates; long `.in()` lists also blow up
+ * the URL. Each caller filters by user_id with a total order, and pages advance
+ * by the rows actually received, so any server cap is safe. An empty page ends.
+ */
+export async function readAllTrainingRows<T>(
+  label: string,
+  page: (from: number, to: number) => PromiseLike<PageResult<T>>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let index = 0; index < 1000; index += 1) {
+    const { data, error } = await page(rows.length, rows.length + pageSize - 1);
+    if (error) throw new Error(`${label}: ${error.message}`);
+    if (!data?.length) return rows;
+    rows.push(...data);
+  }
+  throw new Error(`${label}: demasiadas páginas.`);
+}
+
+/**
+ * Every completed session of the user with its exercises, completed sets and
+ * dates, in a fixed number of paged queries (no per-session or per-exercise
+ * fan-out, no `.in()` id lists). Memberships are resolved in memory.
+ */
 export async function loadCompletedTrainingData(
   context?: AuthenticatedRequestContext,
 ): Promise<CompletedTrainingData> {
   const { supabase, userId } = context ?? await getAuthedContext();
-  const { data: rawSessions, error: sessionError } = await supabase
+  const sessions = await readAllTrainingRows<WorkoutSession>("Leer progreso", (from, to) => supabase
     .from("workout_sessions")
     .select("*")
     .eq("user_id", userId)
     .eq("status", "completed")
     .order("ended_at", { ascending: false })
-    .limit(500);
-  if (sessionError) throw new Error(`Leer progreso: ${sessionError.message}`);
-
-  const sessions = (rawSessions ?? []) as WorkoutSession[];
+    .order("id", { ascending: true })
+    .range(from, to));
   if (sessions.length === 0) {
     return {
       sessions: [],
@@ -1157,46 +1183,39 @@ export async function loadCompletedTrainingData(
     };
   }
 
-  const sessionIds = sessions.map((session) => session.id);
-  const dayLogIds = [...new Set(sessions.map((session) => session.day_log_id))];
-  const [{ data: rawExercises, error: exerciseError }, { data: rawDays, error: daysError }] =
-    await Promise.all([
-      supabase
-        .from("workout_session_exercises")
-        .select("*")
-        .eq("user_id", userId)
-        .in("workout_session_id", sessionIds),
-      supabase
-        .from("day_logs")
-        .select("id, log_date")
-        .eq("user_id", userId)
-        .in("id", dayLogIds),
-    ]);
-  if (exerciseError) throw new Error(`Leer ejercicios de progreso: ${exerciseError.message}`);
-  if (daysError) throw new Error(`Leer fechas de progreso: ${daysError.message}`);
-
-  const sessionExercises = (rawExercises ?? []) as WorkoutSessionExercise[];
-  let sets: WorkoutSet[] = [];
-  if (sessionExercises.length > 0) {
-    const { data: rawSets, error: setsError } = await supabase
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  const dayLogIds = new Set(sessions.map((session) => session.day_log_id));
+  const [allExercises, days, allSets] = await Promise.all([
+    readAllTrainingRows<WorkoutSessionExercise>("Leer ejercicios de progreso", (from, to) => supabase
+      .from("workout_session_exercises")
+      .select("*")
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(from, to)),
+    readAllTrainingRows<{ id: string; log_date: string }>("Leer fechas de progreso", (from, to) => supabase
+      .from("day_logs")
+      .select("id, log_date")
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(from, to)),
+    readAllTrainingRows<WorkoutSet>("Leer series de progreso", (from, to) => supabase
       .from("workout_sets")
       .select("*")
       .eq("user_id", userId)
       .eq("is_completed", true)
-      .in(
-        "workout_session_exercise_id",
-        sessionExercises.map((exercise) => exercise.id),
-      );
-    if (setsError) throw new Error(`Leer series de progreso: ${setsError.message}`);
-    sets = (rawSets ?? []) as WorkoutSet[];
-  }
+      .order("id", { ascending: true })
+      .range(from, to)),
+  ]);
+  const sessionExercises = allExercises.filter((exercise) => sessionIds.has(exercise.workout_session_id));
+  const exerciseIds = new Set(sessionExercises.map((exercise) => exercise.id));
+  const sets = allSets.filter((set) => exerciseIds.has(set.workout_session_exercise_id));
 
   return {
     sessions,
     sessionExercises,
     sets,
     dateByDayLog: new Map(
-      ((rawDays ?? []) as Array<{ id: string; log_date: string }>).map((day) => [
+      days.filter((day) => dayLogIds.has(day.id)).map((day) => [
         day.id,
         day.log_date,
       ]),
