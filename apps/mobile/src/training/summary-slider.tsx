@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { AppText, spacing, useOwnlevelTheme } from '@/design-system';
-import { haptics } from '@/platform/haptics';
+import { triggerHaptic } from '@/platform/haptics';
 
 const THUMB = 28;
 
@@ -21,7 +21,7 @@ export function SummarySlider({ field, label, minimumLabel, value, minimum, maxi
     const ratio = Math.min(Math.max((x - THUMB / 2) / Math.max(width - THUMB, 1), 0), 1);
     const next = minimum + Math.round(ratio * (maximum - minimum));
     if (next === value) return;
-    haptics.selection(); onChange(next);
+    triggerHaptic('stepperChange'); onChange(next);
   };
   const pan = Gesture.Pan().withTestId(`summary-${field}-pan`).enabled(!disabled && width > 0).runOnJS(true)
     .activeOffsetX([-4, 4]).failOffsetY([-12, 12]).onStart(event => select(event.x)).onUpdate(event => select(event.x));

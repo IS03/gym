@@ -17,7 +17,7 @@ export {
   Surface,
   UnavailableState,
 } from './primitives';
-export { AppIcon } from './icons';
+export { AppIcon, appIconSize } from './icons';
 export type { AppIconName } from './icons';
 export { OwnlevelThemeProvider, useOwnlevelTheme } from './theme';
 export type { ResolvedTheme, ThemeMode } from './theme';

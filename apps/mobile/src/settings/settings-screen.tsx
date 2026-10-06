@@ -2,7 +2,7 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { useMobileApi } from '@/api';
 import { useMobileAuth } from '@/auth';
@@ -11,6 +11,7 @@ import {
   spacing, type ThemeMode, useOwnlevelTheme,
 } from '@/design-system';
 import { useNutritionConfiguration } from '@/nutrition/config-provider';
+import { useHapticsPreference } from '@/platform/haptics';
 import { useDisplayNameController } from './use-display-name-controller';
 import type { DisplayNameController, DisplayNameState } from './display-name-controller';
 
@@ -84,6 +85,7 @@ export function SettingsScreen() {
   const { client, config: apiConfig } = useMobileApi();
   const { colors, mode, resolvedMode, setMode, persistenceFailed } = useOwnlevelTheme();
   const { session, signOut, state: authState } = useMobileAuth();
+  const vibration = useHapticsPreference();
   const userId = session?.user.id ?? 'anonymous';
   const name = useDisplayNameController(session ? client : null, userId);
   const configuration = useNutritionConfiguration();
@@ -124,6 +126,17 @@ export function SettingsScreen() {
       {mode === 'system' ? <AppText muted variant="caption">{`Usando el tema ${resolvedMode === 'dark' ? 'oscuro' : 'claro'} del sistema.`}</AppText> : null}
       {persistenceFailed ? <AppText muted variant="caption">No pudimos guardar la preferencia en este dispositivo. Se aplica hasta cerrar la app.</AppText> : null}
     </Surface>
+    <Surface>
+      <View style={styles.switchRow}>
+        <View style={styles.switchText}>
+          <Heading level={2}>Vibración</Heading>
+          <AppText muted variant="caption">Respuesta táctil al usar la app.</AppText>
+        </View>
+        <Switch accessibilityLabel="Vibración" value={vibration.enabled} onValueChange={value => void vibration.setEnabled(value)}
+          trackColor={{ false: colors.surfaceRaised, true: colors.primary }} />
+      </View>
+      {vibration.persistenceFailed ? <AppText muted variant="caption">No pudimos guardar la preferencia en este dispositivo. Se aplica hasta cerrar la app.</AppText> : null}
+    </Surface>
 
     <SectionHeader title="Cuenta" />
     <Surface>
@@ -151,5 +164,7 @@ export function SettingsScreen() {
 
 const styles = StyleSheet.create({
   editor: { gap: spacing.sm },
+  switchRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  switchText: { flex: 1, gap: spacing.xs },
   input: { borderWidth: 1, borderRadius: 8, minHeight: 48, padding: 12 },
 });

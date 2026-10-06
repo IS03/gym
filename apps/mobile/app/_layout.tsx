@@ -11,9 +11,12 @@ import { MobileAuthProvider, useMobileAuth } from '@/auth';
 import { MobileApiProvider } from '@/api';
 import { createThemePreferenceStorage, OwnlevelThemeProvider, useOwnlevelTheme } from '@/design-system';
 import { NutritionConfigurationProvider } from '@/nutrition/config-provider';
+import { initHapticsPreference } from '@/platform/haptics';
+import { createHapticsPreferenceStorage } from '@/platform/haptics-preference';
 import { useStackScreenOptions } from '@/navigation/use-stack-screen-options';
 
 const themePreference = createThemePreferenceStorage(AsyncStorage);
+initHapticsPreference(createHapticsPreferenceStorage(AsyncStorage));
 
 void SplashScreen.preventAutoHideAsync().catch(() => {
   // Fast refresh can call this after the native splash has already been handled.

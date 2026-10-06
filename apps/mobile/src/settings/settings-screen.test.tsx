@@ -5,6 +5,8 @@ import type { MobileApiClient } from '@/api/client';
 import { OwnlevelThemeProvider } from '@/design-system';
 import { NutritionConfigurationProvider } from '@/nutrition/config-provider';
 import { configFixture } from '@/nutrition/config-fixture.test-helper';
+import { hapticsPreference, initHapticsPreference, resetHapticsForTests } from '@/platform/haptics';
+import { createHapticsPreferenceStorage, HAPTICS_PREFERENCE_KEY } from '@/platform/haptics-preference';
 import { SettingsScreen } from './settings-screen';
 
 const mockRead = jest.fn<MobileApiClient['read']>();
@@ -113,6 +115,21 @@ describe('Settings hub', () => {
     expect(view.queryByText(/Usando el tema/)).toBeNull();
     fireEvent.press(view.getByText('Sistema'));
     expect(view.getByText(/Usando el tema (claro|oscuro) del sistema/)).toBeTruthy();
+  });
+
+  it('vibration switch (IDENTIDAD.md): default on, turning it off is local and persisted on the device', async () => {
+    resetHapticsForTests();
+    initHapticsPreference(createHapticsPreferenceStorage(AsyncStorage));
+    const view = render(element());
+    await view.findByText('Nacho');
+    const toggle = view.getByLabelText('Vibración');
+    expect(toggle.props.value).toBe(true);
+    await act(async () => { fireEvent(toggle, 'valueChange', false); });
+    expect(hapticsPreference().enabled).toBe(false);
+    expect(await AsyncStorage.getItem(HAPTICS_PREFERENCE_KEY)).toBe('off');
+    expect(view.getByLabelText('Vibración').props.value).toBe(false);
+    expect(mockRequest).not.toHaveBeenCalled();
+    resetHapticsForTests();
   });
 
   it('account shows email + Google and logs out through the existing local sign-out', async () => {

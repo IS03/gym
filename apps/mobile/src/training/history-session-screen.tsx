@@ -9,7 +9,6 @@ import { fetchSessionDetail, type SessionDetailDto, type SessionFinishedDto } fr
 import { discardSession, type SessionDiscardedDto } from '@/api/training-history';
 import type { MobileApiRequestResult } from '@/api/results';
 import { AppText, Button, ScrollScreen, Surface, UnavailableState, spacing, useOwnlevelTheme } from '@/design-system';
-import { haptics } from '@/platform/haptics';
 import { compactHistoryDate } from './active-session-model';
 import { completedSessionModel } from './completed-session-model';
 import { CompletedSessionView } from './completed-session-view';
@@ -63,14 +62,14 @@ export function CompletedSessionScreen({ api, sessionId, initialDetail, finished
     setDiscarding(true); setNotice(null);
     const result = await api.discard(idempotencyKey);
     setDiscarding(false);
-    if (result.status === 'ok') { setPendingKey(null); haptics.success(); leave(); return; }
+    if (result.status === 'ok') { setPendingKey(null); leave(); return; }
     if (result.status === 'unavailable') {
       setNotice({ tone: 'warning', text: 'No pudimos confirmar si la sesión se eliminó. Volvé a intentarlo: no se elimina dos veces.' });
       void reload();
       return;
     }
     setPendingKey(null);
-    if (result.status === 'conflict' && result.code === 'SESSION_DISCARDED') { haptics.success(); leave(); return; }
+    if (result.status === 'conflict' && result.code === 'SESSION_DISCARDED') { leave(); return; }
     setNotice({ tone: 'danger', text: result.status === 'conflict' || result.status === 'validation' || result.status === 'not_found'
       ? result.message : 'Tu sesión expiró. Volvé a iniciar sesión.' });
     void reload();
