@@ -1,0 +1,314 @@
+# M9 — UX/UI Polish + Release · Plan de marca
+
+Roadmap compartido para Claude Code, Codex, ChatGPT y Nacho.
+Estado: **M0–M8 cerrados. M9 sin empezar.** Ningún cambio visual se hizo al escribir este documento.
+Relevamiento: 2026-10-05 (main en `ce0ceed`). Contexto canónico de marca preparado en el PR "Prepare canonical brand context for M9".
+
+Reglas permanentes de marca para agentes: `AGENTS.md` y `CLAUDE.md` → "Identidad de marca".
+Fuente de verdad de la identidad: `docs/brand/ownlevel-marca/` (`IDENTIDAD.md` manda en el detalle).
+
+---
+
+## 1. Principios de M9
+
+- M9 es pulido visual/UX y release. **No cambia** semántica de datos, analytics, contratos de API, write paths, CAS/idempotencia ni invariantes (`missing != zero`, `empty != unavailable`).
+- Cimientos primero (tokens → tema → componentes base), pantallas después. Nunca "aplicar la marca a toda la app" en un PR.
+- Paridad de producto, no de código: Mobile y Web comparten marca y tokens, no markup.
+- Si la identidad choca con un invariante de producto o con la plataforma, se documenta en §5 y decide Nacho. No se fuerza ninguno de los dos lados.
+- Cada PR de M9 es chico, tiene QA visual propio (Simulator/iPhone o navegador) y no mezcla dominios.
+
+## 2. Fuente de la identidad (estado real)
+
+Revisado completo: `IDENTIDAD.md`, `LEEME.md`, `tema/tokens.ts`, `tema/theme.ts`, `tema/haptics.ts`, `tema/theme.css`, y los assets de `logo/`, `app-icon/` (iOS, Icon Composer, Android), `web/` y `splash/` (SVG + PNG).
+
+Estado del paquete en el repo (resuelto en el PR de preparación):
+- Ubicación canónica: `docs/brand/ownlevel-marca/` (60 archivos, verificados por hash). Las copias duplicadas (`ownlevel-marca/` en la raíz, `ownlevel-identidad.md`, `docs/ownlevel-identidad.md`) eran idénticas y se borraron.
+- `docs/**` está excluido del `tsconfig.json` raíz y de ESLint: `tema/theme.ts` y `tema/haptics.ts` importan `react-native`/`expo-haptics` y no deben compilarse con la Web. Los archivos de marca no se modificaron.
+
+Pendiente de diseño (C16): `tema/tokens.ts` y `tema/theme.css` repiten los mismos hex a mano. En M9.1 el canónico pasa a código compartido y el CSS se genera.
+
+## 3. Arquitectura actual (relevada)
+
+| Área | Estado |
+|---|---|
+| Repo | Monorepo **sin workspaces**. Raíz = Next.js 16 + React 19 + Tailwind v4 + shadcn. `apps/mobile` = Expo SDK 57 / RN 0.86 / React 19.2, `package-lock` propio. `mobile/` e `ios/` raíz = Capacitor legacy (no tocar). |
+| Código compartido | Ya existe un precedente: Mobile importa `src/lib/mobile-api/*` por ruta relativa y Metro lo expone con `watchFolders`. |
+| Mobile DS | `apps/mobile/src/design-system/` (`tokens.ts`, `theme.tsx`, `primitives.tsx`, `icons.tsx`). Paleta **violeta** (`primary` #7C3AED/#A78BFA). `OwnlevelThemeProvider` con preferencia persistida (M8, `ownlevel.theme.v1`). |
+| Mobile íconos | `expo-symbols`: SF Symbols en iOS y Material Symbols en Android (`AppIcon` + `NativeTabs`). |
+| Mobile tabs | `NativeTabs` (nativo; en iOS 26 el sistema ya dibuja vidrio): Inicio, Entrenar, Nutrición, Progreso. |
+| Mobile haptics | `src/platform/haptics.ts`: `selection` / `success` / `warning` (28 llamadas). Sin preferencia de usuario. |
+| Mobile assets | Un solo PNG (`assets/images/ownlevel-app-icon.png`, 512 px) usado como ícono, adaptive icon, favicon y splash. `app.json`: "OWNLEVEL Dev", `fit.ownlevel.app.dev`, scheme `ownlevel-dev`, iOS target 16.4. `app.config.js` (hotfix #173) valida el env público. |
+| Web tema | `src/app/globals.css`: tokens shadcn en `oklch` violeta, `.dark` por clase, `ThemeProvider` propio (`appgym-theme` en localStorage). |
+| Web fuentes | `next/font/google` Geist + Geist Mono. El stack ya empieza con `-apple-system`. |
+| Web íconos | `lucide-react` ^1.8 (92 archivos). |
+| Web assets | `src/app/favicon.ico`, `icon.png`, `apple-icon.png`; `public/brand/*.png` (lockups y app icons viejos); manifest en `src/lib/brand-metadata.ts` (`#0d0d12`, sin maskable). |
+| Instrucciones de agentes | `AGENTS.md` versionado (instrucción compartida de Codex; Claude Code la importa). `CLAUDE.md` importa `@AGENTS.md` y repite solo la sección de marca, idéntica. No hay `CODEX.md`. |
+
+## 4. Inventario de deuda visual
+
+Conteos sobre código no-test al 2026-10-05. "Migrar" = deuda; "legítimo" = queda.
+
+### 4.1 Tokens / colores
+
+**Mobile**
+- Paleta entera violeta en `design-system/tokens.ts` → migrar a la paleta grafito + champagne (`primary` 120 usos, `brandSubtle` 24, `brandSurface` 6).
+- Tokens que la marca no tiene: `success` (7 usos), `warning` (19), `unavailable` (6). `danger` (42) ≈ `error` de marca, pero se usa también en estados de escritura → revisar (ver §5).
+- Hex hardcodeados:
+  - `training/routine-colors.ts` (16): paleta de 8 colores por rutina. Es **dato del usuario** (clave guardada) → decisión §5.
+  - `#17131F`/`#FFFFFF` en `routines-screen.tsx:348` y `routine-editor-screen.tsx:139` (texto sobre color de rutina) → migrar.
+  - `summary-slider.tsx` (2), `session-native-interactions.tsx` (1) → migrar.
+  - Scrims `rgba(0,0,0,.35–.4)` (`session-note-sheet`, `completed-session-view`) y `shadowColor #000` → legítimos, pero conviene tokenizarlos.
+
+**Web**
+- `globals.css`: todo el set shadcn en `oklch` violeta (light/dark, sidebar, `--chart-1..5`, `--routine-*`, `--liquid-nav-*`) → migrar con un adaptador (no renombrar clases).
+- Clases de paleta Tailwind en 22 archivos: `text-emerald` 30, `text-amber` 29, `bg-amber` 10, `bg-emerald` 9, bordes → "guardado"/"conectado"/avisos; migrar a tokens neutrales o de marca.
+- Hex: `login-form.tsx` (colores del logo de Google) → **legítimo**. `brand-metadata.ts` y `layout.tsx` (`theme_color`, `themeColor` oklch) → migrar. `lib/phase2/routine-colors.ts` → misma decisión que Mobile.
+
+### 4.2 Tipografía
+
+- Mobile no setea `fontFamily` (0 usos): ya usa SF Pro en iOS y Roboto en Android. ✔
+- Escala Mobile ≠ escala de marca:
+  - `body` 16/400 vs Body 17/400.
+  - `heading` 24 vs Title 1 28 / Title 2 22.
+  - `caption` 13/500 vs Footnote 13/400 / Caption 12/500.
+  - `label` 15/600 vs Subheadline 15/400 / Headline 17/600.
+  - `overline` (12/700, tracking 1.1, mayúsculas) no existe en la marca y tiene 17 usos.
+- 40 `fontSize` literales y 16 `fontWeight` literales fuera del DS (más frecuentes: 16 ×9, 28 ×8, 18 ×6).
+- Cifras tabulares: solo 2 archivos en Mobile (sesión activa) y 1 en Web. Todos los números relevantes (peso, kcal, reps, series, volumen, deltas, timers) lo necesitan.
+- Web: Geist cargado vía `next/font` → la marca pide solo fuente del sistema.
+
+### 4.3 Radios / espaciado / medidas
+
+- Mobile `radius`: `lg` 18 en `Surface` (marca: tarjeta 20); botón `md` 12 (marca 14); `pill` 999 usado 38 veces (chips: marca 10; `full` sí existe para avatares/botones circulares).
+- Literales `borderRadius`: 12 ×8, 8 ×6, 2 ×3, 4 ×2, 24 ×1 → revisar uno por uno (12 = inner/input es válido).
+- `spacing.xxxl` = 48 (5 usos) no está en la escala; faltan 20 y 40. Relleno de tarjeta 16 (marca 18). Separación entre bloques de pantalla 24 (marca 12 dentro de bloques).
+- Botón `minHeight` 44 (marca 50). Inputs 48 ✔. Zona táctil 44 ✔.
+- Literales chicos de padding/margin/gap (2 ×21, 3 ×2, 46 ×1) → la mayoría son ajustes ópticos; revisar en contexto.
+
+### 4.4 Íconos
+
+- Mobile: `expo-symbols` (SF Symbols en iOS ✔; Material Symbols en Android ≠ Lucide de marca). El ícono "brand" es un SF Symbol (`figure.strengthtraining.traditional`) más el texto "OWNLEVEL" en el header de Home → reemplazar por el isotipo.
+- Marcadores de texto como UI: `'✓ '` en botones de selección (`nutrition/config-editor.tsx`) → reemplazar por un control de selección.
+- Web: `lucide-react` ✔ (el trazo por defecto es 2). Revisar tamaños 24/20/17.
+
+### 4.5 Copy
+
+- Mobile: el copy de recuperación es técnico. Sobre 734 strings, aparecen "intento" (35), "lectura" (20), "borrador" (20), "almacenamiento" (15) y "servidor" (4). Ejemplos: "Comprobar intento guardado", "Cerrar · conservar intento", "Falta actualizar la lectura". Hay que reescribirlo con tono compañero **sin ocultar el estado** (la recuperación explícita es un invariante).
+- Mobile: queda "Plan V2 vigente" / "Configuración heredada" (vocabulario interno) en el editor de configuración.
+- No se encontraron frases de culpa o presión ni formas de "tú". ✔ No hay exclamaciones en la UI hoy ✔ (la marca las permite solo en logros).
+- Web: poco copy técnico (3 "lectura", 2 "borrador"). Revisar tono general en M9.4.
+
+### 4.6 Estados vacíos / carga / errores
+
+- Mobile: `EmptyState` 21, `UnavailableState` 46, `InlineUnavailable` 65, `LoadingState` 24, `SkeletonBlock` 78. Hoy son solo texto. La marca (82 B) pide una vista previa con datos de ejemplo grises y la etiqueta **EJEMPLO**.
+- Los estados "no disponible" ya distinguen correctamente `empty != unavailable`. Se conserva.
+
+### 4.7 Gráficos
+
+- Mobile `progress/value-bars.tsx`: las barras arrancan en el **mínimo del rango con un piso de 15 %**, no en 0. Exageran diferencias, y eso choca con "gráficos fieles a los datos". `missing` ya se muestra como hueco "Sin dato" ✔.
+- Mobile `progress/training-trends-screen.tsx:27`: `improved` = `success` (verde) y `declined` = `warning` (ámbar) → viola "sin bien/mal por color; flecha".
+- Cobertura baja en ámbar (`overview-screen.tsx:72,79`, `metrics-trends-screen.tsx:23`).
+- Falta "período anterior en gris", el rótulo directo al final de la línea y la escala de intensidad de 5 pasos en calendarios.
+- Web: gráficos SVG propios (`progress/comparison-evolution`, `training/*`, `body/body-progress-chart`, `nutrition/nutrition-report-charts`, `steps`, `daily-metrics`) con `--chart-1..5` violeta. Auditar el baseline en 0 y el uso de color en el PR de gráficos web.
+
+## 5. Conflictos / decisiones necesarias
+
+| # | Identidad dice | Implementación actual | Recomendación |
+|---|---|---|---|
+| C1 | Barra de 4 pestañas: Inicio, **Rutinas**, Entrenar, Progreso | Inicio, Entrenar, **Nutrición**, Progreso (M4 en paridad con Web) | **Mantener la IA actual.** Nutrición es un dominio central. Tomar la lista de la lámina como ilustrativa. Decide Nacho; si cambia, es un cambio de producto aparte de M9. |
+| C2 | Barra flotante con vidrio a 16 de los bordes | `NativeTabs` nativo (vidrio y flotante del sistema en iOS 26; barra estándar en iOS < 26 y Android) | Mantener `NativeTabs`: cumple la intención en iOS 26 sin una barra custom. No reconstruirla. |
+| C3 | Sin colores de "bien/mal"; solo `error` para el sistema | `success`/`warning` en tendencias, set completado (check verde), "guardado", "archivada", cobertura baja y estados inciertos | Tendencias: flecha + neutro. Set completado: check en acento o neutro. Cobertura y "archivada": texto secundario + ícono. Escritura incierta: neutro con ícono (no es una falla); `error` solo para falla o bloqueo. **No agregar** `success`/`warning` a la marca. |
+| C4 | Un solo acento | Colores de rutina elegidos por el usuario (8 tonos, incluye verde y rosa), guardados como clave en la base y compartidos con Web | No tocar el dato. Remapear las 8 claves a una paleta de marca (series de gráfico + neutros) en Mobile **y** Web a la vez, o reducir el color de rutina a un acento discreto. Decide Nacho. |
+| C5 | Gráficos fieles; un solo dato en champagne y el período anterior en gris | `ValueBars` con baseline en el mínimo + 15 %; primario violeta | Barras desde 0, o puntos/líneas cuando el rango relativo importa. No cambia el contrato de datos (`missing` = hueco). |
+| C6 | Íconos: Lucide en Android y Web | Android usa Material Symbols vía `expo-symbols`; no hay `react-native-svg` ni `lucide-react-native` | Opción A (recomendada para M9.1): mantener `expo-symbols` en Android (una sola API, sin dependencias nativas nuevas) y aceptar la diferencia. Opción B: `react-native-svg` + `lucide-react-native` (rebuild nativo y ~19 íconos a mapear). Decide Nacho. |
+| C7 | Vidrio en controles (botones flotantes, temporizador, controles sobre gráficos) | No hay vidrio custom | `expo-glass-effect` solo en esos controles, con `isLiquidGlassAvailable()` y fallback sólido (`elevated`). Sin `expo-blur` en la primera pasada (costo/rendimiento en Android). |
+| C8 | Hero con degradado #DCCBA3 → #A8935F | Hero de Home sólido violeta (`brandSurface`) | Requiere `expo-linear-gradient` (no instalado, nativo). Instalarlo en el PR de fundaciones y rebuild del dev client. |
+| C9 | Tema de la marca sigue al sistema (`useColorScheme`) | M8: preferencia persistida Sistema/Claro/Oscuro | Mantener el provider de M8; la marca solo aporta las paletas. No usar `tema/theme.ts` tal cual. |
+| C10 | `theme.css` usa `data-theme` + `prefers-color-scheme` | Web usa la clase `.dark` (variante custom) y `ThemeProvider` propio | El adaptador web mapea las variables `--ol-*` bajo `:root` / `.dark` y respeta el provider actual. No introducir `data-theme` en paralelo. |
+| C11 | `accent` = champagne | En shadcn, `--accent` = superficie de hover | Mapear acento de marca → `--primary`/`--ring`; `elevated` → `--accent`/`--secondary`/`--muted`. Exponer además las utilidades de marca (`bg-surface`, `text-muted`…) sin romper las clases shadcn existentes. |
+| C12 | Vibración por evento (tabla de 6 eventos) y, textual: "La vibración se puede apagar desde los Ajustes de la app." | `selection`/`success`/`warning`; háptico al tocar una pestaña (no está en la tabla); sin preferencia | Adaptador por evento (`hapticsMap`). La preferencia en Ajustes **la exige la identidad** (`IDENTIDAD.md` § Movimiento y vibración): un único interruptor local, mismo patrón que el tema de M8, sin backend. Decidir si se conserva el tic al cambiar de pestaña. |
+| C13 | Splash: isotipo sobre #09090B (#F3F1EC en claro) | Ícono de la app sobre #F8F7FB / #0D0B12 | Usar `splash-isotipo-*`. Decidir entre splash siempre oscuro (sugerencia de `LEEME`) o según el modo. |
+| C14 | Ícono iOS 26 de vidrio armado en Icon Composer | PNG único de 512 px (16-bit) | Usar `icon-1024*.png` (claro, oscuro, teñido) ya. El `.icon` de Icon Composer es un paso manual de Nacho en Xcode 26; después `ios.icon` apunta a ese archivo. |
+| C15 | Estados vacíos con vista previa EJEMPLO | Solo texto | Aplicar solo donde un gráfico o lista quedaría vacío (Progreso, Historial, Métricas), nunca en lugares que muestran datos reales, nunca en acento. |
+| C16 | `tokens.ts` como "fuente única" dentro de `docs/` | `theme.css` duplica los hex; el código no puede importar desde `docs/` sin romper el typecheck raíz | Ver §6: el canónico pasa a `packages/brand/` y `theme.css` se genera desde los tokens. `docs/brand/.../tema/` queda como referencia que apunta al paquete. Decide Nacho (implica editar `LEEME`/`IDENTIDAD` § Archivos). |
+| C17 | Escala de espacios sin 48 | `spacing.xxxl = 48` (5 usos) | Pasar a 40 o a 32 + 12 según el contexto. Ajuste visual, sin decisión de producto. |
+| C18 | Tipografía: estilos de iOS | `overline` en mayúsculas con tracking (17 usos) | Reemplazar por Footnote/Caption de marca. Si Nacho quiere conservar un rótulo de sección en mayúsculas, documentarlo en la identidad primero. |
+
+## 6. Arquitectura propuesta
+
+### 6.1 Tokens compartidos (una sola fuente)
+
+```
+packages/brand/                       ← sin package.json de workspace (como src/lib/mobile-api)
+  src/tokens.ts                       ← CANÓNICO (hoy docs/.../tema/tokens.ts, sin cambios de valores)
+  src/index.ts                        ← re-exports tipados (palette, chart, intensity, typeScale,
+                                         radius, space, layout, glass, motion, hapticsMap)
+  css/theme.css                       ← GENERADO desde tokens.ts (no editar a mano)
+scripts/brand/generate-theme-css.mjs  ← genera css/theme.css; test de vitest que falla si está desactualizado
+```
+
+- `tokens.ts` es TS puro, sin imports de runtime. Sirve igual para Next y para RN.
+- **Mobile** lo importa como hoy `mobile-api`: alias `@brand/*` en `apps/mobile/tsconfig.json` + `watchFolders` de Metro para `packages/brand`.
+- **Web**: alias `@brand/*` en el `tsconfig.json` raíz; `globals.css` importa `packages/brand/css/theme.css`.
+- `tsconfig.json` raíz: excluir `docs/**` (y en ESLint, `globalIgnores`), así ningún archivo de referencia rompe el build.
+- `docs/brand/ownlevel-marca/tema/`: queda como referencia histórica con un README que apunta a `packages/brand`. No se importa nunca desde la app.
+
+### 6.2 Adaptadores
+
+| Capa | Ubicación | Contenido |
+|---|---|---|
+| Mobile tema | `apps/mobile/src/design-system/tokens.ts` → consume `@brand` | Mapea la marca a nombres semánticos del DS (`background`, `surface`, `elevated`, `text`, `textMuted`, `accent`, `accentSoft`, `onAccent`, `error`, `border`, hero, chart, intensity). Se borra la paleta violeta. El provider de M8 (preferencia + persistencia) queda igual. |
+| Mobile tipografía | `design-system/typography.ts` | `typeScale` de marca + estilo `numeric` (`tabular-nums`); variante de `AppText` por estilo iOS. |
+| Mobile haptics | `apps/mobile/src/platform/haptics.ts` | `haptic(event)` según `hapticsMap`; respeta el interruptor local que pide `IDENTIDAD.md` (`ownlevel.haptics.v1`); reemplaza `selection/success/warning`. |
+| Mobile vidrio | `design-system/glass.tsx` | `GlassControl`: `GlassView` si `isLiquidGlassAvailable()`, si no fondo `elevated` sólido. |
+| Web tema | `src/app/globals.css` | `@import` del CSS generado + mapeo de variables shadcn (`--primary`, `--background`, `--card`, `--muted`, `--border`, `--destructive`, `--chart-*`) a `--ol-*` bajo `:root` / `.dark`. |
+| Web fuentes | `src/app/layout.tsx` | Quitar Geist; stack del sistema de la marca. Mono solo si hace falta (1 uso de `font-mono`). |
+| Web metadata | `src/lib/brand-metadata.ts`, `src/lib/brand.ts`, `layout.tsx` (`themeColor`) | Colores #09090B / #F3F1EC, íconos de marca, maskable. |
+
+### 6.3 Destino de assets (propuesto; **no copiado todavía**)
+
+| Asset | Origen (`docs/brand/ownlevel-marca/`) | Destino |
+|---|---|---|
+| Ícono iOS (claro / oscuro / teñido) | `app-icon/ios/icon-1024{,-dark,-tinted}.png` | `apps/mobile/assets/brand/app-icon/ios/` → `app.json` `ios.icon.{light,dark,tinted}` |
+| Ícono iOS 26 (vidrio) | `app-icon/ios/icon-composer/*.svg` (capas) | Nacho arma `ownlevel.icon` en Icon Composer → `apps/mobile/assets/brand/app-icon/ios/ownlevel.icon` |
+| Android adaptativo | `app-icon/android/adaptive-{foreground,monochrome}.png` | `apps/mobile/assets/brand/app-icon/android/` → `android.adaptiveIcon` (fondo #09090B) |
+| Play Store | `app-icon/android/play-store-512.png` | Fuera del bundle (ficha de la tienda) |
+| Splash | `splash/splash-isotipo-{oscuro,claro}.png` | `apps/mobile/assets/brand/splash/` → plugin `expo-splash-screen` |
+| Logo en la app (Mobile) | `logo/png/isotipo-*.png` (o SVG si se suma `react-native-svg`) | `apps/mobile/assets/brand/logo/` |
+| Favicon / ícono Web | `web/favicon.ico`, `web/favicon.svg` | `src/app/favicon.ico`, `src/app/icon.svg` (convención de metadata de Next; reemplaza `icon.png`) |
+| Apple touch | `web/apple-touch-icon.png` (180) | `src/app/apple-icon.png` |
+| Manifest | `web/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `public/brand/icons/` → `brand-metadata.ts` (sumar `purpose: "maskable"`) |
+| Logos Web | `logo/*.svg` | `public/brand/logo/` → `src/lib/brand.ts` |
+| Assets viejos | `public/brand/ownlevel-*.png`, `apps/mobile/assets/images/ownlevel-app-icon.png`, carpeta legacy trackeada `Logos/Logos gym/*` | Borrar en un PR de limpieza **después** de verificar que nada los referencia |
+
+## 7. Dependencias
+
+| Paquete | Estado | Versión | Uso actual | ¿Hace falta? | Nota / conflicto |
+|---|---|---|---|---|---|
+| `expo-haptics` | Instalada (Mobile) | ~57.0.3 | `platform/haptics.ts`, 28 llamadas | Sí | Falta la API por evento y el interruptor que pide la identidad (C12). |
+| `expo-symbols` | Instalada (Mobile) | ~57.0.3 | `AppIcon`, `NativeTabs` | Sí | En Android usa Material Symbols, no Lucide (C6). |
+| `expo-linear-gradient` | **No instalada** | — | — | Solo para el hero | Nativa: requiere `npx expo install` y rebuild del dev client (C8). |
+| `lucide-react-native` | **No instalada** | — | — | Solo si se elige la opción B de C6 | Requiere `react-native-svg` (tampoco instalada, nativa). |
+| `lucide-react` | Instalada (Web) | ^1.8.0 | 92 archivos | Sí | Alineada con la marca. |
+| `expo-glass-effect` | **Solo transitiva** (vía `expo-router`), no es dependencia directa | 57.0.3 | Indirecta (NativeTabs) | Solo para controles flotantes | `GlassView` funciona en **iOS 26+**; en iOS < 26 (target 16.4), Android y Web renderiza un `View` común → fallback obligatorio. Si se usa directo, agregarla con `npx expo install`. |
+| `react-native-reanimated` | Instalada | 4.5.1 | Interacciones | Sí | Base para `motion.spring` y "Reducir movimiento". |
+| `react-native-svg` | No instalada | — | — | Solo para logos SVG o Lucide | Alternativa sin dependencia: PNG del logo. |
+
+**SF Pro:** en iOS, React Native sin `fontFamily` ya usa San Francisco (SF Pro Text/Display según tamaño). **No agregar archivos de fuente.** Android: Roboto por defecto ✔. Web: stack del sistema de `theme.css`; quitar Geist. No se incluyen binarios de fuentes en el repo ni en la documentación.
+
+Todo agregado nativo (`expo-linear-gradient`, `expo-glass-effect` directo, `react-native-svg`) y todo cambio de ícono o splash **requiere un dev client nuevo**: Fast Refresh no alcanza. Agruparlos en un solo PR para hacer un único rebuild.
+
+## 8. Roadmap
+
+### M9.0 — Release gates técnicos (sin branding)
+
+Resueltos: rotación de la secret de Supabase y guardrail (#173), QA físico de M7/M8, cierre de M3.3, ubicación canónica de la identidad, exclusión de `docs/**` del build raíz y versionado de `AGENTS.md`.
+
+Pendiente:
+1. **Baseline rojo de la raíz** (preexistente, ajeno a M9): 2 tests fallan (`daily-metrics/write-reliability`: nombre de migración desactualizado; `nutrition/pr73`: espera un writer directo eliminado) y hay errores de lint en archivos legacy (`mobile/` Capacitor, `scripts/testing/*.mjs`, `src/lib/mobile-api/daily-metrics*`) y en el worktree `.kilo/` que entra al lint. Arreglarlos o aislarlos en un PR chico para que M9 corra sobre CI verde.
+
+### M9.1 — Brand Foundations
+
+Base sin tocar pantallas:
+- tokens compartidos;
+- tema Mobile (light/dark de marca);
+- tipografía y `numeric`;
+- radios, espaciado y medidas;
+- semántica de color (C3);
+- íconos (decisión C6);
+- haptics por evento + el interruptor en Ajustes que exige `IDENTIDAD.md`;
+- logo;
+- ícono de la app;
+- splash;
+- favicon, metadata y manifest.
+
+Resultado: la app ya se ve con la paleta nueva por herencia del DS, aunque las pantallas todavía no estén pulidas.
+
+### M9.2 — Base Components
+
+Componentes base, con tests visuales/unitarios, sobre los que se apoya todo lo demás:
+- `Button` (alto 50, radio 14, presionado al 95 %);
+- `Input` (48/12);
+- `Surface`/Card (20/18, sin vidrio);
+- fila de lista (12);
+- chips (34/10);
+- controles de selección (reemplazan los `✓`);
+- headers y headers de sheet/modal (28);
+- feedback (error, incierto, confirmado, con el copy nuevo);
+- `EmptyState` con vista previa EJEMPLO;
+- skeleton/loading;
+- primitivas de gráfico (línea/barras desde 0, período anterior gris, rótulo directo, intensidad de 5 pasos);
+- `GlassControl`.
+
+Incluye un **glosario de copy de recuperación**: términos fijos para incierto/confirmado/bloqueado/conflicto, en tono compañero, preservando la acción explícita.
+
+### M9.3 — Screen Polish (Mobile)
+
+Orden propuesto: por impacto × dependencia de los componentes de M9.2, y con riesgo creciente.
+1. **Auth** (sign-in; primera impresión, poca lógica).
+2. **Home** (hero con degradado, header con isotipo, accesos).
+3. **Settings** (pantalla nueva de M8; valida el kit de filas y aloja el interruptor de vibración de la identidad).
+4. **Progress** (gráficos: aplica C3/C5, tendencias con flecha).
+5. **Body / Metrics** (badges de calidad, editores; copy de recuperación).
+6. **Nutrition** (día, editores, config; es el volumen más grande de copy técnico).
+7. **History** (calendario con escala de intensidad).
+8. **Training** fuera de la sesión activa (landing, rutinas, editor, biblioteca, historial, corrección; decisión C4).
+9. **Training: sesión activa y finish** (último por riesgo: drafts, autosave, CAS, timer; solo visual).
+
+### M9.4 — Web Brand Alignment
+
+- Adaptador CSS (C10/C11) y fuente del sistema.
+- Íconos, favicon, manifest y metadata.
+- Reemplazo de emerald/amber.
+- Gráficos web (baseline en 0, paleta `chart`).
+- Tono de copy.
+
+Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante, layouts de escritorio, foco de teclado. No clonar Mobile.
+
+### M9.5 — Release
+
+- Identidad de producción: nombre "OWNLEVEL", bundle ID/package y scheme de prod. Variantes por `EXPO_PUBLIC_APP_ENV` en `app.config.js`.
+- Ícono y splash finales, versionado y build number.
+- Callback de Auth de prod en el allowlist de Supabase.
+- Build de producción.
+- Accesibilidad: Dynamic Type, VoiceOver, contraste del champagne en claro, "Reducir movimiento".
+- Gates de App Store:
+  - **eliminación de cuenta dentro de la app** (Guideline 5.1.1(v); hoy no existe: gap de M8, necesita decisión de producto + backend);
+  - URL de política de privacidad;
+  - privacy manifest.
+- QA de release.
+
+## 9. Secuencia de PRs propuesta
+
+| PR | Fase | Contenido | Rebuild nativo |
+|---|---|---|---|
+| 0 | M9.0 | Baseline verde de la raíz (2 tests + lint preexistente) | No |
+| 1 | M9.1 | `packages/brand` (tokens canónicos + CSS generado + test de sincronía), aliases en ambos tsconfig + Metro | No |
+| 2 | M9.1 | Tema Mobile: paleta, tipografía, `numeric`, radios, espacios, semántica de color (sin pantallas) | No |
+| 3 | M9.1 | Assets nativos: ícono (claro/oscuro/teñido, adaptativo), splash, isotipo, `expo-linear-gradient` (+ `expo-glass-effect` directo / `react-native-svg` según decisiones) | **Sí (uno solo)** |
+| 4 | M9.1 | Haptics por evento + interruptor en Ajustes (exigido por `IDENTIDAD.md`) | No |
+| 5 | M9.2 | Controles base: Button, Input, chips, selección, filas, Surface | No |
+| 6 | M9.2 | Feedback + glosario de copy de recuperación + EmptyState EJEMPLO + skeleton | No |
+| 7 | M9.2 | Primitivas de gráfico + `GlassControl` | No |
+| 8–15 | M9.3 | Una pantalla o dominio por PR, en el orden de §8 | No |
+| 16 | M9.4 | Web: adaptador CSS + fuente + metadata, manifest e íconos | No |
+| 17 | M9.4 | Web: emerald/amber → tokens, gráficos, copy | No |
+| 18 | M9.5 | Variantes de producción, accesibilidad, gates de tienda (eliminación de cuenta = milestone propio si requiere backend) | Sí |
+
+## 10. Exclusiones y zonas protegidas
+
+- **M3.3 Active Session está cerrado.** Sus archivos (`training/active-session-*`, `session-*`, `finish-session-sheet.tsx`, `completed-session-*`, `summary-slider.tsx`, `app/(tabs)/train/session/[id].tsx`) entran en M9.3 como cualquier pantalla, al final y **solo con cambios visuales**: no tocar drafts, autosave, CAS/conflictos, timer ni mutaciones. Ahí viven 2 de los 3 usos de `tabular-nums`, el check verde de set completado (C3) y hex hardcodeados.
+- No se toca: semántica de datos, analytics (M7), contratos de API, write paths, Supabase, Vercel, Capacitor legacy (`mobile/`, `ios/`).
+- No se agregan funciones nuevas en M9 salvo las que exige la identidad o la tienda:
+  - interruptor de vibración (`IDENTIDAD.md`: "La vibración se puede apagar desde los Ajustes de la app.");
+  - eliminación de cuenta dentro de la app (requisito de App Store; decisión de producto y backend aparte, ver M9.5).
+- Fuera de esas dos, cualquier preferencia o feature nueva necesita pedido explícito.
+
+## 11. Cómo trabaja un agente en M9
+
+1. Leer `AGENTS.md`/`CLAUDE.md` → "Identidad de marca" y la parte relevante de `IDENTIDAD.md` + `tokens.ts`.
+2. Confirmar en qué PR de §9 cae el pedido; no adelantar fases.
+3. Si aparece un conflicto nuevo, agregarlo a §5 y preguntar; no decidir en silencio.
+4. Antes de usar un valor: token de marca. Si no existe, no inventar uno; documentar.
+5. QA visual en Simulator/iPhone (Mobile) o navegador (Web), light y dark, con "Reducir movimiento" activado y desactivado.
+6. No commitear, pushear ni abrir PR salvo pedido explícito (regla general del repo).

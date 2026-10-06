@@ -1,0 +1,211 @@
+/*
+ * OWNLEVEL · tema para la web (Next.js + Tailwind v4).
+ * Importar en el CSS global, después de `@import "tailwindcss";`.
+ *
+ * Clases que genera: bg-bg, bg-surface, bg-elevated, border-border, text-text,
+ * text-muted, text-accent, bg-accent, bg-accent-soft, text-on-accent, text-error,
+ * bg-error-soft, bg-hero (degradado), text-on-hero, bg-chart-1…6, bg-intensity-0…4,
+ * text-large-title, text-title-1, text-title-2, text-headline, text-body,
+ * text-subheadline, text-footnote, text-caption. Números: `tabular-nums`.
+ * Radios: rounded-card, rounded-inner, rounded-button, rounded-chip, rounded-input,
+ * rounded-sheet, rounded-tabbar. Espacios: la escala de Tailwind ya es de 4 px
+ * (p-4 = 16, gap-3 = 12…); usar solo 1, 2, 3, 4, 5, 6, 8, 10.
+ * Vidrio: clase `glass` (solo en controles). Movimiento: `ease-ol duration-200`.
+ *
+ * Modo: sigue al sistema. Para forzarlo, poné data-theme="dark" o "light" en <html>.
+ * Fuente: la del sistema (SF Pro en Apple). No se descarga ninguna.
+ */
+
+@theme inline {
+  --color-bg: var(--ol-bg);
+  --color-surface: var(--ol-surface);
+  --color-elevated: var(--ol-elevated);
+  --color-border: var(--ol-border);
+  --color-text: var(--ol-text);
+  --color-muted: var(--ol-text-muted);
+  --color-accent: var(--ol-accent);
+  --color-accent-soft: var(--ol-accent-soft);
+  --color-on-accent: var(--ol-on-accent);
+  --color-on-hero: var(--ol-on-hero);
+  --color-error: var(--ol-error);
+  --color-error-soft: var(--ol-error-soft);
+
+  --color-chart-1: var(--ol-chart-1);
+  --color-chart-2: var(--ol-chart-2);
+  --color-chart-3: var(--ol-chart-3);
+  --color-chart-4: var(--ol-chart-4);
+  --color-chart-5: var(--ol-chart-5);
+  --color-chart-6: var(--ol-chart-6);
+
+  --color-intensity-0: var(--ol-intensity-0);
+  --color-intensity-1: var(--ol-intensity-1);
+  --color-intensity-2: var(--ol-intensity-2);
+  --color-intensity-3: var(--ol-intensity-3);
+  --color-intensity-4: var(--ol-intensity-4);
+}
+
+@theme {
+  /* Radios · 77 B · Equilibrado → rounded-card, rounded-inner, rounded-button… */
+  --radius-card: 20px;
+  --radius-inner: 12px;
+  --radius-button: 14px;
+  --radius-chip: 10px;
+  --radius-input: 12px;
+  --radius-sheet: 28px;
+  --radius-tabbar: 26px;
+
+  /* Movimiento · 80 B → ease-ol; duraciones: duration-200 / duration-300 / duration-450 */
+  --ease-ol: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --text-large-title: 2.125rem;
+  --text-large-title--line-height: 1.2;
+  --text-large-title--letter-spacing: -0.012em;
+  --text-large-title--font-weight: 700;
+  --text-title-1: 1.75rem;
+  --text-title-1--line-height: 1.214;
+  --text-title-1--letter-spacing: -0.014em;
+  --text-title-1--font-weight: 700;
+  --text-title-2: 1.375rem;
+  --text-title-2--line-height: 1.273;
+  --text-title-2--letter-spacing: -0.014em;
+  --text-title-2--font-weight: 700;
+  --text-headline: 1.0625rem;
+  --text-headline--line-height: 1.294;
+  --text-headline--letter-spacing: -0.024em;
+  --text-headline--font-weight: 600;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.294;
+  --text-body--letter-spacing: -0.024em;
+  --text-subheadline: 0.9375rem;
+  --text-subheadline--line-height: 1.333;
+  --text-subheadline--letter-spacing: -0.013em;
+  --text-footnote: 0.8125rem;
+  --text-footnote--line-height: 1.385;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.333;
+  --text-caption--font-weight: 500;
+}
+
+@utility glass {
+  background-color: var(--ol-glass-fill);
+  border: 1px solid var(--ol-glass-border);
+  box-shadow: inset 0 1px 0 var(--ol-glass-highlight), 0 10px 30px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+}
+
+@utility bg-hero {
+  background-image: linear-gradient(150deg, var(--ol-hero-from) 0%, var(--ol-hero-to) 100%);
+}
+
+/* Oscuro: valor por defecto */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ol-bg: #09090B;
+  --ol-surface: #18181B;
+  --ol-elevated: #27272A;
+  --ol-border: rgba(255, 255, 255, 0.08);
+  --ol-text: #F4F4F5;
+  --ol-text-muted: #9F9FA9;
+  --ol-accent: #C9B68A;
+  --ol-accent-soft: rgba(201, 182, 138, 0.16);
+  --ol-on-accent: #1A1710;
+  --ol-hero-from: #DCCBA3;
+  --ol-hero-to: #A8935F;
+  --ol-on-hero: #1A1710;
+  --ol-error: #E5736B;
+  --ol-error-soft: rgba(229, 115, 107, 0.14);
+  --ol-chart-1: #C9B68A;
+  --ol-chart-2: #7FA3C9;
+  --ol-chart-3: #A99BD6;
+  --ol-chart-4: #D08C6A;
+  --ol-chart-5: #6FB3AA;
+  --ol-chart-6: #8E8E96;
+  --ol-intensity-0: #27272A;
+  --ol-intensity-1: #504B42;
+  --ol-intensity-2: #786E5A;
+  --ol-intensity-3: #A09272;
+  --ol-intensity-4: #C9B68A;
+  --ol-glass-fill: rgba(38, 38, 42, 0.55);
+  --ol-glass-border: rgba(255, 255, 255, 0.12);
+  --ol-glass-highlight: rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ol-bg: #F3F1EC;
+    --ol-surface: #FFFFFF;
+    --ol-elevated: #EAE7DF;
+    --ol-border: #E0DCD0;
+    --ol-text: #18181B;
+    --ol-text-muted: #6A6A72;
+    --ol-accent: #7D6A3C;
+    --ol-accent-soft: rgba(201, 182, 138, 0.32);
+    --ol-on-accent: #FFFFFF;
+    --ol-error: #B4392F;
+    --ol-error-soft: rgba(180, 57, 47, 0.10);
+    --ol-chart-1: #7D6A3C;
+    --ol-chart-2: #3F6A96;
+    --ol-chart-3: #6B5BA8;
+    --ol-chart-4: #A3573A;
+    --ol-chart-5: #2F7A72;
+    --ol-chart-6: #6A6A72;
+    --ol-intensity-0: #EAE7DF;
+    --ol-intensity-1: #CFC8B6;
+    --ol-intensity-2: #B4A88E;
+    --ol-intensity-3: #988965;
+    --ol-intensity-4: #7D6A3C;
+    --ol-glass-fill: rgba(255, 255, 255, 0.62);
+    --ol-glass-border: rgba(255, 255, 255, 0.9);
+    --ol-glass-highlight: rgba(255, 255, 255, 0.9);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ol-bg: #F3F1EC;
+  --ol-surface: #FFFFFF;
+  --ol-elevated: #EAE7DF;
+  --ol-border: #E0DCD0;
+  --ol-text: #18181B;
+  --ol-text-muted: #6A6A72;
+  --ol-accent: #7D6A3C;
+  --ol-accent-soft: rgba(201, 182, 138, 0.32);
+  --ol-on-accent: #FFFFFF;
+  --ol-error: #B4392F;
+  --ol-error-soft: rgba(180, 57, 47, 0.10);
+  --ol-chart-1: #7D6A3C;
+  --ol-chart-2: #3F6A96;
+  --ol-chart-3: #6B5BA8;
+  --ol-chart-4: #A3573A;
+  --ol-chart-5: #2F7A72;
+  --ol-chart-6: #6A6A72;
+  --ol-intensity-0: #EAE7DF;
+  --ol-intensity-1: #CFC8B6;
+  --ol-intensity-2: #B4A88E;
+  --ol-intensity-3: #988965;
+  --ol-intensity-4: #7D6A3C;
+  --ol-glass-fill: rgba(255, 255, 255, 0.62);
+  --ol-glass-border: rgba(255, 255, 255, 0.9);
+  --ol-glass-highlight: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer base {
+  html {
+    background-color: var(--ol-bg);
+    color: var(--ol-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
