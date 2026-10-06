@@ -50,7 +50,7 @@ function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd
   }>
     <View style={styles.header}>
       <ReturnToHistoryDay />
-      <AppText variant="overline">{date === today ? 'Hoy' : 'Día nutricional'}</AppText>
+      <AppText variant="footnote">{date === today ? 'Hoy' : 'Día nutricional'}</AppText>
       <AppText accessibilityRole="header" variant="heading">{displayNutritionDate(date)}</AppText>
       <View style={styles.dates}>
         <Button accessibilityLabel="Día anterior" disabled={!previous} label="‹" onPress={() => { if (previous) onSelect(previous); }} variant="secondary" />

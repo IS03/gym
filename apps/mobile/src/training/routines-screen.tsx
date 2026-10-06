@@ -108,7 +108,7 @@ function RoutineRow({
           {
             backgroundColor: routine.color
               ? trainingRoutineColor(routine.color, isDark)
-              : colors.unavailable,
+              : colors.textMuted,
           },
         ]}
         testID={`routine-color-${routine.id}-${routine.color ?? 'none'}`}
@@ -128,7 +128,7 @@ function RoutineRow({
             {metadata}
           </AppText>
           {!routine.isActive ? (
-            <AppText muted variant="overline">ARCHIVADA</AppText>
+            <AppText muted variant="footnote">ARCHIVADA</AppText>
           ) : null}
         </View>
         <AppIcon color={colors.textMuted} name="chevronRight" size={15} />

@@ -41,7 +41,7 @@ function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
     onRefresh={() => void refresh()} tintColor={colors.primary} />}>
     <View style={styles.header}>
       <ReturnToHistoryDay />
-      <AppText variant="overline">{date === serverToday ? 'Hoy' : 'Métricas del día'}</AppText>
+      <AppText variant="footnote">{date === serverToday ? 'Hoy' : 'Métricas del día'}</AppText>
       <AppText accessibilityRole="header" variant="heading">{displayNutritionDate(date)}</AppText>
       <View style={styles.dates}>
         <Button accessibilityLabel="Día anterior" disabled={!previous} label="‹" onPress={() => { if (previous) onSelect(previous); }} variant="secondary" />

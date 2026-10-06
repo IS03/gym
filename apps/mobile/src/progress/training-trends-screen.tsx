@@ -24,7 +24,7 @@ const fmt = (n: number, d = 1) => new Intl.NumberFormat('es-AR', { maximumFracti
 
 function ExerciseRow({ item, onPress }: { item: ProgressTrainingExercise; onPress: () => void }) {
   const { colors } = useOwnlevelTheme();
-  const tone = item.status === 'improved' ? colors.success ?? colors.primary : item.status === 'declined' ? colors.warning : colors.textMuted;
+  const tone = item.status === 'improved' ? colors.primary : item.status === 'declined' ? colors.text : colors.textMuted;
   return <View testID={`training-exercise-${item.id}`}><PressableSurface accessibilityLabel={`${item.name}: ${STATUS_LABELS[item.status]}`} onPress={onPress} style={styles.row}>
     <View style={styles.flex}>
       <AppText variant="label">{item.name}{item.isPersonalRecord ? ' · PR' : ''}</AppText>

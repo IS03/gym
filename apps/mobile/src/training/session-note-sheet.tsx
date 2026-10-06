@@ -79,5 +79,5 @@ const styles = StyleSheet.create({
   close: { minWidth: 72, minHeight: sizes.touchTarget, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, textAlign: 'center' }, save: { minWidth: 72, minHeight: sizes.touchTarget, alignItems: 'center', justifyContent: 'center' },
   body: { padding: spacing.lg, gap: spacing.md }, input: { minHeight: 144, maxHeight: 220, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: 17, textAlignVertical: 'top' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }, fallback: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, overflow: 'hidden' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }, fallback: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden' },
 });

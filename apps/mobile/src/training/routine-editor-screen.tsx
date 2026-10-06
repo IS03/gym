@@ -299,7 +299,7 @@ function TargetsEditor({
   };
   return (
     <View style={styles.editorBody}>
-      <AppText accessibilityRole="text" style={{ color: saved ? colors.success : colors.warning }} variant="caption">
+      <AppText accessibilityRole="text" style={{ color: saved ? colors.primary : colors.text }} variant="caption">
         {pending ? 'Guardando…' : saved ? 'Objetivo guardado' : 'Cambios sin guardar'}
       </AppText>
       <AppText variant="label">Series</AppText>
@@ -657,7 +657,7 @@ export function RoutineEditorScreen() {
   );
 
   const count = detail.items.reduce((total, item) => total + item.targets.sets.length, 0);
-  const strip = detail.routine.color ? trainingRoutineColor(detail.routine.color, isDark) : colors.unavailable;
+  const strip = detail.routine.color ? trainingRoutineColor(detail.routine.color, isDark) : colors.textMuted;
   return (
     <>
       <Stack.Screen options={{ headerBackButtonMenuEnabled: false, title: 'Rutinas' }} />
@@ -673,7 +673,7 @@ export function RoutineEditorScreen() {
           <View style={styles.flex}>
             <Heading>{detail.routine.name}</Heading>
             <AppText muted variant="caption">{plural(detail.items.length, 'ejercicio', 'ejercicios')} · {plural(count, 'serie', 'series')}</AppText>
-            {!detail.routine.isActive ? <AppText style={{ color: colors.warning }} variant="caption">Archivada</AppText> : null}
+            {!detail.routine.isActive ? <AppText style={{ color: colors.text }} variant="caption">Archivada</AppText> : null}
           </View>
           <Pressable accessibilityLabel="Editar identidad de rutina" accessibilityRole="button" disabled={Boolean(pending)} onPress={() => { if (guardStructure()) { identityOpenRef.current = true; setIdentityOpen(true); } }} style={[styles.editButton, { borderColor: colors.border }]}>
             <AppIcon color={colors.text} name="settings" size={18} />

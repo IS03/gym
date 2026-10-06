@@ -2,14 +2,18 @@ export {
   AppText,
   Button,
   EmptyState,
+  ExampleFrame,
   Heading,
   IconCircle,
+  InlineNotice,
   InlineUnavailable,
+  InnerSurface,
   LoadingState,
   PressableSurface,
   ProgressBar,
   Row,
   Screen,
+  ScreenHeader,
   ScrollScreen,
   SectionHeader,
   Separator,
@@ -17,6 +21,13 @@ export {
   Surface,
   UnavailableState,
 } from './primitives';
+export type { AppTextVariant, ButtonVariant } from './primitives';
+export { TextField } from './form';
+export { Chip, ChipGroup, SegmentedControl } from './selection';
+export type { SelectionOption } from './selection';
+export { ListGroup, ListRow } from './list';
+export { SheetHandle, SheetHeader, SheetSurface } from './sheet';
+export { motionDurations, pressedStyle, pressScale, useReduceMotion } from './motion';
 export { AppIcon, appIconSize } from './icons';
 export type { AppIconName } from './icons';
 export { OwnlevelThemeProvider, useOwnlevelTheme } from './theme';

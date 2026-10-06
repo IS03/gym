@@ -284,13 +284,28 @@ Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante,
 | 2 | M9.1 | ✅ M9.1B: tema Mobile sobre `packages/brand` (paleta, tipografía, radios, espacios; alias deprecados `success`/`warning`/`unavailable`/`overline`). Pendiente para M9.2: `numeric` y consumidores de los alias | No |
 | 3 | M9.1 | ✅ M9.1D: assets de marca instalados. Mobile: ícono iOS claro/oscuro/teñido, adaptativo Android (+ monocromo, fondo #09090B), splash por modo (isotipo, 96, #F3F1EC/#09090B), logos en `assets/brand/logo`. Web: `favicon.ico`, `icon.svg`, `apple-icon.png` (convención App Router), manifest 192/512/maskable, colores de marca. Legacy runtime borrado. Pendiente: `AppIcon name="brand"` → isotipo (M9.2/M9.3, Home), `.icon` de Icon Composer (M9.5), carpeta `Logos/` (limpieza aparte) | **Sí** (ícono y splash son nativos: prebuild + rebuild) |
 | 4 | M9.1 | ✅ M9.1C: íconos por plataforma (SF Symbols / Lucide) + haptics por evento + interruptor en Ajustes | Android: sí (react-native-svg) |
-| 5 | M9.2 | Controles base: Button, Input, chips, selección, filas, Surface | No |
-| 6 | M9.2 | Feedback + glosario de copy de recuperación + EmptyState EJEMPLO + skeleton | No |
-| 7 | M9.2 | Primitivas de gráfico + `GlassControl` | No |
+| 5–7 | M9.2 | ✅ M9.2 (un PR integral): Button, TextField, Surface/InnerSurface, ListRow/ListGroup, Chip/ChipGroup/SegmentedControl, SectionHeader/ScreenHeader, SheetHeader/SheetSurface, InlineNotice, Empty/Unavailable/Loading/Skeleton, ExampleFrame, `ValueBars` fiel. Diferidos a M9.3: glosario de copy de recuperación, `GlassControl` (requiere `expo-glass-effect` directo), primitivas de línea/período anterior | No |
 | 8–15 | M9.3 | Una pantalla o dominio por PR, en el orden de §8 | No |
 | 16 | M9.4 | Web: adaptador CSS + fuente + metadata, manifest e íconos | No |
 | 17 | M9.4 | Web: emerald/amber → tokens, gráficos, copy | No |
 | 18 | M9.5 | Variantes de producción, accesibilidad, gates de tienda (eliminación de cuenta = milestone propio si requiere backend) | Sí |
+
+## 9b. Resultado de M9.2 y pendientes por pantalla para M9.3
+
+**Primitives canónicas** (`apps/mobile/src/design-system`): `AppText` (roles oficiales + `numeric`), `Heading`, `Button` (primary/secondary/quiet/destructive, loading, icon; 50/14; presión 95 % o fundido con Reducir movimiento), `TextField` (48/12 sobre `elevated`, label/hint/error/disabled/numeric/search/multiline), `Surface` (20/18), `InnerSurface` (12), `ListRow`/`ListGroup`, `Chip`/`ChipGroup`/`SegmentedControl`, `SectionHeader` (Title 2), `ScreenHeader` (Large Title), `SheetHeader`/`SheetSurface`/`SheetHandle` (28), `InlineNotice` (acciones del caller), `EmptyState` (+ `ExampleFrame` EJEMPLO), `UnavailableState`, `LoadingState`, `SkeletonBlock`, `ProgressBar`, `IconCircle`. `ValueBars` usa escala lineal desde 0 (0 sin barra, sin dato = hueco, negativos a la izquierda, sin magnitud mínima).
+
+**Alias eliminados:** `success`, `warning`, `unavailable`, `overline`. **Siguen:** radios legacy `sm/md/lg/xl/pill` (≈90 usos; mismos valores que `input/inner/card/card/full`), nombres de rol `display/heading/label` (= largeTitle/title2/headline).
+
+**Pendientes por pantalla (M9.3; presentar antes de implementar):**
+- **Navegación:** con el tema forzado distinto del sistema, la barra nativa (vidrio iOS 26) sigue la apariencia del sistema y la pestaña activa pierde contraste. Íconos de pestañas Android en Material (C6).
+- **Inicio:** ícono `brand` → isotipo; hero sin degradado (`expo-linear-gradient`); wordmark con estilo propio.
+- **Entrenar:** colores de rutina (C4) y texto `#17131F`/`#FFFFFF` sobre ellos (`routines-screen`, `routine-editor-screen`); `summary-slider` y `session-native-interactions` con `#FFFFFF`/`#000`; encabezado de columna `✓` como glifo; botones de decisión (+ Peso / + Repeticiones) que son selección; cifras tabulares en series; inputs propios (`TargetInput`, celdas de serie, notas).
+- **Nutrición:** pila de acciones quiet; cifras del resumen sin `numeric`; copy técnico de recuperación ("intento", "lectura", "almacenamiento"); inputs propios (quick, meal, food, saved, day-write, date-selector, reporte).
+- **Progreso:** fila "Rendimiento de entrenamiento" se corta (label/valor); "mejoró" en champagne (debe ser flecha + neutro); cobertura baja con énfasis; período anterior en gris y rótulo directo en gráficos; cifras tabulares.
+- **Historial:** rótulo "Training" en inglés; escala de intensidad de 5 pasos en el calendario.
+- **Cuerpo / Métricas:** badges de calidad y mensajes de estado en texto neutro (antes ámbar); inputs ya en `TextField`.
+- **Ajustes:** tarjeta de perfil e íconos de filas a decidir.
+- **Restantes `TextInput` propios** (≈20 archivos) a migrar a `TextField` dentro de cada pantalla.
 
 ## 10. Exclusiones y zonas protegidas
 

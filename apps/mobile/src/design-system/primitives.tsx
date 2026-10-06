@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   type TextProps,
+  type TextStyle,
   type ViewProps,
   type ViewStyle,
   View,
@@ -16,34 +17,45 @@ import {
   SafeAreaView,
 } from 'react-native-safe-area-context';
 
+import { layout } from './brand';
+import { AppIcon, appIconSize, type AppIconName } from './icons';
+import { pressedStyle, useReduceMotion } from './motion';
 import { radius, sizes, spacing, typography } from './tokens';
 import { useOwnlevelTheme } from './theme';
-import { AppIcon, type AppIconName } from './icons';
 
-type AppTextVariant = keyof typeof typography;
+// Base components on the OWNLEVEL design system (IDENTIDAD.md § Sistema). Solid
+// surfaces only (no glass on cards, rows, inputs or hero), one champagne accent,
+// `danger` only for system failures and destructive actions.
+
+export type AppTextVariant = keyof typeof typography;
 
 type AppTextProps = TextProps & {
   muted?: boolean;
+  /** Tabular figures so changing numbers do not jump (IDENTIDAD.md § Tipografía). */
+  numeric?: boolean;
   variant?: AppTextVariant;
 };
 
-export function AppText({ muted = false, style, variant = 'body', ...props }: AppTextProps) {
+const numericStyle: TextStyle = { fontVariant: ['tabular-nums'] };
+
+export function AppText({ muted = false, numeric = false, style, variant = 'body', ...props }: AppTextProps) {
   const { colors } = useOwnlevelTheme();
 
   return (
     <Text
       {...props}
-      style={[typography[variant], { color: muted ? colors.textMuted : colors.text }, style]}
+      style={[typography[variant], { color: muted ? colors.textMuted : colors.text }, numeric && numericStyle, style]}
     />
   );
 }
 
 type HeadingProps = Omit<AppTextProps, 'variant'> & {
+  /** 1 = Large Title (screen), 2 = Title 2 (section/card). */
   level?: 1 | 2;
 };
 
 export function Heading({ level = 1, ...props }: HeadingProps) {
-  return <AppText accessibilityRole="header" variant={level === 1 ? 'display' : 'heading'} {...props} />;
+  return <AppText accessibilityRole="header" variant={level === 1 ? 'largeTitle' : 'title2'} {...props} />;
 }
 
 type ScreenProps = PropsWithChildren<{
@@ -101,6 +113,7 @@ export function ScrollScreen({
 
 type SurfaceProps = ViewProps & { elevated?: boolean };
 
+/** Card: radius 20, padding 18, solid surface. */
 export function Surface({
   children,
   elevated = false,
@@ -124,6 +137,16 @@ export function Surface({
   );
 }
 
+/** Inner block inside a card (radius 12, brand "elevated" background). */
+export function InnerSurface({ children, style, ...props }: ViewProps) {
+  const { colors } = useOwnlevelTheme();
+  return (
+    <View {...props} style={[styles.inner, { backgroundColor: colors.surfaceRaised }, style]}>
+      {children}
+    </View>
+  );
+}
+
 export function Row({ children, style, ...props }: ViewProps) {
   return (
     <View {...props} style={[styles.row, style]}>
@@ -132,44 +155,67 @@ export function Row({ children, style, ...props }: ViewProps) {
   );
 }
 
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'destructive';
+
 type ButtonProps = {
   accessibilityHint?: string;
   accessibilityLabel?: string;
   disabled?: boolean;
+  /** Leading icon (AppIcon), 20 pt as the brand sets for buttons. */
+  icon?: AppIconName;
   label: string;
+  /** Shows progress and blocks presses (the action is in flight). */
+  loading?: boolean;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'quiet';
+  testID?: string;
+  /**
+   * primary = the one champagne action; secondary = neutral; quiet = low-emphasis text
+   * action; destructive = real destructive actions only (brand error).
+   */
+  variant?: ButtonVariant;
 };
 
+/** Height 50 (quiet: 44 min touch), radius 14, no decorative shadows, no haptics. */
 export function Button({
   accessibilityHint,
   accessibilityLabel,
   disabled = false,
+  icon,
   label,
+  loading = false,
   onPress,
+  testID,
   variant = 'primary',
 }: ButtonProps) {
   const { colors } = useOwnlevelTheme();
-  const isPrimary = variant === 'primary';
-  const isQuiet = variant === 'quiet';
+  const reduceMotion = useReduceMotion();
+  const blocked = disabled || loading;
+  const tone = {
+    primary: { background: colors.primary, border: colors.primary, text: colors.onPrimary },
+    secondary: { background: colors.surfaceRaised, border: colors.border, text: colors.text },
+    quiet: { background: 'transparent', border: 'transparent', text: colors.text },
+    destructive: { background: colors.dangerSoft, border: 'transparent', text: colors.danger },
+  }[variant];
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
-      disabled={disabled}
+      accessibilityState={{ busy: loading, disabled: blocked }}
+      disabled={blocked}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.button,
-        {
-          backgroundColor: isPrimary ? colors.primary : isQuiet ? 'transparent' : colors.surfaceRaised,
-          borderColor: isQuiet ? 'transparent' : isPrimary ? colors.primary : colors.border,
-          opacity: disabled ? 0.45 : pressed ? 0.72 : 1,
-        },
+        variant === 'quiet' && styles.buttonQuiet,
+        { backgroundColor: tone.background, borderColor: tone.border },
+        blocked && styles.disabled,
+        pressedStyle(pressed && !blocked, reduceMotion),
       ]}
     >
-      <AppText style={{ color: isPrimary ? colors.onPrimary : colors.text }} variant="label">
+      {loading ? <ActivityIndicator color={tone.text} size="small" /> : icon ? <AppIcon color={tone.text} name={icon} size={appIconSize.row} /> : null}
+      <AppText style={{ color: tone.text }} variant="label">
         {label}
       </AppText>
     </Pressable>
@@ -253,7 +299,7 @@ export function IconCircle({
       <AppIcon
         color={color ?? colors.primary}
         name={icon}
-        size={compact ? 17 : 20}
+        size={compact ? appIconSize.inline : appIconSize.row}
       />
     </View>
   );
@@ -262,20 +308,26 @@ export function IconCircle({
 type SectionHeaderProps = {
   actionLabel?: string;
   onAction?: () => void;
+  subtitle?: string;
   title: string;
 };
 
+/** Section title (Title 2) with an optional subtitle and trailing action. */
 export function SectionHeader({
   actionLabel,
   onAction,
+  subtitle,
   title,
 }: SectionHeaderProps) {
   const { colors } = useOwnlevelTheme();
   return (
     <View style={styles.sectionHeader}>
-      <AppText accessibilityRole="header" style={styles.sectionTitle}>
-        {title}
-      </AppText>
+      <View style={styles.headerText}>
+        <AppText accessibilityRole="header" variant="title2">
+          {title}
+        </AppText>
+        {subtitle ? <AppText muted variant="subheadline">{subtitle}</AppText> : null}
+      </View>
       {actionLabel && onAction ? (
         <Pressable
           accessibilityLabel={actionLabel}
@@ -287,12 +339,31 @@ export function SectionHeader({
             { opacity: pressed ? 0.55 : 1 },
           ]}
         >
-          <AppText style={{ color: colors.primary }} variant="caption">
+          <AppText style={{ color: colors.primary }} variant="subheadline">
             {actionLabel}
           </AppText>
-          <AppIcon color={colors.primary} name="chevronRight" size={14} />
+          <AppIcon color={colors.primary} name="chevronRight" size={appIconSize.inline} />
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+type ScreenHeaderProps = {
+  subtitle?: string;
+  title: string;
+  trailing?: ReactNode;
+};
+
+/** In-content screen header (Large Title) for screens without a native header title. */
+export function ScreenHeader({ subtitle, title, trailing }: ScreenHeaderProps) {
+  return (
+    <View style={styles.screenHeader}>
+      <View style={styles.headerText}>
+        <AppText accessibilityRole="header" variant="largeTitle">{title}</AppText>
+        {subtitle ? <AppText muted variant="subheadline">{subtitle}</AppText> : null}
+      </View>
+      {trailing}
     </View>
   );
 }
@@ -329,7 +400,7 @@ export function PressableSurface({
           backgroundColor: pressed ? colors.surfaceRaised : colors.surface,
           borderColor: colors.border,
         },
-        disabled ? styles.pressableDisabled : null,
+        disabled ? styles.disabled : null,
         style,
       ]}
     >
@@ -352,8 +423,8 @@ export function InlineUnavailable({
   const { colors } = useOwnlevelTheme();
   return (
     <View accessibilityRole="alert" style={styles.inlineUnavailable}>
-      <AppIcon color={colors.unavailable} name="warning" size={18} />
-      <AppText muted style={styles.inlineUnavailableText} variant="caption">
+      <AppIcon color={colors.textMuted} name="warning" size={appIconSize.inline} />
+      <AppText muted style={styles.flex} variant="footnote">
         {message}
       </AppText>
       {actionLabel && onAction ? (
@@ -363,12 +434,41 @@ export function InlineUnavailable({
           hitSlop={8}
           onPress={onAction}
         >
-          <AppText style={{ color: colors.primary }} variant="caption">
+          <AppText style={{ color: colors.primary }} variant="footnote">
             {actionLabel}
           </AppText>
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+type InlineNoticeProps = PropsWithChildren<{
+  message: string;
+  /**
+   * neutral = state to know about (e.g. an intent kept for explicit recovery);
+   * busy = something in flight; error = a real system failure.
+   */
+  tone?: 'neutral' | 'busy' | 'error';
+}>;
+
+/**
+ * Inline status message. Actions are passed by the caller as children so each flow
+ * keeps its exact semantics ("Comprobar", "Revisar intento", ...), never a generic retry.
+ */
+export function InlineNotice({ children, message, tone = 'neutral' }: InlineNoticeProps) {
+  const { colors } = useOwnlevelTheme();
+  const color = tone === 'error' ? colors.danger : colors.text;
+  return (
+    <InnerSurface accessibilityLiveRegion="polite" accessibilityRole={tone === 'busy' ? 'progressbar' : 'alert'} style={styles.notice}>
+      <View style={styles.noticeLine}>
+        {tone === 'busy'
+          ? <ActivityIndicator color={colors.textMuted} size="small" />
+          : <AppIcon color={tone === 'error' ? colors.danger : colors.textMuted} name="warning" size={appIconSize.inline} />}
+        <AppText style={[styles.flex, { color }]} variant="subheadline">{message}</AppText>
+      </View>
+      {children}
+    </InnerSurface>
   );
 }
 
@@ -400,11 +500,13 @@ type StateProps = {
   title: string;
 };
 
-function StateMessage({ action, description, title }: StateProps) {
+function StateMessage({ action, children, description, icon, title }: StateProps & PropsWithChildren<{ icon?: ReactNode }>) {
   return (
     <Surface accessibilityRole="summary" style={styles.state}>
-      <AppText variant="label">{title}</AppText>
-      <AppText muted>{description}</AppText>
+      {icon}
+      <AppText variant="headline">{title}</AppText>
+      <AppText muted variant="subheadline">{description}</AppText>
+      {children}
       {action}
     </Surface>
   );
@@ -415,23 +517,47 @@ export function LoadingState({ label = 'Cargando' }: { label?: string }) {
 
   return (
     <Surface accessibilityLabel={label} accessibilityRole="progressbar" style={styles.loadingState}>
-      <ActivityIndicator color={colors.primary} />
-      <AppText muted>{label}</AppText>
+      <ActivityIndicator color={colors.textMuted} />
+      <AppText muted variant="subheadline">{label}</AppText>
     </Surface>
   );
 }
 
-export function EmptyState(props: StateProps) {
-  return <StateMessage {...props} />;
+type EmptyStateProps = StateProps & {
+  /**
+   * Optional preview of what the screen will look like (IDENTIDAD.md § Estados vacíos):
+   * rendered greyed under a visible EJEMPLO label. Content must use neutral colors and
+   * never look like the user's real numbers.
+   */
+  example?: ReactNode;
+};
+
+/** Truly empty (the data exists and there is nothing yet). Not for unavailable reads. */
+export function EmptyState({ example, ...props }: EmptyStateProps) {
+  return (
+    <StateMessage {...props}>
+      {example ? <ExampleFrame>{example}</ExampleFrame> : null}
+    </StateMessage>
+  );
 }
 
-export function UnavailableState(props: StateProps) {
+/** Greyed sample content with an always-visible EJEMPLO label. */
+export function ExampleFrame({ children }: PropsWithChildren) {
   const { colors } = useOwnlevelTheme();
   return (
-    <View style={{ borderLeftColor: colors.unavailable, borderLeftWidth: 3 }}>
-      <StateMessage {...props} />
+    <View accessibilityLabel="Ejemplo" style={[styles.example, { borderColor: colors.border }]}>
+      <AppText muted style={styles.exampleLabel} variant="caption">EJEMPLO</AppText>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.exampleContent}>
+        {children}
+      </View>
     </View>
   );
+}
+
+/** The read failed: data may exist but could not be confirmed. Never shown as empty. */
+export function UnavailableState(props: StateProps) {
+  const { colors } = useOwnlevelTheme();
+  return <StateMessage {...props} icon={<AppIcon color={colors.textMuted} name="warning" size={appIconSize.row} />} />;
 }
 
 const styles = StyleSheet.create({
@@ -441,27 +567,30 @@ const styles = StyleSheet.create({
   screenContent: {
     alignSelf: 'center',
     flex: 1,
-    gap: spacing.xl,
+    gap: layout.blockGap,
     maxWidth: sizes.contentMaxWidth,
-    padding: spacing.lg,
+    padding: layout.screenPadding,
     width: '100%',
   },
   scrollContent: {
     alignSelf: 'center',
     flexGrow: 1,
-    gap: spacing.xl,
+    gap: layout.blockGap,
     maxWidth: sizes.contentMaxWidth,
-    padding: spacing.lg,
+    padding: layout.screenPadding,
     width: '100%',
   },
   centered: {
     justifyContent: 'center',
   },
+  flex: {
+    flex: 1,
+  },
   surface: {
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
     gap: spacing.md,
-    padding: spacing.lg,
+    padding: layout.cardPadding,
   },
   elevated: {
     elevation: 2,
@@ -469,6 +598,11 @@ const styles = StyleSheet.create({
     shadowOffset: { height: 2, width: 0 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
+  },
+  inner: {
+    borderRadius: radius.inner,
+    gap: spacing.sm,
+    padding: spacing.md,
   },
   row: {
     alignItems: 'center',
@@ -478,75 +612,105 @@ const styles = StyleSheet.create({
   },
   button: {
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.button,
     borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
     justifyContent: 'center',
-    minHeight: sizes.touchTarget,
+    minHeight: layout.buttonHeight,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  pressableDisabled: {
-    opacity: 0.5,
+  buttonQuiet: {
+    minHeight: layout.minTouch,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   separator: {
     height: sizes.separator,
     width: '100%',
   },
   progressTrack: {
-    borderRadius: radius.pill,
-    height: 7,
+    borderRadius: radius.full,
+    height: 8,
     overflow: 'hidden',
     width: '100%',
   },
   progressFill: {
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     height: '100%',
   },
   iconCircle: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     height: 40,
     justifyContent: 'center',
     width: 40,
   },
   iconCircleSmall: {
-    height: 34,
-    width: 34,
+    height: 32,
+    width: 32,
   },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.md,
     justifyContent: 'space-between',
-    minHeight: sizes.touchTarget,
+    minHeight: layout.minTouch,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    lineHeight: 24,
+  screenHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  headerText: {
+    flex: 1,
+    gap: spacing.xs,
   },
   sectionAction: {
     alignItems: 'center',
     flexDirection: 'row',
-    minHeight: sizes.touchTarget,
+    gap: spacing.xs,
+    minHeight: layout.minTouch,
   },
   inlineUnavailable: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: sizes.touchTarget,
+    minHeight: layout.minTouch,
   },
-  inlineUnavailableText: {
-    flex: 1,
+  notice: {
+    gap: spacing.md,
+  },
+  noticeLine: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   skeleton: {
-    borderRadius: radius.sm,
+    borderRadius: radius.inner,
   },
   state: {
-    borderRadius: radius.md,
+    gap: spacing.sm,
   },
   loadingState: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.md,
+  },
+  example: {
+    borderRadius: radius.inner,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  exampleLabel: {
+    letterSpacing: 0.6,
+  },
+  exampleContent: {
+    opacity: 0.45,
   },
 });

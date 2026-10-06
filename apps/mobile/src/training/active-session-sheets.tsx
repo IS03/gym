@@ -5,18 +5,12 @@ import { fetchMobileTrainingExercises, useApiResource } from '@/api';
 import type { MobileApiClient } from '@/api/client';
 import type { SessionDetailDto, SessionExerciseDto } from '@/api/active-session';
 import type { MobileTrainingExercise, MobileTrainingMuscleGroup } from '@/api/exercises';
-import { AppIcon, AppText, Button, EmptyState, Heading, InlineUnavailable, SkeletonBlock, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
+import { AppIcon, AppText, Button, EmptyState, InlineUnavailable, SheetHeader, SkeletonBlock, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
 import { MUSCLE_GROUP_OPTIONS, exerciseSummary } from './exercise-library-model';
 import { pickerExercises } from './routine-editor-model';
 import { compactActual, compactHistoryDate, historyLoadLabel, quickSessions } from './active-session-model';
 export { SessionNoteSheet } from './session-note-sheet';
 
-export function SheetHeader({ title, subtitle, onClose }: { title: string; subtitle: string; onClose: () => void }) {
-  return <View style={styles.header}>
-    <View style={styles.flex}><Heading level={2}>{title}</Heading><AppText muted variant="caption">{subtitle}</AppText></View>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Cerrar ${title}`} onPress={onClose} style={styles.close}><AppText style={styles.closeText}>×</AppText></Pressable>
-  </View>;
-}
 function PickerBody({ client, existingIds, onClose, onCreate, onAdd }: {
   client: MobileApiClient; existingIds: ReadonlySet<string>; onClose: () => void; onCreate: () => void; onAdd: (exercise: MobileTrainingExercise) => void;
 }) {
@@ -102,7 +96,7 @@ export function SessionQuickHistory({ exercise, history, onClose, onRefresh }: {
 const styles = StyleSheet.create({
   screen: { flex: 1 }, flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg },
-  close: { minWidth: sizes.touchTarget, minHeight: sizes.touchTarget, alignItems: 'center', justifyContent: 'center' }, closeText: { fontSize: 28 },
+
   controls: { paddingHorizontal: spacing.lg, gap: spacing.sm }, chips: { gap: spacing.sm, paddingVertical: spacing.xs },
   chip: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, minHeight: sizes.touchTarget, justifyContent: 'center' },
   input: { borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: sizes.touchTarget, fontSize: 16 },

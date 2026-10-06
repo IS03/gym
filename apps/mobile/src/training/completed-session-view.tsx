@@ -24,7 +24,7 @@ export function PostWorkoutSheet({ finished, onHome, onViewSession }: { finished
       <Pressable accessibilityLabel="Ver sesión terminada" style={styles.flex} onPress={onViewSession} />
       <SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]} testID="post-workout-sheet">
         <View style={styles.row}>
-          <View style={[styles.check, { backgroundColor: `${colors.success}22` }]}><AppIcon name="check" color={colors.success} size={22} /></View>
+          <View style={[styles.check, { backgroundColor: `${colors.primary}22` }]}><AppIcon name="check" color={colors.primary} size={22} /></View>
           <View style={styles.flex}>
             <Heading level={2}>Entrenamiento guardado</Heading>
             <AppText muted variant="caption">{summary.name} se guardó correctamente.</AppText>
@@ -53,7 +53,7 @@ export function CompletedSessionView({ detail, finished, onHome, onTraining, onO
   const discarded = model.status === 'discarded';
   return <ScrollScreen testID={discarded ? 'discarded-session' : 'completed-session'}>
     <Surface elevated style={styles.header}>
-      <AppText muted variant="overline">{discarded ? 'SESIÓN ELIMINADA' : 'SESIÓN FINALIZADA'}</AppText>
+      <AppText muted variant="footnote">{discarded ? 'SESIÓN ELIMINADA' : 'SESIÓN FINALIZADA'}</AppText>
       <Heading level={2}>{model.name}</Heading>
       <AppText muted variant="caption">{[compactHistoryDate(model.logDate), model.duration].filter(Boolean).join(' · ')}</AppText>
       <AppText variant="label">{model.completedSetCount} {model.completedSetCount === 1 ? 'serie completada' : 'series completadas'} · {model.completedExerciseCount}/{model.exerciseCount} ejercicios</AppText>
@@ -71,7 +71,7 @@ export function CompletedSessionView({ detail, finished, onHome, onTraining, onO
         accessibilityLabel={`Serie ${set.setNumber}: ${set.label}${set.completed ? ', completada' : ', no completada'}`}>
         <AppText muted style={styles.setNumber} variant="caption">{set.setNumber}</AppText>
         <AppText style={[styles.flex, set.completed ? null : { color: colors.textMuted }]} variant="caption">{set.label}</AppText>
-        {set.completed ? <AppIcon name="check" color={colors.success} size={16} /> : null}
+        {set.completed ? <AppIcon name="check" color={colors.primary} size={16} /> : null}
       </View>)}
     </Surface>)}
     {actions}
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   metadataItem: { minWidth: 88, gap: 2 }, metadataNote: { width: '100%', gap: 2 },
   set: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 28 }, setNumber: { width: 20 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  sheet: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, padding: spacing.lg, gap: spacing.md },
+  sheet: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, borderWidth: StyleSheet.hairlineWidth, padding: spacing.lg, gap: spacing.md },
   check: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   totals: { borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, padding: spacing.md, gap: 2 },
 });

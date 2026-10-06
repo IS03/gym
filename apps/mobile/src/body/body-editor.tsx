@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BODY_MEASUREMENT_FIELDS, BODY_MEASUREMENT_LABELS } from '@/api/body';
-import { AppText, Button, Surface, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
-import { SheetHeader } from '@/training/active-session-sheets';
+import { AppText, Button, SheetHeader, Surface, TextField, spacing, useOwnlevelTheme } from '@/design-system';
 import type { BodyController, BodyState } from './body-controller';
 import { formatCm, formatKg, measurementBadges } from './body-model';
 import type { MeasurementEditor, WeightEditor } from './body-storage';
@@ -12,14 +11,8 @@ function Field({ label, value, onChange, error, unit, editable, keyboard = 'deci
   label: string; value: string; onChange: (v: string) => void; error?: string; unit?: string; editable: boolean;
   keyboard?: 'decimal-pad' | 'numbers-and-punctuation' | 'default'; placeholder?: string; multiline?: boolean;
 }) {
-  const { colors } = useOwnlevelTheme();
-  return <View style={styles.field}>
-    <AppText variant="label">{label}{unit ? <AppText muted variant="caption">{`  ${unit}`}</AppText> : null}</AppText>
-    <TextInput accessibilityLabel={label} editable={editable} keyboardType={keyboard} value={value} onChangeText={onChange} placeholder={placeholder ?? '—'}
-      placeholderTextColor={colors.textMuted} multiline={multiline} autoCorrect={false} selectTextOnFocus={!multiline}
-      style={[styles.input, multiline ? styles.multiline : null, { color: colors.text, backgroundColor: colors.surface, borderColor: error ? colors.danger : colors.border, opacity: editable ? 1 : 0.6 }]} />
-    {error ? <AppText accessibilityRole="alert" style={{ color: colors.danger }} variant="caption">{error}</AppText> : null}
-  </View>;
+  return <TextField label={label} unit={unit} value={value} onChangeText={onChange} error={error} disabled={!editable} keyboardType={keyboard}
+    placeholder={placeholder ?? '—'} multiline={multiline} autoCorrect={false} selectTextOnFocus={!multiline} numeric={keyboard !== 'default'} />;
 }
 
 /** Shared sheet shell: explicit states, no dismissal while a change is in flight or unresolved. */
@@ -37,7 +30,7 @@ function EditorShell({ title, subtitle, state, controller, children, primary, de
       { text: 'Seguir editando', style: 'cancel' }, { text: 'Descartar', style: 'destructive', onPress: () => controller.close() },
     ]);
   };
-  const tone = phase === 'uncertain' || phase === 'confirmed' ? colors.warning : phase === 'conflict' || phase === 'blocked' ? colors.danger : colors.text;
+  const tone = phase === 'uncertain' || phase === 'confirmed' ? colors.text : phase === 'conflict' || phase === 'blocked' ? colors.danger : colors.text;
   return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} testID="body-editor">
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -85,8 +78,8 @@ export function MeasurementEditorSheet({ editor, state, controller }: { editor: 
     state={state} controller={controller}
     primary={{ label: suspect ? 'Guardar y verificar' : 'Guardar', disabled: !!baseline && !suspect && !controller.dirty(), onPress: () => void controller.saveMeasurement() }}
     destructive={baseline ? { label: 'Eliminar medición', confirm: '¿Eliminar esta medición?', onPress: () => void controller.deleteMeasurement() } : undefined}>
-    {baseline ? measurementBadges(baseline).map(badge => <Surface key={badge.text} style={{ borderColor: badge.tone === 'warning' ? colors.warning : colors.border }}>
-      <AppText style={{ color: badge.tone === 'warning' ? colors.warning : colors.textMuted }} variant="caption">{badge.text}</AppText>
+    {baseline ? measurementBadges(baseline).map(badge => <Surface key={badge.text} style={{ borderColor: badge.tone === 'warning' ? colors.text : colors.border }}>
+      <AppText style={{ color: badge.tone === 'warning' ? colors.text : colors.textMuted }} variant="caption">{badge.text}</AppText>
     </Surface>) : null}
     {suspect ? <AppText muted variant="caption">Al guardar la corrección, la medición se marca como verificada y vuelve a contar en el análisis.</AppText> : null}
     <Field label="Fecha" placeholder="DD/MM/AAAA" keyboard="numbers-and-punctuation" value={editor.draft.date} editable={editable}
@@ -109,9 +102,6 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   footer: { padding: spacing.lg, gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  field: { gap: spacing.xs },
-  input: { minHeight: sizes.touchTarget, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: 16 },
-  multiline: { minHeight: 88, paddingVertical: spacing.sm, textAlignVertical: 'top' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -spacing.xs },
   cell: { width: '50%', paddingHorizontal: spacing.xs, paddingBottom: spacing.sm },
 });

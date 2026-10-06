@@ -18,7 +18,7 @@ function Row({ title, detail, badges, onPress, label, divided }: { title: string
     <View style={styles.flex}>
       <AppText variant="label">{title}</AppText>
       <AppText muted numberOfLines={2} variant="caption">{detail}</AppText>
-      {badges?.map(b => <AppText key={b} style={{ color: colors.warning }} variant="caption">{b}</AppText>)}
+      {badges?.map(b => <AppText key={b} style={{ color: colors.text }} variant="caption">{b}</AppText>)}
     </View>
     {onPress ? <AppIcon color={colors.textMuted} name="chevronRight" size={14} /> : null}
   </Pressable>;
@@ -63,7 +63,7 @@ function MeasurementSection({ state, controller, editable }: { state: BodyState;
       {latest ? <>
         <AppText variant="label">{formatBodyDate(latest.measuredOn)}</AppText>
         {measurementValues(latest).map(v => <View key={v.field} style={styles.value}><AppText muted variant="caption">{v.label}</AppText><AppText variant="caption">{v.value}</AppText></View>)}
-        {measurementBadges(latest).map(b => <AppText key={b.text} style={{ color: b.tone === 'warning' ? colors.warning : colors.textMuted }} variant="caption">{b.text}</AppText>)}
+        {measurementBadges(latest).map(b => <AppText key={b.text} style={{ color: b.tone === 'warning' ? colors.text : colors.textMuted }} variant="caption">{b.text}</AppText>)}
       </> : <AppText muted>Todavía no registraste medidas.</AppText>}
       <Button label="Registrar medidas" disabled={!editable} onPress={() => controller.openMeasurement()} />
     </Surface>

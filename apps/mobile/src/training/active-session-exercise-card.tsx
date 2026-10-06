@@ -80,7 +80,7 @@ export const ActiveExerciseCard = memo(function ActiveExerciseCard({ controller,
         {draft.notes.trim() ? <View style={styles.noteIndicator} accessibilityLabel="Este ejercicio tiene una nota">
           <AppIcon name="note" color={colors.textMuted} size={13} /><AppText muted variant="caption">Nota</AppText></View> : null}
       </View>
-      <View style={[styles.badge, { backgroundColor: completion.complete ? colors.brandSubtle : colors.surfaceRaised }]}><AppText style={{ color: completion.complete ? colors.success : colors.textMuted }} variant="caption">{completion.completed}/{completion.total}</AppText></View>
+      <View style={[styles.badge, { backgroundColor: completion.complete ? colors.brandSubtle : colors.surfaceRaised }]}><AppText style={{ color: completion.complete ? colors.primary : colors.textMuted }} variant="caption">{completion.completed}/{completion.total}</AppText></View>
       {state.phase === 'saving' ? <ActivityIndicator testID={`exercise-saving-${id}`} accessibilityLabel="Sincronizando ejercicio" size="small" color={colors.textMuted} /> : null}
       <View style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}><AppIcon name="chevronRight" color={colors.textMuted} size={15} /></View>
     </NativeDragHandle></NativeSwipeActions>
@@ -99,9 +99,9 @@ export const ActiveExerciseCard = memo(function ActiveExerciseCard({ controller,
           onPress={() => { Keyboard.dismiss(); onHistory(id); }} style={[styles.historyTrigger, { backgroundColor: colors.brandSubtle, opacity: locked ? 0.45 : 1 }]}>
           <AppIcon name="clock" color={colors.primary} size={16} /><AppText style={{ color: colors.primary }} variant="caption">Historial</AppText>
         </Pressable></View>
-      <SeriesColumns header ordinal={<AppText muted style={styles.columnTitle} variant="overline">#</AppText>}
-        kg={<AppText muted style={styles.columnTitle} variant="overline">KG</AppText>} reps={<AppText muted style={styles.columnTitle} variant="overline">REPS</AppText>}
-        rir={<AppText muted style={styles.columnTitle} variant="overline">RIR</AppText>} completed={<AppText muted style={styles.columnTitle} variant="overline">✓</AppText>} />
+      <SeriesColumns header ordinal={<AppText muted style={styles.columnTitle} variant="footnote">#</AppText>}
+        kg={<AppText muted style={styles.columnTitle} variant="footnote">KG</AppText>} reps={<AppText muted style={styles.columnTitle} variant="footnote">REPS</AppText>}
+        rir={<AppText muted style={styles.columnTitle} variant="footnote">RIR</AppText>} completed={<AppText muted style={styles.columnTitle} variant="footnote">✓</AppText>} />
       <NativeReorderList ids={draft.sets.map(set => set.localId)} onLift={() => { const accepted = controller.beginSetDrag(id); if (accepted) Keyboard.dismiss(); return accepted; }}
         onDrop={ids => controller.dropSets(id, ids)} onCancel={() => controller.cancelDrag()}>
         {draft.sets.map((set, index) => <NativeReorderItem key={set.localId} id={set.localId}>
@@ -188,7 +188,7 @@ function ActiveSetRow({ controller, id, name, set, index, count, editable }: {
         completed={<NativeDragHandle testID={`set-check-${set.localId}`} accessibilityRole="checkbox" accessibilityLabel={`Serie ${index + 1} completada`} accessibilityState={{ checked: set.isCompleted, disabled: !editable }} disabled={!editable}
           accessibilityActions={actions} onAccessibilityAction={accessibilityAction}
           onTap={tapCompleted} style={styles.controlTrack}>
-          {set.isCompleted ? <AppIcon name="check" color={colors.success} size={29} /> : <View style={[styles.unchecked, { borderColor: colors.border }]} />}</NativeDragHandle>} />
+          {set.isCompleted ? <AppIcon name="check" color={colors.primary} size={29} /> : <View style={[styles.unchecked, { borderColor: colors.border }]} />}</NativeDragHandle>} />
     </View>
   </NativeSwipeActions>;
 }

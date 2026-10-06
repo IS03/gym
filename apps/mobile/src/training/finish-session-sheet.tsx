@@ -2,10 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppText, Button, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
+import { AppText, Button, SheetHeader, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
 import type { ActiveSessionController } from './active-session-controller';
 import { SUMMARY_SCALES, type SessionSummaryDraft } from './active-session-model';
-import { SheetHeader } from './active-session-sheets';
 import { SummarySlider } from './summary-slider';
 
 type ScaleKey = 'energyLevel' | 'performanceLevel';
@@ -74,7 +73,7 @@ export function FinishSessionSheet({ controller, onClose }: { controller: Active
           </View>
         </ScrollView>
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          {status ? <AppText accessibilityLiveRegion="polite" style={{ color: finishIntent?.phase === 'uncertain' ? colors.warning : colors.danger }} variant="caption">{status}</AppText> : null}
+          {status ? <AppText accessibilityLiveRegion="polite" style={{ color: finishIntent?.phase === 'uncertain' ? colors.text : colors.danger }} variant="caption">{status}</AppText> : null}
           {progress.completedSets === 0 && !finishIntent ? <AppText muted variant="caption">Marcá al menos una serie para finalizar.</AppText> : null}
           {running ? <View style={styles.pending}><ActivityIndicator color={colors.primary} />
             <AppText muted variant="caption">{state.finishing ? 'Guardando los cambios pendientes…' : 'Guardando el entrenamiento…'}</AppText></View> : null}

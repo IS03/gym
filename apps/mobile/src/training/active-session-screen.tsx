@@ -128,7 +128,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
     if (Platform.OS !== 'ios') { creatorAfterDismiss.current = false; setCreatorOpen(true); }
   };
   const creatorDismissed = () => { if (creatorAfterDismiss.current) { creatorAfterDismiss.current = false; setCreatorOpen(true); } };
-  const intentPanel = state.intent && state.intent.phase !== 'running' ? <Surface style={{ borderColor: colors.warning }}>
+  const intentPanel = state.intent && state.intent.phase !== 'running' ? <Surface style={{ borderColor: colors.text }}>
     <AppText variant="label">Operación pendiente de confirmación</AppText>
     <AppText muted variant="caption">{state.notice ?? 'Conservamos la misma intención para evitar duplicados.'}</AppText>
     <Button label="Comprobar operación" onPress={() => void controller.retryIntent()} variant="secondary" />
@@ -159,7 +159,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
       refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { setPullRefreshing(true); void controller.refresh().finally(() => setPullRefreshing(false)); }} tintColor={colors.primary} />}>
       <Surface elevated style={[styles.sessionHeader, { borderLeftColor: accent }]}>
         <ReturnToHistoryDay />
-        <AppText muted variant="overline">{active ? 'TU ENTRENAMIENTO' : 'SESIÓN CERRADA'}</AppText>
+        <AppText muted variant="footnote">{active ? 'TU ENTRENAMIENTO' : 'SESIÓN CERRADA'}</AppText>
         <View style={styles.row}><Heading level={2} style={styles.flex}>{detail.session.name}</Heading>
           {state.refreshing || state.intent?.phase === 'running' ? <ActivityIndicator testID="session-background-sync" accessibilityLabel="Sincronizando sesión" size="small" color={colors.textMuted} /> : null}
         </View>

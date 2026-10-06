@@ -63,7 +63,7 @@ function HomeUnavailable({ onRetry }: { onRetry: () => void }) {
     >
       <View style={styles.unavailableHeader}>
         <View>
-          <AppText muted variant="overline">
+          <AppText muted variant="footnote">
             OWNLEVEL
           </AppText>
           <Heading>Inicio</Heading>
