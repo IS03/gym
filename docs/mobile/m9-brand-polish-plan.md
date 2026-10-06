@@ -281,7 +281,7 @@ Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante,
 |---|---|---|---|
 | 0 | M9.0 | Baseline verde de la raíz (2 tests + lint preexistente) | No |
 | 1 | M9.1 | ✅ M9.1A: `packages/brand` (re-export de los tokens de la marca), alias Web, puente Mobile + Metro, tests | No |
-| 2 | M9.1 | Tema Mobile: paleta, tipografía, `numeric`, radios, espacios, semántica de color (sin pantallas) | No |
+| 2 | M9.1 | ✅ M9.1B: tema Mobile sobre `packages/brand` (paleta, tipografía, radios, espacios; alias deprecados `success`/`warning`/`unavailable`/`overline`). Pendiente para M9.2: `numeric` y consumidores de los alias | No |
 | 3 | M9.1 | Assets nativos: ícono (claro/oscuro/teñido, adaptativo), splash, isotipo, `expo-linear-gradient` (+ `expo-glass-effect` directo / `react-native-svg` según decisiones) | **Sí (uno solo)** |
 | 4 | M9.1 | Haptics por evento + interruptor en Ajustes (exigido por `IDENTIDAD.md`) | No |
 | 5 | M9.2 | Controles base: Button, Input, chips, selección, filas, Surface | No |
