@@ -8,7 +8,6 @@ import type { MobileApiClient } from '@/api/client';
 import { fetchSessionDetail, type SessionDetailDto } from '@/api/active-session';
 import { correctSession, type SessionCorrectionInput } from '@/api/training-history';
 import { AppText, Button, ScrollScreen, Surface, UnavailableState, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
-import { haptics } from '@/platform/haptics';
 import { compactHistoryDate } from './active-session-model';
 import { SummaryScale } from './finish-session-sheet';
 import { correctionDraft, correctionInput, correctionIsDirty, type CorrectionDraft } from './history-model';
@@ -54,7 +53,7 @@ function CorrectionForm({ client, detail, onReload }: { client: MobileApiClient;
     setPhase({ kind: 'saving' }); setError(null);
     const result = await correctSession(client, detail.session.id, input);
     if (result.status === 'ok') {
-      haptics.success(); setSaved(true);
+      setSaved(true);
       // The session screen re-reads on focus and shows confirmed server truth.
       requestAnimationFrame(() => router.back());
       return;

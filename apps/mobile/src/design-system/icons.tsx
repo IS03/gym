@@ -1,79 +1,19 @@
-import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
+import { SymbolView } from 'expo-symbols';
 
-export type AppIconName =
-  | 'activity'
-  | 'brand'
-  | 'calendar'
-  | 'check'
-  | 'chevronLeft'
-  | 'chevronRight'
-  | 'clock'
-  | 'dumbbell'
-  | 'flame'
-  | 'filter'
-  | 'nutrition'
-  | 'note'
-  | 'profile'
-  | 'progress'
-  | 'refresh'
-  | 'routines'
-  | 'settings'
-  | 'warning'
-  | 'water';
+import { sfSymbolNames, type AppIconProps } from './icon-names';
 
-const iconNames: Record<
-  AppIconName,
-  { ios: SFSymbol; android: AndroidSymbol }
-> = {
-  activity: { ios: 'bolt.fill', android: 'bolt' },
-  brand: {
-    ios: 'figure.strengthtraining.traditional',
-    android: 'fitness_center',
-  },
-  calendar: { ios: 'calendar', android: 'calendar_month' },
-  check: { ios: 'checkmark.circle.fill', android: 'check_circle' },
-  chevronLeft: { ios: 'chevron.left', android: 'chevron_left' },
-  chevronRight: { ios: 'chevron.right', android: 'chevron_right' },
-  clock: { ios: 'clock.fill', android: 'schedule' },
-  dumbbell: { ios: 'dumbbell.fill', android: 'fitness_center' },
-  flame: { ios: 'flame.fill', android: 'local_fire_department' },
-  filter: { ios: 'line.3.horizontal.decrease', android: 'filter_list' },
-  nutrition: { ios: 'fork.knife', android: 'restaurant' },
-  note: { ios: 'note.text', android: 'edit_note' },
-  profile: { ios: 'person.fill', android: 'person' },
-  progress: { ios: 'chart.line.uptrend.xyaxis', android: 'show_chart' },
-  refresh: { ios: 'arrow.clockwise', android: 'refresh' },
-  routines: { ios: 'list.bullet.rectangle', android: 'list_alt' },
-  settings: { ios: 'gearshape.fill', android: 'settings' },
-  warning: {
-    ios: 'exclamationmark.triangle.fill',
-    android: 'warning',
-  },
-  water: { ios: 'drop.fill', android: 'water_drop' },
-};
+export { appIconSize } from './icon-names';
+export type { AppIconName, AppIconProps } from './icon-names';
 
-type AppIconProps = {
-  accessibilityLabel?: string;
-  color: string;
-  name: AppIconName;
-  size?: number;
-};
-
-export function AppIcon({
-  accessibilityLabel,
-  color,
-  name,
-  size = 20,
-}: AppIconProps) {
+// iOS (and default): native SF Symbols through expo-symbols. Android: icons.android.tsx (Lucide).
+export function AppIcon({ accessibilityLabel, color, name, size = 20 }: AppIconProps) {
   return (
     <SymbolView
       accessibilityElementsHidden={!accessibilityLabel}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityLabel ? 'image' : undefined}
-      importantForAccessibility={
-        accessibilityLabel ? 'auto' : 'no-hide-descendants'
-      }
-      name={iconNames[name]}
+      importantForAccessibility={accessibilityLabel ? 'auto' : 'no-hide-descendants'}
+      name={sfSymbolNames[name]}
       size={size}
       tintColor={color}
     />

@@ -1,7 +1,7 @@
 import { memo, type ReactNode, useCallback, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { AppIcon, AppText, Button, Separator, Surface, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
-import { haptics } from '@/platform/haptics';
+import { haptics, triggerHaptic } from '@/platform/haptics';
 import type { ActiveSessionController, ExercisePhase } from './active-session-controller';
 import { appendSessionSet, compactActual, nextReminder, removeSessionSet, resetSessionSet, setProgress, type SessionExerciseDraft } from './active-session-model';
 import { formatRest, muscleGroupLabel } from './exercise-library-model';
@@ -145,9 +145,10 @@ function ActiveSetRow({ controller, id, name, set, index, count, editable }: {
 }) {
   const { colors } = useOwnlevelTheme();
   const tapCompleted = useCallback(() => {
-    haptics.selection();
+    // Brand event only when a set gets completed; un-completing is silent.
+    if (!set.isCompleted) triggerHaptic('setComplete');
     controller.change(id, current => ({ ...current, sets: current.sets.map(row => row.localId === set.localId ? { ...row, isCompleted: !row.isCompleted } : row) }), true);
-  }, [controller, id, set.localId]);
+  }, [controller, id, set.localId, set.isCompleted]);
   const mutate = (operation: (draft: SessionExerciseDraft, position: number) => SessionExerciseDraft) => controller.change(id, current => operation(current, current.sets.findIndex(row => row.localId === set.localId)), true);
   const reset = () => mutate(resetSessionSet);
   const remove = () => {

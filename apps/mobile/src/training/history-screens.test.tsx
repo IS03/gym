@@ -32,7 +32,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams.current, useFocusEffect: () => undefined,
 }));
 jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({ usePreventRemove: () => undefined }));
-jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: () => mockSuccess(), warning: jest.fn() } }));
+jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: () => mockSuccess(), warning: jest.fn() }, triggerHaptic: () => mockSuccess() }));
 jest.mock('@/api', () => ({ useMobileApi: () => ({ client: mockClient }),
   fetchMobileTraining: (...args: unknown[]) => mockTraining(...args) }));
 jest.mock('@/api/active-session', () => ({ ...jest.requireActual<object>('@/api/active-session'), fetchSessionDetail: (...args: unknown[]) => mockFetchDetail(...args) }));
@@ -82,7 +82,7 @@ describe('completed session: correct + discard (M3.4-3)', () => {
     fireEvent.press(view.getByRole('button', { name: 'Reintentar eliminación' }));
     await flush();
     expect(discard).toHaveBeenCalledTimes(2); expect(discard.mock.calls[1][0]).toBe(discard.mock.calls[0][0]);
-    expect(mockSuccess).toHaveBeenCalledTimes(1); expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockSuccess).not.toHaveBeenCalled(); expect(mockBack).toHaveBeenCalledTimes(1);
   });
   it('treats an already-discarded session as done, and routes correction and exercise history', async () => {
     const discard = jest.fn<CompletedSessionApi['discard']>().mockResolvedValue({ status: 'conflict', code: 'SESSION_DISCARDED', message: 'x', meta });
@@ -126,7 +126,7 @@ describe('historical correction screen', () => {
     const [, sessionId, input] = mockCorrect.mock.calls[0] as [unknown, string, { expectedSessionUpdatedAt: string; exercises: { expectedUpdatedAt: string; sets: { actualWeightKg: number | null }[] }[] }];
     expect(sessionId).toBe(detail.session.id); expect(input.expectedSessionUpdatedAt).toBe(detail.session.updatedAt);
     expect(input.exercises[0].expectedUpdatedAt).toBe(detail.exercises[0].updatedAt); expect(input.exercises[0].sets[0].actualWeightKg).toBe(45.5);
-    expect(mockSuccess).toHaveBeenCalledTimes(1); expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockSuccess).not.toHaveBeenCalled(); expect(mockBack).toHaveBeenCalledTimes(1);
     raf.mockRestore();
   });
   it('keeps an unknown outcome explicit and replays the identical request; a CAS conflict asks to reload server truth', async () => {

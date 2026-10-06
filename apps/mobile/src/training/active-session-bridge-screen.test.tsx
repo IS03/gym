@@ -23,7 +23,9 @@ const mockCatalog = jest.fn();
 const mockSelection = jest.fn();
 const mockSuccess = jest.fn();
 const mockWarning = jest.fn();
-jest.mock('@/platform/haptics', () => ({ haptics: { selection: () => mockSelection(), success: () => mockSuccess(), warning: () => mockWarning() } }));
+const mockTrigger = jest.fn();
+jest.mock('@/platform/haptics', () => ({ haptics: { selection: () => mockSelection(), success: () => mockSuccess(), warning: () => mockWarning() },
+  triggerHaptic: (event: string) => mockTrigger(event) }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ replace: mockReplace, navigate: mockNavigate }), useNavigation: () => ({ dispatch: jest.fn(), setOptions: mockSetOptions }),
   useFocusEffect: () => undefined }));
@@ -71,7 +73,7 @@ function renderWithPressOpen(screen: ReactElement) {
 }
 describe('native active session screen', () => {
   beforeEach(() => {
-    mockReplace.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); mockWarning.mockReset();
+    mockReplace.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); mockWarning.mockReset(); mockTrigger.mockReset();
     jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
   }); afterEach(() => { jest.restoreAllMocks(); });
   it('shows loading and real unavailable/not-found states rather than a false inactive session', async () => {
@@ -137,7 +139,7 @@ describe('native active session screen', () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(tabs)/train'));
     controller.dispose();
   });
-  it('gives one subtle haptic for each expand/collapse, decision, routine toggle and check action', async () => {
+  it('gives one subtle haptic for each expand/collapse, decision and routine toggle; completing a set is the brand setComplete event', async () => {
     const detail = testDetail(); detail.exercises[0].routineExerciseId = detail.exercises[1].id;
     const { controller, Screen } = fixture(detail); await controller.refresh(); const view = renderWithPressOpen(<Screen />);
     fireEvent(view.getByRole('button', { name: 'Contraer PRESS' }), 'accessibilityTap'); expect(mockSelection).toHaveBeenCalledTimes(1);
@@ -152,7 +154,9 @@ describe('native active session screen', () => {
     expect(mockSelection).toHaveBeenCalledTimes(8);
     fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap'); await act(async () => { await controller.flush(EXERCISE_ID); });
     fireEvent(view.getByRole('checkbox', { name: 'Serie 1 completada' }), 'accessibilityTap'); await act(async () => { await controller.flush(EXERCISE_ID); });
-    expect(mockSelection).toHaveBeenCalledTimes(10); expect(mockSuccess).not.toHaveBeenCalled(); expect(mockWarning).not.toHaveBeenCalled();
+    // Complete → setComplete (impact medium); un-complete is silent. No success/warning.
+    expect(mockSelection).toHaveBeenCalledTimes(8); expect(mockTrigger.mock.calls).toEqual([['setComplete']]);
+    expect(mockSuccess).not.toHaveBeenCalled(); expect(mockWarning).not.toHaveBeenCalled();
     controller.dispose();
   });
   it('shares all five column widths and preserves touch targets and input gestures', async () => {
@@ -441,7 +445,7 @@ describe('native active session screen', () => {
 });
 
 describe('native finish screen (M3.4-2)', () => {
-  beforeEach(() => { mockReplace.mockReset(); mockNavigate.mockReset(); mockSetOptions.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); });
+  beforeEach(() => { mockReplace.mockReset(); mockNavigate.mockReset(); mockSetOptions.mockReset(); mockSelection.mockReset(); mockSuccess.mockReset(); mockTrigger.mockReset(); });
   afterEach(() => { jest.restoreAllMocks(); });
   const completedDetail = () => { const detail = testDetail(); detail.exercises[0].payload.sets[0].isCompleted = true; detail.exercises[0].payload.isCompleted = true;
     detail.session = { ...detail.session, status: 'completed', endedAt: '2026-09-30T13:05:00.000000+00:00',
@@ -462,7 +466,7 @@ describe('native finish screen (M3.4-2)', () => {
     await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Guardar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
     expect(api.finish).toHaveBeenCalledTimes(1);
     expect(api.finish).toHaveBeenCalledWith({ metadata: { energyLevel: 4, performanceLevel: null, painLevel: 0, notes: null }, idempotencyKey: expect.any(String) });
-    expect(mockSuccess).toHaveBeenCalledTimes(1);
+    expect(mockTrigger.mock.calls.filter(([event]) => event === 'workoutComplete')).toHaveLength(1);
     expect(view.getByTestId('post-workout-sheet')).toBeTruthy(); expect(view.getByText('Entrenamiento guardado')).toBeTruthy();
     const sheet = within(view.getByTestId('post-workout-sheet'));
     expect(sheet.getByText('1 serie completada · 1 ejercicio')).toBeTruthy(); expect(sheet.getByText('4/5')).toBeTruthy(); expect(sheet.getByText('0/10')).toBeTruthy();
@@ -494,9 +498,9 @@ describe('native finish screen (M3.4-2)', () => {
     act(() => fireGestureHandler(getByGestureTestId('summary-painLevel-tap'), [{ state: State.BEGAN, x: 14 }, { state: State.ACTIVE, x: 14 }, { state: State.END, x: 14 }]));
     await act(async () => { await Promise.resolve(); });
     expect(controller.getSnapshot().summary.painLevel).toBe(0); expect(view.getByText('0/10')).toBeTruthy();
-    mockSelection.mockClear();
+    mockSelection.mockClear(); mockTrigger.mockClear();
     act(() => fireGestureHandler(getByGestureTestId('summary-painLevel-pan'), [{ state: State.BEGAN, x: 14 }, { state: State.ACTIVE, x: 104 }, { state: State.ACTIVE, x: 200 }, { state: State.END, x: 200 }]));
-    expect(controller.getSnapshot().summary.painLevel).toBe(6); expect(mockSelection).toHaveBeenCalledTimes(2);
+    expect(controller.getSnapshot().summary.painLevel).toBe(6); expect(mockTrigger.mock.calls).toEqual([['stepperChange'], ['stepperChange']]);
     fireEvent.press(view.getByRole('button', { name: 'Quitar dolor' }));
     expect(controller.getSnapshot().summary.painLevel).toBeNull(); expect(view.queryByRole('button', { name: 'Quitar dolor' })).toBeNull();
     controller.dispose();
@@ -508,7 +512,7 @@ describe('native finish screen (M3.4-2)', () => {
     fireEvent.press(view.getByRole('button', { name: 'Finalizar entrenamiento' }));
     await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Guardar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
     expect(view.getByText(/No pudimos confirmar si el entrenamiento se guardó/)).toBeTruthy();
-    expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(mockSuccess).not.toHaveBeenCalled();
+    expect(view.queryByTestId('post-workout-sheet')).toBeNull(); expect(mockTrigger).not.toHaveBeenCalledWith('workoutComplete');
     jest.mocked(api.detail).mockResolvedValue({ status: 'ok', data: completedDetail(), meta });
     await act(async () => { fireEvent.press(view.getByRole('button', { name: 'Comprobar entrenamiento' })); for (let i = 0; i < 40; i++) await Promise.resolve(); });
     expect(jest.mocked(api.finish).mock.calls[1][0]).toEqual(jest.mocked(api.finish).mock.calls[0][0]);

@@ -10,7 +10,7 @@ import type { SessionDetailDto } from '@/api/active-session';
 import type { RestDeadline } from './active-session-model';
 import { AppIcon, AppText, Button, Heading, InlineUnavailable, ProgressBar, ScrollScreen, SkeletonBlock, Surface, UnavailableState, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
 import { ReturnToHistoryDay } from '@/history/return-to-day';
-import { haptics } from '@/platform/haptics';
+import { triggerHaptic } from '@/platform/haptics';
 import { ActiveSessionController, sessionIntentKey } from './active-session-controller';
 import { ActiveExerciseCard } from './active-session-exercise-card';
 import { durationLabel, restRemaining } from './active-session-model';
@@ -96,7 +96,8 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   const detail = state.detail;
   const existingIds = useMemo(() => new Set(detail?.exercises.map(exercise => exercise.exerciseId) ?? []), [detail]);
   const returnToTraining = useCallback(() => router.replace('/(tabs)/train'), [router]);
-  useEffect(() => { if (state.status === 'cancelled') { haptics.success(); returnToTraining(); } }, [returnToTraining, state.status]);
+  // Cancelling is not an achievement: no success haptic.
+  useEffect(() => { if (state.status === 'cancelled') returnToTraining(); }, [returnToTraining, state.status]);
   // Reset the Train stack (the closed session must not stay mounted behind the tab), then go Home.
   const returnHome = useCallback(() => { router.replace('/(tabs)/train'); router.navigate('/(tabs)/home'); }, [router]);
   // Closed sessions read through the controller's API; discard goes through the client.
@@ -104,7 +105,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
   const closedApi = useMemo<CompletedSessionApi>(() => ({ detail: () => controller.readDetail(),
     discard: key => completedSessionApi(client, closedId).discard(key) }), [client, closedId, controller]);
   // Confirmed finish (server truth): success feedback once, then the read-only view.
-  useEffect(() => { if (state.finished) haptics.success(); }, [state.finished]);
+  useEffect(() => { if (state.finished) triggerHaptic('workoutComplete'); }, [state.finished]);
   const closedStatus = detail && detail.session.status !== 'in_progress' && !state.intent ? detail.session.status : null;
   useLayoutEffect(() => {
     navigation.setOptions({ title: closedStatus === 'discarded' ? 'Sesión eliminada' : closedStatus ? 'Sesión finalizada' : 'Entrenar' });
