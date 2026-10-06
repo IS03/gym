@@ -25,7 +25,7 @@ Estado del paquete en el repo (resuelto en el PR de preparación):
 - Ubicación canónica: `docs/brand/ownlevel-marca/` (60 archivos, verificados por hash). Las copias duplicadas (`ownlevel-marca/` en la raíz, `ownlevel-identidad.md`, `docs/ownlevel-identidad.md`) eran idénticas y se borraron.
 - `docs/**` está excluido del `tsconfig.json` raíz y de ESLint: `tema/theme.ts` y `tema/haptics.ts` importan `react-native`/`expo-haptics` y no deben compilarse con la Web. Los archivos de marca no se modificaron.
 
-Pendiente de diseño (C16): `tema/tokens.ts` y `tema/theme.css` repiten los mismos hex a mano. En M9.1 el canónico pasa a código compartido y el CSS se genera.
+Tokens runtime (M9.1A, hecho): `packages/brand/src/tokens.ts` re-exporta `tema/tokens.ts` sin copiar valores (ver §6.1). Pendiente (C16): `tema/theme.css` todavía repite los hex a mano; el adaptador CSS de Web se deriva de los tokens en M9.4.
 
 ## 3. Arquitectura actual (relevada)
 
@@ -130,38 +130,35 @@ Conteos sobre código no-test al 2026-10-05. "Migrar" = deuda; "legítimo" = que
 | C13 | Splash: isotipo sobre #09090B (#F3F1EC en claro) | Ícono de la app sobre #F8F7FB / #0D0B12 | Usar `splash-isotipo-*`. Decidir entre splash siempre oscuro (sugerencia de `LEEME`) o según el modo. |
 | C14 | Ícono iOS 26 de vidrio armado en Icon Composer | PNG único de 512 px (16-bit) | Usar `icon-1024*.png` (claro, oscuro, teñido) ya. El `.icon` de Icon Composer es un paso manual de Nacho en Xcode 26; después `ios.icon` apunta a ese archivo. |
 | C15 | Estados vacíos con vista previa EJEMPLO | Solo texto | Aplicar solo donde un gráfico o lista quedaría vacío (Progreso, Historial, Métricas), nunca en lugares que muestran datos reales, nunca en acento. |
-| C16 | `tokens.ts` como "fuente única" dentro de `docs/` | `theme.css` duplica los hex; el código no puede importar desde `docs/` sin romper el typecheck raíz | Ver §6: el canónico pasa a `packages/brand/` y `theme.css` se genera desde los tokens. `docs/brand/.../tema/` queda como referencia que apunta al paquete. Decide Nacho (implica editar `LEEME`/`IDENTIDAD` § Archivos). |
+| C16 | `tokens.ts` como "fuente única" dentro de `docs/` | Resuelto en M9.1A para TS: `packages/brand/src/tokens.ts` re-exporta el archivo de la marca (TS puro), sin copia. `theme.css` sigue duplicando hex | No editar los hex de `theme.css` a mano: el adaptador CSS de Web (M9.4) se deriva de los tokens. |
 | C17 | Escala de espacios sin 48 | `spacing.xxxl = 48` (5 usos) | Pasar a 40 o a 32 + 12 según el contexto. Ajuste visual, sin decisión de producto. |
 | C18 | Tipografía: estilos de iOS | `overline` en mayúsculas con tracking (17 usos) | Reemplazar por Footnote/Caption de marca. Si Nacho quiere conservar un rótulo de sección en mayúsculas, documentarlo en la identidad primero. |
 
 ## 6. Arquitectura propuesta
 
-### 6.1 Tokens compartidos (una sola fuente)
+### 6.1 Tokens compartidos (una sola fuente) — implementado en M9.1A
 
 ```
-packages/brand/                       ← sin package.json de workspace (como src/lib/mobile-api)
-  src/tokens.ts                       ← CANÓNICO (hoy docs/.../tema/tokens.ts, sin cambios de valores)
-  src/index.ts                        ← re-exports tipados (palette, chart, intensity, typeScale,
-                                         radius, space, layout, glass, motion, hapticsMap)
-  css/theme.css                       ← GENERADO desde tokens.ts (no editar a mano)
-scripts/brand/generate-theme-css.mjs  ← genera css/theme.css; test de vitest que falla si está desactualizado
+docs/brand/ownlevel-marca/tema/tokens.ts  ← ÚNICO archivo con valores (paquete de marca, TS puro)
+packages/brand/src/tokens.ts              ← entrada runtime: `export * from` ese archivo, sin copia
 ```
 
-- `tokens.ts` es TS puro, sin imports de runtime. Sirve igual para Next y para RN.
-- **Mobile** lo importa como hoy `mobile-api`: alias `@brand/*` en `apps/mobile/tsconfig.json` + `watchFolders` de Metro para `packages/brand`.
-- **Web**: alias `@brand/*` en el `tsconfig.json` raíz; `globals.css` importa `packages/brand/css/theme.css`.
-- `tsconfig.json` raíz: excluir `docs/**` (y en ESLint, `globalIgnores`), así ningún archivo de referencia rompe el build.
-- `docs/brand/ownlevel-marca/tema/`: queda como referencia histórica con un README que apunta a `packages/brand`. No se importa nunca desde la app.
+- Los valores no se copian: el archivo de la marca ya es TS puro (sin React Native ni CSS) e `IDENTIDAD.md` lo declara fuente única. El código de la app importa siempre `packages/brand`, nunca `docs/` directo.
+- **Web**: alias `@brand/*` en `tsconfig.json` y en `vitest.config.mts` (`import { palette } from "@brand/tokens"`).
+- **Mobile**: `src/design-system/brand.ts` (import relativo, como `src/lib/mobile-api`) + `watchFolders` de Metro (`packages/brand/src` y `docs/brand/ownlevel-marca/tema`). Se expone como `brandTokens` desde `@/design-system`. **Todavía no se aplica a la UI** (M9.1B).
+- `docs/**` sigue excluido del build raíz y de ESLint. `tema/theme.ts` y `tema/haptics.ts` (APIs de RN) no se importan desde ningún lado: no entran a Next ni al bundle Mobile.
+- Tests: `src/lib/brand-tokens.test.ts` (valores clave de `IDENTIDAD.md`, sin tokens success/warning) y `apps/mobile/src/design-system/brand.test.ts` (Mobile resuelve el mismo módulo).
+- Diferido: derivar el CSS de Web de los tokens (M9.4). Mientras tanto no se editan los hex de `tema/theme.css` ni se crea otra copia.
 
 ### 6.2 Adaptadores
 
 | Capa | Ubicación | Contenido |
 |---|---|---|
-| Mobile tema | `apps/mobile/src/design-system/tokens.ts` → consume `@brand` | Mapea la marca a nombres semánticos del DS (`background`, `surface`, `elevated`, `text`, `textMuted`, `accent`, `accentSoft`, `onAccent`, `error`, `border`, hero, chart, intensity). Se borra la paleta violeta. El provider de M8 (preferencia + persistencia) queda igual. |
+| Mobile tema | `apps/mobile/src/design-system/tokens.ts` → consume `./brand` (`packages/brand`) | Mapea la marca a nombres semánticos del DS (`background`, `surface`, `elevated`, `text`, `textMuted`, `accent`, `accentSoft`, `onAccent`, `error`, `border`, hero, chart, intensity). Se borra la paleta violeta. El provider de M8 (preferencia + persistencia) queda igual. |
 | Mobile tipografía | `design-system/typography.ts` | `typeScale` de marca + estilo `numeric` (`tabular-nums`); variante de `AppText` por estilo iOS. |
 | Mobile haptics | `apps/mobile/src/platform/haptics.ts` | `haptic(event)` según `hapticsMap`; respeta el interruptor local que pide `IDENTIDAD.md` (`ownlevel.haptics.v1`); reemplaza `selection/success/warning`. |
 | Mobile vidrio | `design-system/glass.tsx` | `GlassControl`: `GlassView` si `isLiquidGlassAvailable()`, si no fondo `elevated` sólido. |
-| Web tema | `src/app/globals.css` | `@import` del CSS generado + mapeo de variables shadcn (`--primary`, `--background`, `--card`, `--muted`, `--border`, `--destructive`, `--chart-*`) a `--ol-*` bajo `:root` / `.dark`. |
+| Web tema | `src/app/globals.css` | Variables `--ol-*` derivadas de los tokens (mecanismo a definir en M9.4, sin copiar hex a mano) + mapeo de variables shadcn (`--primary`, `--background`, `--card`, `--muted`, `--border`, `--destructive`, `--chart-*`) a `--ol-*` bajo `:root` / `.dark`. |
 | Web fuentes | `src/app/layout.tsx` | Quitar Geist; stack del sistema de la marca. Mono solo si hace falta (1 uso de `font-mono`). |
 | Web metadata | `src/lib/brand-metadata.ts`, `src/lib/brand.ts`, `layout.tsx` (`themeColor`) | Colores #09090B / #F3F1EC, íconos de marca, maskable. |
 
@@ -283,7 +280,7 @@ Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante,
 | PR | Fase | Contenido | Rebuild nativo |
 |---|---|---|---|
 | 0 | M9.0 | Baseline verde de la raíz (2 tests + lint preexistente) | No |
-| 1 | M9.1 | `packages/brand` (tokens canónicos + CSS generado + test de sincronía), aliases en ambos tsconfig + Metro | No |
+| 1 | M9.1 | ✅ M9.1A: `packages/brand` (re-export de los tokens de la marca), alias Web, puente Mobile + Metro, tests | No |
 | 2 | M9.1 | Tema Mobile: paleta, tipografía, `numeric`, radios, espacios, semántica de color (sin pantallas) | No |
 | 3 | M9.1 | Assets nativos: ícono (claro/oscuro/teñido, adaptativo), splash, isotipo, `expo-linear-gradient` (+ `expo-glass-effect` directo / `react-native-svg` según decisiones) | **Sí (uno solo)** |
 | 4 | M9.1 | Haptics por evento + interruptor en Ajustes (exigido por `IDENTIDAD.md`) | No |
