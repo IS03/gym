@@ -5,7 +5,7 @@ import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { brandAssets } from "@/lib/brand";
+import { brandAssets, brandSymbolSize } from "@/lib/brand";
 import {
   googleOAuthRequest,
   PUBLIC_AUTH_ERROR_MESSAGE,
@@ -61,16 +61,16 @@ export function LoginForm({ authError }: LoginFormProps) {
         <div className="flex items-center gap-3">
           <Image
             src={brandAssets.symbolOnLight}
-            width={99}
-            height={128}
+            width={brandSymbolSize.width}
+            height={brandSymbolSize.height}
             alt=""
             aria-hidden
             className="h-12 w-auto object-contain dark:hidden"
           />
           <Image
             src={brandAssets.symbolOnDark}
-            width={99}
-            height={128}
+            width={brandSymbolSize.width}
+            height={brandSymbolSize.height}
             alt=""
             aria-hidden
             className="hidden h-12 w-auto object-contain dark:block"

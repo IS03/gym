@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/brand/ownlevel-lockup-horizontal.png" alt="OWNLEVEL" width="340" />
+  <img src="./docs/brand/ownlevel-marca/logo/png/logo-horizontal-claro.png" alt="OWNLEVEL" width="340" />
 </p>
 
 <p align="center">

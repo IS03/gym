@@ -282,7 +282,7 @@ Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante,
 | 0 | M9.0 | Baseline verde de la raíz (2 tests + lint preexistente) | No |
 | 1 | M9.1 | ✅ M9.1A: `packages/brand` (re-export de los tokens de la marca), alias Web, puente Mobile + Metro, tests | No |
 | 2 | M9.1 | ✅ M9.1B: tema Mobile sobre `packages/brand` (paleta, tipografía, radios, espacios; alias deprecados `success`/`warning`/`unavailable`/`overline`). Pendiente para M9.2: `numeric` y consumidores de los alias | No |
-| 3 | M9.1 | Assets nativos: ícono (claro/oscuro/teñido, adaptativo), splash, isotipo, `expo-linear-gradient` (+ `expo-glass-effect` directo / `react-native-svg` según decisiones) | **Sí (uno solo)** |
+| 3 | M9.1 | ✅ M9.1D: assets de marca instalados. Mobile: ícono iOS claro/oscuro/teñido, adaptativo Android (+ monocromo, fondo #09090B), splash por modo (isotipo, 96, #F3F1EC/#09090B), logos en `assets/brand/logo`. Web: `favicon.ico`, `icon.svg`, `apple-icon.png` (convención App Router), manifest 192/512/maskable, colores de marca. Legacy runtime borrado. Pendiente: `AppIcon name="brand"` → isotipo (M9.2/M9.3, Home), `.icon` de Icon Composer (M9.5), carpeta `Logos/` (limpieza aparte) | **Sí** (ícono y splash son nativos: prebuild + rebuild) |
 | 4 | M9.1 | ✅ M9.1C: íconos por plataforma (SF Symbols / Lucide) + haptics por evento + interruptor en Ajustes | Android: sí (react-native-svg) |
 | 5 | M9.2 | Controles base: Button, Input, chips, selección, filas, Surface | No |
 | 6 | M9.2 | Feedback + glosario de copy de recuperación + EmptyState EJEMPLO + skeleton | No |

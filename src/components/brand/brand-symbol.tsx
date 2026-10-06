@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { brandSymbolSources } from "@/lib/brand";
+import { brandSymbolSize, brandSymbolSources } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 type BrandSymbolProps = {
@@ -18,15 +18,15 @@ export function BrandSymbol({ className, decorative = false }: BrandSymbolProps)
     >
       <Image
         src={brandSymbolSources.light}
-        width={99}
-        height={128}
+        width={brandSymbolSize.width}
+        height={brandSymbolSize.height}
         alt=""
         className="h-full w-auto max-w-full object-contain dark:hidden"
       />
       <Image
         src={brandSymbolSources.dark}
-        width={99}
-        height={128}
+        width={brandSymbolSize.width}
+        height={brandSymbolSize.height}
         alt=""
         className="hidden h-full w-auto max-w-full object-contain dark:block"
       />
