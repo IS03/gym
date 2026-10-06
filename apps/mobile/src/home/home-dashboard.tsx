@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import type {
   MobileHomeResponse,
@@ -7,22 +7,28 @@ import type {
 import {
   AppIcon,
   AppText,
+  Button,
   IconCircle,
   InlineUnavailable,
+  ListGroup,
+  ListRow,
   PressableSurface,
   ProgressBar,
   SectionHeader,
   Separator,
   Surface,
+  appIconSize,
+  brandTokens,
+  pressedStyle,
   radius,
   sizes,
   spacing,
   useOwnlevelTheme,
+  useReduceMotion,
 } from '@/design-system';
 
 import {
   addIsoDays,
-  entriesByCount,
   firstName,
   formatClockTime,
   formatDecimal,
@@ -35,21 +41,36 @@ import {
   profileInitial,
 } from './format';
 
-export type HomeNavigationTarget =
-  | 'nutrition'
-  | 'progress'
-  | 'settings'
-  | 'train';
+export type HomeNavigationTarget = 'nutrition' | 'progress' | 'settings';
 
 type HomeDashboardProps = {
   data: MobileHomeResponse;
   isStale: boolean;
   onNavigate: (target: HomeNavigationTarget) => void;
+  /** Completed session detail (`/(tabs)/train/history/{id}`). */
+  onOpenCompletedSession: (sessionId: string) => void;
+  /** Active session (`/(tabs)/train/session/{id}`), never the Training hub first. */
+  onOpenSession: (sessionId: string) => void;
   onRefresh: () => void;
+  /** Opens the shared StartWorkoutModal (Home never starts a session itself). */
+  onStartWorkout: () => void;
 };
+
+// Real brand isotype (LEEME.md § logo): `claro` for light backgrounds, `oscuro` for dark.
+const isotypes = {
+  dark: require('../../assets/brand/logo/isotipo-oscuro.png'),
+  light: require('../../assets/brand/logo/isotipo-claro.png'),
+};
+
+// Hero gradient as the brand defines it (theme.css `bg-hero`), with the solid start
+// color as fallback. Core RN style: no extra dependency or dev client rebuild.
+function heroGradient(scheme: { heroFrom: string; heroTo: string }) {
+  return `linear-gradient(150deg, ${scheme.heroFrom} 0%, ${scheme.heroTo} 100%)`;
+}
 
 function BrandButton({ label, onPress }: { label: string; onPress: () => void }) {
   const { colors } = useOwnlevelTheme();
+  const reduceMotion = useReduceMotion();
   return (
     <Pressable
       accessibilityLabel={label}
@@ -57,17 +78,36 @@ function BrandButton({ label, onPress }: { label: string; onPress: () => void })
       onPress={onPress}
       style={({ pressed }) => [
         styles.brandButton,
-        {
-          backgroundColor: colors.onBrand,
-          opacity: pressed ? 0.82 : 1,
-        },
+        { backgroundColor: colors.onBrand },
+        pressedStyle(pressed, reduceMotion),
       ]}
     >
-      <AppText style={{ color: colors.brandSurface }} variant="label">
+      <AppText style={{ color: colors.brandSurface }} variant="headline">
         {label}
       </AppText>
-      <AppIcon color={colors.brandSurface} name="chevronRight" size={16} />
+      <AppIcon color={colors.brandSurface} name="chevronRight" size={appIconSize.inline} />
     </Pressable>
+  );
+}
+
+function Avatar({ initial }: { initial: string | null }) {
+  const { colors } = useOwnlevelTheme();
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[
+        styles.avatar,
+        { backgroundColor: initial ? colors.brandSubtle : colors.surfaceRaised, borderColor: colors.border },
+      ]}
+      testID="home-avatar"
+    >
+      {initial ? (
+        <AppText style={[styles.avatarInitial, { color: colors.primary }]}>{initial}</AppText>
+      ) : (
+        <AppIcon color={colors.textMuted} name="profile" size={appIconSize.row} />
+      )}
+    </View>
   );
 }
 
@@ -78,185 +118,198 @@ function HomeHeader({
   data: MobileHomeResponse['profile'];
   onSettings: () => void;
 }) {
-  const { colors } = useOwnlevelTheme();
+  const { isDark } = useOwnlevelTheme();
   const displayName = data.status === 'ok' ? data.data.displayName : null;
-  const label = firstName(displayName);
   const initial = profileInitial(displayName);
+  const name = initial ? firstName(displayName) : null;
 
   return (
     <View style={styles.header}>
-      <View accessibilityLabel="OWNLEVEL" style={styles.brandLockup}>
-        <View style={[styles.brandMark, { backgroundColor: colors.brandSurface }]}>
-          <AppIcon color={colors.onBrand} name="brand" size={19} />
-        </View>
-        <AppText style={styles.brandWordmark} variant="footnote">
-          OWNLEVEL
-        </AppText>
-      </View>
       <Pressable
         accessibilityLabel="Abrir perfil y ajustes"
         accessibilityRole="button"
         onPress={onSettings}
-        style={({ pressed }) => [
-          styles.profileButton,
-          {
-            backgroundColor: pressed ? colors.surfaceRaised : colors.surface,
-            borderColor: colors.border,
-          },
-        ]}
+        style={({ pressed }) => [styles.profile, { opacity: pressed ? 0.7 : 1 }]}
       >
-        <View style={[styles.avatar, { backgroundColor: colors.brandSubtle }]}>
-          {initial ? (
-            <AppText style={{ color: colors.primary }} variant="caption">
-              {initial}
-            </AppText>
+        <Avatar initial={initial} />
+        <View style={styles.flex}>
+          {name ? (
+            <>
+              <AppText muted variant="subheadline">Hola,</AppText>
+              <AppText numberOfLines={1} variant="title2">{name}</AppText>
+            </>
           ) : (
-            <AppIcon color={colors.primary} name="profile" size={15} />
+            <AppText numberOfLines={1} variant="title2">Hola</AppText>
           )}
         </View>
-        <AppText numberOfLines={1} style={styles.profileLabel} variant="caption">
-          {label}
-        </AppText>
-        <AppIcon color={colors.textMuted} name="chevronRight" size={13} />
+      </Pressable>
+      <Pressable
+        accessibilityLabel="Abrir ajustes"
+        accessibilityRole="button"
+        hitSlop={6}
+        onPress={onSettings}
+        style={({ pressed }) => [styles.isotypeButton, { opacity: pressed ? 0.6 : 1 }]}
+        testID="home-isotype"
+      >
+        <Image
+          accessibilityIgnoresInvertColors
+          resizeMode="contain"
+          source={isDark ? isotypes.dark : isotypes.light}
+          style={styles.isotype}
+        />
       </Pressable>
     </View>
   );
 }
 
-function PrimaryTrainingCard({
+function TrainingStatusCard({
+  onRefresh,
+  onStartWorkout,
+  unavailable,
+  workoutStartRoutines,
+}: {
+  onRefresh: () => void;
+  onStartWorkout: () => void;
+  unavailable: boolean;
+  workoutStartRoutines: MobileHomeResponse['training']['workoutStartRoutines'];
+}) {
+  const { colors } = useOwnlevelTheme();
+  if (unavailable) {
+    return (
+      <Surface accessibilityLabel="Entrenamiento" elevated style={styles.compactCard}>
+        <View style={styles.compactText}>
+          <AppText muted variant="footnote">Entrenamiento</AppText>
+          <AppText accessibilityRole="header" variant="headline">Estado no disponible</AppText>
+          <AppText muted variant="subheadline">
+            No pudimos verificar si tenés una sesión en curso.
+          </AppText>
+        </View>
+        <Button label="Reintentar" onPress={onRefresh} variant="secondary" />
+      </Surface>
+    );
+  }
+
+  const routineCount =
+    workoutStartRoutines.status === 'ok' ? workoutStartRoutines.data.length : null;
+  const routineCopy =
+    routineCount === null
+      ? 'No pudimos cargar tus rutinas.'
+      : routineCount > 0
+        ? `${plural(routineCount, 'rutina')} ${routineCount === 1 ? 'disponible' : 'disponibles'}`
+        : 'Podés empezar una sesión libre.';
+
+  return (
+    <View accessibilityLabel="Entrenamiento">
+      <PressableSurface
+        accessibilityHint="Abre el selector para empezar una sesión"
+        accessibilityLabel="Nueva sesión"
+        onPress={onStartWorkout}
+        style={styles.compactRow}
+      >
+        <IconCircle icon="dumbbell" />
+        <View style={styles.compactText}>
+          <AppText muted variant="footnote">Entrenamiento</AppText>
+          <AppText accessibilityRole="header" variant="headline">Listo para entrenar</AppText>
+          <AppText muted numeric numberOfLines={2} variant="subheadline">{routineCopy}</AppText>
+        </View>
+        <View style={styles.compactAction}>
+          <AppText style={{ color: colors.primary }} variant="subheadline">Nueva sesión</AppText>
+          <AppIcon color={colors.primary} name="chevronRight" size={appIconSize.inline} />
+        </View>
+      </PressableSurface>
+    </View>
+  );
+}
+
+function ActiveSessionHero({
+  date,
+  onContinue,
+  session,
+}: {
+  date: string;
+  onContinue: () => void;
+  session: NonNullable<Extract<MobileHomeResponse['training']['activeSession'], { status: 'ok' }>['data']>;
+}) {
+  const { colors, isDark } = useOwnlevelTheme();
+  const scheme = brandTokens.palette[isDark ? 'dark' : 'light'];
+  return (
+    <View
+      accessibilityLabel="Entrenamiento"
+      style={[
+        styles.hero,
+        { backgroundColor: colors.brandSurface, experimental_backgroundImage: heroGradient(scheme) },
+      ]}
+      testID="home-active-hero"
+    >
+      <View style={[styles.sessionBadge, { backgroundColor: colors.onBrand }]}>
+        <AppText style={{ color: colors.brandSurface }} variant="caption">
+          Sesión en curso
+        </AppText>
+      </View>
+      <View>
+        <AppText
+          accessibilityRole="header"
+          numberOfLines={1}
+          style={{ color: colors.onBrand }}
+          variant="title1"
+        >
+          {session.name}
+        </AppText>
+        <AppText numeric style={[styles.heroSecondary, { color: colors.onBrand }]} variant="subheadline">
+          {session.logDate === date ? 'Hoy' : session.logDate} · iniciada{' '}
+          {formatClockTime(session.startedAt)}
+        </AppText>
+      </View>
+      <View style={styles.heroProgress}>
+        <View style={styles.heroProgressLabels}>
+          <AppText numeric style={[styles.flex, styles.heroSecondary, { color: colors.onBrand }]} variant="footnote">
+            {session.exercisesCompleted}/{session.totalExercises}{' '}
+            {session.totalExercises === 1 ? 'ejercicio' : 'ejercicios'} ·{' '}
+            {session.completedSets}/{session.totalSets}{' '}
+            {session.totalSets === 1 ? 'serie' : 'series'}
+          </AppText>
+          <AppText numeric style={{ color: colors.onBrand }} variant="headline">
+            {session.progressPercent}%
+          </AppText>
+        </View>
+        <ProgressBar
+          accessibilityLabel={`Progreso de la sesión: ${session.progressPercent}%`}
+          color={colors.onBrand}
+          trackColor={colors.brandSubtle}
+          value={session.progressPercent}
+        />
+      </View>
+      <BrandButton label="Continuar entrenamiento" onPress={onContinue} />
+    </View>
+  );
+}
+
+function TrainingSection({
   activeSession,
   date,
+  onOpenSession,
   onRefresh,
-  onTrain,
+  onStartWorkout,
   workoutStartRoutines,
 }: {
   activeSession: MobileHomeResponse['training']['activeSession'];
   date: string;
+  onOpenSession: (sessionId: string) => void;
   onRefresh: () => void;
-  onTrain: () => void;
+  onStartWorkout: () => void;
   workoutStartRoutines: MobileHomeResponse['training']['workoutStartRoutines'];
 }) {
-  const { colors } = useOwnlevelTheme();
   const session = activeSession.status === 'ok' ? activeSession.data : null;
-  const routineCount =
-    workoutStartRoutines.status === 'ok'
-      ? workoutStartRoutines.data.length
-      : null;
-
+  if (session) {
+    return <ActiveSessionHero date={date} onContinue={() => onOpenSession(session.id)} session={session} />;
+  }
   return (
-    <Surface
-      accessibilityLabel="Entrenamiento"
-      elevated
-      style={[
-        styles.trainingCard,
-        {
-          backgroundColor: colors.brandSurface,
-          borderColor: colors.brandSurface,
-        },
-      ]}
-    >
-      <View
-        accessibilityElementsHidden
-        style={[
-          styles.trainingOrbLarge,
-          { backgroundColor: colors.onBrand },
-        ]}
-      />
-      <View
-        accessibilityElementsHidden
-        style={[
-          styles.trainingOrbSmall,
-          { backgroundColor: colors.onBrand },
-        ]}
-      />
-
-      {activeSession.status === 'unavailable' ? (
-        <View style={styles.trainingContent}>
-          <AppText style={[styles.brandEyebrow, { color: colors.onBrand }]}>
-            ENTRENAMIENTO
-          </AppText>
-          <AppText
-            accessibilityRole="header"
-            style={[styles.trainingTitle, { color: colors.onBrand }]}
-          >
-            Estado no disponible
-          </AppText>
-          <AppText style={{ color: colors.onBrand }}>
-            No pudimos verificar si tenés una sesión en curso.
-          </AppText>
-          <BrandButton label="Reintentar" onPress={onRefresh} />
-        </View>
-      ) : session ? (
-        <View style={styles.trainingContent}>
-          <View
-            style={[
-              styles.sessionBadge,
-              { backgroundColor: colors.onBrand },
-            ]}
-          >
-            <AppText style={{ color: colors.brandSurface }} variant="caption">
-              Sesión en curso
-            </AppText>
-          </View>
-          <View>
-            <AppText
-              accessibilityRole="header"
-              numberOfLines={1}
-              style={[styles.trainingTitle, { color: colors.onBrand }]}
-            >
-              {session.name}
-            </AppText>
-            <AppText style={[styles.brandSecondary, { color: colors.onBrand }]}>
-              {session.logDate === date ? 'Hoy' : session.logDate} · iniciada{' '}
-              {formatClockTime(session.startedAt)}
-            </AppText>
-          </View>
-          <View style={styles.trainingProgress}>
-            <View style={styles.trainingProgressLabels}>
-              <AppText
-                style={[styles.brandSecondary, { color: colors.onBrand }]}
-                variant="caption"
-              >
-                {session.exercisesCompleted}/{session.totalExercises}{' '}
-                {session.totalExercises === 1 ? 'ejercicio' : 'ejercicios'} ·{' '}
-                {session.completedSets}/{session.totalSets}{' '}
-                {session.totalSets === 1 ? 'serie' : 'series'}
-              </AppText>
-              <AppText style={{ color: colors.onBrand }} variant="label">
-                {session.progressPercent}%
-              </AppText>
-            </View>
-            <ProgressBar
-              accessibilityLabel={`Progreso de la sesión: ${session.progressPercent}%`}
-              color={colors.onBrand}
-              trackColor={colors.brandSubtle}
-              value={session.progressPercent}
-            />
-          </View>
-          <BrandButton label="Ir a Entrenar" onPress={onTrain} />
-        </View>
-      ) : (
-        <View style={styles.trainingContent}>
-          <AppText style={[styles.brandEyebrow, { color: colors.onBrand }]}>
-            ENTRENAMIENTO
-          </AppText>
-          <AppText
-            accessibilityRole="header"
-            style={[styles.trainingTitle, { color: colors.onBrand }]}
-          >
-            Listo para entrenar
-          </AppText>
-          <AppText style={[styles.brandSecondary, { color: colors.onBrand }]}>
-            {routineCount === null
-              ? 'Abrí Entrenar para organizar tu próxima sesión.'
-              : routineCount > 0
-                ? `${plural(routineCount, 'rutina')} disponibles para tu próxima sesión.`
-                : 'Abrí Entrenar para organizar tu próxima sesión.'}
-          </AppText>
-          <BrandButton label="Ir a Entrenar" onPress={onTrain} />
-        </View>
-      )}
-    </Surface>
+    <TrainingStatusCard
+      onRefresh={onRefresh}
+      onStartWorkout={onStartWorkout}
+      unavailable={activeSession.status === 'unavailable'}
+      workoutStartRoutines={workoutStartRoutines}
+    />
   );
 }
 
@@ -304,13 +357,13 @@ function NutritionSummary({
               Calorías consumidas
             </AppText>
             <View style={styles.metricBetween}>
-              <AppText style={styles.heroMetric}>
+              <AppText numeric style={styles.heroMetric}>
                 {formatInteger(summary.calories)}{' '}
                 <AppText muted variant="caption">
                   kcal
                 </AppText>
               </AppText>
-              <AppText muted variant="caption">
+              <AppText muted numeric variant="caption">
                 {summary.calorieTarget !== null
                   ? `de ${formatInteger(summary.calorieTarget)} kcal`
                   : 'Sin objetivo'}
@@ -327,7 +380,7 @@ function NutritionSummary({
         ) : null}
         <View style={[styles.metricGrid, { borderColor: colors.border }]}>
           <View style={styles.metricCell}>
-            <AppText style={styles.smallMetric}>
+            <AppText numeric style={styles.smallMetric}>
               {formatDecimal(summary.proteinG)} g
             </AppText>
             <AppText muted variant="caption">
@@ -353,7 +406,7 @@ function NutritionSummary({
               { borderColor: colors.border },
             ]}
           >
-            <AppText style={styles.smallMetric}>
+            <AppText numeric style={styles.smallMetric}>
               {formatInteger(summary.mealCount)}
             </AppText>
             <AppText muted variant="caption">
@@ -370,7 +423,7 @@ function NutritionSummary({
               { borderColor: colors.border },
             ]}
           >
-            <AppText style={styles.smallMetric}>
+            <AppText numeric style={styles.smallMetric}>
               {summary.waterL === null ? '—' : formatDecimal(summary.waterL)} L
             </AppText>
             <AppText muted variant="caption">
@@ -390,7 +443,7 @@ function NutritionSummary({
             <AppText muted variant="caption">
               Balance estimado
             </AppText>
-            <AppText variant="label">
+            <AppText numeric variant="label">
               {formatEnergyBalance(summary.energyBalanceKcal)}
             </AppText>
           </View>
@@ -466,7 +519,6 @@ function WeeklyProgress({
   onProgress: () => void;
   week: MobileHomeResponse['training']['week'];
 }) {
-  const { colors } = useOwnlevelTheme();
   if (week.status === 'unavailable') {
     return (
       <View>
@@ -492,15 +544,13 @@ function WeeklyProgress({
     session.logDate <= summary.weekEnd
       ? session
       : null;
-  const routines = entriesByCount(summary.routines);
-  const muscles = entriesByCount(summary.muscleGroups);
-  const visibleMuscles = muscles.slice(0, 3);
-  const routineSummary = routines.length
-    ? routines.map(([name, count]) => `${name} ×${count}`).join(' · ')
-    : 'Sin rutinas completadas';
-  const muscleSummary = visibleMuscles.length
-    ? `${visibleMuscles.map(([name, sets]) => `${name} ${sets}`).join(' · ')}${muscles.length > visibleMuscles.length ? ` · +${muscles.length - visibleMuscles.length}` : ''}`
-    : 'Sin series registradas';
+  const headline = [
+    activeThisWeek
+      ? `${plural(summary.sessions, 'completado', 'completados')} · 1 en curso`
+      : plural(summary.sessions, 'entrenamiento'),
+    plural(summary.sets, 'serie'),
+    formatTrainingMinutes(summary.minutes),
+  ].join(' · ');
 
   return (
     <View>
@@ -511,40 +561,10 @@ function WeeklyProgress({
       />
       <PressableSurface
         accessibilityHint="Abre el tab Progreso"
-        accessibilityLabel="Ver progreso semanal"
+        accessibilityLabel={`Ver progreso semanal: ${headline}`}
         onPress={onProgress}
       >
-        <View style={styles.weekLead}>
-          <IconCircle icon="calendar" />
-          <View style={styles.flex}>
-            <AppText muted variant="footnote">
-              ESTA SEMANA
-            </AppText>
-            <AppText style={styles.weekHeadline}>
-              {activeThisWeek
-                ? `${plural(summary.sessions, 'completado', 'completados')} · 1 en curso`
-                : summary.sessions > 0
-                  ? `${plural(summary.sessions, 'entrenamiento')} · ${formatTrainingMinutes(summary.minutes)}`
-                  : '0 entrenamientos'}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={styles.weekStats}>
-          <View style={styles.weekStat}>
-            <AppText style={styles.smallMetric}>{formatInteger(summary.sessions)}</AppText>
-            <AppText muted variant="caption">Entrenos</AppText>
-          </View>
-          <View style={styles.weekStat}>
-            <AppText style={styles.smallMetric}>{formatInteger(summary.sets)}</AppText>
-            <AppText muted variant="caption">Series</AppText>
-          </View>
-          <View style={styles.weekStat}>
-            <AppText style={styles.smallMetric}>{formatTrainingMinutes(summary.minutes)}</AppText>
-            <AppText muted variant="caption">Tiempo</AppText>
-          </View>
-        </View>
-
+        <AppText numeric variant="headline">{headline}</AppText>
         <View accessibilityLabel="Actividad de esta semana" style={styles.weekDays}>
           {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((label, index) => {
             const day = addIsoDays(summary.weekStart, index);
@@ -560,73 +580,8 @@ function WeeklyProgress({
             );
           })}
         </View>
-
-        <Separator />
-        <View style={styles.summaryRow}>
-          <IconCircle icon="routines" size="small" />
-          <View style={styles.flex}>
-            <AppText muted variant="caption">Rutinas</AppText>
-            <AppText numberOfLines={2} variant="label">{routineSummary}</AppText>
-          </View>
-        </View>
-        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.summaryRow}>
-          <IconCircle icon="dumbbell" size="small" />
-          <View style={styles.flex}>
-            <AppText muted variant="caption">Músculos principales</AppText>
-            <AppText numberOfLines={2} variant="label">{muscleSummary}</AppText>
-          </View>
-          <AppIcon color={colors.textMuted} name="chevronRight" size={15} />
-        </View>
       </PressableSurface>
     </View>
-  );
-}
-
-function SessionRow({
-  badge,
-  meta,
-  name,
-  onPress,
-  summary,
-}: {
-  badge?: string;
-  meta: string;
-  name: string;
-  onPress: () => void;
-  summary: string;
-}) {
-  const { colors } = useOwnlevelTheme();
-  return (
-    <Pressable
-      accessibilityHint="Abre el tab Entrenar"
-      accessibilityLabel={`${name}. ${badge ? `${badge}. ` : ''}${meta}. ${summary}`}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.sessionRow,
-        { backgroundColor: pressed ? colors.surfaceRaised : colors.surface },
-      ]}
-    >
-      <IconCircle icon="dumbbell" size="small" />
-      <View style={styles.flex}>
-        <View style={styles.sessionTitleRow}>
-          <AppText numberOfLines={1} style={styles.sessionName} variant="label">
-            {name}
-          </AppText>
-          {badge ? (
-            <View style={[styles.activeBadge, { backgroundColor: colors.brandSubtle }]}>
-              <AppText style={{ color: colors.primary }} variant="caption">
-                {badge}
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-        <AppText muted variant="caption">{meta}</AppText>
-        <AppText muted variant="caption">{summary}</AppText>
-      </View>
-      <AppIcon color={colors.textMuted} name="chevronRight" size={15} />
-    </Pressable>
   );
 }
 
@@ -637,95 +592,41 @@ function completedSessionMeta(session: MobileHomeTodaySession): string {
     .join(' · ');
 }
 
+/**
+ * Completed sessions of today only: the active session already leads Home in the hero,
+ * so it is never repeated here.
+ */
 function TodaySessions({
-  activeSession,
-  date,
-  onTrain,
+  onOpenCompletedSession,
   week,
 }: {
-  activeSession: MobileHomeResponse['training']['activeSession'];
-  date: string;
-  onTrain: () => void;
+  onOpenCompletedSession: (sessionId: string) => void;
   week: MobileHomeResponse['training']['week'];
 }) {
-  if (week.status === 'unavailable') {
-    return null;
-  }
-  const active =
-    activeSession.status === 'ok' && activeSession.data?.logDate === date
-      ? activeSession.data
-      : null;
-  const sessions = week.data.todaySessions;
-  if (!active && sessions.length === 0) {
+  if (week.status === 'unavailable' || week.data.todaySessions.length === 0) {
     return null;
   }
 
   return (
     <View>
       <SectionHeader title="Sesiones de hoy" />
-      <Surface elevated style={styles.sessionsSurface}>
-        {active ? (
-          <SessionRow
-            badge="En curso"
-            meta={`${formatClockTime(active.startedAt)} · En curso`}
-            name={active.name}
-            onPress={onTrain}
-            summary={`${active.exercisesCompleted}/${active.totalExercises} ejercicios · ${active.completedSets}/${active.totalSets} series`}
-          />
-        ) : null}
-        {active && sessions.length > 0 ? <Separator /> : null}
-        {sessions.map((session, index) => (
-          <View key={session.id}>
-            {index > 0 ? <Separator /> : null}
-            <SessionRow
-              meta={completedSessionMeta(session)}
-              name={session.name}
-              onPress={onTrain}
-              summary={`${plural(session.exercisesCompleted, 'ejercicio')} · ${plural(session.completedSets, 'serie')}`}
+      <ListGroup>
+        {week.data.todaySessions.map((session) => {
+          const meta = completedSessionMeta(session);
+          const summary = `${plural(session.exercisesCompleted, 'ejercicio')} · ${plural(session.completedSets, 'serie')}`;
+          return (
+            <ListRow
+              accessibilityHint="Abre el detalle de la sesión"
+              accessibilityLabel={`${session.name}. ${meta}. ${summary}`}
+              icon="dumbbell"
+              key={session.id}
+              onPress={() => onOpenCompletedSession(session.id)}
+              subtitle={`${meta}\n${summary}`}
+              title={session.name}
             />
-          </View>
-        ))}
-      </Surface>
-    </View>
-  );
-}
-
-const quickActions: {
-  icon: 'dumbbell' | 'nutrition' | 'progress' | 'settings';
-  label: string;
-  target: HomeNavigationTarget;
-}[] = [
-  { icon: 'dumbbell', label: 'Entrenar', target: 'train' },
-  { icon: 'nutrition', label: 'Nutrición', target: 'nutrition' },
-  { icon: 'progress', label: 'Progreso', target: 'progress' },
-  { icon: 'settings', label: 'Ajustes', target: 'settings' },
-];
-
-function QuickAccess({
-  onNavigate,
-}: {
-  onNavigate: (target: HomeNavigationTarget) => void;
-}) {
-  const { colors } = useOwnlevelTheme();
-  return (
-    <View>
-      <SectionHeader title="Accesos rápidos" />
-      <View style={styles.quickGrid}>
-        {quickActions.map((action) => (
-          <PressableSurface
-            accessibilityLabel={`Abrir ${action.label}`}
-            key={action.target}
-            onPress={() => onNavigate(action.target)}
-            style={styles.quickAction}
-          >
-            <IconCircle icon={action.icon} size="small" />
-            <AppText style={styles.quickLabel} variant="label">
-              {action.label}
-            </AppText>
-            <AppIcon color={colors.textMuted} name="chevronRight" size={14} />
-          </PressableSurface>
-        ))}
-      </View>
+          );
+        })}
+      </ListGroup>
     </View>
   );
 }
@@ -734,7 +635,10 @@ export function HomeDashboard({
   data,
   isStale,
   onNavigate,
+  onOpenCompletedSession,
+  onOpenSession,
   onRefresh,
+  onStartWorkout,
 }: HomeDashboardProps) {
   return (
     <View style={styles.dashboard} testID="real-home-dashboard">
@@ -746,11 +650,12 @@ export function HomeDashboard({
           onAction={onRefresh}
         />
       ) : null}
-      <PrimaryTrainingCard
+      <TrainingSection
         activeSession={data.training.activeSession}
         date={data.date}
+        onOpenSession={onOpenSession}
         onRefresh={onRefresh}
-        onTrain={() => onNavigate('train')}
+        onStartWorkout={onStartWorkout}
         workoutStartRoutines={data.training.workoutStartRoutines}
       />
       <NutritionSummary
@@ -764,28 +669,26 @@ export function HomeDashboard({
         week={data.training.week}
       />
       <TodaySessions
-        activeSession={data.training.activeSession}
-        date={data.date}
-        onTrain={() => onNavigate('train')}
+        onOpenCompletedSession={onOpenCompletedSession}
         week={data.training.week}
       />
-      <QuickAccess onNavigate={onNavigate} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  activeBadge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
   avatar: {
     alignItems: 'center',
-    borderRadius: radius.pill,
-    height: 30,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 48,
     justifyContent: 'center',
-    width: 30,
+    width: 48,
+  },
+  avatarInitial: {
+    fontSize: 20,
+    fontWeight: '600',
+    lineHeight: 24,
   },
   balanceRow: {
     alignItems: 'center',
@@ -796,37 +699,30 @@ const styles = StyleSheet.create({
   brandButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    borderRadius: radius.md,
+    borderRadius: radius.button,
     flexDirection: 'row',
+    gap: spacing.xs,
     justifyContent: 'center',
-    minHeight: sizes.touchTarget,
+    minHeight: brandTokens.layout.buttonHeight,
     paddingHorizontal: spacing.lg,
   },
-  brandEyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    lineHeight: 16,
-    opacity: 0.78,
-  },
-  brandLockup: {
+  compactAction: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 2,
   },
-  brandMark: {
+  compactCard: {
+    gap: spacing.md,
+  },
+  compactRow: {
     alignItems: 'center',
-    borderRadius: radius.md,
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
+    flexDirection: 'row',
+    gap: spacing.md,
   },
-  brandSecondary: {
-    marginTop: spacing.xs,
-    opacity: 0.8,
-  },
-  brandWordmark: {
-    letterSpacing: 1.8,
+  compactText: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
   },
   dashboard: {
     gap: spacing.xl,
@@ -838,14 +734,44 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: spacing.md,
     justifyContent: 'space-between',
     minHeight: sizes.touchTarget,
+  },
+  hero: {
+    borderRadius: radius.card,
+    gap: spacing.lg,
+    overflow: 'hidden',
+    padding: spacing.xl,
   },
   heroMetric: {
     fontSize: 27,
     fontWeight: '700',
     letterSpacing: -0.5,
     lineHeight: 33,
+  },
+  heroProgress: {
+    gap: spacing.sm,
+  },
+  heroProgressLabels: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  heroSecondary: {
+    marginTop: spacing.xs,
+    opacity: 0.8,
+  },
+  isotype: {
+    height: 29,
+    width: 36,
+  },
+  isotypeButton: {
+    alignItems: 'center',
+    height: sizes.touchTarget,
+    justifyContent: 'center',
+    width: sizes.touchTarget,
   },
   metricBetween: {
     alignItems: 'flex-end',
@@ -873,125 +799,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  profileButton: {
+  profile: {
     alignItems: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    maxWidth: '55%',
-    minHeight: sizes.touchTarget,
-    paddingHorizontal: spacing.sm,
-  },
-  profileLabel: {
-    flexShrink: 1,
-  },
-  quickAction: {
-    alignItems: 'center',
-    flexBasis: '48%',
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: spacing.sm,
-    minHeight: 64,
-    padding: spacing.md,
-  },
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  quickLabel: {
     flex: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    minHeight: sizes.touchTarget,
+    minWidth: 0,
   },
   sessionBadge: {
     alignSelf: 'flex-start',
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     opacity: 0.92,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-  },
-  sessionName: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sessionRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 82,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  sessionTitleRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  sessionsSurface: {
-    gap: 0,
-    overflow: 'hidden',
-    padding: 0,
   },
   smallMetric: {
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.25,
     lineHeight: 24,
-  },
-  summaryDivider: {
-    height: 1,
-    marginLeft: 46,
-  },
-  summaryRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 56,
-  },
-  trainingCard: {
-    borderRadius: radius.xl,
-    minHeight: 232,
-    overflow: 'hidden',
-    padding: spacing.xl,
-  },
-  trainingContent: {
-    flex: 1,
-    gap: spacing.md,
-    justifyContent: 'space-between',
-    zIndex: 1,
-  },
-  trainingOrbLarge: {
-    borderRadius: radius.pill,
-    height: 132,
-    opacity: 0.07,
-    position: 'absolute',
-    right: -38,
-    top: -52,
-    width: 132,
-  },
-  trainingOrbSmall: {
-    borderRadius: radius.pill,
-    height: 74,
-    opacity: 0.06,
-    position: 'absolute',
-    right: 42,
-    top: 38,
-    width: 74,
-  },
-  trainingProgress: {
-    gap: spacing.sm,
-  },
-  trainingProgressLabels: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'space-between',
-  },
-  trainingTitle: {
-    fontSize: 27,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-    lineHeight: 33,
   },
   weekDay: {
     alignItems: 'center',
@@ -1006,33 +833,14 @@ const styles = StyleSheet.create({
   },
   weekDot: {
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     height: 14,
     justifyContent: 'center',
     width: 14,
   },
   weekDotInner: {
-    borderRadius: radius.pill,
+    borderRadius: radius.full,
     height: 5,
     width: 5,
-  },
-  weekHeadline: {
-    fontSize: 17,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    lineHeight: 23,
-  },
-  weekLead: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  weekStat: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 2,
-  },
-  weekStats: {
-    flexDirection: 'row',
   },
 });

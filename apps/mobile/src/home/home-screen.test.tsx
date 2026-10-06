@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { RefreshControl } from 'react-native';
 
@@ -12,6 +12,8 @@ const mockFocusEffects: (() => void)[] = [];
 const mockPush = jest.fn();
 const mockRefresh = jest.fn<() => Promise<void>>();
 const mockUseApiResource = jest.fn();
+type MockModalProps = { onClose: () => void; onContinue: (id: string) => void; onStarted: (id: string) => void };
+let mockModalProps: MockModalProps | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
@@ -26,6 +28,16 @@ jest.mock('@/api', () => ({
   fetchMobileHome: jest.fn(),
   useApiResource: (...args: unknown[]) => mockUseApiResource(...args),
   useMobileApi: () => ({ client: {} }),
+}));
+
+// The real modal (verification, idempotency, conflicts) is covered by its own tests;
+// here we only check that Home reuses it and follows the session it reports.
+jest.mock('@/training/start-workout-modal', () => ({
+  StartWorkoutModal: (props: MockModalProps) => {
+    mockModalProps = props;
+    const { Text: MockText } = jest.requireActual<typeof import('react-native')>('react-native');
+    return <MockText>start-workout-modal</MockText>;
+  },
 }));
 
 jest.mock('@/platform/haptics', () => ({
@@ -95,6 +107,7 @@ describe('Home resource screen', () => {
     mockNavigate.mockReset();
     mockPush.mockReset();
     mockUseApiResource.mockReset();
+    mockModalProps = null;
   });
 
   it('uses a structure-matched skeleton during initial loading', () => {
@@ -195,33 +208,71 @@ describe('Home resource screen', () => {
     mockFocusEffects.at(-1)!();
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
-  it('maps Home actions only to existing tabs and Settings', () => {
-    const data = fixture();
-    const result = okResult(data);
-    mockUseApiResource.mockReturnValue({
-      refresh: mockRefresh,
-      state: {
-        status: 'ready',
-        current: { confirmedAt: 1, data },
-        refreshing: false,
-        trigger: 'initial',
-        result,
-      },
-    });
+  function renderReady(data: MobileHomeResponse = fixture()) {
+    mockUseApiResource.mockReturnValue({ refresh: mockRefresh,
+      state: { status: 'ready', current: { confirmedAt: 1, data }, refreshing: false, trigger: 'initial', result: okResult(data) } });
+    return renderScreen();
+  }
 
-    const view = renderScreen();
-    fireEvent.press(view.getByRole('button', { name: 'Abrir Entrenar' }));
-    fireEvent.press(view.getByRole('button', { name: 'Abrir Nutrición' }));
-    fireEvent.press(view.getByRole('button', { name: 'Abrir Progreso' }));
+  it('maps header, Nutrition and Progress to Settings and their tabs', () => {
+    const view = renderReady();
     fireEvent.press(view.getByRole('button', { name: 'Abrir perfil y ajustes' }));
-    fireEvent.press(view.getByRole('button', { name: 'Abrir Ajustes' }));
+    fireEvent.press(view.getByRole('button', { name: 'Abrir ajustes' }));
+    fireEvent.press(view.getByRole('button', { name: 'Ver Nutrición' }));
+    fireEvent.press(view.getByRole('button', { name: 'Ver Progreso' }));
 
-    expect(mockNavigate.mock.calls).toEqual([
-      ['/(tabs)/train'],
-      ['/(tabs)/nutrition'],
-      ['/(tabs)/progress'],
-    ]);
-    // Both Settings entries (header + quick action) push the same /settings stack.
     expect(mockPush.mock.calls).toEqual([['/settings'], ['/settings']]);
+    expect(mockNavigate.mock.calls).toEqual([['/(tabs)/nutrition'], ['/(tabs)/progress']]);
+  });
+
+  it('opens the shared StartWorkoutModal instead of the Training tab and follows the started session', () => {
+    const view = renderReady();
+    expect(view.queryByText('start-workout-modal')).toBeNull();
+
+    fireEvent.press(view.getByRole('button', { name: 'Nueva sesión' }));
+    expect(view.getByText('start-workout-modal')).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    act(() => mockModalProps!.onStarted('started-1'));
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/started-1');
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(view.queryByText('start-workout-modal')).toBeNull();
+  });
+
+  it('continues an active session detected by the modal, and closes cleanly', () => {
+    const view = renderReady();
+    fireEvent.press(view.getByRole('button', { name: 'Nueva sesión' }));
+    act(() => mockModalProps!.onContinue('active-9'));
+    expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/active-9');
+    expect(view.queryByText('start-workout-modal')).toBeNull();
+
+    fireEvent.press(view.getByRole('button', { name: 'Nueva sesión' }));
+    act(() => mockModalProps!.onClose());
+    expect(view.queryByText('start-workout-modal')).toBeNull();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('continues the active session directly and opens completed sessions in their detail', () => {
+    const data = fixture();
+    data.training.activeSession = { status: 'ok', data: {
+      id: 'active-1', name: 'Upper A', logDate: '2026-09-21', startedAt: '2026-09-21T18:00:00.000Z',
+      exercisesCompleted: 1, totalExercises: 4, completedSets: 3, totalSets: 12, progressPercent: 25,
+    } };
+    if (data.training.week.status === 'ok') {
+      data.training.week.data.todaySessions = [{
+        id: 'done-1', name: 'Movilidad', startedAt: '2026-09-21T11:00:00.000Z', endedAt: '2026-09-21T11:30:00.000Z',
+        durationMilliseconds: 30 * 60_000, exercisesCompleted: 4, completedSets: 8, status: 'completed',
+      }];
+    }
+    const view = renderReady(data);
+
+    fireEvent.press(view.getByRole('button', { name: 'Continuar entrenamiento' }));
+    fireEvent.press(view.getByRole('button', { name: /^Movilidad\./ }));
+    expect(mockPush.mock.calls).toEqual([
+      ['/(tabs)/train/session/active-1'],
+      [{ pathname: '/(tabs)/train/history/[id]', params: { id: 'done-1' } }],
+    ]);
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });
