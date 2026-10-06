@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from '@jest/globals';
 
 import {
@@ -39,6 +42,14 @@ describe('Mobile API config', () => {
     expect(() => readMobileApiConfig(environment)).toThrow(
       MobileApiConfigurationError,
     );
+  });
+
+  it('reads the runtime values through static process.env.EXPO_PUBLIC_* references (Expo inlining)', () => {
+    // Jest does not run Expo's inlining, so the source itself is the contract.
+    const source = readFileSync(join(__dirname, 'config.ts'), 'utf8');
+    expect(source).toContain('process.env.EXPO_PUBLIC_OWNLEVEL_API_URL');
+    expect(source).toContain('process.env.EXPO_PUBLIC_APP_ENV');
+    expect(source).not.toMatch(/process\.env\s+as\b|\.\.\.\s*process\.env|process\.env\s*\[|=\s*process\.env\s*[,;)]/);
   });
 
   it('allows explicit localhost HTTP for simulator-only development', () => {

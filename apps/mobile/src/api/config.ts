@@ -21,8 +21,13 @@ type MobileApiEnvironment = {
   EXPO_PUBLIC_OWNLEVEL_API_URL?: string;
 };
 
+// Literal process.env.EXPO_PUBLIC_* references so Expo inlines them at bundle time
+// (an aliased/spread/bracketed process.env is not inlined). Tests pass an explicit object.
 export function readMobileApiConfig(
-  environment: MobileApiEnvironment = process.env as MobileApiEnvironment,
+  environment: MobileApiEnvironment = {
+    EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+    EXPO_PUBLIC_OWNLEVEL_API_URL: process.env.EXPO_PUBLIC_OWNLEVEL_API_URL,
+  },
 ): MobileApiConfig {
   const configuredUrl = environment.EXPO_PUBLIC_OWNLEVEL_API_URL?.trim() ?? '';
   const configuredAppEnv = environment.EXPO_PUBLIC_APP_ENV?.trim() ?? '';
