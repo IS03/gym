@@ -1,116 +1,113 @@
 import type { TextStyle } from 'react-native';
 
-const palette = {
-  white: '#FFFFFF',
-  ink: '#17131F',
-  violet500: '#7C3AED',
-  violet300: '#A78BFA',
-  red500: '#DC3748',
-  amber500: '#B76A00',
-} as const;
+import { layout, palette, radius as brandRadius, space, typeScale } from './brand';
 
-export const lightColors = {
-  background: '#F8F7FB',
-  surface: palette.white,
-  surfaceRaised: '#F0EDF5',
-  brandSurface: '#6D28D9',
-  brandSubtle: '#EDE9FE',
-  text: palette.ink,
-  textMuted: '#696273',
-  border: '#DDD8E4',
-  primary: palette.violet500,
-  onPrimary: palette.white,
-  onBrand: palette.white,
-  success: '#16835D',
-  danger: palette.red500,
-  warning: palette.amber500,
-  unavailable: '#8A8392',
-} as const;
+// Mobile adapter over the shared OWNLEVEL brand tokens (packages/brand). Every value
+// comes from the brand; this file only maps the design-system names onto it.
+// Legacy names are kept so screens keep compiling; M9.2/M9.3 migrate consumers.
 
-export const darkColors = {
-  background: '#0D0B12',
-  surface: '#17131F',
-  surfaceRaised: '#211B2B',
-  brandSurface: '#5B21B6',
-  brandSubtle: '#2B1D42',
-  text: '#F7F3FB',
-  textMuted: '#B8AFBF',
-  border: '#352E3E',
-  primary: palette.violet300,
-  onPrimary: '#1C102F',
-  onBrand: palette.white,
-  success: '#57D6A2',
-  danger: '#FF7A88',
-  warning: '#F2B35E',
-  unavailable: '#918A99',
-} as const;
-
-export type ThemeColors = {
-  [Key in keyof typeof lightColors]: string;
+type ColorRoles = {
+  background: string;
+  surface: string;
+  surfaceRaised: string;
+  text: string;
+  textMuted: string;
+  border: string;
+  primary: string;
+  onPrimary: string;
+  brandSubtle: string;
+  brandSurface: string;
+  onBrand: string;
+  danger: string;
+  /** @deprecated Compatibility alias (= accent). The brand has no "success" color. Remove in M9.2/M9.3. */
+  success: string;
+  /** @deprecated Compatibility alias (= text, neutral emphasis). The brand has no "warning" color. Remove in M9.2/M9.3. */
+  warning: string;
+  /** @deprecated Compatibility alias (= textMuted). Remove in M9.2/M9.3. */
+  unavailable: string;
 };
 
+function colorRoles(scheme: (typeof palette)['dark'] | (typeof palette)['light']): ColorRoles {
+  return {
+    background: scheme.bg,
+    surface: scheme.surface,
+    surfaceRaised: scheme.elevated,
+    text: scheme.text,
+    textMuted: scheme.textMuted,
+    border: scheme.border,
+    primary: scheme.accent,
+    onPrimary: scheme.onAccent,
+    brandSubtle: scheme.accentSoft,
+    // Hero surfaces stay solid until the hero gradient lands (heroFrom → heroTo).
+    brandSurface: scheme.heroFrom,
+    onBrand: scheme.onHero,
+    // System failures and destructive actions only, never to judge the user's data.
+    danger: scheme.error,
+    // Neutral/brand compatibility: never green/amber "good/bad".
+    success: scheme.accent,
+    warning: scheme.text,
+    unavailable: scheme.textMuted,
+  };
+}
+
+export const lightColors = colorRoles(palette.light);
+export const darkColors = colorRoles(palette.dark);
+
+export type ThemeColors = ColorRoles;
+
+/**
+ * Legacy spacing names mapped onto the brand scale (4, 8, 12, 16, 20, 24, 32, 40).
+ * `none` is the absence of spacing. `xxxl` was 48, which is outside the scale:
+ * it maps to the largest brand step (40).
+ */
 export const spacing = {
   none: 0,
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
-  xxxl: 48,
+  xs: space.xxs,
+  sm: space.xs,
+  md: space.sm,
+  lg: space.md,
+  xl: space.xl,
+  xxl: space.xxl,
+  xxxl: space.xxxl,
 } as const;
 
+/**
+ * Brand radii (card, inner, button, chip, input, sheet, tabBar, full). Prefer these
+ * names in new code. Legacy aliases, by actual use: `sm` = inputs/skeleton → input,
+ * `md` = inner elements/buttons → inner, `lg` = surfaces → card, `xl` = hero card → card,
+ * `pill` = pills/tracks → full.
+ */
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 18,
-  xl: 24,
-  pill: 999,
+  ...brandRadius,
+  sm: brandRadius.input,
+  md: brandRadius.inner,
+  lg: brandRadius.card,
+  xl: brandRadius.card,
+  pill: brandRadius.full,
 } as const;
 
 export const sizes = {
-  touchTarget: 44,
+  touchTarget: layout.minTouch,
+  // Mobile-only layout constraints (not brand tokens).
   contentMaxWidth: 720,
   separator: 1,
 } as const;
 
 type TypographyToken = Pick<TextStyle, 'fontSize' | 'fontWeight' | 'letterSpacing' | 'lineHeight'>;
 
+/**
+ * Legacy roles mapped onto the iOS type scale of the brand. No fontFamily: iOS
+ * renders SF Pro, Android Roboto.
+ */
 export const typography = {
-  display: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-    lineHeight: 40,
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    lineHeight: 30,
-  },
-  body: {
-    fontSize: 16,
-    fontWeight: '400',
-    letterSpacing: 0,
-    lineHeight: 23,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    letterSpacing: 0.1,
-    lineHeight: 20,
-  },
-  caption: {
-    fontSize: 13,
-    fontWeight: '500',
-    letterSpacing: 0.2,
-    lineHeight: 18,
-  },
-  overline: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-    lineHeight: 16,
-  },
+  display: typeScale.largeTitle,
+  heading: typeScale.title2,
+  body: typeScale.body,
+  label: typeScale.headline,
+  caption: typeScale.caption,
+  /**
+   * @deprecated Not part of the brand type scale. Kept for compatibility (caption size,
+   * legacy weight/tracking) until M9.2/M9.3 replace it with footnote/caption.
+   */
+  overline: { ...typeScale.caption, fontWeight: '700', letterSpacing: 1.1 },
 } as const satisfies Record<string, TypographyToken>;
