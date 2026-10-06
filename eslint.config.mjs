@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Expo has its own ESLint config and dependency tree.
     "apps/mobile/**",
+    // Brand/reference material (may target Expo/React Native), not Web app code.
+    "docs/**",
     // PWA generado por @ducanh2912/next-pwa en build
     "public/sw.js",
     "public/workbox-*.js",
