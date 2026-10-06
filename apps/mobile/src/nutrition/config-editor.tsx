@@ -1,5 +1,5 @@
-import {Alert,KeyboardAvoidingView,Modal,Platform,StyleSheet,TextInput,View} from 'react-native';
-import {AppText,Button,Heading,LoadingState,ScrollScreen,Surface,spacing,useOwnlevelTheme} from '@/design-system';
+import {Alert,KeyboardAvoidingView,Modal,Platform,StyleSheet} from 'react-native';
+import {AppText,Button,ChipGroup,Heading,LoadingState,ScrollScreen,Surface,TextField} from '@/design-system';
 import type {ConfigOperation,NutritionConfig} from '@/api/nutrition-config';
 import type {ConfigurationController,ConfigState} from './config-controller';
 import type {ConfigDraft} from './config-model';
@@ -7,13 +7,16 @@ const WEEKDAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domi
 const shown=(n:number|null)=>n===null?'Sin dato':`${n} kcal`;
 const titles:Record<ConfigOperation,string>={plan:'Plan nutricional',energy:'Energía',physical:'Datos físicos'};
 function Field({label,value,onChange,disabled,error,numeric=true}:{label:string;value:string;onChange:(v:string)=>void;disabled:boolean;error?:string;numeric?:boolean}){
- const {colors}=useOwnlevelTheme();return <View style={styles.field}><AppText variant="label">{label}</AppText><TextInput accessibilityLabel={label} value={value} editable={!disabled} onChangeText={onChange} keyboardType={numeric?'decimal-pad':'default'} autoCapitalize={numeric?'none':'sentences'} style={[styles.input,{color:colors.text,borderColor:error?colors.danger:colors.border}]}/>{error?<AppText accessibilityRole="alert">{error}</AppText>:null}</View>;
+ return <TextField label={label} value={value} disabled={disabled} error={error} onChangeText={onChange} numeric={numeric} keyboardType={numeric?'decimal-pad':'default'} autoCapitalize={numeric?'none':'sentences'}/>;
 }
+const SEX_OPTIONS=[{value:'',label:'Sin dato'},{value:'male',label:'Masculino'},{value:'female',label:'Femenino'},{value:'other',label:'Otro'}] as const;
+const ACTIVITY_OPTIONS=[{value:'low',label:'Baja'},{value:'moderate',label:'Moderada'},{value:'high',label:'Alta'}] as const;
+const BASE_MODE_OPTIONS=[{value:'automatic',label:'Automático'},{value:'custom',label:'Personalizado'}] as const;
 // Shared physical editor: M8 can use this surface and the profile/physical API.
 export function PhysicalProfileFields({draft,change,locked,errors,hasHistory}:{draft:ConfigDraft;change:(k:string,v:string)=>void;locked:boolean;errors:Record<string,string>;hasHistory:boolean}){
  return <><AppText muted>Si cambiás el peso, se registra para hoy. Los valores históricos permanecen.</AppText>
   <Field label="Nacimiento (AAAA-MM-DD)" numeric={false} value={draft.birthDate} disabled={locked} error={errors.birthDate} onChange={v=>change('birthDate',v)}/>
-  <AppText variant="label">Sexo</AppText>{([['','Sin dato'],['male','Masculino'],['female','Femenino'],['other','Otro']] as const).map(([v,l])=><Button key={v} label={`${draft.sex===v?'✓ ':''}${l}`} disabled={locked} variant="secondary" onPress={()=>change('sex',v)}/>)}
+  <AppText variant="subheadline">Sexo</AppText><ChipGroup accessibilityLabel="Sexo" options={SEX_OPTIONS} value={draft.sex} disabled={locked} onChange={v=>change('sex',v)}/>
   <Field label="Altura (cm)" value={draft.heightCm} disabled={locked} error={errors.heightCm} onChange={v=>change('heightCm',v)}/>
   <Field label="Peso (kg)" value={draft.weightKg} disabled={locked} error={errors.weightKg} onChange={v=>change('weightKg',v)}/>
   {hasHistory?<AppText muted>El peso con historial no puede quitarse desde este formulario.</AppText>:null}
@@ -45,8 +48,8 @@ export function ConfigurationEditor({controller,state}:{controller:Configuration
    {field('baseWaterL','Agua base (L)')}{field('trainingCalorieDeltaKcal','Extra de objetivo por entrenamiento (kcal)')}{field('trainingWaterDeltaL','Extra de agua por entrenamiento (L)')}
    <AppText muted>Los extras se aplican cuando hay entrenamiento finalizado. El agua del plan no cambia el objetivo de la métrica Agua.</AppText></>:null}
   {op==='energy'?<>
-   <AppText variant="label">Actividad cotidiana</AppText>{([['low','Baja'],['moderate','Moderada'],['high','Alta']] as const).map(([v,l])=><Button key={v} label={`${draft.activityLevel===v?'✓ ':''}${l}`} disabled={locked} variant="secondary" onPress={()=>controller.change('activityLevel',v)}/>)}
-   <AppText variant="label">Gasto base</AppText>{([['automatic','Automático'],['custom','Personalizado']] as const).map(([v,l])=><Button key={v} label={`${draft.baseExpenditureMode===v?'✓ ':''}${l}`} disabled={locked} variant="secondary" onPress={()=>controller.change('baseExpenditureMode',v)}/>)}
+   <AppText variant="subheadline">Actividad cotidiana</AppText><ChipGroup accessibilityLabel="Actividad cotidiana" options={ACTIVITY_OPTIONS} value={draft.activityLevel} disabled={locked} onChange={v=>controller.change('activityLevel',v)}/>
+   <AppText variant="subheadline">Gasto base</AppText><ChipGroup accessibilityLabel="Gasto base" options={BASE_MODE_OPTIONS} value={draft.baseExpenditureMode} disabled={locked} onChange={v=>controller.change('baseExpenditureMode',v)}/>
    <AppText muted>Automático usa tu BMR y actividad cotidiana. Personalizado usa el valor que indicás; ambos requieren datos físicos para calcular BMR.</AppText>
    {config?.energy.status==='ok'?<Surface><AppText>{`BMR: ${shown(config.energy.data.bmrKcal)}`}</AppText><AppText>{`Base automática guardada: ${shown(config.energy.data.automaticBaseKcal)}`}</AppText><AppText>{`Base usada guardada: ${shown(config.energy.data.usedBaseKcal)}`}</AppText></Surface>:null}
    {draft.baseExpenditureMode==='custom'?field('customBaseExpenditureKcal','Gasto base personalizado (kcal)'):null}{field('trainingExpenditureDeltaKcal','Extra de gasto por entrenamiento (kcal)')}
@@ -64,4 +67,4 @@ export function ConfigurationEditor({controller,state}:{controller:Configuration
  <Button label={state.intent?'Cerrar · conservar intento':'Cerrar configuración'} disabled={pending} variant="quiet" onPress={()=>leave(()=>controller.close())}/>
  </ScrollScreen></KeyboardAvoidingView></Modal>;
 }
-const styles=StyleSheet.create({screen:{flex:1},field:{gap:spacing.xs},input:{borderWidth:1,borderRadius:8,minHeight:48,padding:12}});
+const styles=StyleSheet.create({screen:{flex:1}});

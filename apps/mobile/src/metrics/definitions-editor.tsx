@@ -1,8 +1,7 @@
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { METRIC_DEFINITION_VALUE_TYPES } from '@/api/metric-definitions';
-import { AppText, Button, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
-import { SheetHeader } from '@/training/active-session-sheets';
+import { AppText, Button, SheetHeader, TextField, radius, sizes, spacing, useOwnlevelTheme } from '@/design-system';
 import type { DefinitionsController, DefinitionsState } from './definitions-controller';
 import { VALUE_TYPE_LABELS } from './definitions-model';
 import type { DefinitionEditor } from './definitions-storage';
@@ -11,15 +10,8 @@ function Field({ label, value, onChange, error, editable, keyboard = 'default', 
   label: string; value: string; onChange: (v: string) => void; error?: string; editable: boolean;
   keyboard?: 'default' | 'decimal-pad' | 'number-pad'; placeholder?: string; hint?: string;
 }) {
-  const { colors } = useOwnlevelTheme();
-  return <View style={styles.field}>
-    <AppText variant="label">{label}</AppText>
-    <TextInput accessibilityLabel={label} editable={editable} keyboardType={keyboard} value={value} onChangeText={onChange} placeholder={placeholder ?? '—'}
-      placeholderTextColor={colors.textMuted} autoCorrect={false}
-      style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: error ? colors.danger : colors.border, opacity: editable ? 1 : 0.6 }]} />
-    {hint ? <AppText muted variant="caption">{hint}</AppText> : null}
-    {error ? <AppText accessibilityRole="alert" style={{ color: colors.danger }} variant="caption">{error}</AppText> : null}
-  </View>;
+  return <TextField label={label} value={value} onChangeText={onChange} error={error} hint={hint} disabled={!editable} keyboardType={keyboard}
+    placeholder={placeholder ?? '—'} autoCorrect={false} numeric={keyboard !== 'default'} />;
 }
 
 /** Create / edit one definition. Only what the domain allows is editable; the rest is shown read-only. */
@@ -39,7 +31,7 @@ export function DefinitionEditorSheet({ editor, state, controller }: { editor: D
   };
   const confirm = (title: string, detail: string, action: string, run: () => void, destructive = false) =>
     Alert.alert(title, detail, [{ text: 'Cancelar', style: 'cancel' }, { text: action, style: destructive ? 'destructive' : 'default', onPress: run }]);
-  const tone = phase === 'uncertain' || phase === 'confirmed' ? colors.warning : phase === 'conflict' || phase === 'blocked' ? colors.danger : colors.text;
+  const tone = phase === 'uncertain' || phase === 'confirmed' ? colors.text : phase === 'conflict' || phase === 'blocked' ? colors.danger : colors.text;
   const title = b ? b.name : 'Crear métrica';
   const subtitle = !b ? 'Elegí qué querés registrar cada día.' : b.systemKey ? 'Métrica del sistema' : b.isActive ? 'Métrica propia' : 'Métrica propia · archivada';
   return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
@@ -106,7 +98,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   field: { gap: spacing.xs },
   flex: { flex: 1 },
-  input: { minHeight: sizes.touchTarget, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: 16 },
   types: { flexDirection: 'row', gap: spacing.sm },
   type: { flex: 1, minHeight: sizes.touchTarget, borderWidth: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs },
   duration: { flexDirection: 'row', gap: spacing.sm },

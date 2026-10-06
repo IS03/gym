@@ -64,7 +64,7 @@ export function DefinitionsView({ state, controller }: { state: DefinitionsState
       {state.intent && !editor && state.phase !== 'pending' ? <Surface><AppText variant="caption">{state.message ?? 'Hay un cambio pendiente de confirmar.'}</AppText>
         <Button label="Comprobar" onPress={() => void controller.recover()} /></Surface> : null}
       {!state.intent && !editor && state.message && state.phase === 'idle' ? <Surface accessibilityRole="alert">
-        <AppText style={{ color: colors.warning }} variant="caption">{state.message}</AppText></Surface> : null}
+        <AppText style={{ color: colors.text }} variant="caption">{state.message}</AppText></Surface> : null}
       {state.phase === 'blocked' && !editor ? <Surface><AppText style={{ color: colors.danger }} variant="caption">{state.message}</AppText></Surface> : null}
       <View style={styles.section} testID="metric-definitions-active">
         <Heading level={2}>Activas</Heading>

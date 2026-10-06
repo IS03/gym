@@ -9,7 +9,7 @@ export function FoundationPlaceholder({ description, title }: FoundationPlacehol
   return (
     <Screen centered>
       <Surface>
-        <AppText muted variant="overline">
+        <AppText muted variant="footnote">
           OWNLEVEL MOBILE
         </AppText>
         <Heading>{title}</Heading>

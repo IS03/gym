@@ -243,7 +243,7 @@ export function ExerciseFilterModal({
               <View style={styles.grid}>
                 {routines.map((routine) => (
                   <Selectable
-                    dotColor={routine.color ? trainingRoutineColor(routine.color, isDark) : colors.unavailable}
+                    dotColor={routine.color ? trainingRoutineColor(routine.color, isDark) : colors.textMuted}
                     key={routine.id}
                     label={routine.name}
                     onPress={() => setDraft({

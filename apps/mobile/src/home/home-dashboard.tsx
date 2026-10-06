@@ -89,7 +89,7 @@ function HomeHeader({
         <View style={[styles.brandMark, { backgroundColor: colors.brandSurface }]}>
           <AppIcon color={colors.onBrand} name="brand" size={19} />
         </View>
-        <AppText style={styles.brandWordmark} variant="overline">
+        <AppText style={styles.brandWordmark} variant="footnote">
           OWNLEVEL
         </AppText>
       </View>
@@ -517,7 +517,7 @@ function WeeklyProgress({
         <View style={styles.weekLead}>
           <IconCircle icon="calendar" />
           <View style={styles.flex}>
-            <AppText muted variant="overline">
+            <AppText muted variant="footnote">
               ESTA SEMANA
             </AppText>
             <AppText style={styles.weekHeadline}>

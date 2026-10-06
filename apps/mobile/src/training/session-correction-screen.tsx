@@ -87,7 +87,7 @@ function CorrectionForm({ client, detail, onReload }: { client: MobileApiClient;
         <AppText variant="label" style={styles.title}>{detail.session.name}</AppText>
         <AppText muted variant="caption">{compactHistoryDate(detail.session.logDate)}</AppText>
       </View>
-      <Surface style={{ borderColor: colors.warning }}>
+      <Surface style={{ borderColor: colors.text }}>
         <AppText muted variant="caption">Sólo podés corregir datos realizados y notas. La fecha, duración, rutina, ejercicios, objetivos y progresión están congelados.</AppText>
       </Surface>
       <AppText muted variant="label">Series realizadas</AppText>
@@ -119,7 +119,7 @@ function CorrectionForm({ client, detail, onReload }: { client: MobileApiClient;
     <View style={styles.footer}>
       {error ? <AppText accessibilityLiveRegion="polite" style={{ color: colors.danger }} variant="caption">{error}</AppText> : null}
       {phase.kind === 'uncertain' ? <>
-        <AppText style={{ color: colors.warning }} variant="caption">No pudimos confirmar si la corrección se guardó. Reintentá: se reenvía la misma corrección y no se aplica dos veces.</AppText>
+        <AppText style={{ color: colors.text }} variant="caption">No pudimos confirmar si la corrección se guardó. Reintentá: se reenvía la misma corrección y no se aplica dos veces.</AppText>
         <Button label="Reintentar" onPress={() => void send(phase.input)} />
         <Button label="Descartar y recargar" variant="quiet" onPress={reloadServerTruth} />
       </> : phase.kind === 'conflict' ? <>

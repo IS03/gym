@@ -99,7 +99,7 @@ describe('Training Trends', () => {
     mockTraining.mockImplementationOnce(() => new Promise(r => { release = r; }));
     const view = wrap(<TrainingTrendsScreen />); await flush();
     mockTraining.mockImplementation(async (_c, q) => ok(training(q.period, true)));
-    fireEvent.press(view.getByRole('button', { name: '7 días' })); await flush();
+    fireEvent.press(view.getByRole('radio', { name: '7 días' })); await flush();
     await act(async () => { release(ok(training('30'))); }); await flush();
     expect(view.queryByText('Press banca · PR')).toBeNull();
     expect(view.getByText('Sin entrenamientos completados en este período.')).toBeTruthy();

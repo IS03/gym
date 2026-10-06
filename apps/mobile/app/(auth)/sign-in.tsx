@@ -7,7 +7,7 @@ export default function SignInScreen() {
   return (
     <Screen centered testID="native-sign-in-screen">
       <Surface>
-        <AppText muted variant="overline">
+        <AppText muted variant="footnote">
           OWNLEVEL
         </AppText>
         <Heading>Tu nivel, en un solo lugar.</Heading>

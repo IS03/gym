@@ -118,18 +118,18 @@ describe('Progress Overview', () => {
     let release!: (v: unknown) => void;
     mockOverview.mockImplementationOnce(() => new Promise(r => { release = r; }));
     const view = wrap(<ProgressOverviewScreen />); await flush();
-    fireEvent.press(view.getByRole('button', { name: '7 días' })); await flush();
+    fireEvent.press(view.getByRole('radio', { name: '7 días' })); await flush();
     expect(mockOverview).toHaveBeenLastCalledWith(mockClient, { period: '7' });
     await act(async () => { release(ok(overview({ evolution: [{ id: 'stale', label: 'Viejo', value: '1 kg', detail: null, destination: { kind: 'body' } }] }, '30'))); }); await flush();
     expect(view.queryByText('Viejo')).toBeNull();
     expect(view.getByText(/7 días · /)).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: '3 meses' })); await flush();
-    fireEvent.press(view.getByRole('button', { name: '1 año' })); await flush();
+    fireEvent.press(view.getByRole('radio', { name: '3 meses' })); await flush();
+    fireEvent.press(view.getByRole('radio', { name: '1 año' })); await flush();
     expect(mockOverview.mock.calls.map(c => c[1].period)).toEqual(['30', '7', '3m', '1y']);
   });
   it('custom: invalid or longer than 366 days is rejected locally; a valid range is requested', async () => {
     const view = wrap(<ProgressOverviewScreen />); await flush();
-    fireEvent.press(view.getByRole('button', { name: 'Personalizado' }));
+    fireEvent.press(view.getByRole('radio', { name: 'Personalizado' }));
     fireEvent.changeText(view.getByLabelText('Desde (DD/MM/AAAA)'), '01/01/2025');
     fireEvent.changeText(view.getByLabelText('Hasta (DD/MM/AAAA)'), '05/10/2026');
     fireEvent.press(view.getByRole('button', { name: 'Consultar rango' }));

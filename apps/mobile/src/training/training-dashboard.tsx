@@ -327,7 +327,7 @@ function HubCard({
 function SectionIntro({ description, title }: { description: string; title: string }) {
   return (
     <View style={styles.sectionIntro}>
-      <AppText variant="overline">{title}</AppText>
+      <AppText variant="footnote">{title}</AppText>
       <AppText muted>{description}</AppText>
     </View>
   );

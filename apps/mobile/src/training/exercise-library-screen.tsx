@@ -109,7 +109,7 @@ function ExerciseRows({
                   </AppText>
                   {!exercise.isActive ? (
                     <View style={[styles.archivedBadge, { backgroundColor: colors.surfaceRaised }]}>
-                      <AppText muted variant="overline">ARCHIVADO</AppText>
+                      <AppText muted variant="footnote">ARCHIVADO</AppText>
                     </View>
                   ) : null}
                 </View>
@@ -153,7 +153,7 @@ function GroupSection({
         <View style={[styles.disclosure, expanded && styles.disclosureExpanded]}>
           <AppIcon color={colors.textMuted} name="chevronRight" size={16} />
         </View>
-        <AppText style={styles.groupTitle} variant="overline">{label.toUpperCase()}</AppText>
+        <AppText style={styles.groupTitle} variant="footnote">{label.toUpperCase()}</AppText>
         <View style={[styles.countBadge, { backgroundColor: colors.surfaceRaised }]}>
           <AppText variant="caption">{exercises.length}</AppText>
         </View>

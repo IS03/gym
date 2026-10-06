@@ -51,7 +51,7 @@ function Choice({
       }]}
     >
       {icon ? <AppIcon color={colors.primary} name={icon} size={23} /> :
-        <View accessibilityElementsHidden style={[styles.colorDot, { backgroundColor: color ?? colors.unavailable }]} />}
+        <View accessibilityElementsHidden style={[styles.colorDot, { backgroundColor: color ?? colors.textMuted }]} />}
       <View style={styles.flex}>
         <AppText variant="label">{label}</AppText>
         <AppText muted variant="caption">{metadata}</AppText>

@@ -19,18 +19,14 @@ type ColorRoles = {
   brandSurface: string;
   onBrand: string;
   danger: string;
-  /** @deprecated Compatibility alias (= accent). The brand has no "success" color. Remove in M9.2/M9.3. */
-  success: string;
-  /** @deprecated Compatibility alias (= text, neutral emphasis). The brand has no "warning" color. Remove in M9.2/M9.3. */
-  warning: string;
-  /** @deprecated Compatibility alias (= textMuted). Remove in M9.2/M9.3. */
-  unavailable: string;
+  dangerSoft: string;
 };
 
 function colorRoles(scheme: (typeof palette)['dark'] | (typeof palette)['light']): ColorRoles {
   return {
     background: scheme.bg,
     surface: scheme.surface,
+    // Brand "elevated": inputs, chips, inner blocks and pressed states.
     surfaceRaised: scheme.elevated,
     text: scheme.text,
     textMuted: scheme.textMuted,
@@ -43,10 +39,7 @@ function colorRoles(scheme: (typeof palette)['dark'] | (typeof palette)['light']
     onBrand: scheme.onHero,
     // System failures and destructive actions only, never to judge the user's data.
     danger: scheme.error,
-    // Neutral/brand compatibility: never green/amber "good/bad".
-    success: scheme.accent,
-    warning: scheme.text,
-    unavailable: scheme.textMuted,
+    dangerSoft: scheme.errorSoft,
   };
 }
 
@@ -96,18 +89,22 @@ export const sizes = {
 type TypographyToken = Pick<TextStyle, 'fontSize' | 'fontWeight' | 'letterSpacing' | 'lineHeight'>;
 
 /**
- * Legacy roles mapped onto the iOS type scale of the brand. No fontFamily: iOS
- * renders SF Pro, Android Roboto.
+ * The brand iOS type scale (no fontFamily: iOS renders SF Pro, Android Roboto), plus
+ * the historical role names used across screens, mapped onto it.
  */
 export const typography = {
-  display: typeScale.largeTitle,
-  heading: typeScale.title2,
+  largeTitle: typeScale.largeTitle,
+  title1: typeScale.title1,
+  title2: typeScale.title2,
+  headline: typeScale.headline,
   body: typeScale.body,
-  label: typeScale.headline,
+  subheadline: typeScale.subheadline,
+  footnote: typeScale.footnote,
   caption: typeScale.caption,
-  /**
-   * @deprecated Not part of the brand type scale. Kept for compatibility (caption size,
-   * legacy weight/tracking) until M9.2/M9.3 replace it with footnote/caption.
-   */
-  overline: { ...typeScale.caption, fontWeight: '700', letterSpacing: 1.1 },
+  /** Same as largeTitle. */
+  display: typeScale.largeTitle,
+  /** Same as title2. */
+  heading: typeScale.title2,
+  /** Same as headline (button labels, field labels, row titles). */
+  label: typeScale.headline,
 } as const satisfies Record<string, TypographyToken>;

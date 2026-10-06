@@ -20,7 +20,7 @@ function Detail({ data, onDay }: { data: ProgressMetrics; onDay: (date: string) 
       <AppText variant="label">Promedio: {v(s.average)}</AppText>
       <AppText muted variant="caption">Sobre días con dato. Un 0 registrado cuenta; un día sin dato no.</AppText>
       <AppText>Mediana: {v(s.median)} · Mínimo: {v(s.minimum)} · Máximo: {v(s.maximum)}</AppText>
-      <AppText variant="caption" style={low ? { color: colors.warning } : undefined}>{s.registeredDays} de {s.eligibleDays} días con dato{low ? ' · cobertura baja' : ''}</AppText>
+      <AppText variant="caption" style={low ? { color: colors.text } : undefined}>{s.registeredDays} de {s.eligibleDays} días con dato{low ? ' · cobertura baja' : ''}</AppText>
       {s.trendDelta !== null ? <AppText muted variant="caption">Del primer al último dato: {formatDelta(s.trendDelta, m.unit, m.valueType)}{s.trendPercentDelta !== null ? ` (${s.trendPercentDelta > 0 ? '+' : ''}${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(s.trendPercentDelta)}%)` : ''}</AppText>
         : <AppText muted variant="caption">Tendencia: datos insuficientes.</AppText>}
       {m.currentTarget !== null ? <AppText muted variant="caption">Objetivo actual: {v(m.currentTarget)} (no hay objetivos históricos por período)</AppText> : null}

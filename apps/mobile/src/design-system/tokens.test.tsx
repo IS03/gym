@@ -20,8 +20,9 @@ describe('Mobile theme on the OWNLEVEL brand tokens', () => {
     // Every role is a brand value: no green/amber (or any other off-brand color) is reintroduced.
     const allowed = new Set<string>(Object.values(brand));
     expect(Object.entries(colors).filter(([, value]) => !allowed.has(value))).toEqual([]);
-    // Deprecated compatibility aliases stay neutral/brand.
-    expect([colors.success, colors.warning, colors.unavailable]).toEqual([brand.accent, brand.text, brand.textMuted]);
+    expect(colors.dangerSoft).toBe(brand.errorSoft);
+    // The deprecated success/warning/unavailable aliases are gone (M9.2).
+    expect(Object.keys(colors).filter(k => /success|warning|unavailable/.test(k))).toEqual([]);
   });
 
   it('champagne is the primary accent in both modes', () => {
@@ -35,7 +36,8 @@ describe('Mobile theme on the OWNLEVEL brand tokens', () => {
     expect(typography.body).toBe(typeScale.body);
     expect(typography.label).toBe(typeScale.headline);
     expect(typography.caption).toBe(typeScale.caption);
-    expect(typography.overline.fontSize).toBe(typeScale.caption.fontSize);
+    for (const role of Object.keys(typeScale) as (keyof typeof typeScale)[]) expect(typography[role]).toBe(typeScale[role]);
+    expect('overline' in typography).toBe(false);
     const scale = new Set<number>([0, ...Object.values(space)]);
     expect(Object.values(spacing).filter(v => !scale.has(v))).toEqual([]);
     const radii = new Set<number>(Object.values(brandRadius));

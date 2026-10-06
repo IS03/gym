@@ -69,14 +69,14 @@ function Content({ data, open }: { data: ProgressOverview; open: (d: ProgressDes
         <AppText muted variant="caption">{comparisonText(nutrition.protein, 'g')}</AppText>
         {nutrition.averageTargetKcal !== null ? <AppText muted variant="caption">Objetivo histórico promedio: {formatValue(nutrition.averageTargetKcal, 'kcal', 'integer')}</AppText> : null}
         {nutrition.accumulatedBalanceKcal !== null ? <AppText muted variant="caption">Balance acumulado: {formatValue(nutrition.accumulatedBalanceKcal, 'kcal', 'integer')}</AppText> : null}
-        <AppText muted variant="caption" style={nutrition.registeredDays * 2 < nutrition.days ? { color: colors.warning } : undefined}>
+        <AppText muted variant="caption" style={nutrition.registeredDays * 2 < nutrition.days ? { color: colors.text } : undefined}>
           {nutrition.registeredDays} de {nutrition.days} días con registro</AppText>
       </PressableSurface></View> : <Surface><InlineUnavailable message="No pudimos cargar Nutrición. No significa que no haya datos." /></Surface>}
       {data.metrics.status === 'unavailable' ? <Surface><InlineUnavailable message="No pudimos cargar tus métricas. No significa que no haya datos." /></Surface>
         : data.metrics.data.items.map(m => <View key={m.id} testID={`progress-habit-${m.id}`}><PressableSurface accessibilityLabel={m.name} onPress={() => open({ kind: 'metrics', metricId: m.id })} style={styles.block}>
           <View style={styles.rowInline}><AppText variant="label" style={styles.flex}>{m.name}</AppText><AppText>{formatValue(m.average, m.unit, m.valueType)}</AppText></View>
           <AppText muted variant="caption">Promedio por día con dato · {comparisonText(m.comparison, m.unit, m.valueType)}</AppText>
-          <AppText muted={!lowCoverage(m.coverage)} variant="caption" style={lowCoverage(m.coverage) ? { color: colors.warning } : undefined}>
+          <AppText muted={!lowCoverage(m.coverage)} variant="caption" style={lowCoverage(m.coverage) ? { color: colors.text } : undefined}>
             {coverageText(m.coverage)}{lowCoverage(m.coverage) ? ' · cobertura baja' : ''}</AppText>
         </PressableSurface></View>)}
     </View>

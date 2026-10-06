@@ -84,7 +84,7 @@ export function CompletedSessionScreen({ api, sessionId, initialDetail, finished
     ]);
   };
   const actions = detail.session.status === 'completed' ? <View style={styles.actions}>
-    {notice ? <Surface accessibilityRole="alert"><AppText style={{ color: notice.tone === 'danger' ? colors.danger : colors.warning }} variant="caption">{notice.text}</AppText></Surface> : null}
+    {notice ? <Surface accessibilityRole="alert"><AppText style={{ color: notice.tone === 'danger' ? colors.danger : colors.text }} variant="caption">{notice.text}</AppText></Surface> : null}
     <Button label="Corregir sesión" variant="secondary" disabled={discarding} onPress={() => router.push(origin ? { pathname: '/(tabs)/train/correct/[id]', params: { id: sessionId, ...origin } } : `/(tabs)/train/correct/${sessionId}`)} />
     <Button label={discarding ? 'Eliminando…' : pendingKey ? 'Reintentar eliminación' : 'Eliminar sesión'} variant="quiet" disabled={discarding}
       onPress={pendingKey ? () => void runDiscard() : confirmDiscard} />

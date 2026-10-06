@@ -57,7 +57,7 @@ function ApiDiagnosticsContent() {
   return (
     <ScrollScreen testID="api-diagnostics-screen">
       <Surface>
-        <AppText muted variant="overline">
+        <AppText muted variant="footnote">
           DEVELOPMENT / DIAGNOSTICS
         </AppText>
         <Heading>Mobile API Runtime</Heading>

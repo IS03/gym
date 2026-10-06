@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +23,7 @@ import {
   Button,
   Heading,
   Surface,
+  TextField,
   radius,
   sizes,
   spacing,
@@ -75,25 +75,16 @@ function Field({
   placeholder?: string;
   value: string;
 }) {
-  const { colors } = useOwnlevelTheme();
   return (
-    <View style={styles.field}>
-      <AppText variant="caption">{label}</AppText>
-      <TextInput
-        accessibilityLabel={label}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        style={[
-          styles.input,
-          multiline && styles.textarea,
-          { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
-        ]}
-        value={value}
-      />
-    </View>
+    <TextField
+      keyboardType={keyboardType}
+      label={label}
+      multiline={multiline}
+      numeric={Boolean(keyboardType)}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      value={value}
+    />
   );
 }
 
@@ -613,5 +604,4 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   sectionTitleCopy: { flex: 1, gap: spacing.xs },
-  textarea: { minHeight: 100, textAlignVertical: 'top' },
 });
