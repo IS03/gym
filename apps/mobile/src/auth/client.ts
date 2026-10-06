@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { supabaseKeyProblem } from '../config/public-env-policy';
+
 import { MOBILE_AUTH_STORAGE_KEY } from './constants';
 import { mobileAuthStorage } from './storage';
 
@@ -15,11 +17,20 @@ export class MobileAuthConfigurationError extends Error {
   }
 }
 
-export function readMobileSupabaseConfig(): MobileSupabaseConfig {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
-  const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
+type MobileSupabaseEnvironment = { url: string | undefined; publishableKey: string | undefined };
 
-  if (!url || !publishableKey) {
+// Literal process.env access so Expo inlines the public values at bundle time.
+export function readMobileSupabaseConfig(
+  environment: MobileSupabaseEnvironment = {
+    url: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    publishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  },
+): MobileSupabaseConfig {
+  const url = environment.url?.trim() ?? '';
+  const publishableKey = environment.publishableKey?.trim() ?? '';
+
+  // Only publishable keys: a secret key is never used, even if a build slipped past the config guard.
+  if (!url || !publishableKey || supabaseKeyProblem(publishableKey)) {
     throw new MobileAuthConfigurationError();
   }
 
@@ -49,8 +60,12 @@ export function getMobileSupabaseClient(): SupabaseClient {
     return mobileSupabaseClient;
   }
 
-  const config = readMobileSupabaseConfig();
-  mobileSupabaseClient = createClient(config.url, config.publishableKey, {
+  mobileSupabaseClient = createMobileSupabaseClient(readMobileSupabaseConfig());
+  return mobileSupabaseClient;
+}
+
+export function createMobileSupabaseClient(config: MobileSupabaseConfig): SupabaseClient {
+  return createClient(config.url, config.publishableKey, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: false,
@@ -60,6 +75,4 @@ export function getMobileSupabaseClient(): SupabaseClient {
       storageKey: MOBILE_AUTH_STORAGE_KEY,
     },
   });
-
-  return mobileSupabaseClient;
 }
