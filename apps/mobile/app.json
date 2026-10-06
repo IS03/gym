@@ -4,37 +4,43 @@
     "slug": "ownlevel-mobile",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/ownlevel-app-icon.png",
+    "icon": "./assets/brand/app-icon/ios/icon-1024.png",
     "scheme": "ownlevel-dev",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "fit.ownlevel.app.dev",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "icon": {
+        "light": "./assets/brand/app-icon/ios/icon-1024.png",
+        "dark": "./assets/brand/app-icon/ios/icon-1024-dark.png",
+        "tinted": "./assets/brand/app-icon/ios/icon-1024-tinted.png"
+      }
     },
     "android": {
       "package": "fit.ownlevel.app.dev",
       "adaptiveIcon": {
-        "backgroundColor": "#15121D",
-        "foregroundImage": "./assets/images/ownlevel-app-icon.png"
+        "backgroundColor": "#09090B",
+        "foregroundImage": "./assets/brand/app-icon/android/adaptive-foreground.png",
+        "monochromeImage": "./assets/brand/app-icon/android/adaptive-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/ownlevel-app-icon.png"
+      "favicon": "./assets/brand/app-icon/ios/icon-1024.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/ownlevel-app-icon.png",
-          "imageWidth": 112,
+          "image": "./assets/brand/splash/splash-isotipo-claro.png",
+          "imageWidth": 96,
           "resizeMode": "contain",
-          "backgroundColor": "#F8F7FB",
+          "backgroundColor": "#F3F1EC",
           "dark": {
-            "image": "./assets/images/ownlevel-app-icon.png",
-            "backgroundColor": "#0D0B12"
+            "image": "./assets/brand/splash/splash-isotipo-oscuro.png",
+            "backgroundColor": "#09090B"
           }
         }
       ],

@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { THEME_INIT_INLINE_SCRIPT } from "@/lib/app-theme";
+import { palette } from "@brand/tokens";
 import { ownlevelMetadata } from "@/lib/brand-metadata";
 import "./globals.css";
 
@@ -25,8 +26,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "oklch(0.98 0.003 285)" },
-    { media: "(prefers-color-scheme: dark)", color: "oklch(0.155 0.004 285)" },
+    { media: "(prefers-color-scheme: light)", color: palette.light.bg },
+    { media: "(prefers-color-scheme: dark)", color: palette.dark.bg },
   ],
 };
 

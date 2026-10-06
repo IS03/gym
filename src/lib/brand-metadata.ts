@@ -1,4 +1,5 @@
 import type { Metadata, MetadataRoute } from "next";
+import { palette } from "@brand/tokens";
 import { brandAssets } from "./brand";
 
 export const ownlevelMetadata = {
@@ -26,8 +27,8 @@ export function ownlevelManifest(): MetadataRoute.Manifest {
     start_url: "/home",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#0d0d12",
-    theme_color: "#0d0d12",
+    background_color: palette.dark.bg,
+    theme_color: palette.dark.bg,
     lang: "es",
     icons: [
       {
@@ -41,6 +42,12 @@ export function ownlevelManifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
+      },
+      {
+        src: brandAssets.appIconMaskable512,
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };
