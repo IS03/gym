@@ -13,7 +13,7 @@ import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { triggerHaptic } from '@/platform/haptics';
 import { ActiveSessionController, sessionIntentKey } from './active-session-controller';
 import { ActiveExerciseCard } from './active-session-exercise-card';
-import { durationLabel, restRemaining } from './active-session-model';
+import { durationLabel, restRemaining, shouldSignalRestEnd } from './active-session-model';
 import { SessionExercisePicker, SessionQuickHistory } from './active-session-sheets';
 import { ExerciseEditorModal } from './exercise-editor-modal';
 import { trainingRoutineColor } from './routine-colors';
@@ -57,6 +57,11 @@ function RestTimerView({ controller, timer }: { controller: ActiveSessionControl
     return () => { clearInterval(tick); foreground.remove(); };
   }, [timer]);
   const seconds = restRemaining(timer, now);
+  const previousSeconds = useRef<number | null>(null);
+  useEffect(() => {
+    if (shouldSignalRestEnd(previousSeconds.current, seconds, timer, Date.now())) triggerHaptic('restEnd');
+    previousSeconds.current = seconds;
+  }, [seconds, timer]);
   const label = seconds ? `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}` : 'Listo';
   return <SafeAreaView edges={['bottom']} style={[styles.timerSafe, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
     <View style={styles.timer} accessibilityLabel="Temporizador de descanso">

@@ -203,6 +203,12 @@ describe('native exercise library', () => {
 
     const row = view.getByTestId('unclassified-filter-row');
     expect(row.props.accessibilityState).toEqual({ checked: false });
+    expect(row.props.accessibilityLabel).toBe('Sin clasificar');
+    // Every other filter option announces its own name, never "Sin clasificar".
+    const checkboxes = view.getAllByRole('checkbox').filter(box => box.props.testID !== 'unclassified-filter-row');
+    expect(checkboxes.length).toBeGreaterThan(0);
+    for (const box of checkboxes) expect(box.props.accessibilityLabel).not.toBe('Sin clasificar');
+    expect(checkboxes.every(box => typeof box.props.accessibilityLabel === 'string' && box.props.accessibilityLabel.length > 0)).toBe(true);
     expect(view.getByText('Mostrar ejercicios sin grupo muscular asignado.')).toBeTruthy();
     fireEvent.press(row);
     expect(view.getByTestId('unclassified-filter-row').props.accessibilityState).toEqual({

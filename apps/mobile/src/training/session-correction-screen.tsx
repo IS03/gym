@@ -123,10 +123,10 @@ function CorrectionForm({ client, detail, onReload }: { client: MobileApiClient;
         <Button label="Reintentar" onPress={() => void send(phase.input)} />
         <Button label="Descartar y recargar" variant="quiet" onPress={reloadServerTruth} />
       </> : phase.kind === 'conflict' ? <>
-        <AppText style={{ color: colors.danger }} variant="caption">{phase.message}</AppText>
+        <AppText style={{ color: colors.text }} variant="caption">{phase.message}</AppText>
         <Button label="Recargar datos" onPress={reloadServerTruth} />
       </> : phase.kind === 'closed' ? <>
-        <AppText style={{ color: colors.danger }} variant="caption">{phase.message}</AppText>
+        <AppText style={{ color: colors.text }} variant="caption">{phase.message}</AppText>
         <Button label="Volver" onPress={() => { setSaved(true); requestAnimationFrame(() => router.back()); }} />
       </> : <Button label={phase.kind === 'saving' ? 'Guardando…' : 'Guardar corrección'} disabled={phase.kind === 'saving' || !dirty} onPress={save} />}
     </View>

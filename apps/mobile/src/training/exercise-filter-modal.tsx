@@ -104,7 +104,7 @@ function Selectable({
   const { colors } = useOwnlevelTheme();
   return (
     <Pressable
-      accessibilityLabel="Sin clasificar"
+      accessibilityLabel={label}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -141,6 +141,8 @@ function UnclassifiedSelectable({
   const { colors } = useOwnlevelTheme();
   return (
     <Pressable
+      accessibilityHint="Mostrar ejercicios sin grupo muscular asignado"
+      accessibilityLabel="Sin clasificar"
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       onPress={onPress}

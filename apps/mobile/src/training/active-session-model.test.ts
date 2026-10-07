@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { appendSessionSet, compactHistoryDate, exerciseDraft, exercisePayload, historyLoadLabel, historySetLabel, moveSessionSet, parseStoredExerciseDraft, removeSessionSet, resetSessionSet, restoreRestDeadline, restRemaining, restSeconds, sameExercisePayload, setProgress } from './active-session-model';
+import { appendSessionSet, compactHistoryDate, exerciseDraft, exercisePayload, historyLoadLabel, historySetLabel, moveSessionSet, parseStoredExerciseDraft, removeSessionSet, resetSessionSet, restoreRestDeadline, restRemaining, restSeconds, shouldSignalRestEnd, sameExercisePayload, setProgress } from './active-session-model';
 import { EXERCISE_ID, SESSION_ID, VERSION, testExercise, testPayload } from './active-session-test-fixtures';
 
 describe('native active-session product model', () => {
@@ -98,5 +98,16 @@ describe('native active-session product model', () => {
       basePayload: testPayload(), draft: { ...draft, sets: draft.sets.map(({ localId: _localId, ...set }) => set) }, writeId: 'legacy' };
     const restored = parseStoredExerciseDraft(legacy, SESSION_ID, EXERCISE_ID)!;
     expect(restored.draft.sets.every(set => typeof set.localId === 'string')).toBe(true);
+  });
+});
+
+describe('rest-end haptic', () => {
+  const timer = { exerciseId: 'e', exerciseName: 'Press', endAt: 100_000 };
+  it('fires only when the countdown is seen crossing zero live', () => {
+    expect(shouldSignalRestEnd(1, 0, timer, 100_400)).toBe(true);
+    expect(shouldSignalRestEnd(null, 0, timer, 100_400)).toBe(false); // already done when shown
+    expect(shouldSignalRestEnd(0, 0, timer, 100_400)).toBe(false); // no repeat
+    expect(shouldSignalRestEnd(5, 4, timer, 96_000)).toBe(false); // still counting
+    expect(shouldSignalRestEnd(40, 0, timer, 160_000)).toBe(false); // back from background long after
   });
 });

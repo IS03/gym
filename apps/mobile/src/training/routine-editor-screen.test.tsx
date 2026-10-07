@@ -117,6 +117,9 @@ describe('native routine editor', () => {
     expect(view.getByText('Reps', { includeHiddenElements: true })).toBeTruthy();
     expect(view.getByText('Peso', { includeHiddenElements: true })).toBeTruthy();
     expect(view.getByText('RIR', { includeHiddenElements: true })).toBeTruthy();
+    // mm:ss needs ":", which the decimal and number pads do not offer on iOS.
+    expect(view.getByLabelText('Mínimo (mm:ss)').props.keyboardType).toBe('numbers-and-punctuation');
+    expect(view.getByLabelText('Máximo (mm:ss)').props.keyboardType).toBe('numbers-and-punctuation');
     fireEvent.changeText(view.getByLabelText('Serie 1, reps'), '9');
     expect(view.getByText('Cambios sin guardar')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Guardar objetivos' }));
