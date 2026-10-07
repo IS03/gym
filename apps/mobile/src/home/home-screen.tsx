@@ -1,27 +1,28 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
-import { fetchMobileHome, useApiResource, useMobileApi } from '@/api';
+import { useMobileApi } from '@/api';
+import type { QuickOption } from '@/api/nutrition-quick';
+import { useMobileAuth } from '@/auth';
 import {
   AppText,
   Button,
   Heading,
   ScrollScreen,
-  SkeletonBlock,
-  Surface,
   UnavailableState,
-  radius,
-  spacing,
   useOwnlevelTheme,
 } from '@/design-system';
+import { useNutritionConfiguration } from '@/nutrition/config-provider';
 import { haptics } from '@/platform/haptics';
 import { StartWorkoutModal } from '@/training/start-workout-modal';
 
-import {
-  HomeDashboard,
-  type HomeNavigationTarget,
-} from './home-dashboard';
+import { HomeDashboard, type HomeNavigationTarget } from './home-dashboard';
+import { useHomeResources } from './home-data';
+import { homeDay } from './home-day';
+import type { HomeProgressTarget } from './home-progress';
+import type { HomeRegisterTarget } from './home-register';
+import { homeResource } from './home-resource';
 
 const HOME_ROUTES = {
   nutrition: '/(tabs)/nutrition',
@@ -29,67 +30,17 @@ const HOME_ROUTES = {
   settings: '/settings',
 } as const;
 
-function HomeSkeleton() {
-  return (
-    <ScrollScreen
-      accessibilityLabel="Cargando Inicio"
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="home-loading"
-    >
-      <View style={styles.dashboardSkeleton}>
-        <View style={styles.skeletonHeader}>
-          <View style={styles.skeletonProfile}>
-            <SkeletonBlock height={48} style={styles.skeletonAvatar} width={48} />
-            <View style={styles.skeletonProfileText}>
-              <SkeletonBlock height={16} width={44} />
-              <SkeletonBlock height={24} width={120} />
-            </View>
-          </View>
-          <SkeletonBlock height={29} width={36} />
-        </View>
-        <SkeletonBlock height={96} style={styles.cardSkeleton} />
-        <View style={styles.sectionSkeleton}>
-          <SkeletonBlock height={28} width={176} />
-          <Surface elevated>
-            <SkeletonBlock height={24} width="56%" />
-            <SkeletonBlock height={62} />
-            <SkeletonBlock height={44} />
-          </Surface>
-        </View>
-        <View style={styles.sectionSkeleton}>
-          <SkeletonBlock height={28} width={208} />
-          <Surface elevated>
-            <SkeletonBlock height={22} width="80%" />
-            <SkeletonBlock height={48} />
-          </Surface>
-        </View>
-      </View>
-    </ScrollScreen>
-  );
-}
-
 function HomeUnavailable({ onRetry }: { onRetry: () => void }) {
   return (
-    <ScrollScreen
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="home-unavailable"
-    >
+    <ScrollScreen safeAreaEdges={['top', 'left', 'right', 'bottom']} testID="home-unavailable">
       <View style={styles.unavailableHeader}>
         <View>
-          <AppText muted variant="footnote">
-            OWNLEVEL
-          </AppText>
+          <AppText muted variant="footnote">OWNLEVEL</AppText>
           <Heading>Inicio</Heading>
         </View>
       </View>
       <UnavailableState
-        action={
-          <Button
-            accessibilityHint="Vuelve a consultar el resumen de Inicio"
-            label="Reintentar"
-            onPress={onRetry}
-          />
-        }
+        action={<Button accessibilityHint="Vuelve a consultar el resumen de Inicio" label="Reintentar" onPress={onRetry} />}
         description="Tus datos siguen seguros. Revisá la conexión e intentá nuevamente."
         title="No pudimos cargar Inicio"
       />
@@ -97,148 +48,109 @@ function HomeUnavailable({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export function HomeScreen() {
+/** Google account photo carried by the Supabase session (no upload/storage in M9). */
+function sessionAvatarUrl(metadata: Record<string, unknown> | undefined): string | null {
+  const url = metadata?.avatar_url ?? metadata?.picture;
+  return typeof url === 'string' && /^https:\/\//u.test(url) ? url : null;
+}
+
+export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
   const { client } = useMobileApi();
+  const { session } = useMobileAuth();
   const { colors } = useOwnlevelTheme();
   const router = useRouter();
-  const load = useCallback(
-    (signal: AbortSignal) => {
-      if (!client) {
-        return Promise.resolve({
-          status: 'unavailable' as const,
-          reason: 'invalid_response' as const,
-          meta: {
-            durationMs: 0,
-            httpStatus: null,
-            outcome: 'unavailable' as const,
-          },
-        });
-      }
-      return fetchMobileHome(client, signal);
-    },
-    [client],
-  );
-  const { refresh, state } = useApiResource(load);
-  // Reflect server changes made elsewhere (e.g. a finished session) on return.
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
-  const current =
-    state.status === 'ready'
-      ? state.current
-      : state.status === 'loading'
-        ? undefined
-        : state.previous;
-
+  const resources = useHomeResources(client, now);
+  const { refresh } = resources;
+  const configuration = useNutritionConfiguration(refresh);
   const [startOpen, setStartOpen] = useState(false);
 
-  const navigate = useCallback(
-    (target: HomeNavigationTarget) => {
-      haptics.selection();
-      if (target === 'settings') {
-        router.push(HOME_ROUTES.settings);
-        return;
-      }
-      router.navigate(HOME_ROUTES[target]);
-    },
-    [router],
-  );
+  const home = homeResource(resources.home.state);
+  const day = homeDay(now());
+
+  const navigate = useCallback((target: HomeNavigationTarget) => {
+    haptics.selection();
+    if (target === 'settings') router.push(HOME_ROUTES.settings);
+    else router.navigate(HOME_ROUTES[target]);
+  }, [router]);
 
   // Same pattern as TrainingScreen: the shared modal owns verification, idempotency
   // and conflicts; Home only opens it and follows the session it reports.
-  const openStart = useCallback(() => {
-    haptics.selection();
-    setStartOpen(true);
-  }, []);
+  const openStart = useCallback(() => { haptics.selection(); setStartOpen(true); }, []);
   const toSession = useCallback((id: string) => {
     setStartOpen(false);
-    void refresh();
+    refresh();
     router.push(`/(tabs)/train/session/${id}`);
   }, [refresh, router]);
-  const openSession = useCallback((id: string) => {
-    haptics.selection();
-    router.push(`/(tabs)/train/session/${id}`);
-  }, [router]);
-  const openCompletedSession = useCallback((id: string) => {
-    haptics.selection();
-    router.push({ pathname: '/(tabs)/train/history/[id]', params: { id } });
-  }, [router]);
 
-  const runRefresh = useCallback(() => {
-    void refresh();
-  }, [refresh]);
+  const actions = useMemo(() => ({
+    onConfigureNutrition: () => { if (configuration) configuration.controller.open(); },
+    onCreateRoutine: () => { haptics.selection(); router.push('/(tabs)/train/routines'); },
+    onNewMeal: () => { haptics.selection(); router.navigate({ pathname: '/(tabs)/nutrition', params: { add: '1' } }); },
+    onOpenCompletedSession: (id: string) => { haptics.selection(); router.push({ pathname: '/(tabs)/train/history/[id]', params: { id } }); },
+    onOpenDay: (date: string) => { haptics.selection(); router.push({ pathname: '/history/day/[date]', params: { date } }); },
+    onOpenProgress: (target: HomeProgressTarget) => {
+      haptics.selection();
+      if (target.kind === 'body') router.push({ pathname: '/(tabs)/progress/trends/body', params: { period: target.period } });
+      else if (target.kind === 'training') router.push({ pathname: '/(tabs)/progress/trends/training', params: { period: target.period } });
+      else router.push({ pathname: '/(tabs)/progress/trends/exercise/[id]', params: { id: target.exerciseId, period: target.period } });
+    },
+    onOpenSession: (id: string) => { haptics.selection(); router.push(`/(tabs)/train/session/${id}`); },
+    // A2: opens the existing quick registration with this meal; the user confirms there.
+    onQuickMeal: (option: QuickOption) => {
+      haptics.selection();
+      router.navigate({ pathname: '/(tabs)/nutrition', params: { quick: `${option.source.kind}:${option.source.id}` } });
+    },
+    onRegister: (target: HomeRegisterTarget) => {
+      haptics.selection();
+      if (target.kind === 'weight') router.push({ pathname: '/(tabs)/progress/body', params: { registrar: 'peso' } });
+      else if (target.kind === 'metric') router.push({ pathname: '/(tabs)/progress/metrics', params: { editar: 'metricas' } });
+      else router.push('/(tabs)/progress/metrics');
+    },
+  }), [configuration, router]);
 
-  if (!current && state.status === 'loading') {
-    return <HomeSkeleton />;
-  }
-
-  if (!current) {
-    return <HomeUnavailable onRetry={runRefresh} />;
+  if (!home.data && home.status === 'unavailable') {
+    return <HomeUnavailable onRetry={refresh} />;
   }
 
   return (
     <>
-    <ScrollScreen
-      refreshControl={
-        <RefreshControl
-          colors={[colors.primary]}
-          onRefresh={runRefresh}
-          progressBackgroundColor={colors.surface}
-          refreshing={state.status === 'ready' && state.refreshing}
-          testID="home-refresh-control"
-          tintColor={colors.primary}
+      <ScrollScreen
+        refreshControl={
+          <RefreshControl
+            colors={[colors.primary]}
+            onRefresh={refresh}
+            progressBackgroundColor={colors.surface}
+            refreshing={resources.home.state.status === 'ready' && resources.home.state.refreshing}
+            testID="home-refresh-control"
+            tintColor={colors.primary}
+          />
+        }
+        safeAreaEdges={['top', 'left', 'right', 'bottom']}
+        testID={home.data ? 'home-screen' : 'home-loading'}
+      >
+        <HomeDashboard
+          {...actions}
+          avatarUrl={sessionAvatarUrl(session?.user.user_metadata)}
+          calories={homeResource(resources.calories.state)}
+          day={day}
+          home={home}
+          now={() => now().getTime()}
+          onNavigate={navigate}
+          onRefresh={refresh}
+          onStartWorkout={openStart}
+          progressBody={homeResource(resources.progressBody.state)}
+          progressTraining={homeResource(resources.progressTraining.state)}
+          progressRecords={homeResource(resources.progressRecords.state)}
+          quick={homeResource(resources.quick.state)}
+          today={homeResource(resources.today.state)}
+          training={homeResource(resources.training.state)}
         />
-      }
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="home-screen"
-    >
-      <HomeDashboard
-        data={current.data}
-        isStale={state.status !== 'ready'}
-        onNavigate={navigate}
-        onOpenCompletedSession={openCompletedSession}
-        onOpenSession={openSession}
-        onRefresh={runRefresh}
-        onStartWorkout={openStart}
-      />
-    </ScrollScreen>
-    {startOpen ? (
-      <StartWorkoutModal
-        onClose={() => setStartOpen(false)}
-        onContinue={toSession}
-        onStarted={toSession}
-      />
-    ) : null}
+      </ScrollScreen>
+      {startOpen ? <StartWorkoutModal onClose={() => setStartOpen(false)} onContinue={toSession} onStarted={toSession} /> : null}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  cardSkeleton: {
-    borderRadius: radius.card,
-  },
-  dashboardSkeleton: {
-    gap: spacing.xl,
-  },
-  sectionSkeleton: {
-    gap: spacing.md,
-  },
-  skeletonAvatar: {
-    borderRadius: radius.full,
-  },
-  skeletonHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  skeletonProfile: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  skeletonProfileText: {
-    gap: spacing.xs,
-  },
-  unavailableHeader: {
-    minHeight: 64,
-    justifyContent: 'center',
-  },
+  unavailableHeader: { justifyContent: 'center', minHeight: 64 },
 });
