@@ -6,6 +6,7 @@ import type { SFSymbol } from 'expo-symbols';
 export type AppIconName =
   | 'activity'
   | 'brand'
+  | 'book'
   | 'calendar'
   | 'check'
   | 'chevronLeft'
@@ -22,6 +23,7 @@ export type AppIconName =
   | 'nutrition'
   | 'note'
   | 'plus'
+  | 'play'
   | 'profile'
   | 'progress'
   | 'refresh'
@@ -46,6 +48,7 @@ export const sfSymbolNames: Record<AppIconName, SFSymbol> = {
   activity: 'bolt.fill',
   // Temporary until the brand isotype replaces it (M9.1D).
   brand: 'figure.strengthtraining.traditional',
+  book: 'book',
   calendar: 'calendar',
   check: 'checkmark.circle.fill',
   chevronLeft: 'chevron.left',
@@ -62,6 +65,7 @@ export const sfSymbolNames: Record<AppIconName, SFSymbol> = {
   nutrition: 'fork.knife',
   note: 'note.text',
   plus: 'plus',
+  play: 'play',
   profile: 'person.fill',
   progress: 'chart.line.uptrend.xyaxis',
   refresh: 'arrow.clockwise',

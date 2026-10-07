@@ -1,188 +1,98 @@
-import { useCallback, useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshControl, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { fetchMobileTraining, useApiResource, useMobileApi } from '@/api';
-import {
-  AppText,
-  Button,
-  Heading,
-  ScrollScreen,
-  SkeletonBlock,
-  Surface,
-  UnavailableState,
-  useOwnlevelTheme,
-} from '@/design-system';
+import { useMobileApi } from '@/api';
+import type { ResourceRefreshTrigger } from '@/api/resource';
+import { ScrollScreen, SkeletonBlock, useOwnlevelTheme } from '@/design-system';
+import { homeDay, weekDates, mondayOf } from '@/home/home-day';
 import { haptics } from '@/platform/haptics';
 
-import { isoDateForDate, monthForDate } from './calendar';
-import {
-  TrainingDashboard,
-  type TrainingDeferredAction,
-} from './training-dashboard';
+import { TrainingHubCache, shiftHubMonth, useHubRead } from './training-hub-data';
+import { HubHeader, TrainingHubDashboard } from './training-hub-dashboard';
+import { TrainingHubCalendarSheet } from './training-hub-calendar-sheet';
 import { StartWorkoutModal } from './start-workout-modal';
 
 const systemNow = () => new Date();
-
-function TrainingSkeleton() {
-  return (
-    <ScrollScreen
-      accessibilityLabel="Cargando Entrenar"
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="training-loading"
-    >
-      <View style={styles.skeletonHeader}>
-        <SkeletonBlock height={40} width={154} />
-        <SkeletonBlock height={22} width="88%" />
-      </View>
-      <SkeletonBlock height={44} style={styles.buttonSkeleton} />
-      <Surface elevated>
-        <SkeletonBlock height={24} width="54%" />
-        <SkeletonBlock height={18} width="40%" />
-        <SkeletonBlock height={258} />
-      </Surface>
-      <SkeletonBlock height={44} width={128} />
-      <SkeletonBlock height={76} />
-      <SkeletonBlock height={76} />
-    </ScrollScreen>
-  );
-}
-
-function TrainingUnavailable({ onRetry }: { onRetry: () => void }) {
-  return (
-    <ScrollScreen
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="training-unavailable"
-    >
-      <View style={styles.unavailableHeader}>
-        <Heading>Entrenar</Heading>
-        <AppText muted>Entrená, organizá tus rutinas y revisá tu actividad.</AppText>
-      </View>
-      <UnavailableState
-        action={
-          <Button
-            accessibilityHint="Vuelve a consultar Entrenar"
-            label="Reintentar"
-            onPress={onRetry}
-          />
-        }
-        description="Tus datos siguen seguros. Revisá la conexión e intentá nuevamente."
-        title="No pudimos cargar Entrenar"
-      />
-    </ScrollScreen>
-  );
-}
 
 export function TrainingScreen({ now = systemNow }: { now?: () => Date }) {
   const { client } = useMobileApi();
   const { colors } = useOwnlevelTheme();
   const router = useRouter();
-  const [startOpen, setStartOpen] = useState(false);
-  const load = useCallback(
-    (signal: AbortSignal) => {
-      if (!client) {
-        return Promise.resolve({
-          status: 'unavailable' as const,
-          reason: 'invalid_response' as const,
-          meta: {
-            durationMs: 0,
-            httpStatus: null,
-            outcome: 'unavailable' as const,
-          },
-        });
-      }
-      return fetchMobileTraining(client, monthForDate(now()), signal);
-    },
-    [client, now],
-  );
-  const { refresh, state } = useApiResource(load);
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
-  const current =
-    state.status === 'ready'
-      ? state.current
-      : state.status === 'loading'
-        ? undefined
-        : state.previous;
-  const currentDate = now();
-  const today = isoDateForDate(currentDate);
-  const requestedMonth = monthForDate(currentDate);
+  const [clock, setClock] = useState(now);
+  const today = homeDay(clock).today;
+  const [selected, setSelected] = useState(today);
+  const [sheetMonth, setSheetMonth] = useState(today.slice(0, 7));
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [start, setStart] = useState<{ routineId?: string; immediate: boolean } | null>(null);
+  const cache = useMemo(() => new TrainingHubCache(client), [client]);
+  const home = useHubRead(cache.home);
+  const currentMonth = today.slice(0, 7);
+  const previousMonth = shiftHubMonth(currentMonth, -1);
+  useHubRead(cache.month(currentMonth));
+  useHubRead(cache.month(previousMonth));
+  const month = selected.slice(0, 7);
+  const calendar = useHubRead(cache.month(month));
+  const sheetCalendar = useHubRead(cache.month(calendarOpen ? sheetMonth : month));
+  const week = useHubRead(cache.week(selected));
+  const boundaryDates = weekDates(mondayOf(selected));
+  const firstWeekMonth = boundaryDates[0].slice(0, 7);
+  const lastWeekMonth = boundaryDates[6].slice(0, 7);
+  const firstMonth = useHubRead(cache.month(firstWeekMonth));
+  const lastMonth = useHubRead(cache.month(lastWeekMonth));
+  const boundaryCalendars = [firstMonth, lastMonth];
+  const priorToday = useRef(today);
 
+  useEffect(() => {
+    const interval = setInterval(() => setClock(now()), 30_000);
+    return () => clearInterval(interval);
+  }, [now]);
+  useEffect(() => {
+    if (priorToday.current !== today) {
+      const oldToday = priorToday.current;
+      priorToday.current = today;
+      if (selected === oldToday) setSelected(today);
+    }
+  }, [selected, today]);
+  useEffect(() => () => cache.dispose(), [cache]);
 
-  const runRefresh = useCallback(() => {
-    void refresh();
-  }, [refresh]);
+  const refresh = useCallback((trigger: ResourceRefreshTrigger = 'manual') => {
+    setClock(now());
+    const resources = new Set([cache.home, cache.month(currentMonth), cache.month(previousMonth), cache.month(month),
+      cache.month(calendarOpen ? sheetMonth : month), cache.month(firstWeekMonth), cache.month(lastWeekMonth), cache.week(selected)]);
+    resources.forEach(resource => { void resource.refresh(trigger); });
+  }, [cache, calendarOpen, currentMonth, month, now, previousMonth, selected, sheetMonth, firstWeekMonth, lastWeekMonth]);
+  const refreshRef = useRef(refresh);
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
+  useFocusEffect(useCallback(() => { refreshRef.current('foreground'); }, []));
 
-  const showDeferredFeedback = useCallback((action: TrainingDeferredAction) => {
-    haptics.selection();
-    if (action === 'routines') router.push('/(tabs)/train/routines');
-    else if (action === 'exercises') router.push('/(tabs)/train/exercises');
-    else router.push('/(tabs)/train/history');
-  }, [router]);
-
-  const openStart = useCallback(() => {
-    haptics.selection();
-    setStartOpen(true);
-  }, []);
-  const toBridge = useCallback((id: string, replace = false) => {
-    setStartOpen(false);
-    void refresh();
+  const selectDay = (date: string) => { if (date !== selected) haptics.selection(); setSelected(date); setSheetMonth(date.slice(0, 7)); };
+  const openCalendar = () => { setSheetMonth(month); setCalendarOpen(true); };
+  const toSession = (id: string, replace = false) => {
+    setStart(null);
+    refresh('foreground');
     const path = `/(tabs)/train/session/${id}` as const;
-    if (replace) router.replace(path);
-    else router.push(path);
-  }, [refresh, router]);
+    if (replace) router.replace(path); else router.push(path);
+  };
+  const onLibrary = (target: 'routines' | 'exercises' | 'history') => router.push(`/(tabs)/train/${target}`);
+  const homeState = cache.home.getSnapshot();
 
-  if (!current && state.status === 'loading') {
-    return <TrainingSkeleton />;
-  }
-  if (!current) {
-    return <TrainingUnavailable onRetry={runRefresh} />;
-  }
-
-  return (
-    <>
-    <ScrollScreen
-      refreshControl={
-        <RefreshControl
-          colors={[colors.primary]}
-          onRefresh={runRefresh}
-          progressBackgroundColor={colors.surface}
-          refreshing={state.status === 'ready' && state.refreshing}
-          testID="training-refresh-control"
-          tintColor={colors.primary}
-        />
-      }
-      safeAreaEdges={['top', 'left', 'right', 'bottom']}
-      testID="training-screen"
-    >
-      <TrainingDashboard
-        data={current.data}
-        isStale={state.status !== 'ready'}
-        notice={null}
-        onDeferredAction={showDeferredFeedback}
-        onNewSession={openStart}
-        onContinueSession={(id) => toBridge(id)}
-        onRefresh={runRefresh}
-        onSelectDay={(date) => router.push(`/(tabs)/train/day/${date}`)}
-        onOpenCalendar={() => router.push('/(tabs)/train/calendar')}
-        requestedMonth={requestedMonth}
-        today={today}
-      />
+  return <>
+    <ScrollScreen contentContainerStyle={{ paddingBottom: 100, paddingTop: 0 }} safeAreaEdges={['top', 'left', 'right']}
+      refreshControl={<RefreshControl onRefresh={() => refresh()} refreshing={homeState.status === 'ready' && homeState.refreshing && homeState.trigger === 'manual'}
+        tintColor={colors.primary} colors={[colors.primary]} progressBackgroundColor={colors.surface} testID="training-refresh-control" />} testID="training-screen">
+      {home.status === 'loading' && calendar.status === 'loading' ? <View style={{ gap: 12 }} testID="training-loading">
+        <HubHeader onCalendar={openCalendar} /><SkeletonBlock height={66} /><SkeletonBlock height={90} /><SkeletonBlock height={190} /><SkeletonBlock height={160} />
+      </View> : <TrainingHubDashboard home={home} calendar={calendar} week={week} selected={selected} today={today} month={month} now={clock.getTime()}
+        boundaryCalendars={boundaryCalendars} observedSessions={cache.observedSessions(today)} onCalendar={openCalendar} onSelect={selectDay} onRefresh={refresh}
+        onStart={() => { haptics.selection(); setStart({ immediate: false }); }} onPlay={id => setStart({ routineId: id, immediate: true })}
+        onContinue={id => toSession(id)} onSession={id => router.push(`/(tabs)/train/history/${id}`)}
+        onRoutine={id => router.push(`/(tabs)/train/routines/${id}`)} onLibrary={onLibrary} />}
     </ScrollScreen>
-    {startOpen ? <StartWorkoutModal onClose={() => setStartOpen(false)} onContinue={(id) => toBridge(id, true)} onStarted={(id) => toBridge(id, true)} /> : null}
-    </>
-  );
+    <TrainingHubCalendarSheet open={calendarOpen} onClose={() => setCalendarOpen(false)} calendar={sheetCalendar} month={sheetMonth}
+      onMonth={delta => setSheetMonth(value => shiftHubMonth(value, delta))} onSelect={selectDay} selected={selected} today={today} week={week} onRetry={refresh}
+      onDay={date => { setCalendarOpen(false); router.push({ pathname: '/history/day/[date]', params: { date } }); }} />
+    {start ? <StartWorkoutModal key={start.routineId ?? 'free-choice'} initialRoutineId={start.routineId} startImmediately={start.immediate}
+      onClose={() => setStart(null)} onContinue={id => toSession(id, true)} onStarted={id => toSession(id, true)} /> : null}
+  </>;
 }
-
-const styles = StyleSheet.create({
-  buttonSkeleton: {
-    borderRadius: 12,
-  },
-  skeletonHeader: {
-    gap: 8,
-  },
-  unavailableHeader: {
-    gap: 4,
-    minHeight: 88,
-    justifyContent: 'center',
-  },
-});

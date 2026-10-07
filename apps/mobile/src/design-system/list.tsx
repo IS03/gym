@@ -14,6 +14,8 @@ type ListRowProps = {
   /** Trailing value text (muted, tabular when numeric). */
   value?: string;
   numericValue?: boolean;
+  /** A 44 pt minimum row for dense native lists; still grows with Dynamic Type. */
+  compact?: boolean;
   /** Trailing control (switch, badge) instead of a value. */
   trailing?: ReactNode;
   /** Defaults to true for pressable rows. */
@@ -27,7 +29,7 @@ type ListRowProps = {
 
 /** Row: icon + title + subtitle + trailing value/control/chevron. Min touch 44. */
 export function ListRow({
-  accessibilityHint, accessibilityLabel, chevron, disabled = false, icon, numericValue = false, onPress, subtitle,
+  accessibilityHint, accessibilityLabel, chevron, compact = false, disabled = false, icon, numericValue = false, onPress, subtitle,
   testID, title, trailing, value,
 }: ListRowProps) {
   const { colors } = useOwnlevelTheme();
@@ -44,7 +46,7 @@ export function ListRow({
     </>
   );
   if (!onPress) {
-    return <View accessible={Boolean(accessibilityLabel)} accessibilityLabel={accessibilityLabel} style={styles.row} testID={testID}>{content}</View>;
+    return <View accessible={Boolean(accessibilityLabel)} accessibilityLabel={accessibilityLabel} style={[styles.row, compact && styles.compact]} testID={testID}>{content}</View>;
   }
   return (
     <Pressable
@@ -55,7 +57,7 @@ export function ListRow({
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }, disabled && styles.disabled]}
+      style={({ pressed }) => [styles.row, compact && styles.compact, pressed && { backgroundColor: colors.surfaceRaised }, disabled && styles.disabled]}
     >
       {content}
     </Pressable>
@@ -63,11 +65,11 @@ export function ListRow({
 }
 
 /** Grouped list on a card with hairline separators between rows (no glass). */
-export function ListGroup({ children }: PropsWithChildren) {
+export function ListGroup({ children, bordered = true, compact = false, elevated = false }: PropsWithChildren<{ bordered?: boolean; compact?: boolean; elevated?: boolean }>) {
   const { colors } = useOwnlevelTheme();
   const rows = Children.toArray(children).filter(isValidElement);
   return (
-    <View style={[styles.group, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.group, compact && { paddingVertical: 0 }, { backgroundColor: elevated ? colors.surfaceRaised : colors.surface, borderColor: colors.border, borderWidth: bordered ? 1 : 0 }]}>
       {rows.map((row, index) => (
         <Fragment key={row.key ?? index}>
           {index > 0 ? <Separator /> : null}
@@ -79,6 +81,7 @@ export function ListGroup({ children }: PropsWithChildren) {
 }
 
 const styles = StyleSheet.create({
+  compact: { minHeight: 44, paddingVertical: spacing.xs },
   row: {
     alignItems: 'center',
     borderRadius: radius.inner,
