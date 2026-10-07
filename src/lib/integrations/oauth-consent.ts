@@ -8,9 +8,24 @@ export async function oauthConsentContext(authorizationId: string) {
   const supabase = await createClient();
   const { data: session, error: sessionError } = await supabase.auth.getClaims();
   const userId = session?.claims?.sub;
-  if (sessionError || !userId || session.claims.client_id || session.claims.is_anonymous) return null;
+  if (sessionError || !userId || session.claims.client_id || session.claims.is_anonymous) {
+    console.info("[oauth-consent] rejected session", {
+      hasError: Boolean(sessionError),
+      hasUser: Boolean(userId),
+      hasClientId: Boolean(session?.claims?.client_id),
+      isAnonymous: Boolean(session?.claims?.is_anonymous),
+    });
+    return null;
+  }
   const { data: authorization, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
-  if (error || !authorization) return null;
+  if (error || !authorization) {
+    console.info("[oauth-consent] authorization lookup failed", {
+      hasError: Boolean(error),
+      errorCode: (error as { code?: string } | null)?.code ?? null,
+      hasAuthorization: Boolean(authorization),
+    });
+    return null;
+  }
   const config = ownlevelOAuthConfig();
   const admin = createAdminClient();
   // This binds the server-stored authorization request to the verified user,
@@ -18,8 +33,32 @@ export async function oauthConsentContext(authorizationId: string) {
   const { data: clientId, error: policyError } = await admin.rpc("ownlevel_oauth_authorization_client", {
     p_authorization_id: authorizationId, p_user_id: userId, p_resource: config.resource,
   });
-  if (policyError || typeof clientId !== "string") return null;
-  if ("client" in authorization && (authorization.client.id !== clientId || !ownlevelOAuthAuthorizationScopeAllowed(authorization.scope))) return null;
+  if (policyError || typeof clientId !== "string") {
+    console.info("[oauth-consent] policy lookup failed", {
+      hasError: Boolean(policyError),
+      errorCode: (policyError as { code?: string } | null)?.code ?? null,
+      returnedClient: typeof clientId,
+    });
+    return null;
+  }
+  if ("client" in authorization) {
+    const clientMatches = authorization.client.id === clientId;
+    const scopeAllowed = ownlevelOAuthAuthorizationScopeAllowed(authorization.scope);
+    if (!clientMatches || !scopeAllowed) {
+      console.info("[oauth-consent] authorization details rejected", {
+        clientMatches,
+        scopeAllowed,
+        requestedScope: authorization.scope ?? null,
+        detailsClientId: authorization.client.id ?? null,
+        policyClientId: clientId,
+      });
+      return null;
+    }
+  } else {
+    console.info("[oauth-consent] authorization already redirected", {
+      hasRedirectUrl: "redirect_url" in authorization,
+    });
+  }
   return { supabase, admin, authorization, clientId, userId, config };
 }
 
