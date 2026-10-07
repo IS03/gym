@@ -12,6 +12,11 @@ const statusLabels: Partial<Record<ExercisePhase, string>> = {
   validation: 'Revisá los valores', conflict: 'Cambio en otro dispositivo', retryable: 'No se pudo guardar', unconfirmed: 'Pendiente de conexión · Guardado sin confirmar',
    stale: 'Cambios pendientes de revisar', closed: 'Solo lectura', removed: 'Ejercicio quitado',
 };
+// Brand `error` only for real failures (a save that failed, invalid values). A conflict,
+// a pending/unconfirmed write, a read-only or removed exercise are states to know about.
+export function phaseIsFailure(phase: ExercisePhase): boolean {
+  return phase === 'retryable' || phase === 'validation';
+}
 // Header and data rows share these exact five cells. Do not put flex styles on
 // Text in the header and View in rows: Text measurement can change the columns.
 function SeriesColumns({ ordinal, kg, reps, rir, completed, header = false }: {
@@ -85,7 +90,7 @@ export const ActiveExerciseCard = memo(function ActiveExerciseCard({ controller,
       <View style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}><AppIcon name="chevronRight" color={colors.textMuted} size={15} /></View>
     </NativeDragHandle></NativeSwipeActions>
     {state.error || statusLabels[state.phase] ? <View style={styles.recovery}>
-      <AppText accessibilityLiveRegion="polite" style={{ color: colors.danger }} variant="caption">{statusLabels[state.phase] ?? state.error}</AppText>
+      <AppText accessibilityLiveRegion="polite" style={{ color: phaseIsFailure(state.phase) || !statusLabels[state.phase] ? colors.danger : colors.text }} variant="caption">{statusLabels[state.phase] ?? state.error}</AppText>
       {state.error && statusLabels[state.phase] ? <AppText accessibilityRole="alert" style={{ color: colors.danger }} variant="caption">{state.error}</AppText> : null}
       {['conflict', 'stale', 'retryable', 'unconfirmed'].includes(state.phase) ? <>
         <Button disabled={locked} label="Comprobar cambios" onPress={() => void controller.checkExercise(id)} variant="secondary" />

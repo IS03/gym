@@ -68,7 +68,7 @@ function Field({
   placeholder,
   value,
 }: {
-  keyboardType?: 'decimal-pad' | 'number-pad';
+  keyboardType?: 'decimal-pad' | 'number-pad' | 'numbers-and-punctuation';
   label: string;
   multiline?: boolean;
   onChangeText: (value: string) => void;
@@ -435,8 +435,8 @@ export function ExerciseEditorModal({
                 <Field label="Reps" keyboardType="number-pad" onChangeText={(suggestedReps) => changeValues({ ...values, suggestedReps })} placeholder="Ej: 10" value={values.suggestedReps} />
                 <Field label="Peso" keyboardType="decimal-pad" onChangeText={(suggestedWeight) => changeValues({ ...values, suggestedWeight })} placeholder="Ej: 60" value={values.suggestedWeight} />
                 <Field label="RIR" keyboardType="number-pad" onChangeText={(suggestedRir) => changeValues({ ...values, suggestedRir })} placeholder="Ej: 2" value={values.suggestedRir} />
-                <Field label="Descanso mínimo" onChangeText={(suggestedRestMin) => changeValues({ ...values, suggestedRestMin })} placeholder="Ej: 1:30" value={values.suggestedRestMin} />
-                <Field label="Descanso máximo" onChangeText={(suggestedRestMax) => changeValues({ ...values, suggestedRestMax })} placeholder="Ej: 2:00" value={values.suggestedRestMax} />
+                <Field keyboardType="numbers-and-punctuation" label="Descanso mínimo" onChangeText={(suggestedRestMin) => changeValues({ ...values, suggestedRestMin })} placeholder="Ej: 1:30" value={values.suggestedRestMin} />
+                <Field keyboardType="numbers-and-punctuation" label="Descanso máximo" onChangeText={(suggestedRestMax) => changeValues({ ...values, suggestedRestMax })} placeholder="Ej: 2:00" value={values.suggestedRestMax} />
               </View>
             </View>
 

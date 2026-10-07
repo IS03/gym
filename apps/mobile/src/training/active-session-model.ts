@@ -93,6 +93,14 @@ export function restoreRestDeadline(value: unknown, exerciseIds: ReadonlySet<str
     typeof timer.endAt === 'number' && Number.isFinite(timer.endAt) && timer.endAt > now - 60000 ? timer : null;
 }
 export function restRemaining(timer: RestDeadline, now = Date.now()): number { return Math.max(0, Math.ceil((timer.endAt - now) / 1000)); }
+/**
+ * The rest-end haptic (brand event `restEnd`) fires only when the countdown is seen
+ * crossing zero live, not when a long-finished rest is shown again on return.
+ */
+export const REST_END_HAPTIC_WINDOW_MS = 3000;
+export function shouldSignalRestEnd(previousSeconds: number | null, seconds: number, timer: RestDeadline, now: number): boolean {
+  return previousSeconds !== null && previousSeconds > 0 && seconds === 0 && now - timer.endAt < REST_END_HAPTIC_WINDOW_MS;
+}
 export function durationLabel(milliseconds: number): string {
   const minutes = Math.max(0, Math.floor(milliseconds / 60000));
   return minutes === 0 ? '<1 min' : minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;

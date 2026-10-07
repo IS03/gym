@@ -259,7 +259,8 @@ function TargetInput({ label, value, onChange, keyboardType = 'decimal-pad', edi
   label: string;
   value: string;
   onChange: (value: string) => void;
-  keyboardType?: 'decimal-pad' | 'number-pad';
+  /** Rest uses mm:ss: the decimal/number pads have no ":" on iOS. */
+  keyboardType?: 'decimal-pad' | 'number-pad' | 'numbers-and-punctuation';
   editable?: boolean;
   showLabel?: boolean;
 }) {
@@ -332,8 +333,8 @@ function TargetsEditor({
       <Separator />
       <AppText variant="label">Descanso</AppText>
       <View style={styles.restRow}>
-        <TargetInput editable={!pending} label="Mínimo (mm:ss)" onChange={(value) => onChange({ ...draft, restMin: value })} value={draft.restMin} />
-        <TargetInput editable={!pending} label="Máximo (mm:ss)" onChange={(value) => onChange({ ...draft, restMax: value })} value={draft.restMax} />
+        <TargetInput editable={!pending} keyboardType="numbers-and-punctuation" label="Mínimo (mm:ss)" onChange={(value) => onChange({ ...draft, restMin: value })} value={draft.restMin} />
+        <TargetInput editable={!pending} keyboardType="numbers-and-punctuation" label="Máximo (mm:ss)" onChange={(value) => onChange({ ...draft, restMax: value })} value={draft.restMax} />
       </View>
       <Separator />
       <AppText variant="label">Próxima vez</AppText>
