@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "../supabase/server";
-import { createAdminClient } from "../supabase/admin";
+import { ownlevelOAuthAdminRpc } from "./oauth-admin";
 import { ownlevelIntegrationOrigin, ownlevelOAuthAuthorizationScopeAllowed, ownlevelOAuthConfig, ownlevelOAuthEnabled } from "./oauth-config";
 
 export async function oauthConsentContext(authorizationId: string) {
@@ -27,12 +27,12 @@ export async function oauthConsentContext(authorizationId: string) {
     return null;
   }
   const config = ownlevelOAuthConfig();
-  const admin = createAdminClient();
   // This binds the server-stored authorization request to the verified user,
   // approved client and exact resource. Never trust hidden form fields for them.
-  const { data: clientId, error: policyError } = await admin.rpc("ownlevel_oauth_authorization_client", {
-    p_authorization_id: authorizationId, p_user_id: userId, p_resource: config.resource,
-  });
+  const { data: clientId, error: policyError } = await ownlevelOAuthAdminRpc<string>(
+    "ownlevel_oauth_authorization_client",
+    { p_authorization_id: authorizationId, p_user_id: userId, p_resource: config.resource },
+  );
   if (policyError || typeof clientId !== "string") {
     console.info("[oauth-consent] policy lookup failed", {
       hasError: Boolean(policyError),
@@ -59,7 +59,7 @@ export async function oauthConsentContext(authorizationId: string) {
       hasRedirectUrl: "redirect_url" in authorization,
     });
   }
-  return { supabase, admin, authorization, clientId, userId, config };
+  return { supabase, authorization, clientId, userId, config };
 }
 
 export function sameOriginOAuthDecision(request: Request) {

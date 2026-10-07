@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { oauthConsentContext, sameOriginOAuthDecision } from "@/lib/integrations/oauth-consent";
 import { ownlevelOAuthEnabled } from "@/lib/integrations/oauth-config";
+import { ownlevelOAuthAdminRpc } from "@/lib/integrations/oauth-admin";
 
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -30,11 +31,12 @@ export async function POST(request: Request) {
   if (decision !== "approve" && decision !== "deny") return new Response(null, { status: 400 });
   const context = await oauthConsentContext(id);
   if (!context) return new Response("Authorization unavailable", { status: 403 });
-  const { supabase, admin, authorization, userId, clientId, config } = context;
+  const { supabase, authorization, userId, clientId, config } = context;
   if (decision === "approve") {
-    const { error } = await admin.rpc("ownlevel_oauth_grant_meals", {
-      p_user_id: userId, p_client_id: clientId, p_resource: config.resource, p_authorization_id: id,
-    });
+    const { error } = await ownlevelOAuthAdminRpc(
+      "ownlevel_oauth_grant_meals",
+      { p_user_id: userId, p_client_id: clientId, p_resource: config.resource, p_authorization_id: id },
+    );
     if (error) return new Response("Authorization unavailable", { status: 503 });
   }
   // Supabase owns codes, redirects, token exchange and PKCE validation.
@@ -45,7 +47,9 @@ export async function POST(request: Request) {
       : await supabase.auth.oauth.denyAuthorization(id, { skipBrowserRedirect: true });
   if (result.error || !result.data?.redirect_url) {
     if (decision === "approve") {
-      await admin.rpc("ownlevel_oauth_revoke_meals", { p_user_id: userId, p_client_id: clientId });
+      await ownlevelOAuthAdminRpc("ownlevel_oauth_revoke_meals", {
+        p_user_id: userId, p_client_id: clientId,
+      });
     }
     return NextResponse.redirect(new URL(`/oauth/consent?authorization_id=${encodeURIComponent(id)}&error=decision`, request.url), 303);
   }
