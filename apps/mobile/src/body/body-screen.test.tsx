@@ -7,14 +7,15 @@ import { OwnlevelThemeProvider } from '@/design-system';
 import { createMobileApiClient } from '@/api/client';
 import { mutateBodyMeasurement, mutateBodyWeight } from '@/api/body';
 import { BodyController } from './body-controller';
-import { BodyView } from './body-screen';
+import { BodyView, useWeightEntry } from './body-screen';
 import { ProgressHub } from './progress-hub';
 import { MID, TODAY, conflict, fakeApi, measurement, memoryStorage, ok, overview, repository } from './body-fixture.test-helper';
 
 const mockPush = jest.fn();
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@react-native-async-storage/async-storage', () => ({ __esModule: true, default: {} }));
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ push: mockPush }), useFocusEffect: () => undefined }));
+const mockSetParams = jest.fn();
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ push: mockPush, setParams: mockSetParams }), useFocusEffect: () => undefined }));
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: jest.fn(), warning: jest.fn() } }));
 
 const flush = () => act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
@@ -32,6 +33,31 @@ async function mount(api = fakeApi()) {
   await act(async () => { await controller.initialize(); });
   return { view, controller, api };
 }
+
+function EntryHarness({ controller }: { controller: BodyController }) {
+  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  useWeightEntry(true, { state, controller });
+  return <BodyView state={state} controller={controller} />;
+}
+
+describe('Home → Registrar → Peso', () => {
+  it('opens today\'s weight once (edit mode when today already has one) and never reopens after closing', async () => {
+    const controller = new BodyController(fakeApi(), repository(memoryStorage().port), () => 'body:1');
+    wrap(<EntryHarness controller={controller} />);
+    await act(async () => { await controller.initialize(); });
+    expect(controller.getSnapshot().editor).toMatchObject({ kind: 'weight', mode: 'edit', baseline: 80.5 });
+    expect(mockSetParams).toHaveBeenCalledWith({ registrar: undefined });
+    act(() => controller.close());
+    await act(async () => { await Promise.resolve(); });
+    expect(controller.getSnapshot().editor).toBeNull();
+  });
+  it('without a weight today it opens a new entry for today', async () => {
+    const controller = new BodyController(fakeApi(overview({}, [{ date: '2026-10-02', weightKg: 81 }])), repository(memoryStorage().port), () => 'body:1');
+    wrap(<EntryHarness controller={controller} />);
+    await act(async () => { await controller.initialize(); });
+    expect(controller.getSnapshot().editor).toMatchObject({ kind: 'weight', mode: 'create', baseline: null });
+  });
+});
 
 describe('Body screen', () => {
   it('shows current weight with its date, history and the latest measurement with quality/import state', async () => {

@@ -15,12 +15,18 @@ export type AppIconName =
   | 'dumbbell'
   | 'flame'
   | 'filter'
+  | 'footprints'
+  | 'more'
+  | 'moon'
+  | 'mug'
   | 'nutrition'
   | 'note'
+  | 'plus'
   | 'profile'
   | 'progress'
   | 'refresh'
   | 'routines'
+  | 'scale'
   | 'settings'
   | 'warning'
   | 'water';
@@ -48,12 +54,18 @@ export const sfSymbolNames: Record<AppIconName, SFSymbol> = {
   dumbbell: 'dumbbell.fill',
   flame: 'flame.fill',
   filter: 'line.3.horizontal.decrease',
+  footprints: 'figure.walk',
+  more: 'ellipsis',
+  moon: 'moon.fill',
+  mug: 'cup.and.saucer.fill',
   nutrition: 'fork.knife',
   note: 'note.text',
+  plus: 'plus',
   profile: 'person.fill',
   progress: 'chart.line.uptrend.xyaxis',
   refresh: 'arrow.clockwise',
   routines: 'list.bullet.rectangle',
+  scale: 'scalemass.fill',
   settings: 'gearshape.fill',
   warning: 'exclamationmark.triangle.fill',
   water: 'drop.fill',

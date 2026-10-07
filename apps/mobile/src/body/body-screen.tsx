@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { selectedRouteDate } from '@/history/navigation';
 import { ReturnToHistoryDay } from '@/history/return-to-day';
 import { useMobileApi } from '@/api';
@@ -116,10 +117,30 @@ export function BodyScreen() {
 }
 function BodyUserScreen({ userId }: { userId: string }) {
   const { client } = useMobileApi();
-  const date = selectedRouteDate(useLocalSearchParams());
+  const params = useLocalSearchParams();
+  const date = selectedRouteDate(params);
   const body = useBodyController(client, userId, date);
+  useWeightEntry(params.registrar === 'peso' && !date, body);
   if (!body) return <ScrollScreen testID="body-loading"><SkeletonBlock height={140} /></ScrollScreen>;
   return <BodyView state={body.state} controller={body.controller} date={date} />;
+}
+/**
+ * Home → Registrar → Peso (M9.3A): opens the existing weight editor for today once the
+ * screen can edit; today's entry opens in edit mode so it is never duplicated.
+ */
+export function useWeightEntry(requested: boolean, body: { state: BodyState; controller: BodyController } | null) {
+  const router = useRouter();
+  // Consumed once per screen: closing the editor must never reopen it.
+  const used = useRef(false);
+  const today = body?.state.read.overview?.today;
+  const ready = requested && !!body && !!today && body.state.read.status === 'ready' && body.state.phase === 'idle'
+    && !body.state.intent && !body.state.editor;
+  useEffect(() => {
+    if (!ready || !body || !today || used.current) return;
+    used.current = true;
+    router.setParams({ registrar: undefined });
+    body.controller.openWeight(body.state.read.weights.find(entry => entry.date === today));
+  }, [body, ready, router, today]);
 }
 function BodyDate({ state, controller, date, editable }: { state: BodyState; controller: BodyController; date: string; editable: boolean }) {
   const day = state.read.day?.date === date ? state.read.day : null;

@@ -13,7 +13,9 @@ const mockMutate = jest.fn<(client: unknown, intent: unknown) => Promise<unknown
 const mockStore = new Map<string, string>();
 const mockFocus: (() => void)[] = [];
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useRouter: () => ({ push: mockPush }), useFocusEffect: (effect: () => void) => { mockFocus.push(effect); } }));
+let mockParams: Record<string, string> = {};
+const mockSetParams = jest.fn();
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockParams, useRouter: () => ({ push: mockPush, setParams: mockSetParams }), useFocusEffect: (effect: () => void) => { mockFocus.push(effect); } }));
 jest.mock('@/platform/haptics', () => ({ haptics: { selection: jest.fn(), success: jest.fn(), warning: jest.fn() } }));
 jest.mock('@/auth', () => ({ useMobileAuth: () => ({ session: { user: { id: 'owner' } } }) }));
 const mockClient = { request: jest.fn(), read: jest.fn() };
@@ -43,7 +45,7 @@ const wrap = (element: React.ReactElement) => render(<SafeAreaProvider initialMe
   <OwnlevelThemeProvider initialMode="light">{element}</OwnlevelThemeProvider></SafeAreaProvider>);
 
 beforeEach(() => {
-  jest.clearAllMocks(); mockStore.clear(); mockFocus.length = 0;
+  jest.clearAllMocks(); mockStore.clear(); mockFocus.length = 0; mockParams = {};
   jest.useFakeTimers({ now: new Date('2026-10-02T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
   mockFetchDay.mockImplementation(async (_c, d) => ({ status: 'ok', data: day(d), meta }));
   mockMutate.mockImplementation(async (_c, i) => ({ status: 'ok', data: { status: 'saved', date: (i as { date: string }).date, operation: 'metrics' }, meta }));
@@ -51,6 +53,15 @@ beforeEach(() => {
 afterEach(() => { jest.useRealTimers(); });
 
 describe('Progress → Métricas diarias', () => {
+  it('Home → Registrar opens today\'s metrics editor once and never reopens it after cancelling', async () => {
+    mockParams = { editar: 'metricas' };
+    const view = wrap(<DailyMetricsScreen />); await flush();
+    expect(view.getByText('Métricas del día')).toBeTruthy();
+    expect(mockSetParams).toHaveBeenCalledWith({ editar: undefined });
+    fireEvent.press(view.getByRole('button', { name: 'Cancelar' })); await flush();
+    expect(view.queryByText('Métricas del día')).toBeNull();
+    expect(view.getByRole('button', { name: 'Editar métricas' })).toBeTruthy();
+  });
   it('the hub opens the stable Daily Metrics route', () => {
     const view = wrap(<ProgressHub />);
     fireEvent.press(view.getByRole('button', { name: 'Abrir Métricas diarias' }));

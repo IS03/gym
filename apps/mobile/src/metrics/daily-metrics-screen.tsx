@@ -20,7 +20,9 @@ import type { DayWriteController, DayWriteState } from '@/nutrition/day-write-co
  * Progress → Métricas diarias (M5.2). A surface over the SAME exact-date read
  * (nutrition day → activity.metrics) and the SAME writer/editor as Nutrition.
  */
-function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
+function MetricsDay({ autoEdit = false, date, today, onAutoEdit, onSelect, onServerToday, writes }: {
+  /** Home → Registrar: open today's metrics editor once it can be edited (M9.3A, B2). */
+  autoEdit?: boolean; onAutoEdit?: () => void;
   date: string; today: string; onSelect: (date: string | null) => void; onServerToday: (today: string) => void;
   writes: { controller: DayWriteController; state: DayWriteState } | null;
 }) {
@@ -37,6 +39,12 @@ function MetricsDay({ date, today, onSelect, onServerToday, writes }: {
   const previous = shiftNutritionDate(date, -1), next = shiftNutritionDate(date, 1);
   const future = date > serverToday;
   const editable = !!writes && writes.state.phase === 'idle' && !writes.state.intent && !writes.state.draft;
+  const canAutoEdit = autoEdit && editable && !!data && date === serverToday && canWriteDay('metrics', data);
+  useEffect(() => {
+    if (!canAutoEdit || !data || !writes) return;
+    onAutoEdit?.();
+    writes.controller.open('metrics', data);
+  }, [canAutoEdit, data, onAutoEdit, writes]);
   return <ScrollScreen testID="daily-metrics-screen" refreshControl={<RefreshControl refreshing={state.status === 'ready' && state.refreshing}
     onRefresh={() => void refresh()} tintColor={colors.primary} />}>
     <View style={styles.header}>
@@ -87,7 +95,13 @@ export function DailyMetricsScreen() {
   return <DailyMetricsUserScreen key={userId} userId={userId} />;
 }
 function DailyMetricsUserScreen({ userId }: { userId: string }) {
-  const routeDate = selectedRouteDate(useLocalSearchParams());
+  const params = useLocalSearchParams();
+  const routeDate = selectedRouteDate(params);
+  const router = useRouter();
+  // Consumed once per screen: closing the editor must never reopen it.
+  const [autoEditUsed, setAutoEditUsed] = useState(false);
+  const autoEdit = params.editar === 'metricas' && !autoEditUsed;
+  const consumeAutoEdit = useCallback(() => { setAutoEditUsed(true); router.setParams({ editar: undefined }); }, [router]);
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
@@ -99,7 +113,7 @@ function DailyMetricsUserScreen({ userId }: { userId: string }) {
   useFocusEffect(useCallback(() => { if (writeController) void writeController.resync(); }, [writeController]));
   const date = selected ?? today;
   return <>
-    <MetricsDay key={`${userId}:${date}:${revision}`} date={date} today={today} onSelect={setSelected} onServerToday={setToday} writes={writes} />
+    <MetricsDay autoEdit={autoEdit && selected === null} key={`${userId}:${date}:${revision}`} onAutoEdit={consumeAutoEdit} date={date} today={today} onSelect={setSelected} onServerToday={setToday} writes={writes} />
     {writes?.state.draft ? <DayWriteEditor controller={writes.controller} state={writes.state} /> : null}
   </>;
 }

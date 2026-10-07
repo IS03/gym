@@ -1,0 +1,112 @@
+import { useCallback, useRef } from 'react';
+import { useFocusEffect } from 'expo-router';
+
+import { fetchMobileHome, useApiResource } from '@/api';
+import type { MobileApiClient } from '@/api/client';
+import { fetchHistoryDay } from '@/api/history';
+import { fetchNutritionReport } from '@/api/nutrition-report';
+import { fetchQuickOptions } from '@/api/nutrition-quick';
+import { fetchProgressBody, fetchProgressTraining } from '@/api/progress';
+import type { MobileApiReadResult } from '@/api/results';
+import { fetchTrainingHistory, type TrainingHistorySession } from '@/api/training-history';
+
+import { homeDay } from './home-day';
+
+/** Completed sessions of the current week (Monday → today) plus whether the user ever trained. */
+export type HomeTrainingWeek = { weekStart: string; sessions: TrainingHistorySession[]; everTrained: boolean };
+
+const unavailable = {
+  status: 'unavailable' as const,
+  reason: 'invalid_response' as const,
+  meta: { durationMs: 0, httpStatus: null, outcome: 'unavailable' as const },
+};
+
+// History pages are newest first; the current week fits in the first page almost always.
+const MAX_WEEK_PAGES = 4;
+
+export async function loadTrainingWeek(
+  client: MobileApiClient, weekStart: string, signal?: AbortSignal,
+): Promise<MobileApiReadResult<HomeTrainingWeek>> {
+  const sessions: TrainingHistorySession[] = [];
+  let cursor: string | null = null;
+  let everTrained = false;
+  for (let page = 0; page < MAX_WEEK_PAGES; page++) {
+    const result = await fetchTrainingHistory(client, cursor, signal);
+    if (result.status !== 'ok') return result;
+    if (result.data.sessions.length > 0) everTrained = true;
+    let reachedOlder = false;
+    for (const session of result.data.sessions) {
+      if (session.logDate >= weekStart) sessions.push(session);
+      else reachedOlder = true;
+    }
+    cursor = result.data.nextCursor;
+    if (reachedOlder || !cursor) {
+      return { status: 'ok', data: { weekStart, sessions, everTrained }, meta: result.meta };
+    }
+  }
+  // More history than the page budget inside one week: do not show partial week totals.
+  return unavailable;
+}
+
+/**
+ * The minimum time between tab-focus refreshes. Returning to the tab inside this window
+ * keeps the confirmed reads; foregrounding the app (useApiResource) and pull-to-refresh
+ * always refresh, and a day change always refreshes.
+ */
+export const HOME_FOCUS_REFRESH_MS = 30_000;
+
+export function shouldRefreshOnFocus(
+  last: { at: number; day: string } | null, now: number, day: string,
+): boolean {
+  return !last || last.day !== day || now - last.at >= HOME_FOCUS_REFRESH_MS;
+}
+
+/** Home's reads, issued in parallel; each block renders from its own state. */
+export function useHomeResources(client: MobileApiClient | null, now: () => Date = () => new Date()) {
+  const home = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchMobileHome(client, signal) : Promise.resolve(unavailable), [client]));
+  const today = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchHistoryDay(client, homeDay(now()).today, signal) : Promise.resolve(unavailable), [client, now]));
+  const quick = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchQuickOptions(client, signal) : Promise.resolve(unavailable), [client]));
+  const calories = useApiResource(useCallback((signal: AbortSignal) => {
+    const day = homeDay(now());
+    return client
+      ? fetchNutritionReport(client, { period: 'custom', from: day.weekStart, to: day.today }, signal)
+      : Promise.resolve(unavailable);
+  }, [client, now]));
+  const training = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? loadTrainingWeek(client, homeDay(now()).weekStart, signal) : Promise.resolve(unavailable), [client, now]));
+  const progressBody = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchProgressBody(client, { period: '7' }, signal) : Promise.resolve(unavailable), [client]));
+  const progressTraining = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchProgressTraining(client, { period: '7' }, signal) : Promise.resolve(unavailable), [client]));
+  const progressRecords = useApiResource(useCallback((signal: AbortSignal) =>
+    client ? fetchProgressTraining(client, { period: '30' }, signal) : Promise.resolve(unavailable), [client]));
+
+  const refreshHome = home.refresh, refreshToday = today.refresh, refreshQuick = quick.refresh;
+  const refreshCalories = calories.refresh, refreshTraining = training.refresh;
+  const refreshProgressBody = progressBody.refresh, refreshProgressTraining = progressTraining.refresh, refreshProgressRecords = progressRecords.refresh;
+  const refreshAll = useCallback(() => {
+    void Promise.all([refreshHome(), refreshToday(), refreshQuick(), refreshCalories(), refreshTraining(),
+      refreshProgressBody(), refreshProgressTraining(), refreshProgressRecords()]);
+  }, [refreshCalories, refreshHome, refreshQuick, refreshToday, refreshTraining, refreshProgressBody, refreshProgressTraining, refreshProgressRecords]);
+
+  const lastFocus = useRef<{ at: number; day: string } | null>(null);
+  const markRefreshed = useCallback(() => {
+    lastFocus.current = { at: now().getTime(), day: homeDay(now()).today };
+  }, [now]);
+  useFocusEffect(useCallback(() => {
+    const day = homeDay(now()).today;
+    // The first focus coincides with the initial reads.
+    if (lastFocus.current === null) { markRefreshed(); return; }
+    if (shouldRefreshOnFocus(lastFocus.current, now().getTime(), day)) {
+      markRefreshed();
+      refreshAll();
+    }
+  }, [markRefreshed, now, refreshAll]));
+
+  const refreshNow = useCallback(() => { markRefreshed(); refreshAll(); }, [markRefreshed, refreshAll]);
+
+  return { calories, home, progressBody, progressTraining, progressRecords, quick, refresh: refreshNow, today, training };
+}
