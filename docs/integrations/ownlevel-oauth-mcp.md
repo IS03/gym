@@ -101,6 +101,57 @@ implementados ni simulados como un Authorization Server en este repositorio.
 
 ## Configuración y despliegue escalonado
 
+### Lockdown opt-in del Preview
+
+`src/proxy.ts` cubre todas las rutas (incluyendo APIs, archivos públicos y assets).
+Bloquea por defecto con 404 y `Cache-Control: private, no-store` sólo cuando se
+cumplen **simultáneamente** `VERCEL=1`, `VERCEL_ENV=preview` y
+`OWNLEVEL_OAUTH_PREVIEW_LOCKDOWN=true`. Sin ese opt-in, desarrollo y producción
+conservan la selección existente de rutas para refrescar la sesión.
+
+Configurar la variable únicamente en Vercel → gymapp → Preview, override de
+la rama `codex/ownlevel-oauth-mcp`. No es `NEXT_PUBLIC_`, no activa OAuth, no
+concede permisos y no evita las comprobaciones JWT/DB/CSRF de los endpoints.
+
+Lista exhaustiva de exposición durante lockdown:
+
+| Ruta | Métodos permitidos |
+| --- | --- |
+| `/mcp` | GET, HEAD, POST, DELETE, OPTIONS |
+| `/mcp/oauth-protected-resource` | GET, HEAD, OPTIONS |
+| `/.well-known/oauth-protected-resource/mcp` | GET, HEAD, OPTIONS |
+| `/oauth/consent` | GET, HEAD |
+| `/login` | GET, HEAD |
+| `/auth/callback` | GET, HEAD |
+| `/api/oauth/decision` | POST, OPTIONS |
+| `/api/integrations/chatgpt/meals` | POST, OPTIONS |
+| `/_next/static/*` | GET, HEAD |
+| `/favicon.ico`, `/icon.svg`, `/apple-icon.png` | GET, HEAD |
+| `/brand/logo/isotipo-claro.png`, `/brand/logo/isotipo-oscuro.png` | GET, HEAD |
+| `/_next/image` | GET, HEAD, sólo con un único `url` igual a uno de esos dos logos locales |
+
+No se expone el resto de `/_next/*`, `/api/*`, `/settings`, `/home`, `/today`,
+`/train`, service workers, manifest ni revocación. OPTIONS pasa a la resolución
+normal de Next, no agrega autenticación ni CORS por sí solo. Las rutas de UI no
+admiten POST/Server Actions. Los redirects a páginas del producto seguirán
+encontrando el lockdown; no se amplía la lista para evitarlos.
+
+Vercel Authentication permanece activo: este guard es una condición previa a
+una eventual excepción del hostname de la rama, no modifica esa protección.
+Antes de una excepción comprobar en el deployment que `/home` y APIs ajenas
+devuelven el 404 con `X-OWNLEVEL-Preview-Lockdown: blocked`, y que MCP/metadata
+llegan a sus handlers (503 `integration_disabled` mientras OAuth no se active).
+
+### Configuración OAuth posterior (requiere aprobación independiente)
+
+El usuario eligió continuar posteriormente con el proyecto Supabase productivo,
+sin Branch paga. El lockdown no aplica la migración ni activa OAuth Server.
+Antes de esos cambios compartidos hay que revisar la configuración vigente:
+Supabase construye el consentimiento con Site URL + Authorization Path; apuntar
+Site URL al preview no es una configuración aislada de esta rama. La secuencia
+aislada original de abajo documenta la validación previa, no una autorización
+para crear otra base ni para modificar producción automáticamente.
+
 1. Preparar un Supabase de prueba aislado y un preview HTTPS accesible a ChatGPT,
    sin copiar datos personales de producción. Confirmar costos si se necesita
    una rama alojada. El Supabase CLI local ya probado no es accesible por ChatGPT.
