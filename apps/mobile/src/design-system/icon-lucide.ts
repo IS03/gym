@@ -1,6 +1,6 @@
 import {
-  Calendar, ChartLine, ChevronLeft, ChevronRight, CircleCheck, ClipboardList, Clock, Coffee, Droplet, Dumbbell, Ellipsis, Flame,
-  Footprints, ListFilter, Moon, NotebookPen, Plus, RotateCw, Settings, TriangleAlert, Trophy, User, Utensils, Weight, X, Zap, type LucideIcon,
+  BookOpen, Calendar, ChartLine, ChevronLeft, ChevronRight, CircleCheck, ClipboardList, Clock, Coffee, Droplet, Dumbbell, Ellipsis, Flame,
+  Footprints, ListFilter, Moon, NotebookPen, Play, Plus, RotateCw, Settings, TriangleAlert, Trophy, User, Utensils, Weight, X, Zap, type LucideIcon,
 } from 'lucide-react-native';
 
 import type { AppIconName } from './icon-names';
@@ -10,6 +10,7 @@ export const lucideIcons: Record<AppIconName, LucideIcon> = {
   activity: Zap,
   // Temporary until the brand isotype replaces it (M9.1D).
   brand: Dumbbell,
+  book: BookOpen,
   calendar: Calendar,
   check: CircleCheck,
   chevronLeft: ChevronLeft,
@@ -26,6 +27,7 @@ export const lucideIcons: Record<AppIconName, LucideIcon> = {
   nutrition: Utensils,
   note: NotebookPen,
   plus: Plus,
+  play: Play,
   profile: User,
   progress: ChartLine,
   refresh: RotateCw,

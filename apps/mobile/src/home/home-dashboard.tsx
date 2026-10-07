@@ -103,7 +103,7 @@ function HomeHeader({ avatarUrl, date, onSettings, profile }: {
 }
 
 /** Small capsule action (Volver, Elegir rutina…), never full width. */
-function Capsule({ accessibilityHint, accessibilityLabel, label, onPress, tone = 'hero' }: {
+export function Capsule({ accessibilityHint, accessibilityLabel, label, onPress, tone = 'hero' }: {
   accessibilityHint?: string; accessibilityLabel?: string; label: string; onPress: () => void; tone?: 'hero' | 'heroSoft' | 'neutral';
 }) {
   const { colors } = useOwnlevelTheme();
@@ -122,7 +122,7 @@ function Capsule({ accessibilityHint, accessibilityLabel, label, onPress, tone =
 }
 
 /** Champagne hero (brand gradient, core RN style with a solid fallback), sentence case. */
-function Hero({ actions, label, subtitle, testID, title }: {
+export function Hero({ actions, label, subtitle, testID, title }: {
   actions: React.ReactNode; label: string; subtitle: string; testID: string; title: string;
 }) {
   const { colors, isDark } = useOwnlevelTheme();
