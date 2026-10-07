@@ -20,6 +20,7 @@ import { StartWorkoutModal } from '@/training/start-workout-modal';
 import { HomeDashboard, type HomeNavigationTarget } from './home-dashboard';
 import { useHomeResources } from './home-data';
 import { homeDay } from './home-day';
+import type { HomeMealEntry } from './home-nutrition';
 import type { HomeProgressTarget } from './home-progress';
 import type { HomeRegisterTarget } from './home-register';
 import { homeResource } from './home-resource';
@@ -85,7 +86,11 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
   const actions = useMemo(() => ({
     onConfigureNutrition: () => { if (configuration) configuration.controller.open(); },
     onCreateRoutine: () => { haptics.selection(); router.push('/(tabs)/train/routines'); },
-    onNewMeal: () => { haptics.selection(); router.navigate({ pathname: '/(tabs)/nutrition', params: { add: '1' } }); },
+    // Existing Nutrition flows: manual meal, food search, or the quick list ("Ver todas").
+    onMealEntry: (entry: HomeMealEntry) => {
+      haptics.selection();
+      router.navigate({ pathname: '/(tabs)/nutrition', params: entry === 'quick' ? { quick: 'all' } : { add: entry } });
+    },
     onOpenCompletedSession: (id: string) => { haptics.selection(); router.push({ pathname: '/(tabs)/train/history/[id]', params: { id } }); },
     onOpenDay: (date: string) => { haptics.selection(); router.push({ pathname: '/history/day/[date]', params: { date } }); },
     onOpenProgress: (target: HomeProgressTarget) => {
@@ -139,7 +144,6 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
           onRefresh={refresh}
           onStartWorkout={openStart}
           progressBody={homeResource(resources.progressBody.state)}
-          progressTraining={homeResource(resources.progressTraining.state)}
           progressRecords={homeResource(resources.progressRecords.state)}
           quick={homeResource(resources.quick.state)}
           today={homeResource(resources.today.state)}

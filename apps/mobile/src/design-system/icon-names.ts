@@ -28,6 +28,7 @@ export type AppIconName =
   | 'routines'
   | 'scale'
   | 'settings'
+  | 'trophy'
   | 'warning'
   | 'water';
 
@@ -67,6 +68,7 @@ export const sfSymbolNames: Record<AppIconName, SFSymbol> = {
   routines: 'list.bullet.rectangle',
   scale: 'scalemass.fill',
   settings: 'gearshape.fill',
+  trophy: 'trophy.fill',
   warning: 'exclamationmark.triangle.fill',
   water: 'drop.fill',
 };

@@ -1,115 +1,112 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ProgressBody, ProgressTraining, ProgressTrainingExercise } from '@/api/progress';
-import { AppText, InlineUnavailable, ListGroup, ListRow, SectionHeader, SkeletonBlock, spacing } from '@/design-system';
-import { displayNutritionDate } from '@/nutrition/day-format';
-import { comparisonText, formatDelta, formatValue } from '@/progress/progress-format';
+import { AppText, InlineUnavailable, SkeletonBlock, spacing, useOwnlevelTheme } from '@/design-system';
+import { formatValue } from '@/progress/progress-format';
 
 import { formatInteger } from './format';
 import type { HomeResource } from './home-resource';
+import { HomeCard, HomeRow, HomeRowSeparator, HomeSectionHeader } from './home-ui';
 
 export type HomeProgressTarget = { kind: 'body'; period: '7' } | { kind: 'training'; period: '7' | '30' }
   | { kind: 'exercise'; period: '30'; exerciseId: string };
 
-type ProgressRowData = { title: string; detail: string; value?: string; target: HomeProgressTarget };
+type RowSummary = { title: string; subtitle: string; value?: string; target: HomeProgressTarget };
 
-function ReadRow<T extends { today: string }>({ date, label, onOpen, onRetry, render, resource, testID }: {
-  date: string; label: string; onOpen: (target: HomeProgressTarget) => void; onRetry: () => void;
-  render: (data: T) => ProgressRowData; resource: HomeResource<T>; testID: string;
-}) {
-  // A previous day's snapshot must not masquerade as today's rolling period.
-  const data = resource.data?.today === date ? resource.data : undefined;
-  if (!data) {
-    return <View style={styles.state} testID={testID}>
-      <AppText variant="headline">{label}</AppText>
-      {resource.status === 'loading' || (resource.status === 'ready' && resource.data)
-        ? <SkeletonBlock height={18} width="70%" />
-        : <InlineUnavailable actionLabel="Reintentar" message="No pudimos cargar estos datos." onAction={onRetry} />}
-    </View>;
-  }
-  const row = render(data);
-  const detail = resource.status === 'unavailable' ? `${row.detail} · Última lectura; no se pudo actualizar.` : row.detail;
-  return <View testID={testID}>
-    <ListRow accessibilityLabel={`${row.title}. ${detail}${row.value ? `. ${row.value}` : ''}`}
-      accessibilityHint="Abre el detalle de este período" numericValue onPress={() => onOpen(row.target)}
-      subtitle={detail} title={row.title} value={row.value} />
-    {resource.status === 'unavailable' ? <InlineUnavailable actionLabel="Reintentar" message="No pudimos actualizar." onAction={onRetry} /> : null}
-  </View>;
-}
+const shortDate = (date: string) => new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+  .format(new Date(`${date}T12:00:00Z`)).replace('.', '');
 
-function weightRow(data: ProgressBody): ProgressRowData {
-  const weight = data.metrics.find(metric => metric.key === 'body.weight');
-  const latest = weight?.latest;
-  const variation = weight?.change !== null && weight?.change !== undefined && weight.observations.length >= 2
-    ? `${weight.change > 0 ? '↑ ' : weight.change < 0 ? '↓ ' : ''}${formatDelta(weight.change, 'kg')} entre registros · últimos 7 días`
-    : 'Faltan registros para comparar los últimos 7 días';
+/** Last weight and when it was logged (the value only lives here, not in Registrar). */
+export function weightSummary(data: ProgressBody): RowSummary {
+  const latest = data.metrics.find(metric => metric.key === 'body.weight')?.latest;
+  const target = { kind: 'body', period: '7' } as const;
+  if (!latest) return { title: 'Peso', subtitle: data.excludedSuspect > 0 ? 'Revisá tus registros en Cuerpo' : 'Sin registros', target };
   return {
-    title: 'Peso', value: latest ? formatValue(latest.value, 'kg') : undefined,
-    detail: latest ? `${variation}${latest.date === data.today ? '' : ` · Registro del ${displayNutritionDate(latest.date)}`}`
-      : data.excludedSuspect > 0 ? 'Hay registros excluidos del análisis; revisalos en Cuerpo' : 'Todavía no tenés un peso registrado',
-    target: { kind: 'body', period: '7' },
-  };
-}
-
-function trainingRow(data: ProgressTraining): ProgressRowData {
-  const comparison = data.summary.comparisons.sessions;
-  const direction = comparison.status === 'comparable' && comparison.deltaAbsolute !== null
-    ? comparison.deltaAbsolute > 0 ? '↑ ' : comparison.deltaAbsolute < 0 ? '↓ ' : '' : '';
-  const detail = comparison.status === 'comparable' && comparison.deltaAbsolute !== null
-    ? comparison.deltaAbsolute === 0 ? 'Sin cambios frente a los 7 días anteriores'
-      : `${direction}${formatDelta(comparison.deltaAbsolute, Math.abs(comparison.deltaAbsolute) === 1 ? 'entrenamiento' : 'entrenamientos', 'integer')} vs. los 7 días anteriores`
-    : comparisonText(comparison, 'entrenamientos', 'integer');
-  return {
-    title: 'Entrenamientos', value: formatInteger(data.summary.sessions),
-    detail: `Últimos 7 días · ${detail}`,
-    target: { kind: 'training', period: '7' },
+    title: 'Peso', value: formatValue(latest.value, 'kg'), target,
+    subtitle: latest.date === data.today ? 'Último registro: hoy' : `Último registro: ${shortDate(latest.date)}`,
   };
 }
 
 function exerciseChange(exercise: ProgressTrainingExercise): string {
-  const direction = exercise.status === 'improved' ? '↑' : '↓';
-  return `${direction} ${exercise.name} · ${exercise.signal!.description}`;
+  return `${exercise.status === 'improved' ? '↑' : '↓'} ${exercise.name} · ${exercise.signal!.description}`;
 }
 
-function recordsRow(data: ProgressTraining): ProgressRowData {
-  if (data.personalRecords.length) return {
-    title: 'Récords', value: formatInteger(data.personalRecords.length),
-    detail: `Últimos 30 días · ${data.personalRecords.slice(0, 2).map(record => record.name).join(' · ')}${data.personalRecords.length > 2 ? '…' : ''}`,
-    target: data.personalRecords.length === 1
-      ? { kind: 'exercise', period: '30', exerciseId: data.personalRecords[0].exerciseId }
-      : { kind: 'training', period: '30' },
-  };
-  // Use M7's mode-aware assessment; a load increase alone is not a new PR.
+/** Records of the last 30 days; without records, M7's mode-aware assessment (never a fake PR). */
+export function recordsSummary(data: ProgressTraining): RowSummary {
+  const records = data.personalRecords;
+  if (records.length) {
+    const names = records.slice(0, 2).map(record => record.name).join(', ');
+    return {
+      title: records.length === 1 ? '1 récord en 30 días' : `${formatInteger(records.length)} récords en 30 días`,
+      subtitle: records.length > 2 ? `${names} y ${formatInteger(records.length - 2)} más` : names,
+      target: records.length === 1 ? { kind: 'exercise', period: '30', exerciseId: records[0].exerciseId } : { kind: 'training', period: '30' },
+    };
+  }
   const change = data.exercises.filter(exercise => exercise.signal && (exercise.status === 'improved' || exercise.status === 'declined'))
     .sort((a, b) => (b.lastDate ?? '').localeCompare(a.lastDate ?? ''))[0];
-  if (change) return {
-    title: 'Rendimiento', detail: `Últimos 30 días · ${exerciseChange(change)}`,
-    target: { kind: 'exercise', period: '30', exerciseId: change.id },
-  };
+  if (change) return { title: 'Rendimiento en 30 días', subtitle: exerciseChange(change), target: { kind: 'exercise', period: '30', exerciseId: change.id } };
   return {
-    title: 'Récords y rendimiento',
-    detail: data.summary.performance.comparable > 0
-      ? 'Últimos 30 días · Sin nuevos récords ni cambios destacados'
-      : 'Todavía faltan entrenamientos comparables · últimos 30 días',
-    target: { kind: 'training', period: '30' },
+    title: 'Sin récords en 30 días', target: { kind: 'training', period: '30' },
+    subtitle: data.summary.performance.comparable > 0 ? 'Seguí sumando entrenamientos' : 'Faltan entrenamientos comparables',
   };
 }
 
-export function HomeProgress({ body, date, onAll, onOpen, onRetry, records, training }: {
-  body: HomeResource<ProgressBody>; date: string; onAll: () => void; onOpen: (target: HomeProgressTarget) => void;
-  onRetry: () => void; records: HomeResource<ProgressTraining>; training: HomeResource<ProgressTraining>;
+/** Today's snapshot only: a previous day's rolling period never passes as today's. */
+function current<T extends { today: string }>(resource: HomeResource<T>, date: string): T | undefined {
+  return resource.data?.today === date ? resource.data : undefined;
+}
+
+function ReadRow<T extends { today: string }>({ date, icon, label, onOpen, onRetry, resource, summarize, testID }: {
+  date: string; icon: 'trophy' | 'scale'; label: string; onOpen: (target: HomeProgressTarget) => void; onRetry: () => void;
+  resource: HomeResource<T>; summarize: (data: T) => RowSummary; testID: string;
 }) {
-  return <View style={styles.section} testID="home-progress">
-    <SectionHeader actionLabel="Ver todo" onAction={onAll} title="Progreso" />
-    <ListGroup>
-      <ReadRow date={date} label="Peso" onOpen={onOpen} onRetry={onRetry} render={weightRow} resource={body} testID="home-progress-weight" />
-      <ReadRow date={date} label="Entrenamientos" onOpen={onOpen} onRetry={onRetry} render={trainingRow} resource={training} testID="home-progress-training" />
-      <ReadRow date={date} label="Récords y rendimiento" onOpen={onOpen} onRetry={onRetry} render={recordsRow} resource={records} testID="home-progress-records" />
-    </ListGroup>
-  </View>;
+  const { colors } = useOwnlevelTheme();
+  const data = current(resource, date);
+  if (!data) {
+    const waiting = resource.status === 'loading' || (resource.status === 'ready' && !!resource.data);
+    return (
+      <HomeRow icon={icon} testID={testID} title={label}>
+        <View style={styles.indent}>
+          {waiting ? <SkeletonBlock height={14} width="60%" /> : <InlineUnavailable actionLabel="Reintentar" message="No pudimos cargarlo." onAction={onRetry} />}
+        </View>
+      </HomeRow>
+    );
+  }
+  const row = summarize(data);
+  const stale = resource.status === 'unavailable';
+  return (
+    <HomeRow accessibilityHint="Abre el detalle" accessibilityLabel={`${row.title}. ${row.subtitle}${row.value ? `. ${row.value}` : ''}`} chevron
+      icon={icon} onPress={() => onOpen(row.target)} subtitle={row.subtitle} testID={testID} title={row.title}
+      trailing={row.value ? <AppText numeric style={styles.value}>{row.value}</AppText> : undefined}>
+      {stale ? (
+        <Pressable accessibilityLabel="Reintentar" accessibilityRole="button" hitSlop={8} onPress={onRetry} style={styles.indent}>
+          <AppText style={{ color: colors.textMuted }} variant="caption">Sin actualizar · Reintentar</AppText>
+        </Pressable>
+      ) : null}
+    </HomeRow>
+  );
+}
+
+export function HomeProgress({ body, date, onAll, onOpen, onRetry, records }: {
+  body: HomeResource<ProgressBody>; date: string; onAll: () => void; onOpen: (target: HomeProgressTarget) => void;
+  onRetry: () => void; records: HomeResource<ProgressTraining>;
+}) {
+  return (
+    <View style={styles.section} testID="home-progress">
+      <HomeSectionHeader action="Ver todo" onAction={onAll} title="Progreso" />
+      <HomeCard padded={false}>
+        <ReadRow date={date} icon="trophy" label="Récords" onOpen={onOpen} onRetry={onRetry} resource={records} summarize={recordsSummary}
+          testID="home-progress-records" />
+        <HomeRowSeparator />
+        <ReadRow date={date} icon="scale" label="Peso" onOpen={onOpen} onRetry={onRetry} resource={body} summarize={weightSummary}
+          testID="home-progress-weight" />
+      </HomeCard>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  section: { gap: spacing.md },
-  state: { gap: spacing.sm, paddingVertical: spacing.md },
+  indent: { paddingLeft: 40, paddingTop: 2 },
+  section: { gap: spacing.sm, marginBottom: spacing.xl },
+  value: { fontSize: 17, fontWeight: '700', marginRight: 2 },
 });
