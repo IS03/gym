@@ -1,3 +1,4 @@
+import { safeAuthRedirectPath } from "./auth-redirect";
 export const PUBLIC_AUTH_ERROR_MESSAGE =
   "No pudimos iniciar sesión. Intentá nuevamente.";
 
@@ -5,11 +6,12 @@ export const PUBLIC_AUTH_ERROR_MESSAGE =
  * The only supported OWNLEVEL entry flow. Keeping this request in one tested
  * place prevents a visual login change from accidentally changing OAuth.
  */
-export function googleOAuthRequest(origin: string) {
+export function googleOAuthRequest(origin: string, next?: string) {
+  const path = safeAuthRedirectPath(next);
   return {
     provider: "google" as const,
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${origin}/auth/callback${path === "/home" ? "" : `?next=${encodeURIComponent(path)}`}`,
       queryParams: {
         prompt: "select_account",
       },

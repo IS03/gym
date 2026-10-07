@@ -56,6 +56,7 @@ describe("session proxy routing", () => {
     "/train",
     "/train/exercises",
     "/settings/account",
+    "/oauth/consent",
   ])("keeps %s in the authenticated proxy boundary", (pathname) => {
     expect(requiresSessionProxy(pathname)).toBe(true);
   });
@@ -69,6 +70,8 @@ describe("session proxy routing", () => {
     "/_next/image",
     "/auth/callback",
     "/api/integrations/chatgpt/status",
+    "/mcp",
+    "/.well-known/oauth-protected-resource/mcp",
   ])("bypasses auth for public resource %s", async (pathname) => {
     const request = new NextRequest(`https://www.ownlevel.fit${pathname}`);
 
@@ -89,6 +92,7 @@ describe("session proxy routing", () => {
       "/train/:path*",
       "/progress/:path*",
       "/calendar/:path*",
+      "/oauth/consent/:path*",
     ]);
   });
 });

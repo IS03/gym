@@ -6,6 +6,7 @@ import {
   requestPerformanceContext,
 } from "../request-performance";
 import { isInvalidAuthSessionError } from "./auth-errors";
+import { safeAuthRedirectPath } from "../security/auth-redirect";
 
 function isProtectedPath(pathname: string) {
   return [
@@ -134,8 +135,9 @@ export async function updateSession(request: NextRequest) {
 
   if (claimsData?.claims?.sub && request.nextUrl.pathname === "/login") {
     const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/home";
-    homeUrl.search = "";
+    const next = new URL(safeAuthRedirectPath(request.nextUrl.searchParams.get("next")), request.nextUrl.origin);
+    homeUrl.pathname = next.pathname;
+    homeUrl.search = next.search;
     const redirectResponse = NextResponse.redirect(homeUrl);
     copyAuthResponse(supabaseResponse, redirectResponse);
     return redirectResponse;

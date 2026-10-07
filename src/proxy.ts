@@ -9,6 +9,7 @@ export const SESSION_PROXY_PATH_PREFIXES = [
   "/train",
   "/progress",
   "/calendar",
+  "/oauth/consent",
 ] as const;
 
 export function requiresSessionProxy(pathname: string) {
@@ -45,5 +46,6 @@ export const config = {
     "/train/:path*",
     "/progress/:path*",
     "/calendar/:path*",
+    "/oauth/consent/:path*",
   ],
 };

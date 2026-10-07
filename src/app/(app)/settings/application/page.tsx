@@ -2,12 +2,32 @@ import { Bell, Globe2, KeyRound, Palette } from "lucide-react";
 import { listIntegrationApiTokens } from "@/lib/integrations/chatgpt-tokens";
 import { SettingsHeader, SettingsRow, SettingsSection } from "../settings-components";
 import { ThemeSettings } from "../theme-settings";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ownlevelOAuthConfig, ownlevelOAuthEnabled } from "@/lib/integrations/oauth-config";
+import { OAuthConnections } from "./oauth-connections";
 
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationSettingsPage() {
   const tokens = await listIntegrationApiTokens();
   const chatgptConnected = tokens.some((token) => token.revoked_at === null);
+  const oauthEnabled = ownlevelOAuthEnabled();
+  const oauthClientIds: string[] = [];
+  if (oauthEnabled) {
+    const supabase = await createClient();
+    const { data: grants, error } = await supabase.auth.oauth.listGrants();
+    if (error) throw new Error("No se pudieron consultar las conexiones OAuth.");
+    const admin = createAdminClient();
+    const config = ownlevelOAuthConfig();
+    for (const grant of grants ?? []) {
+      const { data: allowed, error: policyError } = await admin.rpc("ownlevel_oauth_client_allowed", {
+        p_client_id: grant.client.id, p_resource: config.resource,
+      });
+      if (policyError) throw new Error("No se pudieron verificar las conexiones OAuth.");
+      if (allowed === true) oauthClientIds.push(grant.client.id);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -47,6 +67,7 @@ export default async function ApplicationSettingsPage() {
             }
           />
         </SettingsSection>
+        {oauthEnabled && <div className="mt-4"><OAuthConnections clientIds={oauthClientIds} /></div>}
       </div>
 
       <SettingsSection title="Personalización">

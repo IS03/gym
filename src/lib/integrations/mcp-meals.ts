@@ -1,0 +1,92 @@
+import "server-only";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { parseChatgptMealInput, type ChatgptMealHttpResult } from "./chatgpt-contract";
+import { ownlevelIntegrationOrigin, ownlevelOAuthConfig, ownlevelOAuthEnabled, OWNLEVEL_OAUTH_SCOPES } from "./oauth-config";
+import { withOwnlevelOAuth } from "./oauth-auth";
+import { readJsonRequestBody, RequestBodyTooLargeError } from "../security/request-body";
+
+export const registerMealTool = {
+  name: "register_meal", title: "Registrar comida en OWNLEVEL",
+  description: "Registra una comida en tu cuenta. Conservá la misma idempotency_key al reintentar. Ante possible_duplicate pedí confirmación antes de usar force_duplicate=true. Nunca envíes user_id. El permiso meals:write es interno, no un scope OAuth.",
+  inputSchema: { type: "object" as const, additionalProperties: false,
+    required: ["date", "title", "description", "calories", "protein_g", "carbs_g", "fat_g", "idempotency_key"],
+    properties: {
+      date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+      title: { type: "string", minLength: 1, maxLength: 120 },
+      description: { type: "string", maxLength: 1000 },
+      calories: { type: "number", minimum: 0, maximum: 100000 },
+      protein_g: { anyOf: [{ type: "number", minimum: 0, maximum: 10000 }, { type: "null" }] },
+      carbs_g: { anyOf: [{ type: "number", minimum: 0, maximum: 10000 }, { type: "null" }] },
+      fat_g: { anyOf: [{ type: "number", minimum: 0, maximum: 10000 }, { type: "null" }] },
+      idempotency_key: { type: "string", minLength: 8, maxLength: 200 },
+      force_duplicate: { type: "boolean" },
+    },
+  },
+  securitySchemes: [{ type: "oauth2", scopes: OWNLEVEL_OAUTH_SCOPES }],
+  _meta: { securitySchemes: [{ type: "oauth2", scopes: OWNLEVEL_OAUTH_SCOPES }] },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+};
+
+export async function forwardOAuthMeal(args: unknown, bearer: string, fetcher: typeof fetch = fetch) {
+  const meal = parseChatgptMealInput(args);
+  const { force_duplicate, ...fields } = meal;
+  const payload = { ...fields, ...(force_duplicate ? { force_duplicate: true } : {}) };
+  // Fixed origin/resource, no user-controlled destination or redirect following.
+  const endpoint = new URL(ownlevelIntegrationOrigin());
+  // Disposable local tests keep the canonical HTTPS resource/audience, but
+  // must never write to production. This override is forbidden in production.
+  endpoint.pathname = "/api/integrations/chatgpt/meals";
+  const response = await fetcher(endpoint, { method: "POST", redirect: "error", cache: "no-store",
+    signal: AbortSignal.timeout(10_000), headers: { "Authorization": bearer, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await response.json() as ChatgptMealHttpResult["body"];
+  return { status: response.status, body };
+}
+
+function toolError(message: string, challenge?: string) {
+  return { content: [{ type: "text" as const, text: message }], isError: true,
+    ...(challenge ? { _meta: { "mcp/www_authenticate": [challenge] } } : {}) };
+}
+
+export async function handleMealsMcp(req: Request) {
+  if (!ownlevelOAuthEnabled()) return Response.json({ error: "integration_disabled" }, { status: 503 });
+  if (req.headers.get("origin") && ![ownlevelIntegrationOrigin(), "https://chatgpt.com"].includes(req.headers.get("origin")!)) {
+    return new Response("Forbidden origin", { status: 403 });
+  }
+  let parsedBody: unknown;
+  if (req.method === "POST") {
+    try { ({ body: parsedBody } = await readJsonRequestBody(req, 32_768)); }
+    catch (error) { return Response.json({ error: "invalid_request" }, { status: error instanceof RequestBodyTooLargeError ? 413 : 400 }); }
+  }
+  const server = new Server({ name: "ownlevel-meals", version: "2.0.0" }, { capabilities: { tools: {} } });
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 32_768 });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [registerMealTool] }));
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+    if (params.name !== "register_meal") return toolError("Herramienta desconocida.");
+    try {
+      // Discovery/initialize are public. Every actual invocation is authenticated
+      // and authorized before forwarding; tools/list never implies permission.
+      let result: Awaited<ReturnType<typeof forwardOAuthMeal>> | undefined;
+      const authRequest = new Request(req.url, { headers: req.headers });
+      const response = await withOwnlevelOAuth(authRequest, async () => {
+        result = await forwardOAuthMeal(params.arguments, req.headers.get("authorization")!);
+        return new Response(null, { status: 204 });
+      });
+      if (!result) return toolError("Conectá OWNLEVEL y autorizá el registro de comidas.", response.headers.get("WWW-Authenticate") ?? undefined);
+      if (result.status === 401 || result.status === 403) {
+        const config = ownlevelOAuthConfig();
+        return toolError("La conexión no tiene permiso vigente.", `Bearer resource_metadata="${config.metadataUrl}", error="${result.status === 401 ? "invalid_token" : "insufficient_scope"}"`);
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify(result.body) }], structuredContent: result.body, isError: !result.body.ok };
+    } catch { return toolError("No se pudo registrar la comida. Si reintentás, conservá la misma idempotency_key."); }
+  });
+  await server.connect(transport);
+  try {
+    const response = await transport.handleRequest(req, { parsedBody });
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  } finally { await server.close(); }
+}

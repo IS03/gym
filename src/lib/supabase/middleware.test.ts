@@ -51,6 +51,15 @@ describe("updateSession redirects", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("returns an already signed-in user to consent without an external redirect", async () => {
+    mocks.getClaims.mockResolvedValue({ data: { claims: { sub: "verified-user" } }, error: null });
+    const next = "/oauth/consent?authorization_id=synthetic";
+    const response = await updateSession(new NextRequest(`https://ownlevel.fit/login?next=${encodeURIComponent(next)}`));
+    expect(response.headers.get("location")).toBe(`https://ownlevel.fit${next}`);
+    const external = await updateSession(new NextRequest("https://ownlevel.fit/login?next=https://foreign.invalid"));
+    expect(external.headers.get("location")).toBe("https://ownlevel.fit/home");
+  });
+
   it.each(["/progress", "/calendar"]) (
     "redirects unauthenticated requests to the protected route %s",
     async (pathname) => {
