@@ -1,6 +1,6 @@
 import { fireEvent, render, within } from '@testing-library/react-native';
 import { describe, expect, it, jest } from '@jest/globals';
-import { Image, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import type { MobileHomeResponse } from '@/api/home';
 import type { HistoryDay } from '@/api/history';
@@ -10,12 +10,23 @@ import { OwnlevelThemeProvider, type ThemeMode } from '@/design-system';
 
 import { HomeDashboard, type HomeDashboardProps } from './home-dashboard';
 import type { HomeTrainingWeek } from './home-data';
-import { homeHabituals } from './home-nutrition';
+import { calorieSplit, homeHabituals } from './home-nutrition';
 import type { HomeResource } from './home-resource';
 import { homeProgressBody, homeProgressTraining } from './home-test-fixtures';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
-jest.mock('expo-glass-effect', () => ({ GlassView: ({ children }: { children: unknown }) => children, isLiquidGlassAvailable: () => false }));
+// The native "+" menu has its own test; here a stub exposes its entries as buttons.
+jest.mock('./home-add-menu', () => {
+  const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { HomeAddMenu: ({ habituals, onAll, onFood, onHabitual, onManual }: import('./home-add-menu.types').HomeAddMenuProps) => (
+    <View testID="home-add-menu">
+      <Pressable accessibilityRole="button" onPress={onManual}><Text>Comida manual</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={onFood}><Text>Buscar alimento</Text></Pressable>
+      {habituals.map(option => <Pressable accessibilityRole="button" key={option.source.id} onPress={() => onHabitual(option)}><Text>{option.name}</Text></Pressable>)}
+      <Pressable accessibilityRole="button" onPress={onAll}><Text>Ver todas</Text></Pressable>
+    </View>
+  ) };
+});
 
 const TODAY = '2026-10-10'; // Saturday
 const WEEK = '2026-10-05';
@@ -94,7 +105,7 @@ const trainingWeek: HomeTrainingWeek = { weekStart: WEEK, everTrained: true, ses
 
 function renderHome(overrides: Partial<HomeDashboardProps> = {}, theme: ThemeMode = 'light') {
   const handlers = {
-    onConfigureNutrition: jest.fn(), onCreateRoutine: jest.fn(), onNavigate: jest.fn(), onNewMeal: jest.fn(), onOpenCompletedSession: jest.fn(),
+    onConfigureNutrition: jest.fn(), onCreateRoutine: jest.fn(), onMealEntry: jest.fn(), onNavigate: jest.fn(), onOpenCompletedSession: jest.fn(),
     onOpenDay: jest.fn(), onOpenProgress: jest.fn(), onOpenSession: jest.fn(), onQuickMeal: jest.fn(), onRefresh: jest.fn(), onRegister: jest.fn(), onStartWorkout: jest.fn(),
   };
   const props: HomeDashboardProps = {
@@ -103,7 +114,7 @@ function renderHome(overrides: Partial<HomeDashboardProps> = {}, theme: ThemeMod
     calories: ready(report),
     day: { today: TODAY, weekStart: WEEK },
     home: ready(home()),
-    progressBody: ready(homeProgressBody()), progressTraining: ready(homeProgressTraining()), progressRecords: ready(homeProgressTraining('30')),
+    progressBody: ready(homeProgressBody()), progressRecords: ready(homeProgressTraining('30')),
     now: () => NOW,
     quick: ready(quickOptions),
     today: ready(todayDay()),
@@ -115,78 +126,67 @@ function renderHome(overrides: Partial<HomeDashboardProps> = {}, theme: ThemeMod
 }
 
 describe('Home header', () => {
-  it('shows only the date and opens Profile/Settings from the avatar and the isotype', () => {
+  it('large title "Hoy" under the uppercase date; the 36 pt photo opens Profile/Settings; no isotype', () => {
     const view = renderHome();
     expect(view.getByText('SÁBADO 10 DE OCTUBRE')).toBeTruthy();
-    expect(view.queryByText(/Hola/)).toBeNull();
-    fireEvent.press(view.getByRole('button', { name: 'Abrir perfil' }));
-    fireEvent.press(view.getByRole('button', { name: 'Abrir ajustes' }));
-    expect(view.onNavigate.mock.calls).toEqual([['settings'], ['settings']]);
+    expect(view.getByRole('header', { name: 'Hoy' })).toBeTruthy();
+    expect(view.queryByTestId('home-isotype')).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Abrir perfil y ajustes' }));
+    expect(view.onNavigate).toHaveBeenCalledWith('settings');
   });
 
   it('uses the Google photo when there is one, the initial when it fails', () => {
     const view = renderHome({ avatarUrl: 'https://lh3.googleusercontent.com/a/photo' });
     const photo = view.getByTestId('home-avatar-photo', { includeHiddenElements: true });
     expect(photo.props.source).toEqual({ uri: 'https://lh3.googleusercontent.com/a/photo' });
+    expect(StyleSheet.flatten(photo.props.style)).toMatchObject({ height: 36, width: 36 });
     fireEvent(photo, 'error');
     const avatar = view.getByTestId('home-avatar', { includeHiddenElements: true });
     expect(within(avatar).getByText('N', { includeHiddenElements: true })).toBeTruthy();
   });
-
-  it.each([['light', require('../../assets/brand/logo/isotipo-claro.png')], ['dark', require('../../assets/brand/logo/isotipo-oscuro.png')]] as [ThemeMode, unknown][])(
-    'uses the real isotype for a %s background', (theme, asset) => {
-      const view = renderHome({}, theme);
-      expect(view.UNSAFE_getAllByType(Image).some(image => image.props.source === asset)).toBe(true);
-    });
-
-  it('without a name keeps the date and never inserts a greeting', () => {
-    const data = home();
-    data.profile = { status: 'ok', data: { displayName: null } };
-    const view = renderHome({ home: ready(data) });
-    expect(view.getByText('SÁBADO 10 DE OCTUBRE')).toBeTruthy();
-    expect(view.queryByText(/Hola/)).toBeNull();
-    expect(view.queryByText(/Perfil/)).toBeNull();
-  });
 });
 
-describe('Training card: states by priority', () => {
-  it('active session first: champagne hero with minutes and exercises; Volver opens the session', () => {
+describe('Training card: states by priority, sentence case, capsule actions', () => {
+  it('active session first: hero with the routine, minutes and exercises; Volver opens the session', () => {
     const data = home();
     data.training.activeSession = { status: 'ok', data: { id: 'act', name: 'Push', logDate: TODAY, startedAt: '2026-10-10T21:00:00.000Z',
       exercisesCompleted: 3, totalExercises: 6, completedSets: 9, totalSets: 18, progressPercent: 50 } };
     if (data.training.week.status === 'ok') data.training.week.data.todaySessions = [{ id: 'done', name: 'Pull', startedAt: '2026-10-10T11:00:00.000Z',
       endedAt: '2026-10-10T12:00:00.000Z', durationMilliseconds: 3_600_000, exercisesCompleted: 4, completedSets: 12, status: 'completed' }];
     const view = renderHome({ home: ready(data) });
-    expect(view.getByText('SESIÓN EN CURSO')).toBeTruthy();
-    expect(view.getByText('Push · 23 min')).toBeTruthy();
-    expect(view.getByText('3 de 6 ejercicios')).toBeTruthy();
-    expect(view.queryByText('ENTRENASTE HOY')).toBeNull();
+    expect(view.getByText('Sesión en curso')).toBeTruthy();
+    expect(view.getByText('Push')).toBeTruthy();
+    expect(view.getByText('23 min · 3 de 6 ejercicios')).toBeTruthy();
+    expect(view.queryByText(/[A-ZÁÉÍÓÚ]{4,} [A-ZÁÉÍÓÚ]{2,}/)).toBeNull();
+    expect(view.queryByText('Entrenaste hoy')).toBeNull();
     const hero = StyleSheet.flatten(view.getByTestId('home-hero-active').props.style);
     expect(hero.experimental_backgroundImage).toBe('linear-gradient(150deg, #DCCBA3 0%, #A8935F 100%)');
     fireEvent.press(view.getByRole('button', { name: 'Volver' }));
     expect(view.onOpenSession).toHaveBeenCalledWith('act');
   });
 
-  it('trained today: the last finished session and Ver detalle opens its real detail', () => {
+  it('trained today: every finished routine, each with a Ver detalle capsule; Entrenar otra vez stays quiet', () => {
     const data = home();
     if (data.training.week.status === 'ok') data.training.week.data.todaySessions = [
-      { id: 'early', name: 'Movilidad', startedAt: '2026-10-10T10:00:00.000Z', endedAt: '2026-10-10T10:20:00.000Z', durationMilliseconds: 20 * 60_000, exercisesCompleted: 3, completedSets: 6, status: 'completed' },
       { id: 'late', name: 'Push', startedAt: '2026-10-10T18:00:00.000Z', endedAt: '2026-10-10T18:55:00.000Z', durationMilliseconds: 55 * 60_000, exercisesCompleted: 6, completedSets: 18, status: 'completed' },
+      { id: 'early', name: 'Movilidad', startedAt: '2026-10-10T10:00:00.000Z', endedAt: '2026-10-10T10:20:00.000Z', durationMilliseconds: 20 * 60_000, exercisesCompleted: 3, completedSets: 6, status: 'completed' },
     ];
     const view = renderHome({ home: ready(data) });
-    expect(view.getByText('ENTRENASTE HOY')).toBeTruthy();
-    expect(view.getByText('Push · 55 min')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Ver detalle' }));
-    expect(view.onOpenCompletedSession).toHaveBeenCalledWith('late');
+    expect(view.getByText('Entrenaste hoy')).toBeTruthy();
+    expect(view.getByText('20 min · 6 series')).toBeTruthy();
+    expect(view.getByText('55 min · 18 series')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Push. 55 min · 18 series. Ver detalle' }));
+    fireEvent.press(view.getByRole('button', { name: 'Movilidad. 20 min · 6 series. Ver detalle' }));
+    expect(view.onOpenCompletedSession.mock.calls).toEqual([['late'], ['early']]);
     fireEvent.press(view.getByRole('button', { name: 'Entrenar otra vez' }));
     expect(view.onStartWorkout).toHaveBeenCalledTimes(1);
   });
 
   it('no planned routine exists in the product: free day, Elegir rutina opens the start modal directly', () => {
     const view = renderHome();
-    expect(view.getByText('DÍA LIBRE')).toBeTruthy();
+    expect(view.getByText('Día libre')).toBeTruthy();
     expect(view.getByText('¿Entrenás hoy?')).toBeTruthy();
-    expect(view.queryByText('HOY TOCA')).toBeNull();
+    expect(view.queryByText(/Hoy toca/i)).toBeNull();
     fireEvent.press(view.getByRole('button', { name: 'Elegir rutina' }));
     expect(view.onStartWorkout).toHaveBeenCalledTimes(1);
     expect(view.onNavigate).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe('Training card: states by priority', () => {
     const data = home();
     data.training.workoutStartRoutines = { status: 'ok', data: [] };
     const view = renderHome({ home: ready(data) });
-    expect(view.getByText('PRIMER PASO')).toBeTruthy();
+    expect(view.getByText('Primer paso')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Crear rutina' }));
     fireEvent.press(view.getByRole('button', { name: 'Entrenar libre' }));
     expect(view.onCreateRoutine).toHaveBeenCalledTimes(1);
@@ -216,36 +216,50 @@ describe('Training card: states by priority', () => {
 });
 
 describe('Nutrition', () => {
-  it('ring shows what is left; protein against its target; carbs and fat from today', () => {
+  it('champagne title and "+"; concentric rings with what is left; legend with consumed / target', () => {
     const view = renderHome();
-    expect(view.getByText('1.840 de 2.600 kcal')).toBeTruthy();
-    expect(view.getByLabelText('760 kcal restantes')).toBeTruthy();
-    expect(view.getByLabelText('Proteína: 128 de 160 gramos')).toBeTruthy();
-    expect(view.getByText('210 g')).toBeTruthy();
-    expect(view.getByText('52 g')).toBeTruthy();
+    expect(view.getByRole('header', { name: 'Nutrición' })).toBeTruthy();
+    expect(view.getByTestId('home-add-menu')).toBeTruthy();
+    expect(view.getByLabelText('760 restantes')).toBeTruthy();
+    expect(view.getByText('1.840 / 2.600 kcal')).toBeTruthy();
+    expect(view.getByText('128 / 160 g')).toBeTruthy();
+    expect(view.queryByText('AGREGAR RÁPIDO')).toBeNull();
   });
 
-  it('over the target says so (same color, full ring)', () => {
+  it('calorie split uses 4/4/9 kcal per gram, with grams and the share of each macro', () => {
+    // 128 g protein = 512, 210 g carbs = 840, 52 g fat = 468 → 1.820 kcal.
+    const view = renderHome();
+    const split = within(view.getByTestId('home-calorie-split'));
+    expect(split.getByText('128 g · 28 %')).toBeTruthy();
+    expect(split.getByText('210 g · 46 %')).toBeTruthy();
+    expect(split.getByText('52 g · 26 %')).toBeTruthy();
+    expect(calorieSplit(10, 10, 0)).toEqual({ carbs: 0.5, fat: 0, protein: 0.5 });
+    expect(calorieSplit(0, 0, 0)).toBeNull();
+    expect(calorieSplit(10, null, 5)).toBeNull();
+  });
+
+  it('over the target says so in the center (same color, full ring)', () => {
     const data = home();
     if (data.nutrition.status === 'ok') data.nutrition.data.calories = 2720;
-    expect(renderHome({ home: ready(data) }).getByLabelText('120 kcal sobre el objetivo')).toBeTruthy();
+    expect(renderHome({ home: ready(data) }).getByLabelText('120 de más')).toBeTruthy();
   });
 
-  it('no meals today: dashed ring and "—", never 0 kcal', () => {
+  it('nothing logged today: empty rings with the whole target left, 0 / target and 0 g macros without a split', () => {
     const data = home();
     if (data.nutrition.status === 'ok') Object.assign(data.nutrition.data, { calories: 0, proteinG: 0, mealCount: 0 });
-    const view = renderHome({ home: ready(data) });
-    expect(view.getByText('Todavía no cargaste comidas hoy')).toBeTruthy();
-    expect(view.getByTestId('home-calorie-ring-empty', { includeHiddenElements: true })).toBeTruthy();
-    expect(view.queryByText(/^0 kcal|kcal restantes/)).toBeNull();
-    expect(view.getByText('objetivo 2.600 kcal')).toBeTruthy();
+    const day = todayDay();
+    day.nutrition = { status: 'ok', data: { dayState: 'missing', summary: null, context: null } } as HistoryDay['nutrition'];
+    const view = renderHome({ home: ready(data), today: ready(day) });
+    expect(view.getByLabelText('2.600 restantes')).toBeTruthy();
+    expect(view.getAllByText('0 g')).toHaveLength(3);
+    expect(view.getByLabelText('Sin reparto todavía')).toBeTruthy();
   });
 
   it('without a calorie target: only what was eaten and a link to configure it', () => {
     const data = home();
     if (data.nutrition.status === 'ok') data.nutrition.data.calorieTarget = null;
     const view = renderHome({ home: ready(data) });
-    expect(view.getByLabelText('1.840 kcal consumidas')).toBeTruthy();
+    expect(view.getByLabelText('1.840 consumidas')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: /Configurá tu objetivo/ }));
     expect(view.onConfigureNutrition).toHaveBeenCalledTimes(1);
   });
@@ -256,55 +270,54 @@ describe('Nutrition', () => {
     expect(homeHabituals({ ...quickOptions, suggested: { status: 'unavailable' } }).map(o => o.name)).toEqual(['Avena guardada']);
   });
 
-  it('Nueva comida and a habitual open the existing Nutrition flows (A2)', () => {
+  it('the "+" menu opens the existing flows: manual, food search, a habitual (A2) and the full list', () => {
     const view = renderHome();
-    fireEvent.press(view.getByRole('button', { name: 'Nueva comida' }));
-    fireEvent.press(view.getByRole('button', { name: 'Batido' }));
-    expect(view.onNewMeal).toHaveBeenCalledTimes(1);
+    const menu = within(view.getByTestId('home-add-menu'));
+    fireEvent.press(menu.getByText('Comida manual'));
+    fireEvent.press(menu.getByText('Buscar alimento'));
+    fireEvent.press(menu.getByText('Batido'));
+    fireEvent.press(menu.getByText('Ver todas'));
+    expect(view.onMealEntry.mock.calls).toEqual([['manual'], ['food'], ['quick']]);
     expect(view.onQuickMeal.mock.calls[0][0]).toMatchObject({ name: 'Batido', source: { kind: 'suggestion' } });
   });
 
   it('carbs and fat show "—" when their read fails; the training card does not wait for nutrition', () => {
     const view = renderHome({ today: unavailable() });
     expect(view.getAllByText('—').length).toBeGreaterThanOrEqual(2);
-    expect(view.getByText('DÍA LIBRE')).toBeTruthy();
+    expect(view.getByText('Día libre')).toBeTruthy();
   });
 });
 
-describe('Tu semana', () => {
-  it('trainings with sets and time, no "de N" (no weekly goal exists), no routines or muscles', () => {
+describe('Esta semana', () => {
+  it('grouped list: trainings with value, sets and time and the 7 days; no "de N", routines or muscles', () => {
     const view = renderHome();
     const training = view.getByTestId('home-week-training');
     expect(within(training).getByText('3')).toBeTruthy();
     expect(within(training).getByText('54 series · 2 h 37 min')).toBeTruthy();
     expect(view.queryByText(/ de 4/)).toBeNull();
     expect(view.queryByText(/Pecho|Músculos|Rutinas/)).toBeNull();
-  });
-
-  it('calories per day: reports average and day count, empty bar without data, today dimmer', () => {
-    const view = renderHome();
-    const calories = view.getByTestId('home-week-calories');
-    expect(within(calories).getByText('2.410 prom.')).toBeTruthy();
-    expect(within(calories).getByText('4 de 7 días con datos')).toBeTruthy();
-    expect(view.queryByTestId('home-week-bar-2026-10-07')).toBeNull();
-    expect(StyleSheet.flatten(view.getByTestId(`home-week-bar-${TODAY}`).props.style).opacity).toBe(0.55);
-    expect(StyleSheet.flatten(view.getByTestId('home-week-bar-2026-10-05').props.style).opacity).toBe(1);
-  });
-
-  it('7-day strip marks trained days without sets or minutes; today is identified and each past day opens history', () => {
-    const view = renderHome();
-    expect(view.getByLabelText('Martes: entrenaste')).toBeTruthy();
-    expect(within(view.getByTestId('home-week-strip')).queryByText(/ser\.|min/)).toBeNull();
-    expect(view.getByLabelText('Miércoles: sin entrenamiento')).toBeTruthy();
-    expect(view.getByLabelText('Sábado, hoy: sin entrenamiento')).toBeTruthy();
-    expect(view.getByText('Hoy')).toBeTruthy();
-    fireEvent.press(view.getByTestId('home-week-day-2026-10-06'));
-    expect(view.onOpenDay).toHaveBeenCalledWith('2026-10-06');
-    fireEvent.press(view.getByRole('button', { name: 'Ver progreso' }));
+    fireEvent.press(view.getByRole('button', { name: 'Progreso' }));
     expect(view.onNavigate).toHaveBeenCalledWith('progress');
   });
 
-  it('each part keeps its own unavailable state', () => {
+  it('calories per day: the reports average and "k de 7 días con datos"', () => {
+    const calories = within(renderHome().getByTestId('home-week-calories'));
+    expect(calories.getByText('2.410')).toBeTruthy();
+    expect(calories.getByText('Promedio · 4 de 7 días con datos')).toBeTruthy();
+  });
+
+  it('days: filled when trained; only today is marked differently; each past day opens history', () => {
+    const view = renderHome();
+    expect(view.getByLabelText('Lunes: entrenaste')).toBeTruthy();
+    expect(view.getByLabelText('Miércoles: sin entrenamiento')).toBeTruthy();
+    expect(view.getByLabelText('Sábado, hoy: sin entrenamiento')).toBeTruthy();
+    expect(view.getByTestId('home-week-today').props.children).toBe('S');
+    fireEvent.press(view.getByTestId('home-week-day-2026-10-06'));
+    expect(view.onOpenDay).toHaveBeenCalledWith('2026-10-06');
+    expect(view.queryByTestId('home-week-day-2026-10-11')).toBeNull();
+  });
+
+  it('each row keeps its own unavailable state', () => {
     const view = renderHome({ calories: unavailable(), training: unavailable() });
     expect(view.getByText('No pudimos cargar las calorías de la semana.')).toBeTruthy();
     expect(view.getByText('No pudimos cargar el detalle por día.')).toBeTruthy();
@@ -315,37 +328,40 @@ describe('Tu semana', () => {
     const view = renderHome({ training: ready({ weekStart: WEEK, everTrained: false, sessions: [] }) });
     expect(view.getByText('EJEMPLO')).toBeTruthy();
     expect(view.getByText('Con tu primer entrenamiento, esto pasa a ser tuyo.')).toBeTruthy();
-    expect(view.queryByTestId('home-week-strip')).toBeNull();
+    expect(view.queryByTestId('home-week-calories')).toBeNull();
   });
 });
 
 describe('Registrar', () => {
-  it('the first two active metrics + Más métricas + pending Peso, with checks on today\'s metrics', () => {
+  it('four circles: Peso, the first two active metrics and Más, with today\'s state and a check on what is logged', () => {
     const view = renderHome();
     const register = view.getByTestId('home-register');
-    expect(within(register).getAllByRole('button').map(button => button.props.accessibilityLabel)).toEqual(['Sueño', 'Energía', 'Más métricas', 'Peso']);
-    expect(within(register).getByRole('button', { name: 'Sueño' }).props.accessibilityState).toEqual({ checked: true });
-    expect(within(register).getByRole('button', { name: 'Energía' }).props.accessibilityState).toEqual({ checked: false });
-    expect(within(register).getByRole('button', { name: 'Peso' }).props.accessibilityState).toEqual({ checked: false });
-    fireEvent.press(within(register).getByRole('button', { name: 'Peso' }));
-    fireEvent.press(within(register).getByRole('button', { name: 'Sueño' }));
-    fireEvent.press(within(register).getByRole('button', { name: 'Más métricas' }));
+    expect(within(register).getAllByRole('button').map(button => button.props.accessibilityLabel))
+      .toEqual(['Peso, Cargar', 'Sueño, 7,5', 'Energía, Cargar', 'Más, Métricas']);
+    expect(within(register).getByRole('button', { name: 'Sueño, 7,5' }).props.accessibilityState).toEqual({ checked: true });
+    expect(within(register).getByRole('button', { name: 'Energía, Cargar' }).props.accessibilityState).toEqual({ checked: false });
+    fireEvent.press(within(register).getByRole('button', { name: 'Peso, Cargar' }));
+    fireEvent.press(within(register).getByRole('button', { name: 'Sueño, 7,5' }));
+    fireEvent.press(within(register).getByRole('button', { name: 'Más, Métricas' }));
     expect(view.onRegister.mock.calls).toEqual([[{ kind: 'weight' }], [{ kind: 'metric', metricId: 'm-sleep' }], [{ kind: 'more' }]]);
   });
 
-  it('a weight registered today is omitted from Registrar', () => {
+  it('a weight logged today is checked; its value only lives in Progreso', () => {
     const day = todayDay();
-    day.body.weight = { status: 'ok', data: { date: TODAY, weightKg: 80 } as never };
-    const view = renderHome({ today: ready(day) });
-    expect(within(view.getByTestId('home-register')).queryByRole('button', { name: 'Peso' })).toBeNull();
+    day.body.weight = { status: 'ok', data: { date: TODAY, weightKg: 80.4 } as never };
+    const weight = within(renderHome({ today: ready(day) }).getByTestId('home-register')).getByTestId('home-register-weight');
+    expect(weight.props.accessibilityLabel).toBe('Peso, Cargado');
+    expect(weight.props.accessibilityState).toEqual({ checked: true });
   });
 
-  it('an unavailable, loading, stale or previous-day read does not invent a pending weight', () => {
+  it('an unavailable, stale, previous-day or failed weight read never claims "Cargar" nor a check', () => {
     const oldDay = todayDay(); oldDay.date = '2026-10-09';
     const failedWeight = todayDay(); failedWeight.body.weight = { status: 'unavailable' };
-    for (const today of [loading<HistoryDay>(), unavailable<HistoryDay>(), unavailable(todayDay()), ready(oldDay), ready(failedWeight)]) {
+    for (const today of [unavailable<HistoryDay>(), unavailable(todayDay()), ready(oldDay), ready(failedWeight)]) {
       const view = renderHome({ today });
-      expect(within(view.getByTestId('home-register')).queryByRole('button', { name: 'Peso' })).toBeNull();
+      const weight = within(view.getByTestId('home-register')).getByTestId('home-register-weight');
+      expect(weight.props.accessibilityLabel).toBe('Peso, —');
+      expect(weight.props.accessibilityState).toEqual({ checked: false });
       view.unmount();
     }
   });
@@ -356,7 +372,6 @@ describe('Screen states', () => {
     const view = renderHome({ home: loading() });
     expect(view.getByTestId('home-nutrition-loading')).toBeTruthy();
     expect(view.getByText('SÁBADO 10 DE OCTUBRE')).toBeTruthy();
-    expect(view.getByTestId('home-week-strip')).toBeTruthy();
     expect(view.getByTestId('home-register')).toBeTruthy();
   });
 
@@ -368,12 +383,16 @@ describe('Screen states', () => {
     expect(view.onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it('progress follows Registrar and has a link to the existing overview', () => {
+  it('progress closes Home and links to the existing overview', () => {
     const view = renderHome();
-    expect(view.queryByText('Accesos rápidos')).toBeNull();
     expect(view.getByTestId('home-progress')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Ver todo' }));
     expect(view.onNavigate).toHaveBeenCalledWith('progress');
+  });
+
+  it('cards have no border', () => {
+    const style = StyleSheet.flatten(renderHome().getByTestId('home-nutrition').props.style);
+    expect(style.borderWidth ?? 0).toBe(0);
   });
 
   it.each(['dark', 'light', 'system'] as const)('renders in %s mode', theme => {

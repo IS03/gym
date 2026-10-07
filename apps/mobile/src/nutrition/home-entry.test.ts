@@ -3,7 +3,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 
 import type { QuickOption, QuickOptions } from '@/api/nutrition-quick';
 
-import { parseQuickEntry, useNutritionHomeEntry } from './home-entry';
+import { parseAddEntry, parseQuickEntry, useNutritionHomeEntry } from './home-entry';
 import type { QuickController, QuickState } from './quick-controller';
 
 const mockSetParams = jest.fn();
@@ -33,6 +33,19 @@ describe('Nutrition entry params from Home', () => {
     expect(parseQuickEntry(`saved:${ID.toUpperCase()}`)).toEqual({ kind: 'saved', id: ID });
     expect(parseQuickEntry('food:x')).toBeNull();
     expect(parseQuickEntry(undefined)).toBeNull();
+    expect(parseQuickEntry('all')).toEqual({ kind: 'all' });
+    expect([parseAddEntry('1'), parseAddEntry('manual'), parseAddEntry('food'), parseAddEntry('x')]).toEqual(['choose', 'manual', 'food', null]);
+  });
+
+  it('add=manual / add=food open that flow directly; quick=all opens the quick list without preselecting', () => {
+    const manual = setup({ add: 'manual' });
+    expect(manual.onAdd).toHaveBeenCalledWith('manual');
+    const food = setup({ add: 'food' });
+    expect(food.onAdd).toHaveBeenCalledWith('food');
+    const all = setup({ quick: 'all' });
+    expect(all.controller.open).toHaveBeenCalledWith('2026-10-10');
+    all.hook.rerender({ editable: true, quick: 'all', state: { ...baseState, open: true, options } });
+    expect(all.controller.choose).not.toHaveBeenCalled();
   });
 
   it('add=1 opens "Agregar" once, only when the screen can edit', () => {
@@ -42,6 +55,7 @@ describe('Nutrition entry params from Home', () => {
     hook.rerender({ add: '1', editable: true, quick: undefined, state: baseState });
     hook.rerender({ add: '1', editable: true, quick: undefined, state: { ...baseState } });
     expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(onAdd).toHaveBeenCalledWith('choose');
     expect(mockSetParams).toHaveBeenCalledWith({ add: undefined });
   });
 
