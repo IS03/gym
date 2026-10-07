@@ -95,13 +95,24 @@ $$;
 reset role;
 insert into auth.oauth_authorizations(id,authorization_id,client_id,user_id,redirect_uri,
   scope,resource,response_type,status)
-values (gen_random_uuid(),'oauth-sql-reauthorize','71000000-0000-4000-8000-000000000002',
-  '71000000-0000-4000-8000-000000000001','http://127.0.0.1:3007/callback',
-  'openid','https://www.ownlevel.fit/mcp','code','pending');
+values
+  (gen_random_uuid(),'oauth-sql-reauthorize','71000000-0000-4000-8000-000000000002',
+    '71000000-0000-4000-8000-000000000001','http://127.0.0.1:3007/callback',
+    'openid email offline_access','https://www.ownlevel.fit/mcp','code','pending'),
+  (gen_random_uuid(),'oauth-sql-disallowed','71000000-0000-4000-8000-000000000002',
+    '71000000-0000-4000-8000-000000000001','http://127.0.0.1:3007/callback',
+    'openid profile','https://www.ownlevel.fit/mcp','code','pending');
 set local role service_role;
 do $$
 declare new_grant uuid;
 begin
+  if public.ownlevel_oauth_authorization_client(
+    'oauth-sql-disallowed',
+    '71000000-0000-4000-8000-000000000001',
+    'https://www.ownlevel.fit/mcp'
+  ) is not null then
+    raise exception 'unexpected OAuth scope accepted';
+  end if;
   new_grant := public.ownlevel_oauth_grant_meals('71000000-0000-4000-8000-000000000001',
     '71000000-0000-4000-8000-000000000002','https://www.ownlevel.fit/mcp','oauth-sql-reauthorize');
   if new_grant='71000000-0000-4000-8000-000000000004' or

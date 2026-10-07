@@ -3,6 +3,18 @@ import { fromSupabaseUrl } from "@supabase/server";
 export const OWNLEVEL_MCP_RESOURCE = "https://www.ownlevel.fit/mcp";
 export const OWNLEVEL_MEAL_PERMISSION = "meals:write";
 export const OWNLEVEL_OAUTH_SCOPES = ["openid"];
+const OWNLEVEL_OAUTH_ALLOWED_AUTHORIZATION_SCOPES = new Set([
+  "openid",
+  "email",
+  "offline_access",
+]);
+
+export function ownlevelOAuthAuthorizationScopeAllowed(scope: unknown) {
+  if (typeof scope !== "string") return false;
+  const scopes = scope.trim().split(/\s+/).filter(Boolean);
+  return scopes.includes("openid")
+    && scopes.every((value) => OWNLEVEL_OAUTH_ALLOWED_AUTHORIZATION_SCOPES.has(value));
+}
 
 export function ownlevelOAuthConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

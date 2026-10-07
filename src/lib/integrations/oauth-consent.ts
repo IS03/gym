@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "../supabase/server";
 import { createAdminClient } from "../supabase/admin";
-import { ownlevelIntegrationOrigin, ownlevelOAuthConfig, ownlevelOAuthEnabled } from "./oauth-config";
+import { ownlevelIntegrationOrigin, ownlevelOAuthAuthorizationScopeAllowed, ownlevelOAuthConfig, ownlevelOAuthEnabled } from "./oauth-config";
 
 export async function oauthConsentContext(authorizationId: string) {
   if (!ownlevelOAuthEnabled() || !/^[A-Za-z0-9_-]{1,255}$/.test(authorizationId)) return null;
@@ -19,7 +19,7 @@ export async function oauthConsentContext(authorizationId: string) {
     p_authorization_id: authorizationId, p_user_id: userId, p_resource: config.resource,
   });
   if (policyError || typeof clientId !== "string") return null;
-  if ("client" in authorization && (authorization.client.id !== clientId || authorization.scope !== "openid")) return null;
+  if ("client" in authorization && (authorization.client.id !== clientId || !ownlevelOAuthAuthorizationScopeAllowed(authorization.scope))) return null;
   return { supabase, admin, authorization, clientId, userId, config };
 }
 
