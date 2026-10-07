@@ -6,6 +6,7 @@ import type {
 import { invalidRequest, parseChatgptMealInput } from "./chatgpt-contract";
 import {
   authenticateChatgptAuthorization,
+  IntegrationPermissionDeniedError,
   type ChatgptAuthDependencies,
 } from "./chatgpt-auth";
 
@@ -59,6 +60,9 @@ export async function handleChatgptMealRequest(
       body: await dependencies.persist(authentication.identity.userId, input),
     };
   } catch (error) {
+    if (error instanceof IntegrationPermissionDeniedError) {
+      return { status: 403, body: { ok: false, error: "permission_denied", message: "El permiso para registrar comidas fue revocado." } };
+    }
     if (error instanceof PossibleDuplicateError) {
       return {
         status: 409,

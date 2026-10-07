@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import {
+  isOAuthPreviewRequestAllowed,
+  oauthPreviewLockdownEnabled,
+} from "@/lib/security/oauth-preview-lockdown";
 
 export const SESSION_PROXY_PATH_PREFIXES = [
   "/home",
@@ -9,6 +13,7 @@ export const SESSION_PROXY_PATH_PREFIXES = [
   "/train",
   "/progress",
   "/calendar",
+  "/oauth/consent",
 ] as const;
 
 export function requiresSessionProxy(pathname: string) {
@@ -25,6 +30,21 @@ export function bypassesSessionProxy(pathname: string) {
 
 export async function proxy(request: NextRequest) {
   if (
+    oauthPreviewLockdownEnabled()
+    && !isOAuthPreviewRequestAllowed(request.nextUrl, request.method)
+  ) {
+    // Deny before session refresh, redirects, render or API execution. Do not
+    // redirect into the product or cache a response across environments.
+    return new NextResponse("Not Found", {
+      status: 404,
+      headers: {
+        "Cache-Control": "private, no-store",
+        "X-OWNLEVEL-Preview-Lockdown": "blocked",
+        "X-Robots-Tag": "noindex, nofollow",
+      },
+    });
+  }
+  if (
     !requiresSessionProxy(request.nextUrl.pathname)
     || bypassesSessionProxy(request.nextUrl.pathname)
   ) {
@@ -35,15 +55,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/",
-    "/login",
-    "/home/:path*",
-    "/today/:path*",
-    "/history/:path*",
-    "/settings/:path*",
-    "/train/:path*",
-    "/progress/:path*",
-    "/calendar/:path*",
-  ],
+  // Must cover APIs and public files too: exclusions would bypass lockdown.
+  // Outside the opt-in preview, requiresSessionProxy preserves existing routing.
+  matcher: ["/:path*"],
 };

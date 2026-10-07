@@ -2,6 +2,8 @@ import type { ChatgptMealError } from "./chatgpt-contract";
 import { parseBearerToken } from "./chatgpt-contract";
 import type { IntegrationAuthEvent } from "./chatgpt-tokens";
 
+export class IntegrationPermissionDeniedError extends Error {}
+
 export type IntegrationIdentity = {
   userId: string;
   tokenId?: string;

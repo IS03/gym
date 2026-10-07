@@ -21,4 +21,17 @@ describe("Google OAuth de OWNLEVEL", () => {
     );
     expect(PUBLIC_AUTH_ERROR_MESSAGE).not.toMatch(/supabase|\.env|anon key/i);
   });
+
+  it("preserva el destino del consentimiento tras iniciar sesión con Google", () => {
+    const next = "/oauth/consent?authorization_id=synthetic";
+    expect(googleOAuthRequest("https://www.ownlevel.fit", next).options.redirectTo)
+      .toBe(`https://www.ownlevel.fit/auth/callback?next=${encodeURIComponent(next)}`);
+  });
+
+  it("nunca pasa un destino externo al callback", () => {
+    for (const next of ["https://foreign.invalid", "//foreign.invalid", "/\\foreign.invalid"]) {
+      expect(googleOAuthRequest("https://www.ownlevel.fit", next).options.redirectTo)
+        .toBe("https://www.ownlevel.fit/auth/callback");
+    }
+  });
 });

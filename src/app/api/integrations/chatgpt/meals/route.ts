@@ -12,6 +12,10 @@ import {
   readJsonRequestBody,
   RequestBodyTooLargeError,
 } from "@/lib/security/request-body";
+import { parseBearerToken } from "@/lib/integrations/chatgpt-contract";
+import { oauthDenied, withOwnlevelOAuth } from "@/lib/integrations/oauth-auth";
+import { ownlevelOAuthConfig } from "@/lib/integrations/oauth-config";
+import { persistOAuthMeal } from "@/lib/integrations/oauth-meals";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +57,23 @@ export async function POST(request: NextRequest) {
       { ok: false, error: "invalid_request", message: "El body debe ser JSON válido." },
       { status: 400 },
     );
+  }
+
+  const rawToken = parseBearerToken(request.headers.get("authorization"));
+  if (rawToken && !rawToken.startsWith("ownlevel_")) {
+    // Body is already bounded before @supabase/server buffers it. The same
+    // protected OWNLEVEL resource owns both /mcp and this private API.
+    const bounded = new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify(body) });
+    return withOwnlevelOAuth(bounded, async (verified, identity, ctx) => {
+      const result = await handleChatgptMealRequest({
+        authorization: verified.headers.get("authorization"), contentLength: String(byteLength), body,
+      }, {
+        authenticate: async () => identity,
+        persist: (_userId, meal) => persistOAuthMeal(ctx.supabaseAdmin, identity, meal),
+      });
+      if (result.status === 403) return oauthDenied(ownlevelOAuthConfig());
+      return NextResponse.json(result.body, { status: result.status });
+    });
   }
 
   const result = await handleChatgptMealRequest(

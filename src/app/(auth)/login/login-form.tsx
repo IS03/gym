@@ -13,6 +13,7 @@ import {
 
 type LoginFormProps = {
   authError?: boolean;
+  next?: string;
 };
 
 function GoogleMark() {
@@ -26,7 +27,7 @@ function GoogleMark() {
   );
 }
 
-export function LoginForm({ authError }: LoginFormProps) {
+export function LoginForm({ authError, next }: LoginFormProps) {
   const [error, setError] = useState<string | null>(
     authError ? PUBLIC_AUTH_ERROR_MESSAGE : null,
   );
@@ -39,7 +40,7 @@ export function LoginForm({ authError }: LoginFormProps) {
     try {
       const supabase = createClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth(
-        googleOAuthRequest(window.location.origin),
+        googleOAuthRequest(window.location.origin, next),
       );
 
       if (oauthError) {

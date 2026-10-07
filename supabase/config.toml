@@ -1,0 +1,44 @@
+# Isolated local test stack. Never link this checkout to production for tests.
+project_id = "ownlevel-oauth-mcp"
+
+[api]
+enabled = true
+port = 55421
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 55422
+shadow_port = 55420
+major_version = 17
+
+[db.seed]
+enabled = false
+
+# Historical 0001.sql is not recognized by the CLI migration-name parser.
+# scripts/testing/oauth-db-bootstrap.mjs applies it and all migrations explicitly.
+[db.migrations]
+enabled = false
+
+[studio]
+enabled = false
+port = 55423
+
+[local_smtp]
+enabled = false
+port = 55424
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3007"
+additional_redirect_urls = ["http://127.0.0.1:3007/auth/callback"]
+jwt_issuer = "http://127.0.0.1:55421/auth/v1"
+
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = false
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/ownlevel_integrations/custom_access_token_hook"

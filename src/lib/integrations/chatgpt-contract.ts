@@ -44,6 +44,7 @@ export type ChatgptMealSuccess = {
 };
 
 export type ChatgptMealErrorCode =
+  | "permission_denied"
   | "invalid_request"
   | "invalid_token"
   | "possible_duplicate"
@@ -56,7 +57,7 @@ export type ChatgptMealError = {
 };
 
 export type ChatgptMealHttpResult = {
-  status: 200 | 400 | 401 | 409 | 413 | 500;
+  status: 200 | 400 | 401 | 403 | 409 | 413 | 500;
   body: ChatgptMealSuccess | ChatgptMealError;
 };
 
