@@ -26,6 +26,7 @@ import { useFoodController } from './use-food-controller';
 import { FoodEditor } from './food-editor';
 import { foodQuickOption } from '@/api/nutrition-food';
 import { QuickEditor } from './quick-editor';
+import { useNutritionHomeEntry } from './home-entry';
 
 function NutritionDayView({ date, today, onSelect, onToday, onServerToday, onAdd, addChoices, onManageFoods, onManageSaved, onConfigure, onReport, onEdit, onActivity, onContext }: {
   date: string; today: string; onSelect: (date: string) => void; onToday: () => void; onServerToday: (date: string) => void;
@@ -86,7 +87,8 @@ export function NutritionDayScreen() {
   return <NutritionUserDayScreen key={session?.user.id ?? 'anonymous'} userId={session?.user.id ?? 'anonymous'} />;
 }
 function NutritionUserDayScreen({ userId }: { userId: string }) {
-  const routeDate = selectedRouteDate(useLocalSearchParams());
+  const params = useLocalSearchParams();
+  const routeDate = selectedRouteDate(params);
   const { client } = useMobileApi();
   const [revision, setRevision] = useState(0);
   const invalidate = useCallback(() => setRevision(v => v + 1), []);
@@ -113,6 +115,9 @@ function NutritionUserDayScreen({ userId }: { userId: string }) {
   const date = selected ?? today;
   const editable = meals?.state.phase === 'idle' && !meals.state.intent && writes?.state.phase === 'idle' && !writes.state.intent
     && quick?.state.phase === 'idle' && !quick.state.intent && foods?.state.phase === 'idle' && !foods.state.intent && saved?.state.phase==='idle' && !saved.state.intent && config?.state.phase==='idle' && !config.state.intent;
+  const showToday = useCallback(() => { updateToday(); setSelected(null); }, [setSelected, updateToday]);
+  const openAdd = useCallback(() => setAdding(true), []);
+  useNutritionHomeEntry({ add: params.add, editable: !!editable, onAdd: openAdd, onShowToday: showToday, quick, quickParam: params.quick, today });
   return <>
     <NutritionDayView key={`${userId}:${date}:${revision}`} date={date} today={today}
       onSelect={setSelected} onToday={() => { updateToday(); setSelected(null); }} onServerToday={setToday}
