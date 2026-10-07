@@ -7,7 +7,8 @@ afterEach(() => vi.unstubAllEnvs());
 function config() {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://synthetic.supabase.co");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "synthetic-public");
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "synthetic-secret");
+  vi.stubEnv("SUPABASE_SECRET_KEY", undefined);
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_synthetic");
   vi.stubEnv("OWNLEVEL_OAUTH_ENABLED", "true");
 }
 describe("OWNLEVEL MCP forwarding contract", () => {

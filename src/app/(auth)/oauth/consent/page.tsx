@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { oauthConsentContext } from "@/lib/integrations/oauth-consent";
 import { ownlevelOAuthEnabled } from "@/lib/integrations/oauth-config";
+import OAuthConsentError from "./error";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export default async function OAuthConsentPage({ searchParams }: {
   searchParams: Promise<{ authorization_id?: string; error?: string }>
 }) {
   const { authorization_id: id, error } = await searchParams;
-  if (!ownlevelOAuthEnabled() || !id || !/^[A-Za-z0-9_-]{1,255}$/.test(id)) {
+  if (!ownlevelOAuthEnabled() || typeof id !== "string" || !/^[A-Za-z0-9_-]{1,255}$/.test(id)) {
     return <p role="alert">La solicitud de conexión no está disponible.</p>;
   }
   const supabase = await createClient();
@@ -19,7 +20,11 @@ export default async function OAuthConsentPage({ searchParams }: {
     const next = `/oauth/consent?authorization_id=${encodeURIComponent(id)}`;
     redirect(`/login?next=${encodeURIComponent(next)}`);
   }
-  const context = await oauthConsentContext(id);
+  let context: Awaited<ReturnType<typeof oauthConsentContext>>;
+  try { context = await oauthConsentContext(id); } catch {
+    console.error("[oauth-consent] context unavailable", { stage: "context" });
+    return <OAuthConsentError />;
+  }
   if (!context) return <p role="alert">La solicitud venció o el cliente no está autorizado. Volvé a conectar desde ChatGPT.</p>;
   return <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 py-8">
     <p className="text-sm font-semibold tracking-widest">OWNLEVEL</p>

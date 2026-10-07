@@ -1,4 +1,5 @@
 import { fromSupabaseUrl } from "@supabase/server";
+import { supabaseOAuthServerCredential } from "./oauth-credentials";
 
 export const OWNLEVEL_MCP_RESOURCE = "https://www.ownlevel.fit/mcp";
 export const OWNLEVEL_MEAL_PERMISSION = "meals:write";
@@ -19,7 +20,7 @@ export function ownlevelOAuthAuthorizationScopeAllowed(scope: unknown) {
 export function ownlevelOAuthConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishable = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const secret = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = supabaseOAuthServerCredential();
   const resource = process.env.OWNLEVEL_MCP_RESOURCE ?? OWNLEVEL_MCP_RESOURCE;
   if (!url || !publishable || !secret) throw new Error("OAuth configuration unavailable");
   const resourceUrl = new URL(resource);

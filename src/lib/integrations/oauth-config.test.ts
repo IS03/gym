@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { vi } from "vitest";
+vi.mock("server-only", () => ({}));
 import { ownlevelOAuthAuthorizationScopeAllowed } from "./oauth-config";
 
 describe("OWNLEVEL OAuth authorization scopes", () => {

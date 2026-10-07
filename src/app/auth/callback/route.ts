@@ -10,9 +10,17 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = safeAuthRedirectPath(searchParams.get("next"));
+  const failedLogin = () => {
+    const destination = new URL("/login", origin);
+    destination.searchParams.set("error", "auth");
+    if (next !== "/home") destination.searchParams.set("next", next);
+    const response = NextResponse.redirect(destination);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  };
 
   if (!url || !anonKey || !code) {
-    return NextResponse.redirect(`${origin}/login?error=auth`);
+    return failedLogin();
   }
 
   const cookieStore = await cookies();
@@ -33,11 +41,18 @@ export async function GET(request: Request) {
     },
   });
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-  if (error) {
-    return NextResponse.redirect(`${origin}/login?error=auth`);
+  let error: unknown;
+  try {
+    ({ error } = await supabase.auth.exchangeCodeForSession(code));
+  } catch {
+    return failedLogin();
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  if (error) {
+    return failedLogin();
+  }
+
+  const response = NextResponse.redirect(`${origin}${next}`);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }

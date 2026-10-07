@@ -6,7 +6,11 @@ import { ownlevelOAuthAdminRpc } from "@/lib/integrations/oauth-admin";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (!ownlevelOAuthEnabled()) return new Response("Integration disabled", { status: 503 });
-  if (!sameOriginOAuthDecision(request)) return new Response("Forbidden", { status: 403 });
+  try {
+    if (!sameOriginOAuthDecision(request)) return new Response("Forbidden", { status: 403 });
+  } catch {
+    return new Response("Authorization temporarily unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
   if (Number(request.headers.get("content-length")) > 4096) return new Response(null, { status: 413 });
   // Read through a bounded stream; do not trust Content-Length alone.
   const reader = request.body?.getReader();
@@ -29,7 +33,10 @@ export async function POST(request: Request) {
   const id = form.get("authorization_id") ?? "";
   const decision = form.get("decision");
   if (decision !== "approve" && decision !== "deny") return new Response(null, { status: 400 });
-  const context = await oauthConsentContext(id);
+  let context: Awaited<ReturnType<typeof oauthConsentContext>>;
+  try { context = await oauthConsentContext(id); } catch {
+    return NextResponse.redirect(new URL(`/oauth/consent?authorization_id=${encodeURIComponent(id)}&error=unavailable`, request.url), 303);
+  }
   if (!context) return new Response("Authorization unavailable", { status: 403 });
   const { supabase, authorization, userId, clientId, config } = context;
   if (decision === "approve") {

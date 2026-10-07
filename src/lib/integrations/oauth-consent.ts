@@ -39,6 +39,7 @@ export async function oauthConsentContext(authorizationId: string) {
       errorCode: (policyError as { code?: string } | null)?.code ?? null,
       returnedClient: typeof clientId,
     });
+    if (policyError) throw new Error("OAuth policy temporarily unavailable");
     return null;
   }
   if ("client" in authorization) {
