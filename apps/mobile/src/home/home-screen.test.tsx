@@ -100,7 +100,8 @@ const historyDay = {
 const quick = { today: '2026-10-10', saved: { status: 'ok', items: [] }, suggested: { status: 'ok', items: [{
   source: { kind: 'suggestion', id: '00000000-0000-4000-8000-000000000001', version: 'a'.repeat(64) }, name: 'Batido', description: null,
   templateType: null, items: [], calories: 200, proteinG: 30, carbsG: 10, fatG: 2, useCount: 5, lastUsedDate: '2026-10-09' }] } };
-const report = { summary: { metrics: { calories: { value: null, denominator: 0, partialDays: 0 } } }, days: [] };
+const report = { today: '2026-10-10', range: { start: '2026-10-05', end: '2026-10-10' },
+  summary: { metrics: Object.fromEntries(['calories', 'protein', 'carbs', 'fat'].map(key => [key, { value: null, denominator: 0, partialDays: 0 }])) }, days: [] };
 
 let clock = SATURDAY_NIGHT.getTime();
 const now = () => new Date(clock);
@@ -216,6 +217,7 @@ describe('Home screen', () => {
     const view = await renderScreen();
     fireEvent.press(view.getByRole('button', { name: 'Push. 55 min · 18 series' }));
     fireEvent.press(view.getByTestId('home-week-day-2026-10-06'));
+    fireEvent.press(view.getByTestId('home-week-page-1'));
     fireEvent.press(view.getByTestId('home-week-calories'));
     expect(mockPush.mock.calls).toEqual([
       [{ pathname: '/(tabs)/train/history/[id]', params: { id: 'done-1' } }],

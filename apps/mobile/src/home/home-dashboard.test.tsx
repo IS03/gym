@@ -15,6 +15,9 @@ import type { HomeResource } from './home-resource';
 import { homeProgressBody, homeProgressTraining } from './home-test-fixtures';
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@/design-system', () => ({ ...jest.requireActual<object>('@/design-system'), useReduceMotion: () => true }));
+// Real glass availability/preferences are covered separately, including accessibility fallback.
+jest.mock('expo-glass-effect', () => ({ isGlassEffectAPIAvailable: () => false, isLiquidGlassAvailable: () => false }));
 // The native "+" menu has its own test; here a stub exposes its entries as buttons.
 jest.mock('./home-add-menu', () => {
   const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -90,7 +93,9 @@ const calorieRow = (date: string, value: number | null, isToday = false) => ({
   targetCalories: 2600, targetProteinG: null, expenditureKcal: null, targetDeviationKcal: null, energyBalanceKcal: null, goalStage: null,
 });
 const report = {
-  summary: { metrics: { calories: { value: 2410, denominator: 4, partialDays: 0 } } },
+  today: TODAY, range: { start: WEEK, end: TODAY },
+  summary: { metrics: { calories: { value: 2410, denominator: 4, partialDays: 0 },
+    protein: { value: 140, denominator: 3, partialDays: 1 }, carbs: { value: 0, denominator: 2, partialDays: 0 }, fat: { value: null, denominator: 0, partialDays: 0 } } },
   days: [calorieRow('2026-10-05', 2500), calorieRow('2026-10-06', 2300), calorieRow('2026-10-07', null), calorieRow('2026-10-08', 2400),
     calorieRow('2026-10-09', 2440), calorieRow(TODAY, 1840, true)],
 } as unknown as NutritionReport;
@@ -186,7 +191,7 @@ describe('Today\'s training: states by priority, no gradients', () => {
     const view = renderHome();
     expect(view.queryByText(/Hoy te toca|Día libre/i)).toBeNull();
     const button = view.getByRole('button', { name: 'Arrancar rutina' });
-    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ backgroundColor: '#7D6A3C', height: 50 });
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ backgroundColor: '#7D6A3C', minHeight: 50, borderRadius: 999 });
     fireEvent.press(button);
     expect(view.onStartWorkout).toHaveBeenCalledTimes(1);
     expect(view.onNavigate).not.toHaveBeenCalled();
@@ -214,9 +219,9 @@ describe('Nutrition', () => {
     expect(view.getByRole('header', { name: 'Nutrición' })).toBeTruthy();
     expect(view.getByTestId('home-add-menu')).toBeTruthy();
     expect(view.getByLabelText('Calorías consumidas: 1.840 de 2.600 kcal, 760 restantes')).toBeTruthy();
-    expect(within(view.getByTestId('home-calories-left')).getByText('760')).toBeTruthy();
+    expect(view.queryByTestId('home-calories-left')).toBeNull();
     expect(view.getByText('128 / 160 g')).toBeTruthy();
-    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar').props.style)).toMatchObject({ height: 8, backgroundColor: '#CFC8B6' });
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar').props.style)).toMatchObject({ height: 8, backgroundColor: '#EAE7DF' });
     expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style)).toMatchObject({ backgroundColor: '#7D6A3C' });
     expect(StyleSheet.flatten(view.getByTestId('home-protein-bar').props.style)).toMatchObject({ height: 5 });
     expect(view.queryByTestId('home-calorie-ring')).toBeNull();
@@ -283,6 +288,45 @@ describe('Nutrition', () => {
     expect(within(view.getByTestId('home-calorie-split')).getAllByText('—')).toHaveLength(2);
     expect(view.getByRole('button', { name: 'Arrancar rutina' })).toBeTruthy();
   });
+
+  it('touching either goal changes both together, without changing consumed bars or macros', () => {
+    const view = renderHome();
+    fireEvent.press(view.getByTestId('home-calories'));
+    expect(view.getByLabelText('Calorías restantes: 760 kcal, objetivo 2.600')).toBeTruthy();
+    expect(view.getByLabelText('Proteína restante: 32 de 160 g')).toBeTruthy();
+    const bar = StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style);
+    expect(bar.width).toBe(`${1840 / 2600 * 100}%`);
+    expect(within(view.getByTestId('home-calorie-split')).getByText('128 g · 28 %')).toBeTruthy();
+    fireEvent.press(view.getByTestId('home-protein'));
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style)).toEqual(bar);
+    expect(view.getByText('Calorías consumidas')).toBeTruthy();
+    expect(view.getByLabelText('Proteína: 128 de 160 g')).toBeTruthy();
+  });
+
+  it('remaining mode distinguishes exceeding a goal from zero remaining, without judgment colors', () => {
+    const data = home();
+    if (data.nutrition.status === 'ok') Object.assign(data.nutrition.data, { calories: 2720, proteinG: 174 });
+    const view = renderHome({ home: ready(data) });
+    fireEvent.press(view.getByTestId('home-protein'));
+    expect(view.getByLabelText('Calorías por encima del objetivo: 120 kcal, objetivo 2.600')).toBeTruthy();
+    expect(view.getByLabelText('Proteína por encima: 14 de 160 g')).toBeTruthy();
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style).backgroundColor).toBe('#7D6A3C');
+  });
+
+  it('a missing goal never manufactures remaining values; no goals disables toggling', () => {
+    const data = home();
+    if (data.nutrition.status === 'ok') data.nutrition.data.calorieTarget = null;
+    const view = renderHome({ home: ready(data) });
+    fireEvent.press(view.getByTestId('home-protein'));
+    expect(view.getByLabelText('Calorías consumidas: 1.840 kcal')).toBeTruthy();
+    expect(view.getByLabelText('Proteína restante: 32 de 160 g')).toBeTruthy();
+    view.unmount();
+    if (data.nutrition.status === 'ok') data.nutrition.data.proteinTargetG = null;
+    const noGoals = renderHome({ home: ready(data) });
+    expect(noGoals.getByTestId('home-calories')).toBeDisabled();
+    expect(noGoals.getByTestId('home-protein')).toBeDisabled();
+    expect(noGoals.getByLabelText('Proteína: 128 g')).toBeTruthy();
+  });
 });
 
 describe('Esta semana', () => {
@@ -297,6 +341,8 @@ describe('Esta semana', () => {
 
   it('calories per day: the reports average, "k de 7 días con datos", and the row opens this week\'s report', () => {
     const view = renderHome();
+    expect(view.queryByTestId('home-week-calories')).toBeNull();
+    fireEvent.press(view.getByTestId('home-week-page-1'));
     const calories = within(view.getByTestId('home-week-calories'));
     expect(calories.getByText('2.410')).toBeTruthy();
     expect(calories.getByText('Promedio · 4 de 7 días con datos')).toBeTruthy();
@@ -304,7 +350,7 @@ describe('Esta semana', () => {
     expect(view.onOpenCalories).toHaveBeenCalledTimes(1);
   });
 
-  it('7 equal capsules: accent when trained (2 sessions = 1 capsule), track otherwise; today\'s letter only in text color', () => {
+  it('7 equal capsules: accent when trained (2 sessions = 1 capsule), track otherwise; today\'s letter in accent', () => {
     const view = renderHome();
     expect(view.getByLabelText('Lunes, entrenaste')).toBeTruthy();
     expect(view.getByLabelText('Martes, entrenaste')).toBeTruthy();
@@ -318,7 +364,7 @@ describe('Esta semana', () => {
     }
     const today = view.getByTestId('home-week-today');
     expect(today.props.children).toBe('S');
-    expect(StyleSheet.flatten(today.props.style)).toMatchObject({ color: '#18181B', fontWeight: '600', fontSize: 13 });
+    expect(StyleSheet.flatten(today.props.style)).toMatchObject({ color: '#7D6A3C', fontWeight: '600', fontSize: 13 });
     fireEvent.press(view.getByTestId('home-week-day-2026-10-06'));
     expect(view.onOpenDay).toHaveBeenCalledWith('2026-10-06');
     fireEvent.press(view.getByTestId('home-week-day-2026-10-11'));
@@ -335,9 +381,12 @@ describe('Esta semana', () => {
 
   it('each part keeps its own unavailable state', () => {
     const view = renderHome({ calories: unavailable(), training: unavailable() });
-    expect(view.getByText('No pudimos cargar las calorías de la semana.')).toBeTruthy();
     expect(view.getByText('No pudimos cargar el detalle por día.')).toBeTruthy();
     expect(view.getByLabelText('3 entrenos esta semana, 54 series · 2 h 37 min')).toBeTruthy();
+    fireEvent.press(view.getByTestId('home-week-page-1'));
+    expect(view.getByText('No pudimos cargar Nutrición de esta semana.')).toBeTruthy();
+    fireEvent.press(view.getByTestId('home-week-page-2'));
+    expect(view.getByText('No pudimos cargar el detalle por día.')).toBeTruthy();
   });
 
   it('a user who never trained sees a greyed EJEMPLO week', () => {
@@ -346,15 +395,51 @@ describe('Esta semana', () => {
     expect(view.getByText('Con tu primer entrenamiento, esto pasa a ser tuyo.')).toBeTruthy();
     expect(view.queryByTestId('home-week-calories')).toBeNull();
   });
+
+  it('weekly macros retain the server averages and each metric\'s coverage: missing is not zero', () => {
+    const view = renderHome();
+    fireEvent.press(view.getByTestId('home-week-page-1'));
+    expect(view.getByText('Promedios diarios · Días terminados con datos')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-protein')).getByText('140')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-protein')).getByText('Promedio · 3 de 7 días con datos · 1 día parcial')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-carbs')).getByText('0')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-fat')).getByText('—')).toBeTruthy();
+    expect(view.queryByTestId('home-week-summary')).toBeNull();
+  });
+
+  it('daily summary keeps multiple routines, unknown duration and absent/future days distinct', () => {
+    const view = renderHome({ training: ready({ ...trainingWeek, sessions: [...weekSessions, { ...sessionAt('s5', '2026-10-06', 0, null), routineName: 'Sesión libre' }] }) });
+    fireEvent.press(view.getByTestId('home-week-page-2'));
+    expect(view.getByText('Push · 30 min / Push · 28 min / Sesión libre · Duración no disponible')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-detail-2026-10-07')).getByText('Sin entrenamientos registrados')).toBeTruthy();
+    expect(within(view.getByTestId('home-week-detail-2026-10-11')).getByText('Por venir')).toBeTruthy();
+    expect(view.queryByText('Descanso')).toBeNull();
+    fireEvent.press(view.getByTestId('home-week-detail-2026-10-06'));
+    expect(view.onOpenDay).toHaveBeenCalledWith('2026-10-06');
+    expect(view.getByTestId('home-week-detail-2026-10-11').props.accessibilityRole).toBeUndefined();
+  });
+
+  it('cached nutrition is marked; a report from another week is not rendered as this week', () => {
+    const view = renderHome({ calories: unavailable(report) });
+    fireEvent.press(view.getByTestId('home-week-page-1'));
+    expect(view.getByText('Sin actualizar · Última lectura disponible')).toBeTruthy();
+    view.unmount();
+    const stale = renderHome({ calories: ready({ ...report, range: { ...report.range, start: '2026-09-28' } }) });
+    fireEvent.press(stale.getByTestId('home-week-page-1'));
+    expect(stale.getByText('No pudimos cargar Nutrición de esta semana.')).toBeTruthy();
+    expect(stale.queryByTestId('home-week-calories')).toBeNull();
+  });
 });
 
 describe('Métricas', () => {
-  it('only daily metrics: the first two active ones and Más, with today\'s state and a check on what is logged', () => {
+  it('all active metrics, preserving order and today\'s state; Más lives outside the scroll', () => {
     const view = renderHome();
     const register = view.getByTestId('home-register');
     expect(within(register).getByRole('header', { name: 'Métricas' })).toBeTruthy();
     expect(within(register).getAllByRole('button').map(button => button.props.accessibilityLabel))
-      .toEqual(['Sueño, 7,5', 'Energía, Cargar', 'Más, Métricas']);
+      .toEqual(['Sueño, 7,5', 'Energía, Cargar', 'Agua, 2', 'Más, Métricas']);
+    expect(within(view.getByTestId('home-register-scroll')).queryByText('Más')).toBeNull();
+    expect(within(view.getByTestId('home-register-fixed-more')).getByRole('button', { name: 'Más, Métricas' })).toBeTruthy();
     expect(within(register).queryByText('Peso')).toBeNull();
     expect(within(register).getByRole('button', { name: 'Sueño, 7,5' }).props.accessibilityState).toEqual({ checked: true });
     expect(within(register).getByRole('button', { name: 'Energía, Cargar' }).props.accessibilityState).toEqual({ checked: false });
@@ -398,7 +483,7 @@ describe('Screen states', () => {
     expect(view.onNavigate).toHaveBeenCalledWith('progress');
   });
 
-  it('no cards: sections sit on the background inside the gutter; Nutrition is a full-bleed band faded at both edges', () => {
+  it('sections sit on the background, without the old faded Nutrition band', () => {
     const view = renderHome();
     for (const id of ['home-week', 'home-register', 'home-progress']) {
       const style = StyleSheet.flatten(view.getByTestId(id).props.style);
@@ -406,38 +491,28 @@ describe('Screen states', () => {
       expect(style.borderWidth ?? 0).toBe(0);
       expect(style).toMatchObject({ paddingLeft: 16, paddingRight: 16 });
     }
-    // The band's own padding carries the gutter, so its layers reach both screen edges.
     const band = StyleSheet.flatten(view.getByTestId('home-nutrition').props.style);
-    expect(band).toMatchObject({ paddingLeft: 16, paddingRight: 16, paddingBottom: 64 });
+    expect(band).toMatchObject({ paddingLeft: 16, paddingRight: 16, paddingBottom: 0 });
     expect(band.backgroundColor).toBeUndefined();
     expect(band.borderRadius ?? 0).toBe(0);
     expect(band.borderWidth ?? 0).toBe(0);
-    expect(StyleSheet.flatten(view.getByTestId('home-band-fade-top').props.style)).toMatchObject({
-      height: 48, left: 0, right: 0, top: 0,
-      experimental_backgroundImage: 'linear-gradient(to bottom, rgba(228,222,201,0) 0%, rgba(228,222,201,1) 100%)',
-    });
-    expect(StyleSheet.flatten(view.getByTestId('home-band-solid').props.style)).toMatchObject({ backgroundColor: 'rgba(228,222,201,1)', top: 48, bottom: 48 });
-    expect(StyleSheet.flatten(view.getByTestId('home-band-fade-bottom').props.style)).toMatchObject({
-      bottom: 0, height: 48,
-      experimental_backgroundImage: 'linear-gradient(to bottom, rgba(228,222,201,1) 0%, rgba(228,222,201,0) 100%)',
-    });
-    expect(StyleSheet.flatten(view.getByTestId('home-calorie-split').props.style)).toMatchObject({ borderTopColor: '#CFC8B6', paddingTop: 16 });
-    // Inside the light band the secondary grey is darker, for contrast.
-    expect(StyleSheet.flatten(view.getByText('Calorías consumidas').props.style)).toMatchObject({ color: '#5F5D54' });
+    for (const id of ['home-band-fade-top', 'home-band-solid', 'home-band-fade-bottom']) expect(view.queryByTestId(id)).toBeNull();
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-split').props.style)).toMatchObject({ borderTopColor: '#E0DCD0', paddingTop: 16 });
+    expect(StyleSheet.flatten(view.getByText('Calorías consumidas').props.style)).toMatchObject({ color: '#6A6A72' });
   });
 
-  it('dark: the band uses its dark tone, brand tracks and the brand grey', () => {
+  it('dark: no band; brand tracks and secondary grey', () => {
     const view = renderHome({}, 'dark');
-    expect(StyleSheet.flatten(view.getByTestId('home-band-solid').props.style)).toMatchObject({ backgroundColor: 'rgba(31,29,24,1)' });
+    expect(view.queryByTestId('home-band-solid')).toBeNull();
     expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar').props.style)).toMatchObject({ backgroundColor: '#27272A' });
     expect(StyleSheet.flatten(view.getByText('Calorías consumidas').props.style)).toMatchObject({ color: '#9F9FA9' });
   });
 
-  it('0 kcal: the band keeps its layers and empty bars', () => {
+  it('0 kcal: no faded layers; empty bars still render', () => {
     const data = home();
     if (data.nutrition.status === 'ok') Object.assign(data.nutrition.data, { calories: 0, proteinG: 0 });
     const view = renderHome({ home: ready(data) });
-    expect(view.getByTestId('home-band-solid')).toBeTruthy();
+    expect(view.queryByTestId('home-band-solid')).toBeNull();
     expect(view.getByTestId('home-calorie-bar')).toBeTruthy();
     expect(view.queryByTestId('home-calorie-bar-fill')).toBeNull();
   });

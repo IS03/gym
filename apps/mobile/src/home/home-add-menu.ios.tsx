@@ -1,8 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { Button, Host, Menu, Section, Text } from '@expo/ui/swift-ui';
-import { accessibilityLabel, font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
+import { accessibilityLabel, font, foregroundStyle, padding } from '@expo/ui/swift-ui/modifiers';
 
-import { useOwnlevelTheme } from '@/design-system';
+import { radius, useOwnlevelTheme } from '@/design-system';
 
 import type { HomeAddMenuProps } from './home-add-menu.types';
 
@@ -10,9 +10,9 @@ import type { HomeAddMenuProps } from './home-add-menu.types';
 export function HomeAddMenu({ habituals, onAll, onFood, onHabitual, onManual }: HomeAddMenuProps) {
   const { colors, isDark } = useOwnlevelTheme();
   return (
-    <Host colorScheme={isDark ? 'dark' : 'light'} matchContents style={styles.host} testID="home-add-menu">
+    <Host colorScheme={isDark ? 'dark' : 'light'} matchContents style={[styles.host, { backgroundColor: colors.brandSubtle }]} testID="home-add-menu">
       <Menu
-        label={<Text modifiers={[font({ size: 17, weight: 'medium' }), foregroundStyle(colors.primary)]}>+ Comida</Text>}
+        label={<Text modifiers={[font({ textStyle: 'subheadline', weight: 'medium' }), foregroundStyle(colors.primary), padding({ horizontal: 12, vertical: 12 })]}>+ Comida</Text>}
         modifiers={[accessibilityLabel('Agregar comida')]}
       >
         <Button label="Comida manual" onPress={onManual} systemImage="pencil" />
@@ -28,4 +28,4 @@ export function HomeAddMenu({ habituals, onAll, onFood, onHabitual, onManual }: 
   );
 }
 
-const styles = StyleSheet.create({ host: { minHeight: 44 } });
+const styles = StyleSheet.create({ host: { borderRadius: radius.full, minHeight: 44 } });

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import type { MobileHomeResponse } from '@/api/home';
 import type { HistoryDay } from '@/api/history';
 import type { QuickOption, QuickOptions } from '@/api/nutrition-quick';
-import { AppIcon, AppText, InlineUnavailable, SkeletonBlock, atmosphere, brandTokens, fadeGradient, rgba, spacing, useOwnlevelTheme } from '@/design-system';
+import { AppIcon, AppText, InlineUnavailable, SkeletonBlock, spacing, useOwnlevelTheme, useReduceMotion } from '@/design-system';
 
 import { HomeAddMenu } from './home-add-menu';
 import { formatDecimal, formatInteger } from './format';
@@ -72,29 +74,12 @@ export function homeHabituals(options: QuickOptions | undefined, limit = 2): Qui
   return [...suggested, ...saved].slice(0, limit);
 }
 
-type BandColors = { hairline: string; rgb: string; textMuted: string; track: string };
+type BandColors = { hairline: string; textMuted: string; track: string };
 
-/**
- * Nutrition's band: the glow tone, faded at the top and bottom edges. Tracks, hairline and
- * bars are brand colors; the light band only needs a darker secondary grey for contrast.
- */
+/** Nutrition now shares the screen background; all colors come from the theme. */
 function useBandColors(): BandColors {
-  const { colors, isDark } = useOwnlevelTheme();
-  const scheme = atmosphere[isDark ? 'dark' : 'light'];
-  return isDark
-    ? { hairline: colors.border, rgb: scheme.band, textMuted: scheme.bandTextMuted ?? colors.textMuted, track: colors.surfaceRaised }
-    : { hairline: brandTokens.intensity.light[1], rgb: scheme.band, textMuted: scheme.bandTextMuted ?? colors.textMuted, track: brandTokens.intensity.light[1] };
-}
-
-/** Three layers instead of a measured gradient: fade in, solid, fade out. Only the band has alpha. */
-function BandBackground({ rgb }: { rgb: string }) {
-  return (
-    <>
-      <View pointerEvents="none" style={[styles.fadeTop, { experimental_backgroundImage: fadeGradient(rgb, 'in') }]} testID="home-band-fade-top" />
-      <View pointerEvents="none" style={[styles.solid, { backgroundColor: rgba(rgb, 1) }]} testID="home-band-solid" />
-      <View pointerEvents="none" style={[styles.fadeBottom, { experimental_backgroundImage: fadeGradient(rgb, 'out') }]} testID="home-band-fade-bottom" />
-    </>
-  );
+  const { colors } = useOwnlevelTheme();
+  return { hairline: colors.border, textMuted: colors.textMuted, track: colors.surfaceRaised };
 }
 
 export function HomeNutrition({
@@ -111,10 +96,9 @@ export function HomeNutrition({
   const band = useBandColors();
   const gutter = useHomeGutter();
   const nutrition = home.data?.nutrition;
-  // Full-bleed band: edge to edge, no radius, border or shadow; the gutter lives inside.
+  // Transparent section: keep the screen's upper-right glow, without a second backdrop.
   return (
     <View style={[styles.band, gutter]} testID={!nutrition ? 'home-nutrition-loading' : 'home-nutrition'}>
-      <BandBackground rgb={band.rgb} />
       <HomeSectionTitle title="Nutrición">
         <HomeAddMenu habituals={homeHabituals(quick.data)} onAll={() => onMealEntry('quick')} onFood={() => onMealEntry('food')}
           onHabitual={onQuickMeal} onManual={() => onMealEntry('manual')} />
@@ -129,7 +113,7 @@ export function HomeNutrition({
         ) : nutrition.status === 'unavailable' ? (
           <InlineUnavailable message="No pudimos cargar Nutrición." />
         ) : (
-          <NutritionBody band={band} colors={{ primary: colors.primary, protein: colors.textMuted }} n={nutrition.data} onConfigure={onConfigure} today={today} />
+          <NutritionBody key={home.data?.date} band={band} colors={{ primary: colors.primary, protein: colors.textMuted }} n={nutrition.data} onConfigure={onConfigure} today={today} />
         )}
       </View>
     </View>
@@ -141,6 +125,8 @@ type NutritionData = Extract<MobileHomeResponse['nutrition'], { status: 'ok' }>[
 function NutritionBody({ band, colors, n, onConfigure, today }: {
   band: BandColors; colors: { primary: string; protein: string }; n: NutritionData; onConfigure: () => void; today: HomeResource<HistoryDay>;
 }) {
+  const [remaining, setRemaining] = useState(false);
+  const reduceMotion = useReduceMotion();
   const target = n.calorieTarget;
   const over = target !== null && n.calories > target;
   const consumed = formatInteger(n.calories);
@@ -148,21 +134,23 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
   const protein = formatDecimal(Math.round(n.proteinG));
   // Nothing logged yet is 0 for the day so far: an empty bar and the whole target left.
   const left = target === null ? null : { label: over ? 'de más' : 'restantes', value: formatInteger(Math.abs(target - n.calories)) };
+  const calorieLabel = remaining && left ? over ? 'Calorías por encima del objetivo' : 'Calorías restantes' : 'Calorías consumidas';
+  const proteinOver = proteinTarget !== null && n.proteinG > proteinTarget;
+  const proteinLeft = proteinTarget === null ? null : formatDecimal(Math.round(Math.abs(proteinTarget - n.proteinG)));
+  const proteinLabel = remaining && proteinTarget !== null ? proteinOver ? 'Proteína por encima' : 'Proteína restante' : 'Proteína';
+  const canToggle = target !== null || proteinTarget !== null;
+  const toggle = () => setRemaining(value => !value);
+  const hint = remaining ? 'Tocá para ver calorías y proteína consumidas' : 'Tocá para ver calorías y proteína restantes';
   return (
     <View>
-      <View accessible accessibilityLabel={`Calorías consumidas: ${consumed}${target !== null && left ? ` de ${formatInteger(target)} kcal, ${left.value} ${left.label}` : ' kcal'}`}
+      <Pressable accessibilityRole={canToggle ? 'button' : undefined} accessibilityHint={canToggle ? hint : undefined} disabled={!canToggle} onPress={toggle}
+        accessibilityLabel={remaining && left ? `${calorieLabel}: ${left.value} kcal, objetivo ${formatInteger(target!)}` : `Calorías consumidas: ${consumed}${target !== null && left ? ` de ${formatInteger(target)} kcal, ${left.value} ${left.label}` : ' kcal'}`}
         style={styles.calories} testID="home-calories">
-        <View style={styles.flex}>
-          <BigNumber mutedColor={band.textMuted} unit={target !== null ? `/ ${formatInteger(target)} kcal` : 'kcal'} value={consumed} />
-          <AppText style={{ color: band.textMuted }} variant="subheadline">Calorías consumidas</AppText>
-        </View>
-        {left ? (
-          <View style={styles.left} testID="home-calories-left">
-            <AppText numeric style={{ color: band.textMuted }} variant="subheadline">{left.value}</AppText>
-            <AppText style={{ color: band.textMuted }} variant="subheadline">{left.label}</AppText>
-          </View>
-        ) : null}
-      </View>
+        <Animated.View key={remaining ? 'remaining' : 'consumed'} entering={FadeIn.duration(reduceMotion ? 100 : 200)} style={styles.flex}>
+          <BigNumber mutedColor={band.textMuted} unit={target !== null ? `/ ${formatInteger(target)} kcal` : 'kcal'} value={remaining && left ? left.value : consumed} />
+          <AppText style={{ color: band.textMuted }} variant="subheadline">{calorieLabel}</AppText>
+        </Animated.View>
+      </Pressable>
       <View style={styles.caloriesBar}>
         {target !== null ? (
           <HomeBar color={colors.primary} fraction={target > 0 ? n.calories / target : 1} height={8} testID="home-calorie-bar" track={band.track} />
@@ -174,10 +162,13 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
         )}
       </View>
       <View style={styles.protein}>
-        <View accessible accessibilityLabel={`Proteína: ${protein}${proteinTarget !== null ? ` de ${formatDecimal(proteinTarget)} g` : ' g'}`} style={styles.proteinRow}>
-          <AppText variant="body">Proteína</AppText>
-          <AppText numeric variant="headline">{proteinTarget !== null ? `${protein} / ${formatDecimal(proteinTarget)} g` : `${protein} g`}</AppText>
-        </View>
+        <Pressable accessibilityRole={canToggle ? 'button' : undefined} accessibilityHint={canToggle ? hint : undefined} disabled={!canToggle} onPress={toggle}
+          accessibilityLabel={`${proteinLabel}: ${remaining && proteinLeft !== null ? proteinLeft : protein}${proteinTarget !== null ? ` de ${formatDecimal(proteinTarget)} g` : ' g'}`} testID="home-protein">
+          <Animated.View key={remaining ? 'remaining' : 'consumed'} entering={FadeIn.duration(reduceMotion ? 100 : 200)} style={styles.proteinRow}>
+            <AppText variant="subheadline">{proteinLabel}</AppText>
+            <AppText numeric variant="headline">{proteinTarget !== null ? `${remaining ? proteinLeft : protein} / ${formatDecimal(proteinTarget)} g` : `${protein} g`}</AppText>
+          </Animated.View>
+        </Pressable>
         {proteinTarget !== null ? (
           <View style={styles.proteinBar}>
             <HomeBar color={colors.protein} fraction={proteinTarget > 0 ? n.proteinG / proteinTarget : 1} height={5} testID="home-protein-bar" track={band.track} />
@@ -192,20 +183,16 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
 const { band } = homeLayout;
 
 const styles = StyleSheet.create({
-  band: { paddingBottom: band.paddingBottom, paddingTop: band.paddingTop - HEADER_SLACK },
-  fadeBottom: { bottom: 0, height: band.fade, left: 0, position: 'absolute', right: 0 },
-  fadeTop: { height: band.fade, left: 0, position: 'absolute', right: 0, top: 0 },
-  solid: { bottom: band.fade, left: 0, position: 'absolute', right: 0, top: band.fade },
+  band: { paddingBottom: band.paddingBottom, paddingTop: band.paddingTop },
   body: { marginTop: homeLayout.titleToContent - HEADER_SLACK },
-  calories: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.sm },
+  calories: { minHeight: 44 },
   caloriesBar: { marginTop: band.caloriesToBar },
-  flex: { flex: 1, minWidth: 0 },
-  left: { alignItems: 'flex-end' },
+  flex: { minWidth: 0 },
   legend: { borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, marginTop: band.proteinBarToLegend, paddingTop: band.legendPaddingTop },
   legendItem: { flex: 1, gap: 2, minWidth: 0 },
   link: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 2, minHeight: 44 },
   loading: { gap: spacing.md },
   protein: { marginTop: band.barToProtein },
   proteinBar: { marginTop: band.proteinToBar },
-  proteinRow: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between' },
+  proteinRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'space-between', minHeight: 44 },
 });
