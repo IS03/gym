@@ -18,7 +18,7 @@ jest.mock('@expo/ui/swift-ui', () => {
   };
 });
 jest.mock('@expo/ui/swift-ui/modifiers', () => ({
-  accessibilityLabel: (label: string) => ({ label }), font: () => ({}), foregroundStyle: () => ({}),
+  accessibilityLabel: (label: string) => ({ label }), font: () => ({}), foregroundStyle: () => ({}), padding: () => ({}),
 }));
 
 const option = (id: string, name: string): QuickOption => ({

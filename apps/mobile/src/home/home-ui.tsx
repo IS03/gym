@@ -24,7 +24,7 @@ export function useHomeGutter() {
   return { paddingLeft: homeLayout.gutter + (insets?.left ?? 0), paddingRight: homeLayout.gutter + (insets?.right ?? 0) };
 }
 
-/** A Home block inside the gutter (everything but the full-bleed Nutrition band). */
+/** A Home block inside the gutter. */
 export function HomeGutter({ children, style, ...props }: PropsWithChildren<ViewProps>) {
   return <View {...props} style={[useHomeGutter(), style]}>{children}</View>;
 }
@@ -35,7 +35,7 @@ export function HomeSectionTitle({ action, accessibilityLabel, children, onActio
 }>) {
   return (
     <View style={styles.sectionHeader}>
-      <AppText accessibilityRole="header" style={styles.flex} variant="title2">{title}</AppText>
+      <AppText accessibilityRole="header" style={styles.flex} variant={title === 'Métricas' || title === 'Progreso' ? 'headline' : 'title2'}>{title}</AppText>
       {children ?? (action && onAction ? <HomeLink accessibilityLabel={accessibilityLabel} label={action} onPress={onAction} /> : null)}
     </View>
   );
@@ -114,10 +114,10 @@ export function HomeRow({ accessibilityHint, accessibilityLabel, chevron = false
   const body = (
     <>
       <View style={styles.row}>
-        {leading ?? (icon ? <View style={styles.rowIcon}><AppIcon color={colors.text} name={icon} size={20} /></View> : null)}
+        {leading ?? (icon ? <View style={styles.rowIcon}><AppIcon color={colors.textMuted} name={icon} size={20} /></View> : null)}
         <View style={styles.flex}>
-          <AppText numberOfLines={1} style={styles.rowTitle}>{title}</AppText>
-          {subtitle ? <AppText muted numberOfLines={2} numeric variant="subheadline">{subtitle}</AppText> : null}
+          <AppText style={styles.rowTitle}>{title}</AppText>
+          {subtitle ? <AppText muted numeric variant="subheadline">{subtitle}</AppText> : null}
         </View>
         {trailing}
         {chevron ? <AppIcon color={colors.textMuted} name="chevronRight" size={15} /> : null}
@@ -161,12 +161,12 @@ export function HomeSectionHeader({ action, onAction, title }: { action?: string
 const ICON_COLUMN = 36;
 
 const styles = StyleSheet.create({
-  button: { alignItems: 'center', borderRadius: radius.button, height: brandTokens.layout.buttonHeight, justifyContent: 'center', paddingHorizontal: spacing.md },
+  button: { alignItems: 'center', borderRadius: radius.full, minHeight: brandTokens.layout.buttonHeight, justifyContent: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   fill: { borderRadius: radius.full, height: '100%' },
   flex: { flex: 1, minWidth: 0 },
   legacyHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   legacyTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.2, lineHeight: 25 },
-  link: { fontSize: 17, fontWeight: '500', letterSpacing: -0.4, lineHeight: 22 },
+  link: { fontSize: 15, fontWeight: '500', letterSpacing: -0.2, lineHeight: 20 },
   row: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, minHeight: 44 },
   rowIcon: { alignItems: 'flex-start', width: ICON_COLUMN - spacing.sm },
   rowTitle: { fontSize: 17, fontWeight: '500', letterSpacing: -0.4, lineHeight: 22 },
