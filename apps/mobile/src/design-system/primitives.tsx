@@ -1,4 +1,4 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import { useContext, type PropsWithChildren, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,7 +16,9 @@ import {
   type Edge,
   SafeAreaView,
 } from 'react-native-safe-area-context';
+import { HeaderHeightContext } from 'expo-router/build/react-navigation/elements/Header/HeaderHeightContext';
 
+import { atmosphere, glowGradient } from './atmosphere';
 import { layout } from './brand';
 import { AppIcon, appIconSize, type AppIconName } from './icons';
 import { pressedStyle, useReduceMotion } from './motion';
@@ -58,12 +60,30 @@ export function Heading({ level = 1, ...props }: HeadingProps) {
   return <AppText accessibilityRole="header" variant={level === 1 ? 'largeTitle' : 'title2'} {...props} />;
 }
 
+/**
+ * The screen's background glow (top-right radial gradient): fixed to the screen, behind
+ * the content, static and never touchable. Screen and ScrollScreen render it, so every
+ * screen built on them inherits it.
+ *
+ * Only on screens without a native header: an opaque stack header would cut the glow with
+ * a hard edge. Extending it under headers needs transparent headers (follow-up PR).
+ */
+export function ScreenGlow() {
+  const { isDark } = useOwnlevelTheme();
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  if (headerHeight > 0) return null;
+  const rgb = atmosphere[isDark ? 'dark' : 'light'].glow;
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { experimental_backgroundImage: glowGradient(rgb) }]} testID="screen-glow" />;
+}
+
 type ScreenProps = PropsWithChildren<{
   centered?: boolean;
+  /** Background glow; off for focused flows (the active training session). */
+  glow?: boolean;
   testID?: string;
 }>;
 
-export function Screen({ centered = false, children, testID }: ScreenProps) {
+export function Screen({ centered = false, children, glow = true, testID }: ScreenProps) {
   const { colors } = useOwnlevelTheme();
 
   return (
@@ -72,6 +92,7 @@ export function Screen({ centered = false, children, testID }: ScreenProps) {
       style={[styles.screen, { backgroundColor: colors.background }]}
       testID={testID}
     >
+      {glow ? <ScreenGlow /> : null}
       <View style={[styles.screenContent, centered && styles.centered]}>{children}</View>
     </SafeAreaView>
   );
@@ -79,6 +100,8 @@ export function Screen({ centered = false, children, testID }: ScreenProps) {
 
 type ScrollScreenProps = PropsWithChildren<
   Omit<ScrollViewProps, 'children'> & {
+    /** Background glow; off for focused flows (the active training session). */
+    glow?: boolean;
     safeAreaEdges?: Edge[];
     testID?: string;
   }
@@ -87,6 +110,7 @@ type ScrollScreenProps = PropsWithChildren<
 export function ScrollScreen({
   children,
   contentContainerStyle,
+  glow = true,
   safeAreaEdges = ['left', 'right', 'bottom'],
   testID,
   ...scrollViewProps
@@ -99,6 +123,7 @@ export function ScrollScreen({
       style={[styles.screen, { backgroundColor: colors.background }]}
       testID={testID}
     >
+      {glow ? <ScreenGlow /> : null}
       <ScrollView
         {...scrollViewProps}
         contentContainerStyle={[styles.scrollContent, contentContainerStyle]}

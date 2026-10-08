@@ -26,7 +26,8 @@ import { HomeNutrition, type HomeMealEntry } from './home-nutrition';
 import { HomeProgress, type HomeProgressTarget } from './home-progress';
 import { HomeRegister, type HomeRegisterTarget } from './home-register';
 import type { HomeResource } from './home-resource';
-import { HomeCard } from './home-ui';
+import { HEADER_SLACK, homeLayout } from './home-layout';
+import { HomeButton, HomeGutter, HomeRow, HomeRowSeparator } from './home-ui';
 import { HomeWeek } from './home-week';
 
 export type HomeNavigationTarget = 'nutrition' | 'progress' | 'settings';
@@ -38,12 +39,13 @@ export type HomeDashboardProps = {
   home: HomeResource<MobileHomeResponse>;
   now?: () => number;
   onConfigureNutrition: () => void;
-  onCreateRoutine: () => void;
   /** Opens an existing Nutrition loading flow: manual meal, food search or the quick list. */
   onMealEntry: (entry: HomeMealEntry) => void;
   onNavigate: (target: HomeNavigationTarget) => void;
   /** Completed session detail (`/(tabs)/train/history/{id}`). */
   onOpenCompletedSession: (sessionId: string) => void;
+  /** This week's Nutrition report (same range as "Calorías por día"). */
+  onOpenCalories: () => void;
   onOpenDay: (date: string) => void;
   onOpenProgress: (target: HomeProgressTarget) => void;
   /** Active session (`/(tabs)/train/session/{id}`), never the Training hub first. */
@@ -51,7 +53,7 @@ export type HomeDashboardProps = {
   onQuickMeal: (option: QuickOption) => void;
   onRefresh: () => void;
   onRegister: (target: HomeRegisterTarget) => void;
-  /** Opens the shared StartWorkoutModal (Home never starts a session itself). */
+  /** Opens the start sheet ("¿Qué entrenás hoy?"); the session starts through the shared start flow. */
   onStartWorkout: () => void;
   progressBody: HomeResource<ProgressBody>;
   progressRecords: HomeResource<ProgressTraining>;
@@ -71,7 +73,7 @@ function Avatar({ initial, url }: { initial: string | null; url: string | null }
   const photo = url && !failed;
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-      style={[styles.avatar, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]} testID="home-avatar">
+      style={[styles.avatar, { backgroundColor: colors.brandSubtle }]} testID="home-avatar">
       {photo ? (
         <Image accessibilityIgnoresInvertColors onError={() => setFailed(true)} source={{ uri: url }} style={styles.avatarPhoto} testID="home-avatar-photo" />
       ) : initial ? (
@@ -83,7 +85,7 @@ function Avatar({ initial, url }: { initial: string | null; url: string | null }
   );
 }
 
-/** Large-title header (iOS): small uppercase date, "Hoy", and the profile photo (Perfil y Ajustes). */
+/** Large-title header (iOS): the date, "Hoy", and the profile photo (Perfil y Ajustes). */
 function HomeHeader({ avatarUrl, date, onSettings, profile }: {
   avatarUrl: string | null; date: string; onSettings: () => void; profile: MobileHomeResponse['profile'] | undefined;
 }) {
@@ -91,7 +93,7 @@ function HomeHeader({ avatarUrl, date, onSettings, profile }: {
   return (
     <View style={styles.header}>
       <View style={styles.flex}>
-        <AppText muted numberOfLines={1} style={styles.date}>{headerDate(date)}</AppText>
+        <AppText muted numberOfLines={1} variant="subheadline">{headerDate(date)}</AppText>
         <AppText accessibilityRole="header" style={styles.title}>Hoy</AppText>
       </View>
       <Pressable accessibilityLabel="Abrir perfil y ajustes" accessibilityRole="button" hitSlop={8} onPress={onSettings}
@@ -102,7 +104,7 @@ function HomeHeader({ avatarUrl, date, onSettings, profile }: {
   );
 }
 
-/** Small capsule action (Volver, Elegir rutina…), never full width. */
+/** Small capsule action (Reintentar; the Training hub's Volver / Elegir rutina), never full width. */
 export function Capsule({ accessibilityHint, accessibilityLabel, label, onPress, tone = 'hero' }: {
   accessibilityHint?: string; accessibilityLabel?: string; label: string; onPress: () => void; tone?: 'hero' | 'heroSoft' | 'neutral';
 }) {
@@ -121,7 +123,7 @@ export function Capsule({ accessibilityHint, accessibilityLabel, label, onPress,
   );
 }
 
-/** Champagne hero (brand gradient, core RN style with a solid fallback), sentence case. */
+/** Champagne hero (brand gradient, core RN style with a solid fallback). Used by the Training hub, not by Home V3. */
 export function Hero({ actions, label, subtitle, testID, title }: {
   actions: React.ReactNode; label: string; subtitle: string; testID: string; title: string;
 }) {
@@ -144,71 +146,68 @@ function durationLabel(ms: number | null): string | null {
   return ms === null ? null : `${formatInteger(Math.max(1, Math.round(ms / 60_000)))} min`;
 }
 
-/** Every finished routine of the day (oldest first), each with a small capsule to its real detail. */
+function TodayHeading({ children }: { children: string }) {
+  return <AppText accessibilityRole="header" variant="headline">{children}</AppText>;
+}
+
+/** Every finished routine of the day (oldest first), each row opening its real detail. */
 function TrainedToday({ onOpenCompletedSession, onStartWorkout, sessions }: {
   onOpenCompletedSession: (id: string) => void; onStartWorkout: () => void; sessions: MobileHomeTodaySession[];
 }) {
-  const { colors } = useOwnlevelTheme();
   return (
-    <HomeCard accessibilityLabel="Entrenamiento" padded={false} testID="home-trained-today">
-      <View style={styles.doneHeader}>
-        <AppIcon color={colors.primary} name="check" size={15} />
-        <AppText accessibilityRole="header" style={[styles.doneLabel, { color: colors.primary }]}>Entrenaste hoy</AppText>
-      </View>
-      {sessions.map((session, index) => {
-        const duration = durationLabel(session.durationMilliseconds);
-        const detail = [duration, `${formatInteger(session.completedSets)} ${session.completedSets === 1 ? 'serie' : 'series'}`].filter(Boolean).join(' · ');
-        return (
-          <View key={session.id} style={[styles.doneRow, index > 0 && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth }]}
-            testID={`home-trained-${session.id}`}>
-            <View style={styles.flex}>
-              <AppText numberOfLines={1} style={styles.doneName}>{session.name}</AppText>
-              <AppText muted numeric variant="footnote">{detail}</AppText>
+    <View style={styles.today} testID="home-trained-today">
+      <TodayHeading>Entrenaste hoy</TodayHeading>
+      <View>
+        {sessions.map((session, index) => {
+          const duration = durationLabel(session.durationMilliseconds);
+          const detail = [duration, `${formatInteger(session.completedSets)} ${session.completedSets === 1 ? 'serie' : 'series'}`].filter(Boolean).join(' · ');
+          return (
+            <View key={session.id}>
+              {index > 0 ? <HomeRowSeparator /> : null}
+              <HomeRow accessibilityHint="Abre el detalle de la sesión" accessibilityLabel={`${session.name}. ${detail}`} chevron
+                onPress={() => onOpenCompletedSession(session.id)} subtitle={detail} testID={`home-trained-${session.id}`} title={session.name} />
             </View>
-            <Capsule accessibilityHint="Abre el detalle de la sesión" accessibilityLabel={`${session.name}. ${detail}. Ver detalle`}
-              label="Ver detalle" onPress={() => onOpenCompletedSession(session.id)} tone="neutral" />
-          </View>
-        );
-      })}
-      <Pressable accessibilityLabel="Entrenar otra vez" accessibilityRole="button" hitSlop={8} onPress={onStartWorkout}
-        style={({ pressed }) => [styles.again, { opacity: pressed ? 0.6 : 1 }]}>
-        <AppIcon color={colors.textMuted} name="plus" size={13} />
-        <AppText muted variant="footnote">Entrenar otra vez</AppText>
-      </Pressable>
-    </HomeCard>
+          );
+        })}
+      </View>
+      <HomeButton accessibilityHint="Elegí qué entrenar" label="+ Nueva sesión" onPress={onStartWorkout} testID="home-new-session" tone="soft" />
+    </View>
   );
 }
 
-/** Training card, by priority: active session → trained today → (no plan) first step / free day. */
-function TrainingCard({ home, now, onCreateRoutine, onOpenCompletedSession, onOpenSession, onRefresh, onStartWorkout }: {
-  home: MobileHomeResponse | undefined; now: () => number; onCreateRoutine: () => void; onOpenCompletedSession: (id: string) => void;
+/**
+ * Today's training, by priority: active session → trained today → "Arrancar rutina"
+ * (opens the start sheet; with no routines the sheet offers creating one or training free).
+ */
+function TodayTraining({ home, now, onOpenCompletedSession, onOpenSession, onRefresh, onStartWorkout }: {
+  home: MobileHomeResponse | undefined; now: () => number; onOpenCompletedSession: (id: string) => void;
   onOpenSession: (id: string) => void; onRefresh: () => void; onStartWorkout: () => void;
 }) {
-  if (!home) return <SkeletonBlock height={92} style={styles.cardSkeleton} />;
-  const { activeSession, week, workoutStartRoutines } = home.training;
+  if (!home) return <SkeletonBlock height={50} style={styles.skeleton} />;
+  const { activeSession, week } = home.training;
 
   if (activeSession.status === 'unavailable') {
     return (
-      <HomeCard accessibilityLabel="Entrenamiento" testID="home-training-unavailable">
-        <View style={styles.flex}>
-          <AppText accessibilityRole="header" variant="headline">Estado no disponible</AppText>
-          <AppText muted variant="footnote">No pudimos verificar si tenés una sesión en curso.</AppText>
+      <View accessibilityLabel="Entrenamiento" style={styles.today} testID="home-training-unavailable">
+        <View>
+          <TodayHeading>Estado no disponible</TodayHeading>
+          <AppText muted variant="subheadline">No pudimos verificar si tenés una sesión en curso.</AppText>
         </View>
         <Button label="Reintentar" onPress={onRefresh} variant="secondary" />
-      </HomeCard>
+      </View>
     );
   }
 
   const active = activeSession.data;
   if (active) {
+    const detail = `${elapsedMinutes(active.startedAt, now())} min · ${active.exercisesCompleted} de ${active.totalExercises} ejercicios`;
     return (
-      <Hero
-        actions={<Capsule label="Volver" onPress={() => onOpenSession(active.id)} />}
-        label="Sesión en curso"
-        subtitle={`${elapsedMinutes(active.startedAt, now())} min · ${active.exercisesCompleted} de ${active.totalExercises} ejercicios`}
-        testID="home-hero-active"
-        title={active.name}
-      />
+      <View style={styles.today} testID="home-active-session">
+        <TodayHeading>Sesión en curso</TodayHeading>
+        <HomeRow accessibilityHint="Vuelve a la sesión" accessibilityLabel={`${active.name}. ${detail}`} chevron onPress={() => onOpenSession(active.id)}
+          subtitle={detail} testID="home-active-row" title={active.name} />
+        <HomeButton label="Volver a la sesión" onPress={() => onOpenSession(active.id)} testID="home-active-resume" tone="solid" />
+      </View>
     );
   }
 
@@ -216,35 +215,13 @@ function TrainingCard({ home, now, onCreateRoutine, onOpenCompletedSession, onOp
   if (doneToday.length) {
     return <TrainedToday onOpenCompletedSession={onOpenCompletedSession} onStartWorkout={onStartWorkout} sessions={doneToday} />;
   }
-
-  // No planned routine exists in the product yet (no "Hoy toca" until Programs).
-  if (workoutStartRoutines.status === 'ok' && workoutStartRoutines.data.length === 0) {
-    return (
-      <Hero
-        actions={<><Capsule label="Crear rutina" onPress={onCreateRoutine} /><Capsule label="Entrenar libre" onPress={onStartWorkout} tone="heroSoft" /></>}
-        label="Primer paso"
-        subtitle="O entrená libre y la guardamos después."
-        testID="home-hero-first-step"
-        title="Armá tu primera rutina"
-      />
-    );
-  }
-
-  return (
-    <Hero
-      actions={<Capsule label="Elegir rutina" onPress={onStartWorkout} />}
-      label="Día libre"
-      subtitle="No tenés nada planificado."
-      testID="home-hero-free"
-      title="¿Entrenás hoy?"
-    />
-  );
+  return <HomeButton accessibilityHint="Elegí qué entrenar hoy" label="Arrancar rutina" onPress={onStartWorkout} testID="home-start-routine" tone="solid" />;
 }
 
 function OfflineNotice({ confirmedAt, now, onRetry }: { confirmedAt: number; now: () => number; onRetry: () => void }) {
   const { colors } = useOwnlevelTheme();
   return (
-    <HomeCard accessibilityRole="alert" style={styles.notice} testID="home-offline">
+    <View accessibilityRole="alert" style={styles.notice} testID="home-offline">
       <AppIcon color={colors.textMuted} name="warning" size={20} />
       <View style={styles.flex}>
         <AppText variant="headline">Uy, no pudimos actualizar</AppText>
@@ -253,7 +230,7 @@ function OfflineNotice({ confirmedAt, now, onRetry }: { confirmedAt: number; now
         </AppText>
       </View>
       <Capsule label="Reintentar" onPress={onRetry} tone="neutral" />
-    </HomeCard>
+    </View>
   );
 }
 
@@ -266,40 +243,48 @@ export function HomeDashboard(props: HomeDashboardProps) {
   const weekStart = data?.training.week.status === 'ok' ? data.training.week.data.summary.weekStart : day.weekStart;
   return (
     <View style={styles.dashboard} testID="real-home-dashboard">
-      <HomeHeader avatarUrl={avatarUrl} date={date} onSettings={() => onNavigate('settings')} profile={data?.profile} />
-      {stale && home.confirmedAt !== null ? <OfflineNotice confirmedAt={home.confirmedAt} now={now} onRetry={onRefresh} /> : null}
-      <View style={[styles.blocks, stale && styles.stale]}>
-        <TrainingCard home={data} now={now} onCreateRoutine={props.onCreateRoutine} onOpenCompletedSession={props.onOpenCompletedSession}
-          onOpenSession={props.onOpenSession} onRefresh={onRefresh} onStartWorkout={props.onStartWorkout} />
-        <HomeNutrition home={home} onConfigure={props.onConfigureNutrition} onMealEntry={props.onMealEntry} onQuickMeal={props.onQuickMeal}
-          quick={quick} today={today} />
-        <HomeWeek calories={calories} onOpenDay={props.onOpenDay} onProgress={() => onNavigate('progress')} today={date}
-          training={training} week={data?.training.week} weekStart={weekStart} />
-        <HomeRegister date={day.today} onRegister={props.onRegister} today={today} />
-        <HomeProgress body={props.progressBody} date={day.today} onAll={() => onNavigate('progress')}
-          onOpen={props.onOpenProgress} onRetry={onRefresh} records={props.progressRecords} />
+      <HomeGutter style={styles.top}>
+        <HomeHeader avatarUrl={avatarUrl} date={date} onSettings={() => onNavigate('settings')} profile={data?.profile} />
+        {stale && home.confirmedAt !== null ? <OfflineNotice confirmedAt={home.confirmedAt} now={now} onRetry={onRefresh} /> : null}
+      </HomeGutter>
+      {/* sectionGap is the visible gap: blocks that open with a 44 pt section header take its slack off. */}
+      <View style={stale && styles.stale}>
+        <HomeGutter>
+          <TodayTraining home={data} now={now} onOpenCompletedSession={props.onOpenCompletedSession}
+            onOpenSession={props.onOpenSession} onRefresh={onRefresh} onStartWorkout={props.onStartWorkout} />
+        </HomeGutter>
+        <View style={styles.beforeBand}>
+          <HomeNutrition home={home} onConfigure={props.onConfigureNutrition} onMealEntry={props.onMealEntry} onQuickMeal={props.onQuickMeal}
+            quick={quick} today={today} />
+        </View>
+        <View style={styles.afterBand}>
+          <HomeWeek calories={calories} onOpenCalories={props.onOpenCalories} onOpenDay={props.onOpenDay} onProgress={() => onNavigate('progress')} today={date}
+            training={training} week={data?.training.week} weekStart={weekStart} />
+        </View>
+        <View style={styles.headedBlock}><HomeRegister date={day.today} onRegister={props.onRegister} today={today} /></View>
+        <View style={styles.headedBlock}>
+          <HomeProgress body={props.progressBody} date={day.today} onAll={() => onNavigate('progress')}
+            onOpen={props.onOpenProgress} onRetry={onRefresh} records={props.progressRecords} />
+        </View>
       </View>
     </View>
   );
 }
 
+const AVATAR = 44;
+
 const styles = StyleSheet.create({
-  again: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 4, marginBottom: spacing.sm, marginHorizontal: spacing.lg, minHeight: 36 },
-  avatar: { alignItems: 'center', borderRadius: radius.full, borderWidth: StyleSheet.hairlineWidth, height: 36, justifyContent: 'center', overflow: 'hidden', width: 36 },
-  avatarButton: { marginBottom: 4 },
-  avatarInitial: { fontSize: 15, fontWeight: '700' },
-  avatarPhoto: { height: 36, width: 36 },
-  blocks: { gap: spacing.md },
+  avatar: { alignItems: 'center', borderRadius: radius.full, height: AVATAR, justifyContent: 'center', overflow: 'hidden', width: AVATAR },
+  avatarButton: { marginBottom: 2 },
+  avatarInitial: { fontSize: 17, fontWeight: '600' },
+  avatarPhoto: { height: AVATAR, width: AVATAR },
+  afterBand: { marginTop: homeLayout.band.gapAfter - HEADER_SLACK },
+  beforeBand: { marginTop: homeLayout.band.gapBefore },
   capsule: { alignItems: 'center', borderRadius: radius.full, justifyContent: 'center', minHeight: 34, paddingHorizontal: 14 },
   capsuleLabel: { fontSize: 14, fontWeight: '600' },
-  cardSkeleton: { borderRadius: radius.card },
-  dashboard: { gap: spacing.md },
-  date: { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, lineHeight: 18 },
-  doneHeader: { alignItems: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: spacing.lg, paddingTop: 14 },
-  doneLabel: { fontSize: 13, fontWeight: '600' },
-  doneName: { fontSize: 17, fontWeight: '700', lineHeight: 22 },
-  doneRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.md, marginHorizontal: spacing.lg, paddingVertical: 8 },
+  dashboard: { gap: homeLayout.headerToToday },
   flex: { flex: 1, minWidth: 0 },
+  headedBlock: { marginTop: homeLayout.sectionGap - HEADER_SLACK },
   header: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.md, justifyContent: 'space-between' },
   hero: { alignItems: 'center', borderRadius: radius.card, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, overflow: 'hidden', paddingHorizontal: spacing.lg, paddingVertical: 14 },
   heroActions: { flexDirection: 'row', gap: spacing.sm },
@@ -307,6 +292,9 @@ const styles = StyleSheet.create({
   heroSubtitle: { fontSize: 13, opacity: 0.75 },
   heroTitle: { fontSize: 20, fontWeight: '700', lineHeight: 25, marginTop: 1 },
   notice: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  skeleton: { borderRadius: radius.button },
   stale: { opacity: 0.6 },
-  title: { fontSize: 34, fontWeight: '700', letterSpacing: -0.7, lineHeight: 41 },
+  top: { gap: spacing.md },
+  title: { fontSize: 34, fontWeight: '700', letterSpacing: -0.4, lineHeight: 41 },
+  today: { gap: spacing.sm },
 });

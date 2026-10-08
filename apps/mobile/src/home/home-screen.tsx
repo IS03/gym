@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -20,10 +20,17 @@ import { StartWorkoutModal } from '@/training/start-workout-modal';
 import { HomeDashboard, type HomeNavigationTarget } from './home-dashboard';
 import { useHomeResources } from './home-data';
 import { homeDay } from './home-day';
+import { homeLayout } from './home-layout';
 import type { HomeMealEntry } from './home-nutrition';
 import type { HomeProgressTarget } from './home-progress';
 import type { HomeRegisterTarget } from './home-register';
 import { homeResource } from './home-resource';
+import { HomeStartSheet } from './home-start-sheet';
+
+// The start flow presents its own modal; it opens once the sheet's dismissal has run.
+const SHEET_DISMISS_MS = 350;
+
+type StartRequest = { free?: boolean; immediate: boolean; routineId?: string };
 
 const HOME_ROUTES = {
   nutrition: '/(tabs)/nutrition',
@@ -63,7 +70,10 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
   const resources = useHomeResources(client, now);
   const { refresh } = resources;
   const configuration = useNutritionConfiguration(refresh);
-  const [startOpen, setStartOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [start, setStart] = useState<StartRequest | null>(null);
+  const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (startTimer.current) clearTimeout(startTimer.current); }, []);
 
   const home = homeResource(resources.home.state);
   const day = homeDay(now());
@@ -74,22 +84,32 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
     else router.navigate(HOME_ROUTES[target]);
   }, [router]);
 
-  // Same pattern as TrainingScreen: the shared modal owns verification, idempotency
-  // and conflicts; Home only opens it and follows the session it reports.
-  const openStart = useCallback(() => { haptics.selection(); setStartOpen(true); }, []);
+  // "Arrancar rutina" / "+ Nueva sesión" open the sheet. Picking there starts through the
+  // shared modal (same as TrainingScreen): it owns verification, idempotency and conflicts;
+  // Home only follows the session it reports.
+  const openStart = useCallback(() => { haptics.selection(); setSheetOpen(true); }, []);
+  const startAfterSheet = useCallback((request: StartRequest | null, then?: () => void) => {
+    haptics.selection();
+    setSheetOpen(false);
+    if (startTimer.current) clearTimeout(startTimer.current);
+    startTimer.current = setTimeout(() => { startTimer.current = null; if (request) setStart(request); then?.(); }, SHEET_DISMISS_MS);
+  }, []);
   const toSession = useCallback((id: string) => {
-    setStartOpen(false);
+    setStart(null);
     refresh();
     router.push(`/(tabs)/train/session/${id}`);
   }, [refresh, router]);
 
   const actions = useMemo(() => ({
     onConfigureNutrition: () => { if (configuration) configuration.controller.open(); },
-    onCreateRoutine: () => { haptics.selection(); router.push('/(tabs)/train/routines'); },
     // Existing Nutrition flows: manual meal, food search, or the quick list ("Ver todas").
     onMealEntry: (entry: HomeMealEntry) => {
       haptics.selection();
       router.navigate({ pathname: '/(tabs)/nutrition', params: entry === 'quick' ? { quick: 'all' } : { add: entry } });
+    },
+    onOpenCalories: () => {
+      haptics.selection();
+      router.push({ pathname: '/(tabs)/nutrition/reports', params: { period: 'custom', from: day.weekStart, to: day.today } });
     },
     onOpenCompletedSession: (id: string) => { haptics.selection(); router.push({ pathname: '/(tabs)/train/history/[id]', params: { id } }); },
     onOpenDay: (date: string) => { haptics.selection(); router.push({ pathname: '/history/day/[date]', params: { date } }); },
@@ -107,11 +127,10 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
     },
     onRegister: (target: HomeRegisterTarget) => {
       haptics.selection();
-      if (target.kind === 'weight') router.push({ pathname: '/(tabs)/progress/body', params: { registrar: 'peso' } });
-      else if (target.kind === 'metric') router.push({ pathname: '/(tabs)/progress/metrics', params: { editar: 'metricas' } });
+      if (target.kind === 'metric') router.push({ pathname: '/(tabs)/progress/metrics', params: { editar: 'metricas' } });
       else router.push('/(tabs)/progress/metrics');
     },
-  }), [configuration, router]);
+  }), [configuration, day.today, day.weekStart, router]);
 
   if (!home.data && home.status === 'unavailable') {
     return <HomeUnavailable onRetry={refresh} />;
@@ -130,7 +149,10 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
             tintColor={colors.primary}
           />
         }
-        safeAreaEdges={['top', 'left', 'right', 'bottom']}
+        // Blocks apply their own gutter (with the side insets) so the Nutrition band is full-bleed;
+        // the bottom keeps the tab bar inset plus homeLayout.bottomExtra.
+        contentContainerStyle={styles.content}
+        safeAreaEdges={['top', 'bottom']}
         testID={home.data ? 'home-screen' : 'home-loading'}
       >
         <HomeDashboard
@@ -150,11 +172,25 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
           training={homeResource(resources.training.state)}
         />
       </ScrollScreen>
-      {startOpen ? <StartWorkoutModal onClose={() => setStartOpen(false)} onContinue={toSession} onStarted={toSession} /> : null}
+      <HomeStartSheet
+        onClose={() => setSheetOpen(false)}
+        onCreateRoutine={() => startAfterSheet(null, () => router.push('/(tabs)/train/routines'))}
+        onFree={() => startAfterSheet({ free: true, immediate: true })}
+        onPickRoutine={routineId => startAfterSheet({ immediate: true, routineId })}
+        open={sheetOpen}
+        plan={null}
+        routines={home.data?.training.workoutStartRoutines}
+        week={homeResource(resources.training.state).data}
+      />
+      {start ? (
+        <StartWorkoutModal initialFree={start.free} initialRoutineId={start.routineId} key={start.routineId ?? 'free'} onClose={() => setStart(null)}
+          onContinue={toSession} onStarted={toSession} startImmediately={start.immediate} />
+      ) : null}
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  content: { paddingBottom: homeLayout.bottomExtra, paddingHorizontal: 0 },
   unavailableHeader: { justifyContent: 'center', minHeight: 64 },
 });

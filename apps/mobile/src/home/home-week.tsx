@@ -2,23 +2,23 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { MobileHomeResponse } from '@/api/home';
 import type { NutritionReport } from '@/api/nutrition-report';
-import {
-  AppText,
-  ExampleFrame,
-  InlineUnavailable,
-  SkeletonBlock,
-  radius,
-  spacing,
-  useOwnlevelTheme,
-} from '@/design-system';
+import { AppText, ExampleFrame, InlineUnavailable, SkeletonBlock, brandTokens, spacing, useOwnlevelTheme } from '@/design-system';
 
 import { formatInteger, formatTrainingMinutes, plural } from './format';
 import type { HomeTrainingWeek } from './home-data';
 import { WEEKDAY_LETTERS, weekDates } from './home-day';
 import type { HomeResource } from './home-resource';
-import { HomeCard, HomeRow, HomeRowSeparator, HomeSectionHeader } from './home-ui';
+import { homeLayout } from './home-layout';
+import { HomeBar, HomeRow, HomeRowSeparator, HomeSection } from './home-ui';
 
 const WEEKDAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const CAPSULE_HEIGHT = 8;
+const LETTER_LINE = 18;
+const DAY_GAP = 6;
+/** Each day is a 44 pt touch target around capsule + letter: this much is empty below the letter. */
+const DAY_SLACK = (brandTokens.layout.minTouch - CAPSULE_HEIGHT - DAY_GAP - LETTER_LINE) / 2;
+/** HomeRow's vertical padding above its text. */
+const ROW_INSET = spacing.xs;
 
 type DayCalories = { date: string; value: number | null; target: number | null };
 
@@ -37,9 +37,15 @@ export function weekStrip(week: HomeTrainingWeek, dates: string[]) {
   return dates.map(date => ({ date, count: week.sessions.filter(session => session.logDate === date).length }));
 }
 
+/** Accessible name of one day of the strip ("Lunes, entrenaste" / "Jueves, sin entreno"). */
+export function dayLabel(index: number, done: boolean, isToday: boolean): string {
+  return `${WEEKDAY_NAMES[index]}${isToday ? ', hoy' : ''}, ${done ? 'entrenaste' : 'sin entreno'}`;
+}
+
 /**
- * The week's days as small dots: filled when trained. Only today is marked differently
- * (its letter in the primary text color). Each past day opens that day in the history.
+ * Linear week calendar: 7 equal capsules (Monday first). A day with at least one session
+ * is filled with the accent (several sessions are still one capsule); a day without one,
+ * or a future day, keeps the track color. Past days open that day in the history.
  */
 function Days({ dates, onOpenDay, today, trained }: { dates: string[]; onOpenDay?: (date: string) => void; today: string; trained: Set<string> }) {
   const { colors } = useOwnlevelTheme();
@@ -48,86 +54,99 @@ function Days({ dates, onOpenDay, today, trained }: { dates: string[]; onOpenDay
       {dates.map((date, index) => {
         const isToday = date === today;
         const done = trained.has(date);
-        const label = `${WEEKDAY_NAMES[index]}${isToday ? ', hoy' : ''}: ${date > today ? 'día futuro' : done ? 'entrenaste' : 'sin entrenamiento'}`;
         const content = (
           <>
-            <View style={[styles.dot, { backgroundColor: done ? colors.primary : colors.surfaceRaised }]} testID={`home-week-marker-${date}`} />
-            <AppText style={[styles.letter, { color: isToday ? colors.text : colors.textMuted, fontWeight: isToday ? '700' : '600' }]}
+            <HomeBar color={colors.primary} fraction={done ? 1 : 0} height={CAPSULE_HEIGHT} testID={`home-week-marker-${date}`} />
+            <AppText style={[styles.letter, isToday ? { color: colors.text, fontWeight: '600' } : { color: colors.textMuted }]}
               testID={isToday ? 'home-week-today' : undefined}>
               {WEEKDAY_LETTERS[index]}
             </AppText>
           </>
         );
+        const label = dayLabel(index, done, isToday);
         return onOpenDay && date <= today ? (
-          <Pressable accessibilityHint="Abre este día en el historial" accessibilityLabel={label} accessibilityRole="button" hitSlop={{ bottom: 10, left: 4, right: 4, top: 10 }}
-            key={date} onPress={() => onOpenDay(date)} style={({ pressed }) => [styles.day, pressed && { opacity: 0.5 }]} testID={`home-week-day-${date}`}>
+          <Pressable accessibilityHint="Abre este día en el historial" accessibilityLabel={label} accessibilityRole="button" key={date}
+            onPress={() => onOpenDay(date)} style={({ pressed }) => [styles.day, pressed && { opacity: 0.55 }]} testID={`home-week-day-${date}`}>
             {content}
           </Pressable>
-        ) : <View accessible accessibilityLabel={label} key={date} style={styles.day}>{content}</View>;
+        ) : <View accessible accessibilityLabel={label} key={date} style={styles.day} testID={`home-week-day-${date}`}>{content}</View>;
       })}
     </View>
   );
 }
 
-function TrainingRow({ dates, onOpenDay, today, training, week }: {
-  dates: string[]; onOpenDay: (date: string) => void; today: string; training: HomeResource<HomeTrainingWeek>;
-  week: MobileHomeResponse['training']['week'] | undefined;
-}) {
-  const { colors } = useOwnlevelTheme();
-  const daysFromHistory = training.data ? new Set(weekStrip(training.data, dates).filter(day => day.count > 0).map(day => day.date)) : null;
-  if (!week) {
-    return <HomeRow icon="dumbbell" title="Entrenamientos" trailing={<SkeletonBlock height={16} width={24} />}><View style={styles.indent}><SkeletonBlock height={24} width={140} /></View></HomeRow>;
-  }
-  if (week.status === 'unavailable') {
-    return <HomeRow icon="dumbbell" testID="home-week-training" title="Entrenamientos"><View style={styles.indent}><InlineUnavailable message="No pudimos cargar la semana." /></View></HomeRow>;
-  }
-  const s = week.data.summary;
-  const trained = daysFromHistory ?? new Set(s.trainingDays);
+/** Big number with its unit beside it ("5 entrenos", "1.105 / 2.100 kcal"). */
+export function BigNumber({ mutedColor, unit, value }: { mutedColor?: string; unit?: string; value: string }) {
   return (
-    <HomeRow accessibilityLabel={`Entrenamientos: ${plural(s.sessions, 'entrenamiento')} esta semana, ${plural(s.sets, 'serie')}, ${formatTrainingMinutes(s.minutes)}`}
-      icon="dumbbell" subtitle={`${plural(s.sets, 'serie')} · ${formatTrainingMinutes(s.minutes)}`} testID="home-week-training" title="Entrenamientos"
-      trailing={<AppText numeric style={[styles.value, { color: colors.textMuted }]}>{formatInteger(s.sessions)}</AppText>}>
-      <View style={styles.indent}>
-        <Days dates={dates} onOpenDay={onOpenDay} today={today} trained={trained} />
-        {!training.data && training.status === 'unavailable' ? <AppText muted variant="caption">No pudimos cargar el detalle por día.</AppText> : null}
-      </View>
-    </HomeRow>
+    <AppText numeric style={styles.bigLine}>
+      <AppText numeric variant="largeTitle">{value}</AppText>
+      {unit ? <AppText muted numeric style={mutedColor ? { color: mutedColor } : undefined} variant="body">{` ${unit}`}</AppText> : null}
+    </AppText>
   );
 }
 
-function CaloriesRow({ calories }: { calories: HomeResource<NutritionReport> }) {
-  const { colors } = useOwnlevelTheme();
+function TrainingSummary({ dates, onOpenDay, today, training, week }: {
+  dates: string[]; onOpenDay: (date: string) => void; today: string; training: HomeResource<HomeTrainingWeek>;
+  week: MobileHomeResponse['training']['week'] | undefined;
+}) {
+  if (!week) {
+    return <View style={styles.summary}><SkeletonBlock height={41} width={140} /><SkeletonBlock height={18} width={180} /><SkeletonBlock height={CAPSULE_HEIGHT} /></View>;
+  }
+  if (week.status === 'unavailable') {
+    return <View style={styles.summary} testID="home-week-training"><InlineUnavailable message="No pudimos cargar la semana." /></View>;
+  }
+  const s = week.data.summary;
+  const fromHistory = training.data ? new Set(weekStrip(training.data, dates).filter(day => day.count > 0).map(day => day.date)) : null;
+  const trained = fromHistory ?? new Set(s.trainingDays);
+  const detail = `${plural(s.sets, 'serie')} · ${formatTrainingMinutes(s.minutes)}`;
+  return (
+    <View style={styles.summary} testID="home-week-training">
+      <View accessible accessibilityLabel={`${plural(s.sessions, 'entreno')} esta semana, ${detail}`} testID="home-week-summary">
+        <BigNumber unit={s.sessions === 1 ? 'entreno' : 'entrenos'} value={formatInteger(s.sessions)} />
+        <AppText muted numeric variant="subheadline">{detail}</AppText>
+      </View>
+      <Days dates={dates} onOpenDay={onOpenDay} today={today} trained={trained} />
+      {!training.data && training.status === 'unavailable' ? <AppText muted variant="footnote">No pudimos cargar el detalle por día.</AppText> : null}
+    </View>
+  );
+}
+
+function CaloriesRow({ calories, onOpen }: { calories: HomeResource<NutritionReport>; onOpen: () => void }) {
   if (!calories.data) {
     return calories.status === 'loading'
-      ? <HomeRow icon="flame" title="Calorías por día" trailing={<SkeletonBlock height={16} width={48} />} />
-      : <HomeRow icon="flame" testID="home-week-calories" title="Calorías por día"><View style={styles.indent}><InlineUnavailable message="No pudimos cargar las calorías de la semana." /></View></HomeRow>;
+      ? <HomeRow title="Calorías por día" trailing={<SkeletonBlock height={34} width={88} />} />
+      : <HomeRow testID="home-week-calories" title="Calorías por día"><InlineUnavailable message="No pudimos cargar las calorías de la semana." /></HomeRow>;
   }
   // Same average and day count as Nutrition reports (finished days with a known value).
   const stat = calories.data.summary.metrics.calories;
   const average = stat.value === null ? '—' : formatInteger(Math.round(stat.value));
   return (
-    <HomeRow accessibilityLabel={`Calorías por día: ${average === '—' ? 'sin promedio' : `${average} de promedio`}, ${stat.denominator} de 7 días con datos`}
-      icon="flame" subtitle={`Promedio · ${stat.denominator} de 7 días con datos`} testID="home-week-calories" title="Calorías por día"
-      trailing={<AppText numeric style={[styles.value, { color: colors.textMuted }]}>{average}</AppText>} />
+    <HomeRow accessibilityHint="Abre el reporte de nutrición de esta semana"
+      accessibilityLabel={`Calorías por día: ${average === '—' ? 'sin promedio' : `${average} de promedio`}, ${stat.denominator} de 7 días con datos`}
+      chevron onPress={onOpen} subtitle={`Promedio · ${stat.denominator} de 7 días con datos`} testID="home-week-calories" title="Calorías por día"
+      trailing={<AppText numeric variant="largeTitle">{average}</AppText>} />
   );
 }
 
 function ExampleWeek({ dates, today }: { dates: string[]; today: string }) {
   return (
     <ExampleFrame>
-      <HomeCard padded={false}>
-        <HomeRow icon="dumbbell" subtitle="48 series · 2 h 30 min" title="Entrenamientos" trailing={<AppText muted style={styles.value}>3</AppText>}>
-          <View style={styles.indent}><Days dates={dates} today={today} trained={new Set([dates[0], dates[1], dates[3]])} /></View>
-        </HomeRow>
-      </HomeCard>
+      <View style={styles.summary}>
+        <View>
+          <BigNumber unit="entrenos" value="3" />
+          <AppText muted variant="subheadline">48 series · 2 h 30 min</AppText>
+        </View>
+        <Days dates={dates} today={today} trained={new Set([dates[0], dates[1], dates[3]])} />
+      </View>
     </ExampleFrame>
   );
 }
 
 export function HomeWeek({
-  calories, onOpenDay, onProgress, today, training, week, weekStart,
+  calories, onOpenCalories, onOpenDay, onProgress, today, training, week, weekStart,
 }: {
   calories: HomeResource<NutritionReport>;
+  onOpenCalories: () => void;
   onOpenDay: (date: string) => void;
   onProgress: () => void;
   today: string;
@@ -138,31 +157,32 @@ export function HomeWeek({
   const dates = weekDates(weekStart);
   const firstTime = training.data !== undefined && !training.data.everTrained;
   return (
-    <View style={styles.section} testID="home-week">
-      <HomeSectionHeader action="Progreso" onAction={onProgress} title="Esta semana" />
+    <HomeSection accessibilityLabel="Progreso" action="Progreso →" onAction={onProgress} testID="home-week" title="Esta semana">
       {firstTime ? (
         <>
           <ExampleWeek dates={dates} today={today} />
-          <AppText muted style={styles.note} variant="footnote">Con tu primer entrenamiento, esto pasa a ser tuyo.</AppText>
+          <AppText muted variant="footnote">Con tu primer entrenamiento, esto pasa a ser tuyo.</AppText>
         </>
       ) : (
-        <HomeCard padded={false}>
-          <TrainingRow dates={dates} onOpenDay={onOpenDay} today={today} training={training} week={week} />
-          <HomeRowSeparator />
-          <CaloriesRow calories={calories} />
-        </HomeCard>
+        <>
+          <TrainingSummary dates={dates} onOpenDay={onOpenDay} today={today} training={training} week={week} />
+          <View style={styles.divider}><HomeRowSeparator /></View>
+          <CaloriesRow calories={calories} onOpen={onOpenCalories} />
+        </>
       )}
-    </View>
+    </HomeSection>
   );
 }
 
+// Calendar → "Calorías por día": the visible gap is homeLayout.calendarToCalories, split
+// around the hairline (minus the day's touch slack above and the row's padding below).
+const HALF_GAP = homeLayout.calendarToCalories / 2;
+
 const styles = StyleSheet.create({
-  day: { alignItems: 'center', gap: 5, minWidth: 18 },
-  days: { flexDirection: 'row', gap: 9 },
-  dot: { borderRadius: radius.full, height: 10, width: 10 },
-  indent: { gap: spacing.xs, paddingLeft: 40, paddingTop: 2 },
-  letter: { fontSize: 10, lineHeight: 12 },
-  note: { paddingHorizontal: spacing.lg },
-  section: { gap: spacing.sm },
-  value: { fontSize: 17 },
+  bigLine: { lineHeight: 41 },
+  day: { flex: 1, gap: DAY_GAP, justifyContent: 'center', minHeight: brandTokens.layout.minTouch },
+  days: { flexDirection: 'row', gap: 6 },
+  divider: { marginBottom: HALF_GAP - ROW_INSET, marginTop: HALF_GAP - DAY_SLACK },
+  letter: { fontSize: 13, lineHeight: LETTER_LINE, textAlign: 'center' },
+  summary: { gap: spacing.md },
 });

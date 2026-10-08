@@ -1,12 +1,12 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ProgressBody, ProgressTraining, ProgressTrainingExercise } from '@/api/progress';
-import { AppText, InlineUnavailable, SkeletonBlock, spacing, useOwnlevelTheme } from '@/design-system';
+import { AppText, InlineUnavailable, SkeletonBlock, useOwnlevelTheme } from '@/design-system';
 import { formatValue } from '@/progress/progress-format';
 
 import { formatInteger } from './format';
 import type { HomeResource } from './home-resource';
-import { HomeCard, HomeRow, HomeRowSeparator, HomeSectionHeader } from './home-ui';
+import { HomeRow, HomeRowSeparator, HomeSection } from './home-ui';
 
 export type HomeProgressTarget = { kind: 'body'; period: '7' } | { kind: 'training'; period: '7' | '30' }
   | { kind: 'exercise'; period: '30'; exerciseId: string };
@@ -77,7 +77,7 @@ function ReadRow<T extends { today: string }>({ date, icon, label, onOpen, onRet
   return (
     <HomeRow accessibilityHint="Abre el detalle" accessibilityLabel={`${row.title}. ${row.subtitle}${row.value ? `. ${row.value}` : ''}`} chevron
       icon={icon} onPress={() => onOpen(row.target)} subtitle={row.subtitle} testID={testID} title={row.title}
-      trailing={row.value ? <AppText numeric style={styles.value}>{row.value}</AppText> : undefined}>
+      trailing={row.value ? <AppText numeric variant="title2">{row.value}</AppText> : undefined}>
       {stale ? (
         <Pressable accessibilityLabel="Reintentar" accessibilityRole="button" hitSlop={8} onPress={onRetry} style={styles.indent}>
           <AppText style={{ color: colors.textMuted }} variant="caption">Sin actualizar · Reintentar</AppText>
@@ -92,21 +92,18 @@ export function HomeProgress({ body, date, onAll, onOpen, onRetry, records }: {
   onRetry: () => void; records: HomeResource<ProgressTraining>;
 }) {
   return (
-    <View style={styles.section} testID="home-progress">
-      <HomeSectionHeader action="Ver todo" onAction={onAll} title="Progreso" />
-      <HomeCard padded={false}>
+    <HomeSection action="Ver todo" onAction={onAll} testID="home-progress" title="Progreso">
+      <View>
         <ReadRow date={date} icon="trophy" label="Récords" onOpen={onOpen} onRetry={onRetry} resource={records} summarize={recordsSummary}
           testID="home-progress-records" />
-        <HomeRowSeparator />
+        <HomeRowSeparator inset />
         <ReadRow date={date} icon="scale" label="Peso" onOpen={onOpen} onRetry={onRetry} resource={body} summarize={weightSummary}
           testID="home-progress-weight" />
-      </HomeCard>
-    </View>
+      </View>
+    </HomeSection>
   );
 }
 
 const styles = StyleSheet.create({
-  indent: { paddingLeft: 40, paddingTop: 2 },
-  section: { gap: spacing.sm, marginBottom: spacing.xl },
-  value: { fontSize: 17, fontWeight: '700', marginRight: 2 },
+  indent: { paddingLeft: 36, paddingTop: 2 },
 });

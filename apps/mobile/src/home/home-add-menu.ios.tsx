@@ -1,19 +1,18 @@
 import { StyleSheet } from 'react-native';
-import { Button, Host, Image, Menu, Section } from '@expo/ui/swift-ui';
-import { accessibilityLabel, background, frame, shapes } from '@expo/ui/swift-ui/modifiers';
+import { Button, Host, Menu, Section, Text } from '@expo/ui/swift-ui';
+import { accessibilityLabel, font, foregroundStyle } from '@expo/ui/swift-ui/modifiers';
 
 import { useOwnlevelTheme } from '@/design-system';
 
 import type { HomeAddMenuProps } from './home-add-menu.types';
 
-/** Nutrition's "+": a native UIMenu (SwiftUI Menu through @expo/ui). */
+/** Nutrition's "+ Comida": a native UIMenu (SwiftUI Menu through @expo/ui). */
 export function HomeAddMenu({ habituals, onAll, onFood, onHabitual, onManual }: HomeAddMenuProps) {
   const { colors, isDark } = useOwnlevelTheme();
   return (
     <Host colorScheme={isDark ? 'dark' : 'light'} matchContents style={styles.host} testID="home-add-menu">
       <Menu
-        label={<Image color={colors.primary} modifiers={[frame({ height: 32, width: 32 }), background(colors.brandSubtle, shapes.circle())]}
-          size={16} systemName="plus" />}
+        label={<Text modifiers={[font({ size: 17, weight: 'medium' }), foregroundStyle(colors.primary)]}>+ Comida</Text>}
         modifiers={[accessibilityLabel('Agregar comida')]}
       >
         <Button label="Comida manual" onPress={onManual} systemImage="pencil" />
@@ -29,4 +28,4 @@ export function HomeAddMenu({ habituals, onAll, onFood, onHabitual, onManual }: 
   );
 }
 
-const styles = StyleSheet.create({ host: { height: 32, width: 32 } });
+const styles = StyleSheet.create({ host: { minHeight: 44 } });

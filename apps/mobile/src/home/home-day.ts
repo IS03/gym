@@ -26,12 +26,12 @@ export function weekDates(weekStart: string): string[] {
 
 export const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
 
-/** "SÁBADO 10 DE OCTUBRE" for an ISO logical date. */
+/** "Sábado 10 de octubre" for an ISO logical date. */
 export function headerDate(date: string): string {
   return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'long', timeZone: 'UTC', weekday: 'long' })
     .format(new Date(`${date}T12:00:00Z`))
     .replace(/,/gu, '')
-    .toLocaleUpperCase('es-AR');
+    .replace(/^./u, letter => letter.toLocaleUpperCase('es-AR'));
 }
 
 /** Age of the last confirmed read, for the offline notice ("hace 2 h"). */

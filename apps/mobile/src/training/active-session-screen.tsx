@@ -139,7 +139,7 @@ export function ActiveSessionView({ controller, state, client }: { controller: A
     <Button label="Comprobar operación" onPress={() => void controller.retryIntent()} variant="secondary" />
     {state.intent.phase === 'blocked' ? <Button label="Descartar intención y actualizar" onPress={() => void controller.discardBlockedIntent()} variant="quiet" /> : null}
   </Surface> : null;
-  if (!detail || state.status === 'not_found') return <ScrollScreen testID={state.status === 'loading' ? 'active-session-loading' : 'active-session-unavailable'}>
+  if (!detail || state.status === 'not_found') return <ScrollScreen glow={false} testID={state.status === 'loading' ? 'active-session-loading' : 'active-session-unavailable'}>
     {state.status === 'loading' ? <><SkeletonBlock height={80} /><SkeletonBlock height={100} /><SkeletonBlock height={100} /></> : <>
       <UnavailableState title={state.status === 'not_found' ? 'Sesión no disponible' : 'No pudimos cargar la sesión'}
         description={state.notice ?? 'Reintentá para comprobar su estado. Los borradores locales se conservan.'}
