@@ -11,7 +11,9 @@ import { activeStartRoutines, initialStartSelection, sameStartSelection, StartIn
 const unavailableResult = { status: 'unavailable' as const, reason: 'invalid_response' as const, meta: { durationMs: 0, httpStatus: null, outcome: 'unavailable' as const } };
 
 /** Shared start flow, moved unchanged from StartWorkoutModal. */
-export function useWorkoutStart({ initialRoutineId, onClose, onStarted }: { initialRoutineId?: string; onClose: () => void; onStarted: (id: string) => void }) {
+export function useWorkoutStart({ initialFree = false, initialRoutineId, onClose, onStarted }: {
+  initialFree?: boolean; initialRoutineId?: string; onClose: () => void; onStarted: (id: string) => void;
+}) {
   const { client } = useMobileApi();
   const loadActive = useCallback((signal: AbortSignal) => client
     ? fetchMobileTraining(client, monthForDate(new Date()), signal)
@@ -38,7 +40,7 @@ export function useWorkoutStart({ initialRoutineId, onClose, onStarted }: { init
   const routineConfirmed = routineRead.state.status === 'ready' && !routineRead.state.refreshing && routineResource?.status === 'ok';
   const routines = routineResource?.status === 'ok' ? activeStartRoutines(routineResource.data) : [];
   const selected = validStartSelection(chosen === undefined
-    ? initialStartSelection(routines, initialRoutineId) : chosen, routines);
+    ? initialFree ? { kind: 'free' } : initialStartSelection(routines, initialRoutineId) : chosen, routines);
 
   const close = () => {
     if (pendingRef.current) return;

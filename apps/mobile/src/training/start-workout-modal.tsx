@@ -10,6 +10,8 @@ import { startCtaLabel, startRoutineMeta } from './start-workout-model';
 import { trainingRoutineColor } from './routine-colors';
 
 type Props = {
+  /** Preselects a free session (Home's "Entrenar libre"). */
+  initialFree?: boolean;
   initialRoutineId?: string;
   onClose: () => void;
   onContinue: (sessionId: string) => void;
@@ -52,12 +54,13 @@ function Choice({
   );
 }
 
-export function StartWorkoutModal({ initialRoutineId, onClose, onContinue, onStarted, startImmediately = false }: Props & { startImmediately?: boolean }) {
+export function StartWorkoutModal({ initialFree, initialRoutineId, onClose, onContinue, onStarted, startImmediately = false }: Props & { startImmediately?: boolean }) {
   const { colors, isDark } = useOwnlevelTheme();
-  const { active, activeSession, close, error, keyConflict, pending, routineRead, routineResource, routineConfirmed, routines, selected, select, submit, verifiedNoActive } = useWorkoutStart({ initialRoutineId, onClose, onStarted });
+  const { active, activeSession, close, error, keyConflict, pending, routineRead, routineResource, routineConfirmed, routines, selected, select, submit, verifiedNoActive } = useWorkoutStart({ initialFree, initialRoutineId, onClose, onStarted });
   const attempted = useRef(false);
   useEffect(() => {
-    if (startImmediately && !attempted.current && verifiedNoActive && routineConfirmed && selected?.kind === 'routine') {
+    const ready = selected?.kind === 'routine' ? routineConfirmed : selected?.kind === 'free';
+    if (startImmediately && !attempted.current && verifiedNoActive && ready) {
       attempted.current = true;
       void submit();
     }

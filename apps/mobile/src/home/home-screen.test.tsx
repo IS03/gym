@@ -20,7 +20,8 @@ const mockFetchProgressBody = jest.fn<(...args: unknown[]) => Promise<unknown>>(
 const mockFetchProgressWeek = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockFetchProgressRecords = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockConfigOpen = jest.fn();
-type MockModalProps = { onClose: () => void; onContinue: (id: string) => void; onStarted: (id: string) => void };
+type MockModalProps = { initialFree?: boolean; initialRoutineId?: string; onClose: () => void; onContinue: (id: string) => void;
+  onStarted: (id: string) => void; startImmediately?: boolean };
 let mockModalProps: MockModalProps | null = null;
 
 jest.mock('expo-router', () => ({
@@ -28,6 +29,10 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => { mockFocusEffects.push(effect); },
 }));
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
+jest.mock('@expo/ui', () => {
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { Host: View, RNHostView: View, BottomSheet: ({ isPresented, children }: { isPresented: boolean; children: React.ReactNode }) => isPresented ? <View testID="mock-sheet">{children}</View> : null };
+});
 jest.mock('./home-add-menu', () => {
   const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { HomeAddMenu: ({ habituals, onAll, onFood, onHabitual, onManual }: import('./home-add-menu.types').HomeAddMenuProps) => (
@@ -107,6 +112,8 @@ async function renderScreen() {
 }
 // Lets refreshes triggered by an action resolve inside act (no state updates after the test).
 const settle = () => act(async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); });
+// The start modal opens after the sheet's dismissal (SHEET_DISMISS_MS).
+const afterSheet = () => act(() => new Promise<void>(resolve => { setTimeout(resolve, 400); }));
 const focus = async () => { act(() => { mockFocusEffects.at(-1)!(); }); await settle(); };
 const allFetchers = () => [mockFetchHome, mockFetchDay, mockFetchQuick, mockFetchReport, mockFetchHistory,
   mockFetchProgressBody, mockFetchProgressRecords];
@@ -191,64 +198,82 @@ describe('Home screen', () => {
     ]);
   });
 
-  it('Registrar opens the weight entry, today\'s metrics editor and all metrics', async () => {
+  it('Métricas opens today\'s metrics editor and all metrics; weight is not here', async () => {
     const view = await renderScreen();
     const register = within(view.getByTestId('home-register'));
-    fireEvent.press(register.getByTestId('home-register-weight'));
+    expect(register.queryByText('Peso')).toBeNull();
     fireEvent.press(register.getByRole('button', { name: 'Sueño, Cargar' }));
     fireEvent.press(register.getByRole('button', { name: 'Más, Métricas' }));
     expect(mockPush.mock.calls).toEqual([
-      [{ pathname: '/(tabs)/progress/body', params: { registrar: 'peso' } }],
       [{ pathname: '/(tabs)/progress/metrics', params: { editar: 'metricas' } }],
       ['/(tabs)/progress/metrics'],
     ]);
   });
 
-  it('Ver detalle opens the finished session; a strip day opens that day in the history', async () => {
+  it('a session row opens the finished session; a strip day opens that day; calories per day opens this week\'s report', async () => {
     mockFetchHistory.mockImplementation(() => ok({ sessions: [{ id: 's', routineId: null, routineName: 'Push', routineColor: null, logDate: '2026-10-06',
       startedAt: '2026-10-06T12:00:00.000Z', endedAt: '2026-10-06T13:00:00.000Z', durationMilliseconds: 3_600_000, exercisesCompleted: 6, completedSets: 18, volumeKg: null }], nextCursor: null }));
     const view = await renderScreen();
-    fireEvent.press(view.getByRole('button', { name: 'Ver detalle' }));
+    fireEvent.press(view.getByRole('button', { name: 'Push. 55 min · 18 series' }));
     fireEvent.press(view.getByTestId('home-week-day-2026-10-06'));
+    fireEvent.press(view.getByTestId('home-week-calories'));
     expect(mockPush.mock.calls).toEqual([
       [{ pathname: '/(tabs)/train/history/[id]', params: { id: 'done-1' } }],
       [{ pathname: '/history/day/[date]', params: { date: '2026-10-06' } }],
+      [{ pathname: '/(tabs)/nutrition/reports', params: { period: 'custom', from: '2026-10-05', to: '2026-10-10' } }],
     ]);
   });
 
-  it('Elegir rutina reuses StartWorkoutModal and follows the session it reports', async () => {
+  it('"Arrancar rutina" opens the sheet; a routine starts right away through StartWorkoutModal and Home follows the session', async () => {
     const data = homeData();
     if (data.training.week.status === 'ok') data.training.week.data.todaySessions = [];
     mockFetchHome.mockImplementation(() => ok(data));
+    mockFetchHistory.mockImplementation(() => ok({ sessions: [{ id: 's', routineId: 'r1', routineName: 'Push', routineColor: null, logDate: '2026-10-06',
+      startedAt: '2026-10-06T12:00:00.000Z', endedAt: '2026-10-06T13:14:00.000Z', durationMilliseconds: 74 * 60_000, exercisesCompleted: 6, completedSets: 21, volumeKg: null }], nextCursor: null }));
     const view = await renderScreen();
+    expect(view.queryByText('¿Qué entrenás hoy?')).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
+    expect(view.getByText('¿Qué entrenás hoy?')).toBeTruthy();
+    expect(view.getByText('Todavía no tenés una planificación activa. Elegí una rutina para empezar.')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Push. Última vez: 1 h 14 min · 21 series' }));
+    expect(view.queryByText('¿Qué entrenás hoy?')).toBeNull();
     expect(view.queryByText('start-workout-modal')).toBeNull();
-    fireEvent.press(view.getByRole('button', { name: 'Elegir rutina' }));
-    expect(view.getByText('start-workout-modal')).toBeTruthy();
+    await afterSheet();
+    expect(mockModalProps).toMatchObject({ initialRoutineId: 'r1', startImmediately: true });
     expect(mockNavigate).not.toHaveBeenCalled();
 
     act(() => mockModalProps!.onStarted('started-1'));
-
     await settle();
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/started-1');
     expect(view.queryByText('start-workout-modal')).toBeNull();
 
-    fireEvent.press(view.getByRole('button', { name: 'Elegir rutina' }));
+    // An active session found by the modal is continued, never duplicated.
+    fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
+    fireEvent.press(view.getByRole('button', { name: 'Entrenar libre' }));
+    await afterSheet();
+    expect(mockModalProps).toMatchObject({ initialFree: true, startImmediately: true });
     act(() => mockModalProps!.onContinue('active-9'));
     await settle();
     expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/train/session/active-9');
 
-    fireEvent.press(view.getByRole('button', { name: 'Elegir rutina' }));
+    fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
+    fireEvent.press(view.getByRole('button', { name: 'Push. Última vez: 1 h 14 min · 21 series' }));
+    await afterSheet();
     act(() => mockModalProps!.onClose());
     expect(view.queryByText('start-workout-modal')).toBeNull();
   });
 
-  it('Entrenar otra vez opens the same verified start flow after a completed session', async () => {
+  it('"+ Nueva sesión" after a completed session opens the same sheet; without routines it offers creating one', async () => {
+    const data = homeData();
+    data.training.workoutStartRoutines = { status: 'ok', data: [] };
+    mockFetchHome.mockImplementation(() => ok(data));
     const view = await renderScreen();
-    fireEvent.press(view.getByRole('button', { name: 'Entrenar otra vez' }));
-    expect(view.getByText('start-workout-modal')).toBeTruthy();
-    act(() => mockModalProps!.onStarted('second-session'));
-    await settle();
-    expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/train/session/second-session');
+    fireEvent.press(view.getByRole('button', { name: '+ Nueva sesión' }));
+    expect(view.getByText('Todavía no tenés rutinas. Creá una o entrená libre.')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Crear rutina' }));
+    await afterSheet();
+    expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/train/routines');
+    expect(view.queryByText('start-workout-modal')).toBeNull();
   });
 
   it('opens each progress detail preserving its period and exercise identity', async () => {

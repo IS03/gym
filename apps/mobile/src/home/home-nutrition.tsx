@@ -1,95 +1,19 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
 
 import type { MobileHomeResponse } from '@/api/home';
 import type { HistoryDay } from '@/api/history';
 import type { QuickOption, QuickOptions } from '@/api/nutrition-quick';
-import {
-  AppIcon,
-  AppText,
-  InlineUnavailable,
-  SkeletonBlock,
-  brandTokens,
-  radius,
-  spacing,
-  useOwnlevelTheme,
-} from '@/design-system';
+import { AppIcon, AppText, InlineUnavailable, SkeletonBlock, atmosphere, brandTokens, fadeGradient, rgba, spacing, useOwnlevelTheme } from '@/design-system';
 
 import { HomeAddMenu } from './home-add-menu';
 import { formatDecimal, formatInteger } from './format';
 import type { HomeResource } from './home-resource';
-import { HomeCard } from './home-ui';
+import { HEADER_SLACK, homeLayout } from './home-layout';
+import { HomeBar, HomeSectionTitle, useHomeGutter } from './home-ui';
+import { BigNumber } from './home-week';
 
-/** Existing Nutrition flows reachable from the "+" menu. */
+/** Existing Nutrition flows reachable from the "+ Comida" menu. */
 export type HomeMealEntry = 'manual' | 'food' | 'quick';
-
-const OUTER = 132;
-const INNER = 104;
-const STROKE = 14;
-
-/**
- * Lámina 90 colors, all from the brand tokens: calories = the accent; protein = the lighter
- * champagne (an intensity step in light, heroFrom in dark); carbs = secondary grey; fat = a
- * lighter intensity step.
- */
-function useMacroColors() {
-  const { colors, isDark } = useOwnlevelTheme();
-  const scheme = isDark ? 'dark' : 'light';
-  const palette = brandTokens.palette[scheme];
-  return {
-    calories: colors.primary,
-    carbs: colors.textMuted,
-    // Dark: a visible step of the intensity scale (the track color would hide the segment).
-    fat: isDark ? brandTokens.intensity.dark[2] : brandTokens.intensity.light[1],
-    protein: isDark ? palette.heroFrom : brandTokens.intensity.light[2],
-    track: colors.surfaceRaised,
-  };
-}
-
-function Arc({ color, fraction, size, track }: { color: string; fraction: number; size: number; track: string }) {
-  const r = (size - STROKE) / 2;
-  const circumference = 2 * Math.PI * r;
-  const filled = Math.min(1, Math.max(0, fraction)) * circumference;
-  return (
-    <Svg height={size} width={size}>
-      <Circle cx={size / 2} cy={size / 2} fill="none" r={r} stroke={track} strokeWidth={STROKE} />
-      {filled > 0 ? (
-        <Circle cx={size / 2} cy={size / 2} fill="none" origin={`${size / 2}, ${size / 2}`} r={r} rotation={-90}
-          stroke={color} strokeDasharray={`${filled} ${circumference}`} strokeLinecap="round" strokeWidth={STROKE} />
-      ) : null}
-    </Svg>
-  );
-}
-
-/** Concentric rings: outside calories, inside protein; what is left (or over) in the center. */
-function Rings({ calories, centerLabel, centerValue, protein }: { calories: number; centerLabel: string; centerValue: string; protein: number }) {
-  const colors = useMacroColors();
-  return (
-    <View accessible accessibilityLabel={`${centerValue} ${centerLabel}`} style={styles.rings} testID="home-calorie-ring">
-      <View style={StyleSheet.absoluteFill}><Arc color={colors.calories} fraction={calories} size={OUTER} track={colors.track} /></View>
-      <View style={styles.inner}><Arc color={colors.protein} fraction={protein} size={INNER} track={colors.track} /></View>
-      <View style={styles.center}>
-        <AppText numeric style={styles.centerValue}>{centerValue}</AppText>
-        <AppText muted style={styles.centerLabel}>{centerLabel}</AppText>
-      </View>
-    </View>
-  );
-}
-
-function Legend({ color, label, target, unit, value }: { color: string; label: string; target: number | null; unit: string; value: string }) {
-  return (
-    <View style={styles.legend}>
-      <View style={styles.legendHead}>
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <AppText muted style={styles.legendLabel}>{label}</AppText>
-      </View>
-      <AppText numeric style={styles.legendValue}>
-        {value}
-        <AppText muted numeric variant="footnote">{target !== null ? ` / ${formatDecimal(target)} ${unit}` : ` ${unit}`}</AppText>
-      </AppText>
-    </View>
-  );
-}
 
 type DayNutrient = 'carbsG' | 'fatG';
 
@@ -116,38 +40,26 @@ export function calorieSplit(proteinG: number, carbsG: number | null | undefined
 
 const percent = (share: number) => `${Math.round(share * 100)} %`;
 
-function Split({ carbsG, fatG, proteinG }: { carbsG: number | null | undefined; fatG: number | null | undefined; proteinG: number }) {
-  const colors = useMacroColors();
+/** Three columns: grams of each macro and its share of the calories. */
+function Legend({ band, carbsG, fatG, proteinG }: { band: BandColors; carbsG: number | null | undefined; fatG: number | null | undefined; proteinG: number }) {
   const split = calorieSplit(proteinG, carbsG, fatG);
   const grams = (value: number | null | undefined) => (value === undefined ? null : value === null ? '—' : `${formatDecimal(Math.round(value))} g`);
   const items = [
-    { color: colors.protein, key: 'protein', label: 'Proteína', share: split?.protein, value: grams(proteinG) },
-    { color: colors.carbs, key: 'carbs', label: 'Carbos', share: split?.carbs, value: grams(carbsG) },
-    { color: colors.fat, key: 'fat', label: 'Grasas', share: split?.fat, value: grams(fatG) },
+    { key: 'protein', label: 'Proteína', share: split?.protein, value: grams(proteinG) },
+    { key: 'carbs', label: 'Carbos', share: split?.carbs, value: grams(carbsG) },
+    { key: 'fat', label: 'Grasas', share: split?.fat, value: grams(fatG) },
   ];
   return (
-    <View style={styles.split} testID="home-calorie-split">
-      <AppText muted variant="footnote">Reparto de calorías</AppText>
-      <View accessibilityLabel={split ? items.map(item => `${item.label} ${percent(item.share!)}`).join(', ') : 'Sin reparto todavía'}
-        accessible style={[styles.splitBar, { backgroundColor: colors.track }]}>
-        {split ? items.map(item => <View key={item.key} style={{ backgroundColor: item.color, flex: item.share }} testID={`home-split-${item.key}`} />) : null}
-      </View>
-      <View style={styles.splitItems}>
-        {items.map(item => (
-          <View key={item.key} style={styles.splitItem}>
-            <View style={styles.legendHead}>
-              <View style={[styles.square, { backgroundColor: item.color }]} />
-              <AppText muted variant="caption">{item.label}</AppText>
-            </View>
-            {item.value === null ? <SkeletonBlock height={16} width={48} /> : (
-              <AppText numeric style={styles.splitValue}>
-                {item.value}
-                {item.share !== undefined ? <AppText muted numeric variant="caption">{` · ${percent(item.share)}`}</AppText> : null}
-              </AppText>
-            )}
-          </View>
-        ))}
-      </View>
+    <View style={[styles.legend, { borderTopColor: band.hairline }]} testID="home-calorie-split">
+      {items.map(item => (
+        <View accessibilityLabel={item.value === null ? undefined : `${item.label}: ${item.value}${item.share !== undefined ? `, ${percent(item.share)} de las calorías` : ''}`}
+          accessible={item.value !== null} key={item.key} style={styles.legendItem} testID={`home-split-${item.key}`}>
+          <AppText style={{ color: band.textMuted }} variant="footnote">{item.label}</AppText>
+          {item.value === null ? <SkeletonBlock height={18} style={{ backgroundColor: band.track }} width={64} /> : (
+            <AppText numeric variant="headline">{item.share !== undefined ? `${item.value} · ${percent(item.share)}` : item.value}</AppText>
+          )}
+        </View>
+      ))}
     </View>
   );
 }
@@ -158,6 +70,31 @@ export function homeHabituals(options: QuickOptions | undefined, limit = 2): Qui
   const suggested = options.suggested.status === 'ok' ? options.suggested.items : [];
   const saved = options.saved.status === 'ok' ? options.saved.items : [];
   return [...suggested, ...saved].slice(0, limit);
+}
+
+type BandColors = { hairline: string; rgb: string; textMuted: string; track: string };
+
+/**
+ * Nutrition's band: the glow tone, faded at the top and bottom edges. Tracks, hairline and
+ * bars are brand colors; the light band only needs a darker secondary grey for contrast.
+ */
+function useBandColors(): BandColors {
+  const { colors, isDark } = useOwnlevelTheme();
+  const scheme = atmosphere[isDark ? 'dark' : 'light'];
+  return isDark
+    ? { hairline: colors.border, rgb: scheme.band, textMuted: scheme.bandTextMuted ?? colors.textMuted, track: colors.surfaceRaised }
+    : { hairline: brandTokens.intensity.light[1], rgb: scheme.band, textMuted: scheme.bandTextMuted ?? colors.textMuted, track: brandTokens.intensity.light[1] };
+}
+
+/** Three layers instead of a measured gradient: fade in, solid, fade out. Only the band has alpha. */
+function BandBackground({ rgb }: { rgb: string }) {
+  return (
+    <>
+      <View pointerEvents="none" style={[styles.fadeTop, { experimental_backgroundImage: fadeGradient(rgb, 'in') }]} testID="home-band-fade-top" />
+      <View pointerEvents="none" style={[styles.solid, { backgroundColor: rgba(rgb, 1) }]} testID="home-band-solid" />
+      <View pointerEvents="none" style={[styles.fadeBottom, { experimental_backgroundImage: fadeGradient(rgb, 'out') }]} testID="home-band-fade-bottom" />
+    </>
+  );
 }
 
 export function HomeNutrition({
@@ -171,75 +108,104 @@ export function HomeNutrition({
   today: HomeResource<HistoryDay>;
 }) {
   const { colors } = useOwnlevelTheme();
-  const macroColors = useMacroColors();
+  const band = useBandColors();
+  const gutter = useHomeGutter();
   const nutrition = home.data?.nutrition;
-  const header = (
-    <View style={styles.header}>
-      <View style={styles.title}>
-        <AppIcon color={colors.primary} name="nutrition" size={16} />
-        <AppText accessibilityRole="header" style={[styles.titleText, { color: colors.primary }]}>Nutrición</AppText>
-      </View>
-      <HomeAddMenu habituals={homeHabituals(quick.data)} onAll={() => onMealEntry('quick')} onFood={() => onMealEntry('food')}
-        onHabitual={onQuickMeal} onManual={() => onMealEntry('manual')} />
-    </View>
-  );
-  if (!nutrition) {
-    return <HomeCard testID="home-nutrition-loading">{header}<SkeletonBlock height={OUTER} /><SkeletonBlock height={48} /></HomeCard>;
-  }
-  if (nutrition.status === 'unavailable') {
-    return <HomeCard testID="home-nutrition">{header}<InlineUnavailable message="No pudimos cargar Nutrición." /></HomeCard>;
-  }
-  const n = nutrition.data;
-  const target = n.calorieTarget;
-  const over = target !== null && n.calories > target;
-  // Nothing logged yet is 0 for the day so far: empty rings and the whole target left.
+  // Full-bleed band: edge to edge, no radius, border or shadow; the gutter lives inside.
   return (
-    <HomeCard testID="home-nutrition">
-      {header}
+    <View style={[styles.band, gutter]} testID={!nutrition ? 'home-nutrition-loading' : 'home-nutrition'}>
+      <BandBackground rgb={band.rgb} />
+      <HomeSectionTitle title="Nutrición">
+        <HomeAddMenu habituals={homeHabituals(quick.data)} onAll={() => onMealEntry('quick')} onFood={() => onMealEntry('food')}
+          onHabitual={onQuickMeal} onManual={() => onMealEntry('manual')} />
+      </HomeSectionTitle>
       <View style={styles.body}>
-        <Rings
-          calories={target !== null && target > 0 ? n.calories / target : target === 0 ? 1 : 0}
-          centerLabel={target === null ? 'consumidas' : over ? 'de más' : 'restantes'}
-          centerValue={formatInteger(target === null ? n.calories : Math.abs(target - n.calories))}
-          protein={n.proteinTargetG !== null && n.proteinTargetG > 0 ? n.proteinG / n.proteinTargetG : 0}
-        />
-        <View style={styles.legends}>
-          <Legend color={macroColors.calories} label="Calorías" target={target} unit="kcal" value={formatInteger(n.calories)} />
-          <Legend color={macroColors.protein} label="Proteína" target={n.proteinTargetG} unit="g" value={formatDecimal(Math.round(n.proteinG))} />
-        </View>
+        {!nutrition ? (
+          <View style={styles.loading}>
+            <SkeletonBlock height={41} style={{ backgroundColor: band.track }} width={180} />
+            <SkeletonBlock height={8} style={{ backgroundColor: band.track }} />
+            <SkeletonBlock height={44} style={{ backgroundColor: band.track }} />
+          </View>
+        ) : nutrition.status === 'unavailable' ? (
+          <InlineUnavailable message="No pudimos cargar Nutrición." />
+        ) : (
+          <NutritionBody band={band} colors={{ primary: colors.primary, protein: colors.textMuted }} n={nutrition.data} onConfigure={onConfigure} today={today} />
+        )}
       </View>
-      {target === null ? (
-        <Pressable accessibilityRole="button" hitSlop={8} onPress={onConfigure} style={styles.link}>
-          <AppText style={{ color: colors.primary }} variant="subheadline">Configurá tu objetivo de calorías</AppText>
-          <AppIcon color={colors.primary} name="chevronRight" size={15} />
-        </Pressable>
-      ) : null}
-      <Split carbsG={dayNutrient(today, 'carbsG')} fatG={dayNutrient(today, 'fatG')} proteinG={n.proteinG} />
-    </HomeCard>
+    </View>
   );
 }
 
+type NutritionData = Extract<MobileHomeResponse['nutrition'], { status: 'ok' }>['data'];
+
+function NutritionBody({ band, colors, n, onConfigure, today }: {
+  band: BandColors; colors: { primary: string; protein: string }; n: NutritionData; onConfigure: () => void; today: HomeResource<HistoryDay>;
+}) {
+  const target = n.calorieTarget;
+  const over = target !== null && n.calories > target;
+  const consumed = formatInteger(n.calories);
+  const proteinTarget = n.proteinTargetG;
+  const protein = formatDecimal(Math.round(n.proteinG));
+  // Nothing logged yet is 0 for the day so far: an empty bar and the whole target left.
+  const left = target === null ? null : { label: over ? 'de más' : 'restantes', value: formatInteger(Math.abs(target - n.calories)) };
+  return (
+    <View>
+      <View accessible accessibilityLabel={`Calorías consumidas: ${consumed}${target !== null && left ? ` de ${formatInteger(target)} kcal, ${left.value} ${left.label}` : ' kcal'}`}
+        style={styles.calories} testID="home-calories">
+        <View style={styles.flex}>
+          <BigNumber mutedColor={band.textMuted} unit={target !== null ? `/ ${formatInteger(target)} kcal` : 'kcal'} value={consumed} />
+          <AppText style={{ color: band.textMuted }} variant="subheadline">Calorías consumidas</AppText>
+        </View>
+        {left ? (
+          <View style={styles.left} testID="home-calories-left">
+            <AppText numeric style={{ color: band.textMuted }} variant="subheadline">{left.value}</AppText>
+            <AppText style={{ color: band.textMuted }} variant="subheadline">{left.label}</AppText>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.caloriesBar}>
+        {target !== null ? (
+          <HomeBar color={colors.primary} fraction={target > 0 ? n.calories / target : 1} height={8} testID="home-calorie-bar" track={band.track} />
+        ) : (
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={onConfigure} style={styles.link}>
+            <AppText style={{ color: colors.primary }} variant="subheadline">Configurá tu objetivo de calorías</AppText>
+            <AppIcon color={colors.primary} name="chevronRight" size={15} />
+          </Pressable>
+        )}
+      </View>
+      <View style={styles.protein}>
+        <View accessible accessibilityLabel={`Proteína: ${protein}${proteinTarget !== null ? ` de ${formatDecimal(proteinTarget)} g` : ' g'}`} style={styles.proteinRow}>
+          <AppText variant="body">Proteína</AppText>
+          <AppText numeric variant="headline">{proteinTarget !== null ? `${protein} / ${formatDecimal(proteinTarget)} g` : `${protein} g`}</AppText>
+        </View>
+        {proteinTarget !== null ? (
+          <View style={styles.proteinBar}>
+            <HomeBar color={colors.protein} fraction={proteinTarget > 0 ? n.proteinG / proteinTarget : 1} height={5} testID="home-protein-bar" track={band.track} />
+          </View>
+        ) : null}
+      </View>
+      <Legend band={band} carbsG={dayNutrient(today, 'carbsG')} fatG={dayNutrient(today, 'fatG')} proteinG={n.proteinG} />
+    </View>
+  );
+}
+
+const { band } = homeLayout;
+
 const styles = StyleSheet.create({
-  body: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl },
-  center: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
-  centerLabel: { fontSize: 11, lineHeight: 13 },
-  centerValue: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, lineHeight: 26 },
-  dot: { borderRadius: radius.full, height: 8, width: 8 },
-  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 32 },
-  inner: { left: (OUTER - INNER) / 2, position: 'absolute', top: (OUTER - INNER) / 2 },
-  legend: { gap: 1 },
-  legendHead: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  legendLabel: { fontSize: 13, fontWeight: '600' },
-  legendValue: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, lineHeight: 27 },
-  legends: { flex: 1, gap: spacing.md, minWidth: 140 },
-  link: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 2, minHeight: 32 },
-  rings: { height: OUTER, width: OUTER },
-  split: { gap: spacing.sm },
-  splitBar: { borderRadius: radius.full, flexDirection: 'row', gap: 2, height: 10, overflow: 'hidden' },
-  splitItem: { flex: 1, gap: 2, minWidth: 0 },
-  splitItems: { flexDirection: 'row', gap: spacing.sm },
-  splitValue: { fontSize: 15, fontWeight: '600' },
-  square: { borderRadius: 2, height: 8, width: 8 },
-  title: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  titleText: { fontSize: 15, fontWeight: '600' },
+  band: { paddingBottom: band.paddingBottom, paddingTop: band.paddingTop - HEADER_SLACK },
+  fadeBottom: { bottom: 0, height: band.fade, left: 0, position: 'absolute', right: 0 },
+  fadeTop: { height: band.fade, left: 0, position: 'absolute', right: 0, top: 0 },
+  solid: { bottom: band.fade, left: 0, position: 'absolute', right: 0, top: band.fade },
+  body: { marginTop: homeLayout.titleToContent - HEADER_SLACK },
+  calories: { alignItems: 'flex-end', flexDirection: 'row', gap: spacing.sm },
+  caloriesBar: { marginTop: band.caloriesToBar },
+  flex: { flex: 1, minWidth: 0 },
+  left: { alignItems: 'flex-end' },
+  legend: { borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, marginTop: band.proteinBarToLegend, paddingTop: band.legendPaddingTop },
+  legendItem: { flex: 1, gap: 2, minWidth: 0 },
+  link: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 2, minHeight: 44 },
+  loading: { gap: spacing.md },
+  protein: { marginTop: band.barToProtein },
+  proteinBar: { marginTop: band.proteinToBar },
+  proteinRow: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between' },
 });

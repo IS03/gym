@@ -12,13 +12,13 @@ jest.mock('@expo/ui/swift-ui', () => {
   return {
     Button: ({ label, onPress }: { label: string; onPress: () => void }) => <Pressable accessibilityRole="button" onPress={onPress}><Text>{label}</Text></Pressable>,
     Host: ({ children }: { children: React.ReactNode }) => <View>{children}</View>,
-    Image: () => null,
+    Text: ({ children }: { children: React.ReactNode }) => <Text>{children}</Text>,
     Menu: ({ children, label }: { children: React.ReactNode; label: React.ReactNode }) => <View testID="native-menu">{label}{children}</View>,
     Section: ({ children, title }: { children: React.ReactNode; title: string }) => <View><Text>{title}</Text>{children}</View>,
   };
 });
 jest.mock('@expo/ui/swift-ui/modifiers', () => ({
-  accessibilityLabel: (label: string) => ({ label }), background: () => ({}), frame: () => ({}), shapes: { circle: () => ({}) },
+  accessibilityLabel: (label: string) => ({ label }), font: () => ({}), foregroundStyle: () => ({}),
 }));
 
 const option = (id: string, name: string): QuickOption => ({
@@ -26,11 +26,12 @@ const option = (id: string, name: string): QuickOption => ({
   calories: 1, proteinG: null, carbsG: null, fatG: null, useCount: 3, lastUsedDate: '2026-10-09',
 });
 
-describe('Nutrition "+" native menu (iOS)', () => {
+describe('Nutrition "+ Comida" native menu (iOS)', () => {
   it('lists Comida manual, Buscar alimento, the Habituales section and Ver todas, each calling its flow', () => {
     const handlers = { onAll: jest.fn(), onFood: jest.fn(), onHabitual: jest.fn(), onManual: jest.fn() };
     const habituals = [option('00000000-0000-4000-8000-000000000001', 'YOGURT CASERO'), option('00000000-0000-4000-8000-000000000002', 'Batido')];
     const view = render(<OwnlevelThemeProvider initialMode="light"><HomeAddMenu habituals={habituals} {...handlers} /></OwnlevelThemeProvider>);
+    expect(view.getByText('+ Comida')).toBeTruthy();
     expect(view.getByText('Habituales')).toBeTruthy();
     fireEvent.press(view.getByText('Comida manual'));
     fireEvent.press(view.getByText('Buscar alimento'));

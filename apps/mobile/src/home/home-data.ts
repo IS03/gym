@@ -12,8 +12,15 @@ import { fetchTrainingHistory, type TrainingHistorySession } from '@/api/trainin
 
 import { homeDay } from './home-day';
 
-/** Completed sessions of the current week (Monday → today) plus whether the user ever trained. */
-export type HomeTrainingWeek = { weekStart: string; sessions: TrainingHistorySession[]; everTrained: boolean };
+/**
+ * Completed sessions of the current week (Monday → today) plus whether the user ever trained.
+ * `recent` keeps every session read on the way (newest first) and `historyComplete` says
+ * whether that is the whole history: the start sheet's "Última vez" comes from here.
+ */
+export type HomeTrainingWeek = {
+  weekStart: string; sessions: TrainingHistorySession[]; everTrained: boolean;
+  recent: TrainingHistorySession[]; historyComplete: boolean;
+};
 
 const unavailable = {
   status: 'unavailable' as const,
@@ -28,6 +35,7 @@ export async function loadTrainingWeek(
   client: MobileApiClient, weekStart: string, signal?: AbortSignal,
 ): Promise<MobileApiReadResult<HomeTrainingWeek>> {
   const sessions: TrainingHistorySession[] = [];
+  const recent: TrainingHistorySession[] = [];
   let cursor: string | null = null;
   let everTrained = false;
   for (let page = 0; page < MAX_WEEK_PAGES; page++) {
@@ -35,13 +43,14 @@ export async function loadTrainingWeek(
     if (result.status !== 'ok') return result;
     if (result.data.sessions.length > 0) everTrained = true;
     let reachedOlder = false;
+    recent.push(...result.data.sessions);
     for (const session of result.data.sessions) {
       if (session.logDate >= weekStart) sessions.push(session);
       else reachedOlder = true;
     }
     cursor = result.data.nextCursor;
     if (reachedOlder || !cursor) {
-      return { status: 'ok', data: { weekStart, sessions, everTrained }, meta: result.meta };
+      return { status: 'ok', data: { weekStart, sessions, everTrained, recent, historyComplete: !cursor }, meta: result.meta };
     }
   }
   // More history than the page budget inside one week: do not show partial week totals.

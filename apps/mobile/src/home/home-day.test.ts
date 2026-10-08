@@ -30,7 +30,7 @@ describe('Home day semantics (same as the server: Córdoba day, Monday week)', (
   });
 
   it('formats the header date and the age of the last confirmed read', () => {
-    expect(headerDate('2026-10-10')).toBe('SÁBADO 10 DE OCTUBRE');
+    expect(headerDate('2026-10-10')).toBe('Sábado 10 de octubre');
     expect(readAge(0, 30_000)).toBe('hace un momento');
     expect(readAge(0, 5 * 60_000)).toBe('hace 5 min');
     expect(readAge(0, 2 * 3_600_000)).toBe('hace 2 h');
@@ -55,7 +55,8 @@ describe('loadTrainingWeek', () => {
     mockFetchHistory.mockReset();
     mockFetchHistory.mockResolvedValueOnce({ status: 'ok', meta, data: { sessions: [session('a', '2026-10-07'), session('b', '2026-10-05'), session('c', '2026-10-02')], nextCursor: 'x' } });
     const result = await loadTrainingWeek(client, '2026-10-05');
-    expect(result).toEqual({ status: 'ok', meta, data: { weekStart: '2026-10-05', everTrained: true, sessions: [session('a', '2026-10-07'), session('b', '2026-10-05')] } });
+    expect(result).toEqual({ status: 'ok', meta, data: { weekStart: '2026-10-05', everTrained: true, sessions: [session('a', '2026-10-07'), session('b', '2026-10-05')],
+      recent: [session('a', '2026-10-07'), session('b', '2026-10-05'), session('c', '2026-10-02')], historyComplete: false } });
     expect(mockFetchHistory).toHaveBeenCalledTimes(1);
   });
 
@@ -66,12 +67,13 @@ describe('loadTrainingWeek', () => {
       .mockResolvedValueOnce({ status: 'ok', meta, data: { sessions: [session('b', '2026-10-06')], nextCursor: null } });
     const result = await loadTrainingWeek(client, '2026-10-05');
     expect(result.status === 'ok' && result.data.sessions.map(s => s.id)).toEqual(['a', 'b']);
+    expect(result.status === 'ok' && [result.data.recent.map(s => s.id), result.data.historyComplete]).toEqual([['a', 'b'], true]);
     expect(mockFetchHistory.mock.calls.map(([, cursor]) => cursor)).toEqual([null, 'p2']);
 
     mockFetchHistory.mockReset();
     mockFetchHistory.mockResolvedValueOnce({ status: 'ok', meta, data: { sessions: [], nextCursor: null } });
     const empty = await loadTrainingWeek(client, '2026-10-05');
-    expect(empty.status === 'ok' && empty.data).toEqual({ weekStart: '2026-10-05', everTrained: false, sessions: [] });
+    expect(empty.status === 'ok' && empty.data).toEqual({ weekStart: '2026-10-05', everTrained: false, sessions: [], recent: [], historyComplete: true });
   });
 
   it('a failed page is unavailable, never a partial week', async () => {

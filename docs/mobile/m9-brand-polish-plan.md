@@ -307,6 +307,24 @@ Misma marca y tokens que Mobile, con patrones web propios: sin tab bar flotante,
 - **Ajustes:** tarjeta de perfil e íconos de filas a decidir.
 - **Restantes `TextInput` propios** (≈20 archivos) a migrar a `TextField` dentro de cada pantalla.
 
+### 9c. Atmósfera de fondo (M9.3 Inicio V3) — a revisar al cierre de M9
+
+Colores nuevos que **no están en la paleta de marca** y viven aparte en `apps/mobile/src/design-system/atmosphere.ts` (los roles del tema solo mapean valores de marca). El modo oscuro mantiene la paleta oscura de marca; solo se agregaron estos:
+
+| Token | Claro | Oscuro | Uso |
+|---|---|---|---|
+| `glow` | rgb(228,222,201) `#E4DEC9` | rgb(42,39,32) `#2A2720` | Centro del resplandor de fondo |
+| `band` | rgb(228,222,201) `#E4DEC9` | rgb(31,29,24) `#1F1D18` | Franja de Nutrición en Inicio |
+| `bandTextMuted` | `#5F5D54` | — (gris de marca) | Gris secundario dentro de la franja clara: el gris de marca da ≈3,9:1 sobre `#E4DEC9`; este ≈4,8:1 |
+
+Dentro de la franja, pista y línea usan la escala de intensidad (claro `#CFC8B6`) o `elevated`/`border` (oscuro); barras y acento son los de marca.
+
+**Para registrar en `IDENTIDAD.md` (decisión pendiente):**
+- Degradados de fondo permitidos: un único resplandor radial fijo (elipse de radios 300 × 400, centro en 105 % / -4 %, stops 1 → 0,55 a 38 % → 0, mismo color con alpha 0, nunca `transparent`), detrás del contenido, estático, sin animación ni interacción.
+- Franjas tonales: solo la de Nutrición en Inicio, a ancho completo, con fundido vertical de 48 en cada borde; nada se transparenta a través de ella.
+- Dónde no van: sesión de entrenamiento activa (flujo de foco), sheets y modales, y por ahora bajo encabezados nativos opacos (cortarían el resplandor; extenderlo requiere encabezados transparentes, PR aparte junto con las ≈15 pantallas con fondo propio que todavía no usan `Screen`/`ScrollScreen`).
+- Agregar los tres tokens de arriba a la paleta (`tema/tokens.ts`) y su equivalente CSS para Web (`radial-gradient(ellipse 300px 400px at 105% -4%, …)`).
+
 ## 10. Exclusiones y zonas protegidas
 
 - **M3.3 Active Session está cerrado.** Sus archivos (`training/active-session-*`, `session-*`, `finish-session-sheet.tsx`, `completed-session-*`, `summary-slider.tsx`, `app/(tabs)/train/session/[id].tsx`) entran en M9.3 como cualquier pantalla, al final y **solo con cambios visuales**: no tocar drafts, autosave, CAS/conflictos, timer ni mutaciones. Ahí viven 2 de los 3 usos de `tabular-nums`, el check verde de set completado (C3) y hex hardcodeados.
