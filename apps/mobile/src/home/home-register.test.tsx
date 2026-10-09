@@ -8,6 +8,8 @@ import { OwnlevelThemeProvider } from '@/design-system';
 import { HomeRegister } from './home-register';
 
 let mockSupported = true;
+let mockReduced = false;
+jest.mock('@/design-system', () => ({ ...jest.requireActual<object>('@/design-system'), useReduceMotion: () => mockReduced }));
 jest.mock('expo-glass-effect', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { GlassView: View, isGlassEffectAPIAvailable: () => mockSupported, isLiquidGlassAvailable: () => mockSupported };
@@ -28,7 +30,7 @@ async function metrics() {
 }
 
 describe('Home metric controls', () => {
-  beforeEach(() => { jest.restoreAllMocks(); mockSupported = true; });
+  beforeEach(() => { jest.restoreAllMocks(); mockSupported = true; mockReduced = false; });
 
   it('all six metrics remain reachable, zero is logged, and Más is fixed outside the scroller', async () => {
     jest.spyOn(AccessibilityInfo, 'isReduceTransparencyEnabled').mockResolvedValue(false);
@@ -55,6 +57,27 @@ describe('Home metric controls', () => {
     expect(view.getByTestId('home-register-more-glass')).toBeTruthy();
     act(() => callback(true));
     expect(view.queryByTestId('home-register-more-glass')).toBeNull();
+  });
+
+  it('native expansion has top headroom and is not combined with a second press scale', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceTransparencyEnabled').mockResolvedValue(false);
+    const view = await metrics();
+    const scroller = view.getByTestId('home-register-scroll');
+    expect(StyleSheet.flatten(scroller.props.contentContainerStyle).paddingTop).toBe(20);
+    expect(scroller.props.removeClippedSubviews).toBe(false);
+    expect(StyleSheet.flatten(view.getByTestId('home-register-fixed-more').props.style).paddingTop).toBe(20);
+    expect(view.getByTestId('home-register-metric-m0-glass').props.isInteractive).toBe(true);
+    fireEvent(view.getByTestId('home-register-metric-m0'), 'pressIn');
+    expect(StyleSheet.flatten(view.getByTestId('home-register-metric-m0').props.style).transform).toBeUndefined();
+  });
+
+  it('Reduce Motion disables native expansion while retaining the metric action', async () => {
+    mockReduced = true;
+    jest.spyOn(AccessibilityInfo, 'isReduceTransparencyEnabled').mockResolvedValue(false);
+    const view = await metrics();
+    expect(view.getByTestId('home-register-metric-m0-glass').props.isInteractive).toBe(false);
+    fireEvent.press(view.getByTestId('home-register-metric-m0'));
+    expect(view.onRegister).toHaveBeenCalledWith({ kind: 'metric', metricId: 'm0' });
   });
 
   it('unsupported systems and Android never mount native glass', async () => {

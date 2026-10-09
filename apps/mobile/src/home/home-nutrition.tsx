@@ -1,18 +1,17 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 
 import type { MobileHomeResponse } from '@/api/home';
 import type { HistoryDay } from '@/api/history';
 import type { QuickOption, QuickOptions } from '@/api/nutrition-quick';
-import { AppIcon, AppText, InlineUnavailable, SkeletonBlock, spacing, useOwnlevelTheme, useReduceMotion } from '@/design-system';
+import { AppIcon, AppText, brandTokens, InlineUnavailable, SkeletonBlock, spacing, useOwnlevelTheme, useReduceMotion } from '@/design-system';
 
 import { HomeAddMenu } from './home-add-menu';
 import { formatDecimal, formatInteger } from './format';
 import type { HomeResource } from './home-resource';
 import { HEADER_SLACK, homeLayout } from './home-layout';
 import { HomeBar, HomeSectionTitle, useHomeGutter } from './home-ui';
-import { BigNumber } from './home-week';
+import { NutritionSwitchText } from './home-nutrition-switch';
 
 /** Existing Nutrition flows reachable from the "+ Comida" menu. */
 export type HomeMealEntry = 'manual' | 'food' | 'quick';
@@ -127,6 +126,18 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
 }) {
   const [remaining, setRemaining] = useState(false);
   const reduceMotion = useReduceMotion();
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const [x1, y1, x2, y2] = brandTokens.motion.easing;
+    const animation = Animated.timing(progress, {
+      toValue: remaining ? 1 : 0,
+      duration: reduceMotion ? brandTokens.motion.duration.fast : brandTokens.motion.duration.base,
+      easing: Easing.bezier(x1, y1, x2, y2),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduceMotion, remaining]);
   const target = n.calorieTarget;
   const over = target !== null && n.calories > target;
   const consumed = formatInteger(n.calories);
@@ -146,10 +157,13 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
       <Pressable accessibilityRole={canToggle ? 'button' : undefined} accessibilityHint={canToggle ? hint : undefined} disabled={!canToggle} onPress={toggle}
         accessibilityLabel={remaining && left ? `${calorieLabel}: ${left.value} kcal, objetivo ${formatInteger(target!)}` : `Calorías consumidas: ${consumed}${target !== null && left ? ` de ${formatInteger(target)} kcal, ${left.value} ${left.label}` : ' kcal'}`}
         style={styles.calories} testID="home-calories">
-        <Animated.View key={remaining ? 'remaining' : 'consumed'} entering={FadeIn.duration(reduceMotion ? 100 : 200)} style={styles.flex}>
-          <BigNumber mutedColor={band.textMuted} unit={target !== null ? `/ ${formatInteger(target)} kcal` : 'kcal'} value={remaining && left ? left.value : consumed} />
-          <AppText style={{ color: band.textMuted }} variant="subheadline">{calorieLabel}</AppText>
-        </Animated.View>
+        <View style={styles.numberRow}>
+          <NutritionSwitchText alternate={left?.value ?? consumed} direction={target !== null && Math.abs(target - n.calories) < n.calories ? -1 : 1}
+            numeric progress={progress} reduced={reduceMotion} remaining={remaining} testID="home-calorie-value" value={consumed} variant="largeTitle" />
+          <AppText numeric style={{ color: band.textMuted, paddingBottom: 4 }}>{target !== null ? `/ ${formatInteger(target)} kcal` : 'kcal'}</AppText>
+        </View>
+        <NutritionSwitchText alternate={left ? over ? 'Calorías por encima del objetivo' : 'Calorías restantes' : 'Calorías consumidas'} color={band.textMuted}
+          progress={progress} reduced={reduceMotion} remaining={remaining} testID="home-calorie-label" value="Calorías consumidas" variant="subheadline" />
       </Pressable>
       <View style={styles.caloriesBar}>
         {target !== null ? (
@@ -164,10 +178,14 @@ function NutritionBody({ band, colors, n, onConfigure, today }: {
       <View style={styles.protein}>
         <Pressable accessibilityRole={canToggle ? 'button' : undefined} accessibilityHint={canToggle ? hint : undefined} disabled={!canToggle} onPress={toggle}
           accessibilityLabel={`${proteinLabel}: ${remaining && proteinLeft !== null ? proteinLeft : protein}${proteinTarget !== null ? ` de ${formatDecimal(proteinTarget)} g` : ' g'}`} testID="home-protein">
-          <Animated.View key={remaining ? 'remaining' : 'consumed'} entering={FadeIn.duration(reduceMotion ? 100 : 200)} style={styles.proteinRow}>
-            <AppText variant="subheadline">{proteinLabel}</AppText>
-            <AppText numeric variant="headline">{proteinTarget !== null ? `${remaining ? proteinLeft : protein} / ${formatDecimal(proteinTarget)} g` : `${protein} g`}</AppText>
-          </Animated.View>
+          <View style={styles.proteinRow}>
+            <NutritionSwitchText alternate={proteinTarget !== null ? proteinOver ? 'Proteína por encima' : 'Proteína restante' : 'Proteína'}
+              progress={progress} reduced={reduceMotion} remaining={remaining} testID="home-protein-label" value="Proteína" variant="subheadline" />
+            <NutritionSwitchText alternate={proteinTarget !== null ? `${proteinLeft} / ${formatDecimal(proteinTarget)} g` : `${protein} g`}
+              direction={proteinTarget !== null && Math.abs(proteinTarget - n.proteinG) < n.proteinG ? -1 : 1} numeric
+              progress={progress} reduced={reduceMotion} remaining={remaining} testID="home-protein-value"
+              value={proteinTarget !== null ? `${protein} / ${formatDecimal(proteinTarget)} g` : `${protein} g`} variant="headline" />
+          </View>
         </Pressable>
         {proteinTarget !== null ? (
           <View style={styles.proteinBar}>
@@ -187,7 +205,7 @@ const styles = StyleSheet.create({
   body: { marginTop: homeLayout.titleToContent - HEADER_SLACK },
   calories: { minHeight: 44 },
   caloriesBar: { marginTop: band.caloriesToBar },
-  flex: { minWidth: 0 },
+  numberRow: { alignItems: 'flex-end', flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   legend: { borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: spacing.sm, marginTop: band.proteinBarToLegend, paddingTop: band.legendPaddingTop },
   legendItem: { flex: 1, gap: 2, minWidth: 0 },
   link: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 2, minHeight: 44 },

@@ -1,58 +1,60 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Animated, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { AppText, spacing, useOwnlevelTheme, useReduceMotion } from '@/design-system';
+import { spacing, useReduceMotion } from '@/design-system';
+import { HomePageControl } from './home-page-control';
 
 /** Swipe and explicit buttons expose the same pages, including to VoiceOver. */
 export function HomeCarousel({ pages }: { pages: { label: string; content: ReactNode }[] }) {
-  const { colors } = useOwnlevelTheme();
   const reduceMotion = useReduceMotion();
   const window = useWindowDimensions();
   const [width, setWidth] = useState(Math.max(1, window.width - 32));
   const [page, setPage] = useState(0);
   const currentPage = useRef(0);
-  const [heights, setHeights] = useState<Record<number, number>>({});
+  const [offset] = useState(() => new Animated.Value(0));
+  // Stable on the very first render: no tallest-page fallback or delayed measurements.
+  // Larger type gets a larger (still bounded) viewport; every page remains scrollable.
+  const height = Math.min(280, 176 * Math.max(1, window.fontScale));
   const scroll = useRef<ScrollView>(null);
   useEffect(() => {
     scroll.current?.scrollTo({ x: currentPage.current * width, animated: false });
   }, [width]);
-  const select = (index: number) => {
+  const select = useCallback((index: number) => {
     setPage(index);
     currentPage.current = index;
     scroll.current?.scrollTo({ x: index * width, animated: !reduceMotion });
-  };
+  }, [width, reduceMotion]);
+  const scrub = useCallback((position: number) => scroll.current?.scrollTo({ x: position * width, animated: false }), [width]);
   return (
     <View onLayout={event => {
       const next = event.nativeEvent.layout.width;
-      if (next > 0 && next !== width) { setHeights({}); setWidth(next); }
+      if (next > 0 && next !== width) setWidth(next);
     }} testID="home-week-carousel">
-      <View style={styles.tabs}>
-        {pages.map((item, index) => <Pressable accessibilityLabel={`Ver ${item.label.toLowerCase()} de esta semana`}
-          accessibilityRole="button" accessibilityState={{ selected: page === index }} key={item.label}
-          onPress={() => select(index)} style={[styles.tab, { borderBottomColor: page === index ? colors.primary : 'transparent' }]}
-          testID={`home-week-page-${index}`}>
-          <AppText style={{ color: page === index ? colors.primary : colors.textMuted }} variant="footnote">{item.label}</AppText>
-        </Pressable>)}
-      </View>
-      <ScrollView contentContainerStyle={styles.pages} decelerationRate="fast" directionalLockEnabled horizontal nestedScrollEnabled
+      <Animated.ScrollView contentContainerStyle={styles.pages} decelerationRate="fast" directionalLockEnabled horizontal nestedScrollEnabled
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: offset } } }], { useNativeDriver: true })} scrollEventThrottle={16}
         onMomentumScrollEnd={event => {
           const next = Math.max(0, Math.min(pages.length - 1, Math.round(event.nativeEvent.contentOffset.x / width)));
           currentPage.current = next; setPage(next);
         }}
-        pagingEnabled ref={scroll} showsHorizontalScrollIndicator={false} style={{ height: heights[page] }} testID="home-week-pager">
+        pagingEnabled ref={scroll} removeClippedSubviews={false} showsHorizontalScrollIndicator={false} style={{ height }} testID="home-week-pager">
         {pages.map((item, index) => <View accessibilityElementsHidden={page !== index}
           importantForAccessibility={page === index ? 'auto' : 'no-hide-descendants'} key={item.label}
-          onLayout={event => {
-            const height = event.nativeEvent.layout.height;
-            if (height > 0) setHeights(previous => previous[index] === height ? previous : { ...previous, [index]: height });
-          }} style={{ width }} testID={`home-week-content-${index}`}>{item.content}</View>)}
-      </ScrollView>
+          style={{ height, width }} testID={`home-week-content-${index}`}>
+          <ScrollView accessibilityHint="Deslizá hacia arriba para ver el resto del resumen" alwaysBounceVertical={false} bounces={false} contentContainerStyle={styles.pageContent}
+            directionalLockEnabled nestedScrollEnabled removeClippedSubviews={false} showsVerticalScrollIndicator
+            style={styles.pageScroll} testID={`home-week-scroll-${index}`}>{item.content}</ScrollView>
+        </View>)}
+      </Animated.ScrollView>
+      <View style={styles.indicators} testID="home-week-pagination">
+        <HomePageControl labels={pages.map(item => item.label)} offset={offset} onScrub={scrub} onSelect={select} page={page} width={width} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   pages: { alignItems: 'flex-start' },
-  tab: { alignItems: 'center', borderBottomWidth: 2, flex: 1, justifyContent: 'center', minHeight: 44 },
-  tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  pageContent: { paddingBottom: spacing.xs },
+  pageScroll: { flex: 1 },
+  indicators: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
 });

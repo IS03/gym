@@ -508,6 +508,24 @@ describe('Screen states', () => {
     expect(StyleSheet.flatten(view.getByText('Calorías consumidas').props.style)).toMatchObject({ color: '#9F9FA9' });
   });
 
+  it.each(['light', 'dark'] as const)('%s: exact nutrition ratios and trained days are painted immediately, in either nutrition mode', theme => {
+    const view = renderHome({}, theme);
+    const textColor = theme === 'dark' ? '#F4F4F5' : '#18181B';
+    const accent = theme === 'dark' ? '#C9B68A' : '#7D6A3C';
+    expect(StyleSheet.flatten(view.getByText('1.840').props.style).color).toBe(textColor);
+    expect(StyleSheet.flatten(view.getByText('128 / 160 g').props.style).color).toBe(textColor);
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style).width).toBe(`${1840 / 2600 * 100}%`);
+    expect(StyleSheet.flatten(view.getByTestId('home-protein-bar-fill').props.style).width).toBe('80%');
+    for (const date of ['2026-10-05', '2026-10-06', '2026-10-08']) {
+      expect(StyleSheet.flatten(view.getByTestId(`home-week-marker-${date}-fill`).props.style)).toMatchObject({ backgroundColor: accent, width: '100%' });
+    }
+    expect(view.queryByTestId('home-week-marker-2026-10-07-fill')).toBeNull();
+    fireEvent.press(view.getByTestId('home-calories'));
+    expect(StyleSheet.flatten(view.getByText('760').props.style).color).toBe(textColor);
+    expect(StyleSheet.flatten(view.getByText('32 / 160 g').props.style).color).toBe(textColor);
+    expect(StyleSheet.flatten(view.getByTestId('home-calorie-bar-fill').props.style).width).toBe(`${1840 / 2600 * 100}%`);
+  });
+
   it('0 kcal: no faded layers; empty bars still render', () => {
     const data = home();
     if (data.nutrition.status === 'ok') Object.assign(data.nutrition.data, { calories: 0, proteinG: 0 });
@@ -521,3 +539,5 @@ describe('Screen states', () => {
     expect(renderHome({}, theme).getByTestId('real-home-dashboard')).toBeTruthy();
   });
 });
+// Data/empty/error-state assertions use the Android/web control. UIKit is tested separately.
+jest.mock('./home-page-control', () => jest.requireActual('./home-page-control.tsx'));

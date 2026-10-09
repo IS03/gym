@@ -7,6 +7,7 @@ import type { NutritionDayMetric } from '@/api/nutrition-day';
 import {
   AppIcon,
   AppText,
+  brandTokens,
   SkeletonBlock,
   pressedStyle,
   radius,
@@ -51,11 +52,11 @@ function RegisterCircle({ detail, done, glass, icon, label, onPress, testID, wid
       accessibilityRole="button"
       accessibilityState={{ checked: done }}
       onPress={onPress}
-      style={({ pressed }) => [styles.item, { width }, pressedStyle(pressed, reduceMotion)]}
+      style={({ pressed }) => [styles.item, { width }, glass && !reduceMotion ? null : pressedStyle(pressed, reduceMotion)]}
       testID={testID}
     >
       <View style={styles.circleWrap}>
-        {glass ? <GlassView colorScheme={isDark ? 'dark' : 'light'} glassEffectStyle="regular" isInteractive style={styles.circle} testID={`${testID}-glass`}>{image}</GlassView>
+        {glass ? <GlassView colorScheme={isDark ? 'dark' : 'light'} glassEffectStyle="regular" isInteractive={!reduceMotion} style={styles.circle} testID={`${testID}-glass`}>{image}</GlassView>
           : <View style={[styles.circle, { backgroundColor: colors.surface }]}>{image}</View>}
         {done ? (
           <View style={[styles.badge, { backgroundColor: colors.background }]}>
@@ -96,7 +97,7 @@ export function HomeRegister({ date, onRegister, today }: { date: string; onRegi
     <HomeSection testID="home-register" title="Métricas">
       <View onLayout={event => { if (event.nativeEvent.layout.width > 0) setWidth(event.nativeEvent.layout.width); }} style={styles.row}>
         <ScrollView accessibilityHint="Deslizá para ver más métricas" contentContainerStyle={styles.scrollContent} decelerationRate="fast"
-          directionalLockEnabled horizontal nestedScrollEnabled showsHorizontalScrollIndicator={metrics.length > 3}
+          directionalLockEnabled horizontal nestedScrollEnabled removeClippedSubviews={false} showsHorizontalScrollIndicator={metrics.length > 3}
           style={styles.scroll} testID="home-register-scroll">
         {loading
           ? <><RegisterCircle detail={null} done={false} glass={false} icon="activity" label=" " onPress={() => undefined} width={itemWidth} /><RegisterCircle detail={null} done={false} glass={false} icon="activity" label=" " onPress={() => undefined} width={itemWidth} /></>
@@ -119,10 +120,12 @@ const styles = StyleSheet.create({
   circle: { alignItems: 'center', borderRadius: radius.full, height: 48, justifyContent: 'center', width: 48 },
   circleWrap: { height: 48, marginBottom: 2, width: 48 },
   detail: { textAlign: 'center' },
-  fixedMore: { paddingBottom: spacing.sm, paddingTop: spacing.xs },
+  fixedMore: { paddingBottom: spacing.sm, paddingTop: brandTokens.space.lg },
   item: { alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: spacing.xs },
   label: { fontWeight: '600', textAlign: 'center' },
-  row: { alignItems: 'flex-start', flexDirection: 'row', paddingTop: spacing.xs },
+  // Native glass grows outside its 48 pt circle. Keep its entire expansion inside the
+  // scroller's clipping rectangle, without exposing offscreen metrics behind Más.
+  row: { alignItems: 'flex-start', flexDirection: 'row', marginTop: -brandTokens.space.md, paddingTop: spacing.xs },
   scroll: { flex: 1 },
-  scrollContent: { alignItems: 'flex-start', paddingBottom: spacing.sm, paddingTop: spacing.xs },
+  scrollContent: { alignItems: 'flex-start', paddingBottom: spacing.sm, paddingTop: brandTokens.space.lg },
 });
