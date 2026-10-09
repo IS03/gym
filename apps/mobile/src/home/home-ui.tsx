@@ -1,7 +1,6 @@
-import { useContext, useEffect, type PropsWithChildren } from 'react';
+import { useContext, type PropsWithChildren } from 'react';
 import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import {
   AppIcon,
@@ -85,22 +84,15 @@ export function HomeButton({ accessibilityHint, label, onPress, testID, tone }: 
 }
 
 /**
- * A capsule bar filled to `fraction` (0–1). On mount the fill grows in 350 ms with the
- * brand curve; with Reduce Motion it is drawn at its value directly.
+ * A capsule filled to the actual `fraction` (0–1) on the first render. Binary training
+ * markers and consumed ratios must never depend on a mount animation to show truth.
  */
 export function HomeBar({ color, fraction, height, testID, track }: { color: string; fraction: number; height: number; testID?: string; track?: string }) {
   const { colors } = useOwnlevelTheme();
-  const reduceMotion = useReduceMotion();
   const target = Math.min(1, Math.max(0, fraction));
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    const [x1, y1, x2, y2] = brandTokens.motion.easing;
-    progress.value = reduceMotion ? target : withTiming(target, { duration: 350, easing: Easing.bezier(x1, y1, x2, y2) });
-  }, [progress, reduceMotion, target]);
-  const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }));
   return (
     <View style={[styles.track, { backgroundColor: track ?? colors.surfaceRaised, height }]} testID={testID}>
-      {target > 0 ? <Animated.View style={[styles.fill, { backgroundColor: color }, fill]} testID={testID ? `${testID}-fill` : undefined} /> : null}
+      {target > 0 ? <View style={[styles.fill, { backgroundColor: color, width: `${target * 100}%` }]} testID={testID ? `${testID}-fill` : undefined} /> : null}
     </View>
   );
 }

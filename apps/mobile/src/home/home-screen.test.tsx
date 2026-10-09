@@ -8,6 +8,9 @@ import { HOME_FOCUS_REFRESH_MS } from './home-data';
 import { HomeScreen } from './home-screen';
 import { homeProgressBody, homeProgressTraining } from './home-test-fixtures';
 
+// Screen navigation uses the portable control; the UIKit bridge has its own integration suite.
+jest.mock('./home-page-control', () => jest.requireActual('./home-page-control.tsx'));
+
 const mockNavigate = jest.fn();
 const mockPush = jest.fn();
 const mockFocusEffects: (() => void)[] = [];
