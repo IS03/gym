@@ -34,12 +34,15 @@ jest.mock('expo-router', () => ({
   }),
   useRouter: () => ({ back: mockBack, replace: mockReplace }),
 }));
-jest.mock('./start-workout-modal', () => ({
-  StartWorkoutModal: ({ initialRoutineId }: { initialRoutineId: string }) => {
-    const { Text } = jest.requireActual('react-native') as typeof import('react-native');
-    return <Text>Start Workout Modal {initialRoutineId}</Text>;
+const mockStartSession = jest.fn();
+// The native confirmation and the starter have their own tests; here they record what was asked.
+jest.mock('./start-confirm', () => ({
+  StartConfirm: ({ onConfirm, open, routineName }: { onConfirm: () => void; open: boolean; routineName: string }) => {
+    const { Pressable, Text } = jest.requireActual('react-native') as typeof import('react-native');
+    return open ? <Pressable accessibilityRole="button" onPress={onConfirm}><Text>Empezar {routineName}</Text></Pressable> : null;
   },
 }));
+jest.mock('./use-session-starter', () => ({ useSessionStarter: () => ({ element: null, start: (request: unknown) => mockStartSession(request) }) }));
 jest.mock('expo-router/build/react-navigation/core/usePreventRemove', () => ({
   usePreventRemove: (preventRemove: boolean, callback: typeof mockPreventRemoveCallback) => {
     mockUsePreventRemove(preventRemove);
@@ -98,13 +101,16 @@ describe('native routine editor', () => {
     mockFetch.mockResolvedValue(loaded());
   });
 
-  it('shows real detail and opens start flow with this routine without starting on entry', async () => {
+  it('shows real detail and starts this routine only after confirming, without starting on entry', async () => {
     const view = renderScreen();
     await waitFor(() => expect(view.getByText('PUSH')).toBeTruthy());
     expect(view.getByText('1 ejercicio · 1 serie')).toBeTruthy();
     expect(view.getByText('Ejercicio archivado')).toBeTruthy();
+    mockStartSession.mockReset();
     fireEvent.press(view.getByRole('button', { name: 'Iniciar entrenamiento' }));
-    expect(view.getByText('Start Workout Modal 11111111-1111-4111-8111-111111111111')).toBeTruthy();
+    expect(mockStartSession).not.toHaveBeenCalled(); // it asks first
+    fireEvent.press(view.getByRole('button', { name: 'Empezar PUSH' }));
+    expect(mockStartSession).toHaveBeenCalledWith({ routineId: '11111111-1111-4111-8111-111111111111' });
     expect(mockTemplate).not.toHaveBeenCalled();
     expect(mockRequest).not.toHaveBeenCalled();
   });
@@ -143,7 +149,7 @@ describe('native routine editor', () => {
     fireEvent.press(view.getByRole('button', { name: 'Press, expandir' }));
     fireEvent.changeText(view.getByLabelText('Serie 1, reps'), '10');
     fireEvent.press(view.getByRole('button', { name: 'Iniciar entrenamiento' }));
-    expect(view.queryByText(/Start Workout Modal/)).toBeNull();
+    expect(view.queryByText(/Empezar PUSH/)).toBeNull();
     fireEvent.press(view.getByRole('button', { name: '+ Agregar ejercicio' }));
     expect(view.getByText(/Guardá los objetivos pendientes/)).toBeTruthy();
     expect(mockCatalog).not.toHaveBeenCalled();

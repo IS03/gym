@@ -9,6 +9,7 @@ export type AppIconName =
   | 'book'
   | 'calendar'
   | 'check'
+  | 'chevronDown'
   | 'chevronLeft'
   | 'chevronRight'
   | 'clock'
@@ -51,6 +52,7 @@ export const sfSymbolNames: Record<AppIconName, SFSymbol> = {
   book: 'book',
   calendar: 'calendar',
   check: 'checkmark.circle.fill',
+  chevronDown: 'chevron.down',
   chevronLeft: 'chevron.left',
   chevronRight: 'chevron.right',
   clock: 'clock.fill',

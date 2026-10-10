@@ -30,7 +30,9 @@ import {
   toggleAdjustment, type TargetsDraft,
 } from './routine-editor-model';
 import { trainingRoutineColor, trainingRoutineColorLabel } from './routine-colors';
-import { StartWorkoutModal } from './start-workout-modal';
+import { StartConfirm } from './start-confirm';
+import { useStartConfirmPointerEvents } from './start-confirm-lock';
+import { useSessionStarter } from './use-session-starter';
 
 const COLORS: MobileRoutineColorKey[] = [
   'violet', 'indigo', 'blue', 'cyan', 'green', 'yellow', 'orange', 'rose',
@@ -403,6 +405,9 @@ export function RoutineEditorScreen() {
   const [identityOpen, setIdentityOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
+  // "Iniciar entrenamiento" asks first (anchored native confirmation), then starts with no chooser.
+  const starter = useSessionStarter({ onSession: sessionId => router.replace(`/(tabs)/train/session/${sessionId}`) });
+  const confirmPointerEvents = useStartConfirmPointerEvents();
   const [pending, setPending] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -663,6 +668,7 @@ export function RoutineEditorScreen() {
     <>
       <Stack.Screen options={{ headerBackButtonMenuEnabled: false, title: 'Rutinas' }} />
       <ScrollScreen
+        pointerEvents={confirmPointerEvents}
         refreshControl={<RefreshControl refreshing={state.status === 'ready' && state.refreshing} onRefresh={() => {
           if (dirtyRef.current) announce('Guardá los objetivos pendientes antes de actualizar.');
           else void refresh();
@@ -685,7 +691,11 @@ export function RoutineEditorScreen() {
         ) : null}
         {dirty ? <AppText muted variant="caption">Hay cambios sin guardar; las actualizaciones se posponen hasta guardarlos.</AppText> : null}
         {detail.routine.isActive ? (
-          <Button disabled={Boolean(pending)} label="Iniciar entrenamiento" onPress={() => { if (guardStructure()) setStartOpen(true); }} />
+          <View>
+            <StartConfirm onCancel={() => setStartOpen(false)} onConfirm={() => { setStartOpen(false); starter.start({ routineId: detail.routine.id }); }} open={startOpen}
+              routineName={detail.routine.name} />
+            <Button disabled={Boolean(pending)} label="Iniciar entrenamiento" onPress={() => { if (guardStructure()) setStartOpen(true); }} />
+          </View>
         ) : (
           <Surface style={styles.archivedNotice}>
             <AppText variant="label">Rutina archivada</AppText>
@@ -757,7 +767,7 @@ export function RoutineEditorScreen() {
       </View> : null}
       {identityOpen ? <IdentityModal detail={detail} onClose={() => { identityOpenRef.current = false; setIdentityOpen(false); void refresh(); }} onSubmit={(name, color) => void submitIdentity(name, color)} pending={pending === 'identity'} /> : null}
       {pickerOpen ? <ExercisePicker client={client} detail={detail} onAdd={addExercise} onClose={() => setPickerOpen(false)} pending={pending === 'template'} /> : null}
-      {startOpen ? <StartWorkoutModal initialRoutineId={detail.routine.id} onClose={() => setStartOpen(false)} onContinue={(sessionId) => { setStartOpen(false); router.replace(`/(tabs)/train/session/${sessionId}`); }} onStarted={(sessionId) => { setStartOpen(false); router.replace(`/(tabs)/train/session/${sessionId}`); }} /> : null}
+      {starter.element}
     </>
   );
 }

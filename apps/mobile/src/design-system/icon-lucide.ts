@@ -1,5 +1,6 @@
 import {
-  BookOpen, Calendar, ChartLine, ChevronLeft, ChevronRight, CircleCheck, ClipboardList, Clock, Coffee, Droplet, Dumbbell, Ellipsis, Flame,
+  BookOpen, Calendar, ChartLine, ChevronDown,
+  ChevronLeft, ChevronRight, CircleCheck, ClipboardList, Clock, Coffee, Droplet, Dumbbell, Ellipsis, Flame,
   Footprints, ListFilter, Moon, NotebookPen, Play, Plus, RotateCw, Settings, TriangleAlert, Trophy, User, Utensils, Weight, X, Zap, type LucideIcon,
 } from 'lucide-react-native';
 
@@ -13,6 +14,7 @@ export const lucideIcons: Record<AppIconName, LucideIcon> = {
   book: BookOpen,
   calendar: Calendar,
   check: CircleCheck,
+  chevronDown: ChevronDown,
   chevronLeft: ChevronLeft,
   chevronRight: ChevronRight,
   clock: Clock,

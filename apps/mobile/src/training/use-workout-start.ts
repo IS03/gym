@@ -10,7 +10,7 @@ import { activeStartRoutines, initialStartSelection, sameStartSelection, StartIn
 
 const unavailableResult = { status: 'unavailable' as const, reason: 'invalid_response' as const, meta: { durationMs: 0, httpStatus: null, outcome: 'unavailable' as const } };
 
-/** Shared start flow, moved unchanged from StartWorkoutModal. */
+/** Shared start flow (active-session check, idempotency, conflicts); driven by the session starter. */
 export function useWorkoutStart({ initialFree = false, initialRoutineId, onClose, onStarted }: {
   initialFree?: boolean; initialRoutineId?: string; onClose: () => void; onStarted: (id: string) => void;
 }) {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, within } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import type { MobileHomeResponse } from '@/api/home';
@@ -19,13 +19,13 @@ const mockFetchDay = jest.fn<(client: unknown, date: string) => Promise<unknown>
 const mockFetchQuick = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockFetchReport = jest.fn<(client: unknown, query: unknown) => Promise<unknown>>();
 const mockFetchHistory = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockFetchTrainingDay = jest.fn<(client: unknown, date: string) => Promise<unknown>>();
 const mockFetchProgressBody = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockFetchProgressWeek = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockFetchProgressRecords = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockConfigOpen = jest.fn();
-type MockModalProps = { initialFree?: boolean; initialRoutineId?: string; onClose: () => void; onContinue: (id: string) => void;
-  onStarted: (id: string) => void; startImmediately?: boolean };
-let mockModalProps: MockModalProps | null = null;
+const mockStartSession = jest.fn();
+let mockStarterOnSession: ((id: string) => void) | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
@@ -36,6 +36,10 @@ jest.mock('@expo/ui', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { Host: View, RNHostView: View, BottomSheet: ({ isPresented, children }: { isPresented: boolean; children: React.ReactNode }) => isPresented ? <View testID="mock-sheet">{children}</View> : null };
 });
+// The SwiftUI sheet (iOS) is native; these tests drive the React Native version, same behavior.
+jest.mock('@/training/new-session-sheet', () => ({
+  NewSessionSheet: (jest.requireActual('@/training/new-session-sheet-rn') as typeof import('@/training/new-session-sheet-rn')).NewSessionSheetRN,
+}));
 jest.mock('./home-add-menu', () => {
   const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { HomeAddMenu: ({ habituals, onAll, onFood, onHabitual, onManual }: import('./home-add-menu.types').HomeAddMenuProps) => (
@@ -58,19 +62,21 @@ jest.mock('@/api', () => ({
 jest.mock('@/api/history', () => ({ fetchHistoryDay: (c: unknown, d: string) => mockFetchDay(c, d) }));
 jest.mock('@/api/nutrition-quick', () => ({ fetchQuickOptions: (...args: unknown[]) => mockFetchQuick(...args) }));
 jest.mock('@/api/nutrition-report', () => ({ fetchNutritionReport: (c: unknown, q: unknown) => mockFetchReport(c, q) }));
-jest.mock('@/api/training-history', () => ({ fetchTrainingHistory: (...args: unknown[]) => mockFetchHistory(...args) }));
+jest.mock('@/api/training-history', () => ({
+  fetchTrainingDay: (client: unknown, date: string) => mockFetchTrainingDay(client, date),
+  fetchTrainingHistory: (...args: unknown[]) => mockFetchHistory(...args),
+}));
 jest.mock('@/api/progress', () => ({
   ...jest.requireActual<object>('@/api/progress'),
   fetchProgressBody: (...args: unknown[]) => mockFetchProgressBody(...args),
   fetchProgressTraining: (c: unknown, q: { period: string }, s: unknown) => q.period === '7'
     ? mockFetchProgressWeek(c, q, s) : mockFetchProgressRecords(c, q, s),
 }));
-// The real modal (verification, idempotency, conflicts) has its own tests.
-jest.mock('@/training/start-workout-modal', () => ({
-  StartWorkoutModal: (props: MockModalProps) => {
-    mockModalProps = props;
-    const { Text: MockText } = jest.requireActual<typeof import('react-native')>('react-native');
-    return <MockText>start-workout-modal</MockText>;
+// The real starter (verification, idempotency, conflicts) has its own tests; here it records the request.
+jest.mock('@/training/use-session-starter', () => ({
+  useSessionStarter: ({ onSession }: { onSession: (id: string) => void }) => {
+    mockStarterOnSession = onSession;
+    return { element: null, start: (request: unknown) => mockStartSession(request) };
   },
 }));
 
@@ -126,7 +132,7 @@ describe('Home screen', () => {
   beforeEach(() => {
     clock = SATURDAY_NIGHT.getTime();
     mockFocusEffects.length = 0;
-    mockModalProps = null;
+    mockStartSession.mockReset();
     for (const mock of [mockNavigate, mockPush, mockConfigOpen, mockFetchProgressWeek, ...allFetchers()]) mock.mockReset();
     mockFetchHome.mockImplementation(() => ok(homeData()));
     mockFetchDay.mockImplementation(() => ok(historyDay));
@@ -229,43 +235,43 @@ describe('Home screen', () => {
     ]);
   });
 
-  it('"Arrancar rutina" opens the sheet; a routine starts right away through StartWorkoutModal and Home follows the session', async () => {
+  it('"Arrancar rutina" opens the new session sheet; the recommended routine starts right away (no chooser) and Home follows the session', async () => {
     const data = homeData();
     if (data.training.week.status === 'ok') data.training.week.data.todaySessions = [];
     mockFetchHome.mockImplementation(() => ok(data));
-    mockFetchHistory.mockImplementation(() => ok({ sessions: [{ id: 's', routineId: 'r1', routineName: 'Push', routineColor: null, logDate: '2026-10-06',
-      startedAt: '2026-10-06T12:00:00.000Z', endedAt: '2026-10-06T13:14:00.000Z', durationMilliseconds: 74 * 60_000, exercisesCompleted: 6, completedSets: 21, volumeKg: null }], nextCursor: null }));
+    // Saturday: Push on the last two Saturdays → recommended.
+    const pushOn = (id: string, logDate: string) => ({ id, routineId: 'r1', routineName: 'Push', routineColor: null, logDate,
+      startedAt: `${logDate}T12:00:00.000Z`, endedAt: `${logDate}T13:14:00.000Z`, durationMilliseconds: 74 * 60_000, exercisesCompleted: 6, completedSets: 21, volumeKg: null });
+    mockFetchHistory.mockImplementation(() => ok({ sessions: [pushOn('a', '2026-10-03'), pushOn('b', '2026-09-26')], nextCursor: null }));
+    mockFetchTrainingDay.mockImplementation((_client: unknown, date: string) => ok({ date, sessions: ['2026-10-03', '2026-09-26'].includes(date) ? [pushOn(date, date)] : [],
+      summary: { sessionCount: 0, exercisesCompleted: 0, completedSets: 0, durationMilliseconds: null, volumeKg: null } }));
     const view = await renderScreen();
-    expect(view.queryByText('¿Qué entrenás hoy?')).toBeNull();
+    expect(view.queryByTestId('new-session-start')).toBeNull();
     fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
-    expect(view.getByText('¿Qué entrenás hoy?')).toBeTruthy();
-    expect(view.getByText('Todavía no tenés una planificación activa. Elegí una rutina para empezar.')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Push. Última vez: 1 h 14 min · 21 series' }));
-    expect(view.queryByText('¿Qué entrenás hoy?')).toBeNull();
-    expect(view.queryByText('start-workout-modal')).toBeNull();
+    expect(view.getByTestId('new-session-start')).toBeTruthy();
+    await waitFor(() => expect(view.getByTestId('new-session-recommended')).toBeTruthy());
+    fireEvent.press(view.getByTestId('new-session-recommended'));
+    expect(view.queryByTestId('new-session-start')).toBeNull();
+    expect(mockStartSession).not.toHaveBeenCalled(); // waits for the sheet to be gone
     await afterSheet();
-    expect(mockModalProps).toMatchObject({ initialRoutineId: 'r1', startImmediately: true });
+    expect(mockStartSession).toHaveBeenCalledWith({ routineId: 'r1' });
     expect(mockNavigate).not.toHaveBeenCalled();
-
-    act(() => mockModalProps!.onStarted('started-1'));
+    act(() => mockStarterOnSession!('started-1'));
     await settle();
     expect(mockPush).toHaveBeenCalledWith('/(tabs)/train/session/started-1');
-    expect(view.queryByText('start-workout-modal')).toBeNull();
-
-    // An active session found by the modal is continued, never duplicated.
-    fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
-    fireEvent.press(view.getByRole('button', { name: 'Entrenar libre' }));
-    await afterSheet();
-    expect(mockModalProps).toMatchObject({ initialFree: true, startImmediately: true });
-    act(() => mockModalProps!.onContinue('active-9'));
-    await settle();
-    expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/train/session/active-9');
 
     fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
-    fireEvent.press(view.getByRole('button', { name: 'Push. Última vez: 1 h 14 min · 21 series' }));
+    fireEvent.press(view.getByTestId('new-session-free'));
     await afterSheet();
-    act(() => mockModalProps!.onClose());
-    expect(view.queryByText('start-workout-modal')).toBeNull();
+    expect(mockStartSession).toHaveBeenLastCalledWith({ free: true });
+
+    // "Elegir rutina" lists every routine with when it was last done; closing never starts anything.
+    fireEvent.press(view.getByRole('button', { name: 'Arrancar rutina' }));
+    fireEvent.press(view.getByTestId('new-session-choose'));
+    expect(view.getByRole('button', { name: 'Push, 6 ejercicios · 18 series, hace 7 días' })).toBeTruthy();
+    fireEvent.press(view.getByTestId('new-session-close'));
+    await afterSheet();
+    expect(mockStartSession).toHaveBeenCalledTimes(2);
   });
 
   it('"+ Nueva sesión" after a completed session opens the same sheet; without routines it offers creating one', async () => {
@@ -274,11 +280,12 @@ describe('Home screen', () => {
     mockFetchHome.mockImplementation(() => ok(data));
     const view = await renderScreen();
     fireEvent.press(view.getByRole('button', { name: '+ Nueva sesión' }));
-    expect(view.getByText('Todavía no tenés rutinas. Creá una o entrená libre.')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Crear rutina' }));
+    fireEvent.press(view.getByTestId('new-session-choose'));
+    expect(view.getByText('Todavía no tenés rutinas.')).toBeTruthy();
+    fireEvent.press(view.getByTestId('new-session-create'));
     await afterSheet();
     expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/train/routines');
-    expect(view.queryByText('start-workout-modal')).toBeNull();
+    expect(mockStartSession).not.toHaveBeenCalled();
   });
 
   it('opens each progress detail preserving its period and exercise identity', async () => {
