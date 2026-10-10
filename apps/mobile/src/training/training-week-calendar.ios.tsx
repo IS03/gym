@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { Circle, GlassEffectContainer, Grid, HStack, Host, Image, Picker, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
 import {
-  Animation, accessibilityAddTraits, accessibilityLabel, animation, contentShape, fixedSize, font, foregroundStyle, frame, glassEffect, monospacedDigit,
-  onGeometryChange, onTapGesture, padding, pickerStyle, shapes, strokeBorder, tag,
+  Animation, accessibilityAddTraits, accessibilityLabel, animation, blur, contentShape, fixedSize, font, foregroundStyle, frame, glassEffect, monospacedDigit,
+  onGeometryChange, onTapGesture, opacity, padding, pickerStyle, scaleEffect, shapes, strokeBorder, tag,
 } from '@expo/ui/swift-ui/modifiers';
 import { isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 
@@ -42,6 +42,9 @@ function useReduceTransparency(): boolean {
   }, []);
   return reduced;
 }
+
+// Cross-fade between the month days and the wheels.
+const layer = (shown: boolean) => [opacity(shown ? 1 : 0), scaleEffect(shown ? 1 : 0.96), blur(shown ? 0 : 8)];
 
 const alpha = (hex: string, value: number) => `rgba(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',')},${value})`;
 
@@ -162,17 +165,9 @@ export function TrainingWeekCalendar(props: TrainingWeekCalendarProps) {
                   </>
                 )}
               </HStack>
-              {picking ? (
-                <HStack modifiers={[frame({ height: monthArea })]} spacing={0}>
-                  <Picker modifiers={[pickerStyle('wheel'), frame({ maxWidth: FILL })]} onSelectionChange={(value: number) => onMonth(monthKey(year, value))} selection={monthNumber}>
-                    {MONTH_NAMES.map((name, index) => <Text key={name} modifiers={[tag(index + 1)]}>{name}</Text>)}
-                  </Picker>
-                  <Picker modifiers={[pickerStyle('wheel'), frame({ maxWidth: FILL })]} onSelectionChange={(value: number) => onMonth(monthKey(value, monthNumber))} selection={year}>
-                    {years.map(value => <Text key={value} modifiers={[tag(value)]}>{String(value)}</Text>)}
-                  </Picker>
-                </HStack>
-              ) : (
-                <Grid horizontalSpacing={0} modifiers={[frame({ alignment: 'top', height: monthArea })]} verticalSpacing={2}>
+              {/* Days and wheels share the space and cross-fade (soft blur and scale); the hidden one takes no touches (opacity 0). */}
+              <ZStack alignment="top">
+                <Grid horizontalSpacing={0} modifiers={[frame({ alignment: 'top', height: monthArea }), ...layer(!picking)]} verticalSpacing={2}>
                   <Grid.Row>
                     {WEEKDAY_LETTERS.map((letter, index) => (
                       <Text key={index} modifiers={[font({ size: 13 }), foregroundStyle(palette.textMuted), frame({ maxWidth: FILL })]}>{letter}</Text>
@@ -186,7 +181,15 @@ export function TrainingWeekCalendar(props: TrainingWeekCalendarProps) {
                     </Grid.Row>
                   ))}
                 </Grid>
-              )}
+                <HStack modifiers={[frame({ height: monthArea }), ...layer(picking)]} spacing={0}>
+                  <Picker modifiers={[pickerStyle('wheel'), frame({ maxWidth: FILL })]} onSelectionChange={(value: number) => onMonth(monthKey(year, value))} selection={monthNumber}>
+                    {MONTH_NAMES.map((name, index) => <Text key={name} modifiers={[tag(index + 1)]}>{name}</Text>)}
+                  </Picker>
+                  <Picker modifiers={[pickerStyle('wheel'), frame({ maxWidth: FILL })]} onSelectionChange={(value: number) => onMonth(monthKey(value, monthNumber))} selection={year}>
+                    {years.map(value => <Text key={value} modifiers={[tag(value)]}>{String(value)}</Text>)}
+                  </Picker>
+                </HStack>
+              </ZStack>
               {monthStatus === 'unavailable' ? (
                 <Text modifiers={[font({ size: 13 }), foregroundStyle(palette.textMuted)]}>No pudimos cargar los días entrenados de este mes.</Text>
               ) : null}
