@@ -315,7 +315,8 @@ Colores nuevos que **no están en la paleta de marca** y viven aparte en `apps/m
 |---|---|---|---|
 | `glow` | rgb(228,222,201) `#E4DEC9` | rgb(42,39,32) `#2A2720` | Centro del resplandor de fondo |
 | `band` | rgb(228,222,201) `#E4DEC9` | rgb(31,29,24) `#1F1D18` | Franja de Nutrición en Inicio |
-| `bandTextMuted` | `#5F5D54` | — (gris de marca) | Gris secundario dentro de la franja clara: el gris de marca da ≈3,9:1 sobre `#E4DEC9`; este ≈4,8:1 |
+| `bandTextMuted` | `#5F5D54` | — (gris de marca) | Gris secundario dentro de la franja clara: el gris de marca da ≈3,9:1 sobre `#E4DEC9`; este ≈4,8:1. También "N días entrenados" de Entrenar, que cae sobre el resplandor |
+| `accentStrong` | `#5E5129` | — (acento de marca) | Texto del botón de vidrio "Nueva sesión" (Entrenar): el acento de marca sobre el vidrio con tinte da ≈4:1; este ≈6:1 |
 
 Dentro de la franja, pista y línea usan la escala de intensidad (claro `#CFC8B6`) o `elevated`/`border` (oscuro); barras y acento son los de marca.
 
@@ -323,7 +324,18 @@ Dentro de la franja, pista y línea usan la escala de intensidad (claro `#CFC8B6
 - Degradados de fondo permitidos: un único resplandor radial fijo (elipse de radios 300 × 400, centro en 105 % / -4 %, stops 1 → 0,55 a 38 % → 0, mismo color con alpha 0, nunca `transparent`), detrás del contenido, estático, sin animación ni interacción.
 - Franjas tonales: solo la de Nutrición en Inicio, a ancho completo, con fundido vertical de 48 en cada borde; nada se transparenta a través de ella.
 - Dónde no van: sesión de entrenamiento activa (flujo de foco), sheets y modales, y por ahora bajo encabezados nativos opacos (cortarían el resplandor; extenderlo requiere encabezados transparentes, PR aparte junto con las ≈15 pantallas con fondo propio que todavía no usan `Screen`/`ScrollScreen`).
-- Agregar los tres tokens de arriba a la paleta (`tema/tokens.ts`) y su equivalente CSS para Web (`radial-gradient(ellipse 300px 400px at 105% -4%, …)`).
+- Agregar los tokens de arriba a la paleta (`tema/tokens.ts`) y su equivalente CSS para Web (`radial-gradient(ellipse 300px 400px at 105% -4%, …)`).
+
+
+### 9d. Entrenar (hub) — siguiente iteración
+
+- **Día seleccionado (opción "a"):** en esta pasada el bloque de Entrenar muestra siempre hoy y tocar un día pasado abre `/history/day/[fecha]`. La siguiente iteración puede hacer que tocar un día lo seleccione y el bloque muestre ese día. El modelo ya está preparado: `dayBlock(date, sessions)` (`apps/mobile/src/training/training-hub-model.ts`) recibe la fecha, no "hoy" fijo. Falta definir cómo se marca el día seleccionado en la tira y cómo se ve un día pasado o futuro sin sesiones.
+- **Calendario fijo:** la tira de la semana queda fija arriba y al tocarla se expande en el mismo vidrio al mes completo (ruedas nativas de mes y año al tocar el título). En iOS 26 es una vista SwiftUI (`@expo/ui`: `glassEffect`, `animation`, `Picker` en rueda) en `training-week-calendar.ios.tsx`; en Android, iOS anterior o "Reducir transparencia", la versión React Native (`training-week-calendar-rn.tsx`) sobre la superficie de marca, con flechas para cambiar de mes. `GlassSurface` (design system) sigue para el botón "Nueva sesión".
+- **Nueva sesión (Inicio y Entrenar):** sheet nativa compartida (`use-new-session.tsx`): recomendada, "Elegir rutina" (push nativo con volver) y "Sesión libre"; la X es la del sistema. En iOS es SwiftUI (`BottomSheet` + `NavigationStack` + `Toolbar`); en Android, React Native. Elegir cierra la sheet y arranca directo, sin selector intermedio.
+- **Arranque directo:** `use-session-starter.tsx` reemplaza a `StartWorkoutModal`. Usa el mismo flujo (`useWorkoutStart`: verificación de sesión en curso, clave de idempotencia, reintento explícito con la misma clave) y muestra solo "Iniciando…"; los casos que piden decisión son alertas nativas (sesión en curso → Continuar, no se pudo verificar → Reintentar, fallo ambiguo → Reintentar con la misma clave). El ▶ de cada rutina y "Iniciar entrenamiento" del editor piden confirmación antes (`start-confirm`: diálogo anclado de SwiftUI en iOS, alerta en Android). En iOS 26 el toque fuera del diálogo también llegaba a la pantalla de abajo; mientras está abierto la pantalla no toma toques (`start-confirm-lock.ts`).
+- **Recomendación:** rutina más repetida en el mismo día de la semana de las últimas 12 semanas (días distintos, por `logDate`; mínimo 2; empate = la más reciente; solo rutinas activas). Si ya se hizo hoy se sigue mostrando, con "Ya la hiciste hoy". Se calcula en la app con 13 lecturas de día en paralelo (hoy y el mismo día de las 12 semanas anteriores) más una página de historial para "última vez"; se precarga 1 s después de abrir la pantalla y queda en memoria 5 min. Si falla un día no hay recomendación (nunca se adivina con datos parciales). Mejora posible: calcularla en el servidor (paso EXPAND, fuera de M9).
+- **Calendario sin pie:** se quitaron "N días entrenados" e "Ir a hoy". El mes siempre ocupa 6 filas y las ruedas la misma altura, así abrir, cerrar, cambiar de mes o abrir las ruedas no cambia el alto de golpe. La altura del `Host` la decide React Native, no el contenido: con `matchContents` el `Host` llegaba un cuadro tarde y SwiftUI centraba el contenido (el vidrio saltaba al abrir o cerrar). El vidrio se mide con `onGeometryChange`; el `Host` crece antes de abrir y se achica después de la animación de cierre, y el contenedor SwiftUI (`minHeight: 0`) siempre ocupa el alto del `Host` con el vidrio arriba.
+- **Sheet Nueva sesión ajustada:** la primera página mide su contenido y usa un detent de esa altura (sin media pantalla vacía); "Elegir rutina" abre grande.
 
 ## 10. Exclusiones y zonas protegidas
 

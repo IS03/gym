@@ -7,12 +7,15 @@
  * color roles, which only map brand values. Dark mode keeps the brand dark palette; only
  * the glow and the band are new.
  *
+ * `bandTextMuted` (grey over the light glow/band) and `accentStrong` (accent text on a light
+ * accent-tinted glass button) exist only for contrast (≥ 4.5:1); dark uses the brand values.
+ *
  * Colors are kept as "r,g,b" so every gradient stop uses the same color with its own alpha
  * (never "transparent", which interpolates through grey).
  */
 export const atmosphere = {
-  light: { glow: '228,222,201', band: '228,222,201', bandTextMuted: '#5F5D54' as string | null },
-  dark: { glow: '42,39,32', band: '31,29,24', bandTextMuted: null as string | null },
+  light: { glow: '228,222,201', band: '228,222,201', bandTextMuted: '#5F5D54' as string | null, accentStrong: '#5E5129' as string | null },
+  dark: { glow: '42,39,32', band: '31,29,24', bandTextMuted: null as string | null, accentStrong: null as string | null },
 } as const;
 
 export type AtmosphereScheme = keyof typeof atmosphere;

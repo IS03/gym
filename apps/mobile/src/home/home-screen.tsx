@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -15,7 +15,8 @@ import {
 } from '@/design-system';
 import { useNutritionConfiguration } from '@/nutrition/config-provider';
 import { haptics } from '@/platform/haptics';
-import { StartWorkoutModal } from '@/training/start-workout-modal';
+import { useNewSession } from '@/training/use-new-session';
+import { useSessionStarter } from '@/training/use-session-starter';
 
 import { HomeDashboard, type HomeNavigationTarget } from './home-dashboard';
 import { useHomeResources } from './home-data';
@@ -25,12 +26,6 @@ import type { HomeMealEntry } from './home-nutrition';
 import type { HomeProgressTarget } from './home-progress';
 import type { HomeRegisterTarget } from './home-register';
 import { homeResource } from './home-resource';
-import { HomeStartSheet } from './home-start-sheet';
-
-// The start flow presents its own modal; it opens once the sheet's dismissal has run.
-const SHEET_DISMISS_MS = 350;
-
-type StartRequest = { free?: boolean; immediate: boolean; routineId?: string };
 
 const HOME_ROUTES = {
   nutrition: '/(tabs)/nutrition',
@@ -70,10 +65,6 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
   const resources = useHomeResources(client, now);
   const { refresh } = resources;
   const configuration = useNutritionConfiguration(refresh);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [start, setStart] = useState<StartRequest | null>(null);
-  const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (startTimer.current) clearTimeout(startTimer.current); }, []);
 
   const home = homeResource(resources.home.state);
   const day = homeDay(now());
@@ -84,21 +75,10 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
     else router.navigate(HOME_ROUTES[target]);
   }, [router]);
 
-  // "Arrancar rutina" / "+ Nueva sesión" open the sheet. Picking there starts through the
-  // shared modal (same as TrainingScreen): it owns verification, idempotency and conflicts;
-  // Home only follows the session it reports.
-  const openStart = useCallback(() => { haptics.selection(); setSheetOpen(true); }, []);
-  const startAfterSheet = useCallback((request: StartRequest | null, then?: () => void) => {
-    haptics.selection();
-    setSheetOpen(false);
-    if (startTimer.current) clearTimeout(startTimer.current);
-    startTimer.current = setTimeout(() => { startTimer.current = null; if (request) setStart(request); then?.(); }, SHEET_DISMISS_MS);
-  }, []);
-  const toSession = useCallback((id: string) => {
-    setStart(null);
-    refresh();
-    router.push(`/(tabs)/train/session/${id}`);
-  }, [refresh, router]);
+  // "Arrancar rutina" / "+ Nueva sesión": the shared native sheet (same as Training). The start
+  // flow owns verification, idempotency and conflicts; Home only follows the session it reports.
+  const starter = useSessionStarter({ onSession: id => { refresh(); router.push(`/(tabs)/train/session/${id}`); } });
+  const newSession = useNewSession({ client, home, onCreateRoutine: () => router.push('/(tabs)/train/routines'), start: starter.start, today: day.today });
 
   const actions = useMemo(() => ({
     onConfigureNutrition: () => { if (configuration) configuration.controller.open(); },
@@ -164,7 +144,7 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
           now={() => now().getTime()}
           onNavigate={navigate}
           onRefresh={refresh}
-          onStartWorkout={openStart}
+          onStartWorkout={newSession.open}
           progressBody={homeResource(resources.progressBody.state)}
           progressRecords={homeResource(resources.progressRecords.state)}
           quick={homeResource(resources.quick.state)}
@@ -172,20 +152,8 @@ export function HomeScreen({ now = () => new Date() }: { now?: () => Date }) {
           training={homeResource(resources.training.state)}
         />
       </ScrollScreen>
-      <HomeStartSheet
-        onClose={() => setSheetOpen(false)}
-        onCreateRoutine={() => startAfterSheet(null, () => router.push('/(tabs)/train/routines'))}
-        onFree={() => startAfterSheet({ free: true, immediate: true })}
-        onPickRoutine={routineId => startAfterSheet({ immediate: true, routineId })}
-        open={sheetOpen}
-        plan={null}
-        routines={home.data?.training.workoutStartRoutines}
-        week={homeResource(resources.training.state).data}
-      />
-      {start ? (
-        <StartWorkoutModal initialFree={start.free} initialRoutineId={start.routineId} key={start.routineId ?? 'free'} onClose={() => setStart(null)}
-          onContinue={toSession} onStarted={toSession} startImmediately={start.immediate} />
-      ) : null}
+      {newSession.element}
+      {starter.element}
     </>
   );
 }

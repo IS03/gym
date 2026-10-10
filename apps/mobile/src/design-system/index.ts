@@ -38,3 +38,4 @@ export type { ThemePreferenceStorage } from './theme-preference';
 export { darkColors, lightColors, radius, sizes, spacing, typography } from './tokens';
 export * as brandTokens from './brand';
 export { atmosphere, fadeGradient, glowGradient, rgba } from './atmosphere';
+export { GlassSurface } from './glass';
