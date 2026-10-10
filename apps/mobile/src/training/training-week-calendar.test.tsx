@@ -21,7 +21,7 @@ jest.mock('@expo/ui/swift-ui/modifiers', () => {
   const marker = (key: string) => (value?: unknown) => ({ [key]: value });
   return {
     Animation: { easeInOut: () => ({}), smooth: () => ({}) },
-    accessibilityAddTraits: marker('traits'), accessibilityLabel: marker('label'), animation: marker('animation'), contentShape: marker('shape'), fixedSize: marker('fixed'),
+    accessibilityAddTraits: marker('traits'), accessibilityLabel: marker('label'), animation: marker('animation'), blur: marker('blur'), contentShape: marker('shape'), fixedSize: marker('fixed'), opacity: marker('opacity'), scaleEffect: marker('scale'),
     font: marker('font'), foregroundStyle: marker('fg'), frame: marker('frame'), glassEffect: marker('glass'), monospacedDigit: marker('mono'),
     onGeometryChange: marker('onGeometry'), onTapGesture: marker('onTap'), padding: marker('padding'), pickerStyle: marker('pickerStyle'), shapes: { rectangle: () => ({}) },
     strokeBorder: marker('stroke'), tag: marker('tag'),
@@ -105,9 +105,10 @@ describe('Training week calendar (iOS)', () => {
     fireEvent.press(view.getByRole('button', { name: 'Mes anterior' }));
     fireEvent.press(view.getByRole('button', { name: 'Mes siguiente' }));
     expect(view.onMonth.mock.calls).toEqual([['2026-09'], ['2026-11']]);
-    expect(view.queryAllByTestId('native-wheel')).toHaveLength(0);
+    expect(view.queryByRole('button', { name: 'Mes anterior' })).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Octubre 2026, elegir mes y año' }));
-    expect(view.getAllByTestId('native-wheel')).toHaveLength(2);
+    expect(view.getAllByTestId('native-wheel')).toHaveLength(2); // the wheels cross-fade in (always mounted)
+    expect(view.queryByRole('button', { name: 'Mes anterior' })).toBeNull();
     expect(view.getByText('Septiembre')).toBeTruthy();
     expect(view.getByText('2027')).toBeTruthy();
   });
