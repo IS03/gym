@@ -14,11 +14,11 @@ import { useOwnlevelTheme } from '@/design-system';
 import { NEW_SESSION_COPY as COPY, routineDetail, type NewSessionRoutine, type NewSessionSheetProps } from './new-session-sheet.types';
 
 const FILL = 10_000;
-// Each page fits its content (no empty half or full sheet): inline navigation bar plus the
+// The sheet fits its content (no empty half or full sheet): inline navigation bar plus the
 // content, estimated until SwiftUI measures it. A long routine list is capped by the system.
 const NAV_BAR = 56;
 const ESTIMATE = { plain: 176, recommended: 311, routine: 76, routinesBase: 46 };
-type DetentKey = 'fit' | 'routines' | 'large';
+type DetentKey = 'fit' | 'large';
 type Palette = { border: string; muted: string; onPrimary: string; primary: string; soft: string; surface: string; text: string };
 
 function Row({ icon, onPress, palette, subtitle, title, trailing }: {
@@ -83,12 +83,12 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   }
   const fit = { height: NAV_BAR + (contentHeight ?? (recommendation.status === 'ok' ? ESTIMATE.recommended : ESTIMATE.plain)) };
   const routineCount = routines.status === 'ok' ? Math.max(1, routines.items.length) : 1;
-  const routinesFit = { height: NAV_BAR + (routinesHeight ?? ESTIMATE.routinesBase + routineCount * ESTIMATE.routine) };
-  const detents: PresentationDetent[] = routinesFit.height === fit.height ? [fit, 'large'] : [fit, routinesFit, 'large'];
-  const key = userDetent ?? (page === 'routines' ? 'routines' : 'fit');
-  const selected = key === 'large' ? 'large' : key === 'routines' ? routinesFit : fit;
-  const onDetent = (detent: PresentationDetent) =>
-    setUserDetent(detent === 'large' ? 'large' : typeof detent === 'object' && 'height' in detent && detent.height === routinesFit.height ? 'routines' : 'fit');
+  // One height for both pages (the taller one): pushing "Elegir rutina" never resizes the sheet,
+  // which showed the list cut and then growing.
+  const routinesFit = NAV_BAR + (routinesHeight ?? ESTIMATE.routinesBase + routineCount * ESTIMATE.routine);
+  const shared = { height: Math.max(fit.height, routinesFit) };
+  const selected = userDetent === 'large' ? 'large' : shared;
+  const onDetent = (detent: PresentationDetent) => setUserDetent(detent === 'large' ? 'large' : 'fit');
   const onRoutines = ({ height }: { height: number }) => {
     const value = Math.ceil(height);
     if (value > 0 && value !== routinesHeight) setRoutinesHeight(value);
@@ -105,7 +105,7 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   return (
     <Host colorScheme={isDark ? 'dark' : 'light'} style={styles.host}>
       <BottomSheet isPresented={open} onDismiss={onDismissed} onIsPresentedChange={presented => { if (!presented) onClose(); }}>
-        <Group modifiers={[presentationDetents(detents, { onSelectionChange: onDetent, selection: selected }), presentationDragIndicator('visible')]}>
+        <Group modifiers={[presentationDetents([shared, 'large'], { onSelectionChange: onDetent, selection: selected }), presentationDragIndicator('visible')]}>
           <NavigationStack onPathChange={path => onPage(path.includes('routines') ? 'routines' : 'start')} path={page === 'routines' ? ['routines'] : []}>
             <Toolbar>
               <ScrollView modifiers={[navigationTitle(COPY.title), navigationBarTitleDisplayMode('inline')]}>
