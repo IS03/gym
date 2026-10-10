@@ -4,7 +4,7 @@ import {
   BottomSheet, Button, Group, HStack, Host, Image, NavigationDestination, NavigationStack, ScrollView, Spacer, Text, Toolbar, ToolbarItem, VStack, ZStack,
 } from '@expo/ui/swift-ui';
 import {
-  accessibilityAddTraits, accessibilityLabel, background, contentShape, font, foregroundStyle, frame, lineLimit, navigationBarTitleDisplayMode, navigationTitle,
+  accessibilityAddTraits, accessibilityLabel, background, containerBackground, contentShape, font, foregroundStyle, frame, lineLimit, navigationBarTitleDisplayMode, navigationTitle,
   onGeometryChange, onTapGesture, padding, presentationDetents, presentationDragIndicator, shapes, type PresentationDetent,
 } from '@expo/ui/swift-ui/modifiers';
 import type { SFSymbol } from 'sf-symbols-typescript';
@@ -86,9 +86,11 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   const shared = fit;
   const selected = userDetent === 'large' ? 'large' : shared;
   const onDetent = (detent: PresentationDetent) => setUserDetent(detent === 'large' ? 'large' : 'fit');
+  // Measured only while Nueva sesión is showing: during the push its page is re-laid out off screen
+  // and reported taller, which made the sheet jump up on "Elegir rutina".
   const onContent = ({ height }: { height: number }) => {
     const value = Math.ceil(height);
-    if (value > 0 && value !== contentHeight) setContentHeight(value);
+    if (page === 'start' && value > 0 && value !== contentHeight) setContentHeight(value);
   };
   const close = (
     <Toolbar.Content>
@@ -101,7 +103,7 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
         <Group modifiers={[presentationDetents([shared, 'large'], { onSelectionChange: onDetent, selection: selected }), presentationDragIndicator('visible')]}>
           <NavigationStack onPathChange={path => onPage(path.includes('routines') ? 'routines' : 'start')} path={page === 'routines' ? ['routines'] : []}>
             <Toolbar>
-              <ScrollView modifiers={[navigationTitle(COPY.title), navigationBarTitleDisplayMode('inline')]}>
+              <ScrollView modifiers={[navigationTitle(COPY.title), navigationBarTitleDisplayMode('inline'), containerBackground('clear', 'navigation')]}>
                 <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 }), onGeometryChange(onContent)]} spacing={12}>
                   {recommendation.status === 'ok' ? (
                     <Recommended doneToday={recommendation.doneToday} onPress={() => onPickRoutine(recommendation.routine.id)} palette={palette}
@@ -116,7 +118,7 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
             </Toolbar>
             <NavigationDestination value="routines">
               <Toolbar>
-                <ScrollView modifiers={[navigationTitle(COPY.chooseTitle), navigationBarTitleDisplayMode('inline')]}>
+                <ScrollView modifiers={[navigationTitle(COPY.chooseTitle), navigationBarTitleDisplayMode('inline'), containerBackground('clear', 'navigation')]}>
                   <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 })]} spacing={10}>
                     <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesSubtitle}</Text>
                     {routines.status === 'unavailable' ? <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesUnavailable}</Text> : null}
