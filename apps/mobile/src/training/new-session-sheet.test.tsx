@@ -12,7 +12,7 @@ jest.mock('expo-symbols', () => ({ SymbolView: () => null }));
 jest.mock('@expo/ui/swift-ui/modifiers', () => {
   const marker = (key: string) => (value?: unknown) => ({ [key]: value });
   return {
-    accessibilityAddTraits: marker('traits'), accessibilityLabel: marker('label'), background: marker('bg'), contentShape: marker('shape'), font: marker('font'),
+    accessibilityAddTraits: marker('traits'), accessibilityLabel: marker('label'), background: marker('bg'), containerBackground: marker('containerBg'), contentShape: marker('shape'), font: marker('font'),
     foregroundStyle: marker('fg'), frame: marker('frame'), lineLimit: marker('lines'), navigationBarTitleDisplayMode: marker('titleMode'),
     navigationTitle: marker('title'), onGeometryChange: marker('onGeometry'), onTapGesture: marker('onTap'), opacity: marker('opacity'), padding: marker('padding'),
     presentationDetents: marker('detents'), presentationDragIndicator: marker('grabber'), shapes: { capsule: () => ({}), circle: () => ({}), rectangle: () => ({}), roundedRectangle: () => ({}) },
