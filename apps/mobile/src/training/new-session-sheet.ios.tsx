@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import {
-  BottomSheet, Button, Group, HStack, Host, Image, NavigationDestination, NavigationLink, NavigationStack, ScrollView, Spacer, Text, Toolbar, ToolbarItem, VStack, ZStack,
+  BottomSheet, Button, Group, HStack, Host, Image, NavigationDestination, NavigationStack, ScrollView, Spacer, Text, Toolbar, ToolbarItem, VStack, ZStack,
 } from '@expo/ui/swift-ui';
 import {
   accessibilityAddTraits, accessibilityLabel, background, contentShape, font, foregroundStyle, frame, lineLimit, navigationBarTitleDisplayMode, navigationTitle,
@@ -17,7 +17,7 @@ const FILL = 10_000;
 // Each page fits its content (no empty half or full sheet): inline navigation bar plus the
 // content, estimated until SwiftUI measures it. A long routine list is capped by the system.
 const NAV_BAR = 56;
-const ESTIMATE = { plain: 176, recommended: 311, routine: 74, routinesBase: 60 };
+const ESTIMATE = { plain: 176, recommended: 311, routine: 76, routinesBase: 46 };
 type DetentKey = 'fit' | 'routines' | 'large';
 type Palette = { border: string; muted: string; onPrimary: string; primary: string; soft: string; surface: string; text: string };
 
@@ -114,9 +114,8 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
                     <Recommended doneToday={recommendation.doneToday} onPress={() => onPickRoutine(recommendation.routine.id)} palette={palette}
                       routine={recommendation.routine} weekday={recommendation.weekday} />
                   ) : null}
-                  <NavigationLink value="routines">
-                    <Row icon="list.bullet" palette={palette} subtitle={COPY.chooseSubtitle} title={COPY.chooseTitle} />
-                  </NavigationLink>
+                  {/* Pushed from JS (not a NavigationLink): the push and the taller detent then start in the same update, instead of growing after the push. */}
+                  <Row icon="list.bullet" onPress={() => onPage('routines')} palette={palette} subtitle={COPY.chooseSubtitle} title={COPY.chooseTitle} />
                   <Row icon="plus" onPress={onFree} palette={palette} subtitle={COPY.freeSubtitle} title={COPY.freeTitle} />
                 </VStack>
               </ScrollView>

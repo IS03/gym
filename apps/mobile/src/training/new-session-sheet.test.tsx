@@ -61,7 +61,8 @@ describe('New session sheet (iOS, SwiftUI)', () => {
     expect(view.onFree).toHaveBeenCalledTimes(1);
     fireEvent.press(view.getAllByRole('button', { name: 'Cerrar' })[0]);
     expect(view.onClose).toHaveBeenCalledTimes(1);
-    expect(view.getByTestId('link-routines')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Elegir rutina, Todas tus rutinas guardadas' }));
+    expect(view.onPage).toHaveBeenCalledWith('routines');
   });
 
   it('a recommendation already done today says so', () => {
