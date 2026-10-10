@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import {
-  BottomSheet, Button, Group, HStack, Host, Image, NavigationDestination, NavigationLink, NavigationStack, ScrollView, Spacer, Text, Toolbar, ToolbarItem, VStack, ZStack,
+  BottomSheet, Button, Group, HStack, Host, Image, NavigationDestination, NavigationStack, ScrollView, Spacer, Text, Toolbar, ToolbarItem, VStack, ZStack,
 } from '@expo/ui/swift-ui';
 import {
-  accessibilityAddTraits, accessibilityLabel, background, contentShape, font, foregroundStyle, frame, lineLimit, navigationBarTitleDisplayMode, navigationTitle,
+  accessibilityAddTraits, accessibilityLabel, background, containerBackground, contentShape, font, foregroundStyle, frame, lineLimit, navigationBarTitleDisplayMode, navigationTitle,
   onGeometryChange, onTapGesture, padding, presentationDetents, presentationDragIndicator, shapes, type PresentationDetent,
 } from '@expo/ui/swift-ui/modifiers';
 import type { SFSymbol } from 'sf-symbols-typescript';
@@ -14,10 +14,11 @@ import { useOwnlevelTheme } from '@/design-system';
 import { NEW_SESSION_COPY as COPY, routineDetail, type NewSessionRoutine, type NewSessionSheetProps } from './new-session-sheet.types';
 
 const FILL = 10_000;
-// The first page fits its content (no empty half sheet): inline navigation bar plus the content,
-// estimated until SwiftUI measures it. "Elegir rutina" opens large.
+// The sheet fits its content (no empty half or full sheet): inline navigation bar plus the
+// content, estimated until SwiftUI measures it.
 const NAV_BAR = 56;
 const ESTIMATE = { plain: 176, recommended: 311 };
+type DetentKey = 'fit' | 'large';
 type Palette = { border: string; muted: string; onPrimary: string; primary: string; soft: string; surface: string; text: string };
 
 function Row({ icon, onPress, palette, subtitle, title, trailing }: {
@@ -73,18 +74,23 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   const palette: Palette = { border: colors.border, muted: colors.textMuted, onPrimary: colors.onPrimary, primary: colors.primary, soft: colors.brandSubtle,
     surface: colors.surface, text: colors.text };
   const [contentHeight, setContentHeight] = useState<number | null>(null);
-  const [userDetent, setUserDetent] = useState<'fit' | 'large' | null>(null);
+  const [userDetent, setUserDetent] = useState<DetentKey | null>(null);
   const [shownPage, setShownPage] = useState(page);
   if (shownPage !== page) {
     setShownPage(page);
     setUserDetent(null);
   }
-  const fit: PresentationDetent = { height: NAV_BAR + (contentHeight ?? (recommendation.status === 'ok' ? ESTIMATE.recommended : ESTIMATE.plain)) };
-  const selected = (userDetent ?? (page === 'routines' ? 'large' : 'fit')) === 'large' ? 'large' : fit;
+  const fit = { height: NAV_BAR + (contentHeight ?? (recommendation.status === 'ok' ? ESTIMATE.recommended : ESTIMATE.plain)) };
+  // One height for both pages, the Nueva sesión one: pushing "Elegir rutina" never resizes the sheet
+  // (the list scrolls), and at this height iOS keeps the Liquid Glass sheet (taller ones turn opaque).
+  const shared = fit;
+  const selected = userDetent === 'large' ? 'large' : shared;
   const onDetent = (detent: PresentationDetent) => setUserDetent(detent === 'large' ? 'large' : 'fit');
+  // Measured only while Nueva sesión is showing: during the push its page is re-laid out off screen
+  // and reported taller, which made the sheet jump up on "Elegir rutina".
   const onContent = ({ height }: { height: number }) => {
     const value = Math.ceil(height);
-    if (value > 0 && value !== contentHeight) setContentHeight(value);
+    if (page === 'start' && value > 0 && value !== contentHeight) setContentHeight(value);
   };
   const close = (
     <Toolbar.Content>
@@ -94,18 +100,17 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   return (
     <Host colorScheme={isDark ? 'dark' : 'light'} style={styles.host}>
       <BottomSheet isPresented={open} onDismiss={onDismissed} onIsPresentedChange={presented => { if (!presented) onClose(); }}>
-        <Group modifiers={[presentationDetents([fit, 'large'], { onSelectionChange: onDetent, selection: selected }), presentationDragIndicator('visible')]}>
+        <Group modifiers={[presentationDetents([shared, 'large'], { onSelectionChange: onDetent, selection: selected }), presentationDragIndicator('visible')]}>
           <NavigationStack onPathChange={path => onPage(path.includes('routines') ? 'routines' : 'start')} path={page === 'routines' ? ['routines'] : []}>
             <Toolbar>
-              <ScrollView modifiers={[navigationTitle(COPY.title), navigationBarTitleDisplayMode('inline')]}>
+              <ScrollView modifiers={[navigationTitle(COPY.title), navigationBarTitleDisplayMode('inline'), containerBackground('clear', 'navigation')]}>
                 <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 }), onGeometryChange(onContent)]} spacing={12}>
                   {recommendation.status === 'ok' ? (
                     <Recommended doneToday={recommendation.doneToday} onPress={() => onPickRoutine(recommendation.routine.id)} palette={palette}
                       routine={recommendation.routine} weekday={recommendation.weekday} />
                   ) : null}
-                  <NavigationLink value="routines">
-                    <Row icon="list.bullet" palette={palette} subtitle={COPY.chooseSubtitle} title={COPY.chooseTitle} />
-                  </NavigationLink>
+                  {/* Pushed from JS (not a NavigationLink): the push and the taller detent then start in the same update, instead of growing after the push. */}
+                  <Row icon="list.bullet" onPress={() => onPage('routines')} palette={palette} subtitle={COPY.chooseSubtitle} title={COPY.chooseTitle} />
                   <Row icon="plus" onPress={onFree} palette={palette} subtitle={COPY.freeSubtitle} title={COPY.freeTitle} />
                 </VStack>
               </ScrollView>
@@ -113,7 +118,7 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
             </Toolbar>
             <NavigationDestination value="routines">
               <Toolbar>
-                <ScrollView modifiers={[navigationTitle(COPY.chooseTitle), navigationBarTitleDisplayMode('inline')]}>
+                <ScrollView modifiers={[navigationTitle(COPY.chooseTitle), navigationBarTitleDisplayMode('inline'), containerBackground('clear', 'navigation')]}>
                   <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 })]} spacing={10}>
                     <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesSubtitle}</Text>
                     {routines.status === 'unavailable' ? <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesUnavailable}</Text> : null}
