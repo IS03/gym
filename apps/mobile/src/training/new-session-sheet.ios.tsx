@@ -15,9 +15,9 @@ import { NEW_SESSION_COPY as COPY, routineDetail, type NewSessionRoutine, type N
 
 const FILL = 10_000;
 // The sheet fits its content (no empty half or full sheet): inline navigation bar plus the
-// content, estimated until SwiftUI measures it. A long routine list is capped by the system.
+// content, estimated until SwiftUI measures it.
 const NAV_BAR = 56;
-const ESTIMATE = { plain: 176, recommended: 311, routine: 76, routinesBase: 46 };
+const ESTIMATE = { plain: 176, recommended: 311 };
 type DetentKey = 'fit' | 'large';
 type Palette = { border: string; muted: string; onPrimary: string; primary: string; soft: string; surface: string; text: string };
 
@@ -74,7 +74,6 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
   const palette: Palette = { border: colors.border, muted: colors.textMuted, onPrimary: colors.onPrimary, primary: colors.primary, soft: colors.brandSubtle,
     surface: colors.surface, text: colors.text };
   const [contentHeight, setContentHeight] = useState<number | null>(null);
-  const [routinesHeight, setRoutinesHeight] = useState<number | null>(null);
   const [userDetent, setUserDetent] = useState<DetentKey | null>(null);
   const [shownPage, setShownPage] = useState(page);
   if (shownPage !== page) {
@@ -82,17 +81,11 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
     setUserDetent(null);
   }
   const fit = { height: NAV_BAR + (contentHeight ?? (recommendation.status === 'ok' ? ESTIMATE.recommended : ESTIMATE.plain)) };
-  const routineCount = routines.status === 'ok' ? Math.max(1, routines.items.length) : 1;
-  // One height for both pages (the taller one): pushing "Elegir rutina" never resizes the sheet,
-  // which showed the list cut and then growing.
-  const routinesFit = NAV_BAR + (routinesHeight ?? ESTIMATE.routinesBase + routineCount * ESTIMATE.routine);
-  const shared = { height: Math.max(fit.height, routinesFit) };
+  // One height for both pages, the Nueva sesión one: pushing "Elegir rutina" never resizes the sheet
+  // (the list scrolls), and at this height iOS keeps the Liquid Glass sheet (taller ones turn opaque).
+  const shared = fit;
   const selected = userDetent === 'large' ? 'large' : shared;
   const onDetent = (detent: PresentationDetent) => setUserDetent(detent === 'large' ? 'large' : 'fit');
-  const onRoutines = ({ height }: { height: number }) => {
-    const value = Math.ceil(height);
-    if (value > 0 && value !== routinesHeight) setRoutinesHeight(value);
-  };
   const onContent = ({ height }: { height: number }) => {
     const value = Math.ceil(height);
     if (value > 0 && value !== contentHeight) setContentHeight(value);
@@ -124,7 +117,7 @@ export function NewSessionSheet({ onClose, onCreateRoutine, onDismissed, onFree,
             <NavigationDestination value="routines">
               <Toolbar>
                 <ScrollView modifiers={[navigationTitle(COPY.chooseTitle), navigationBarTitleDisplayMode('inline')]}>
-                  <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 }), onGeometryChange(onRoutines)]} spacing={10}>
+                  <VStack alignment="leading" modifiers={[padding({ bottom: 24, horizontal: 20, top: 4 })]} spacing={10}>
                     <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesSubtitle}</Text>
                     {routines.status === 'unavailable' ? <Text modifiers={[font({ size: 15 }), foregroundStyle(palette.muted)]}>{COPY.routinesUnavailable}</Text> : null}
                     {routines.status === 'ok' && routines.items.length === 0
